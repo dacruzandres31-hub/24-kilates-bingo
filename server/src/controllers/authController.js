@@ -95,6 +95,32 @@ exports.register = async (req, res) => {
       [result.insertId]
     );
     const newUser = newUserResult[0];
+
+    // Auto-inicializar gamificación para jugadores
+    if (role === 'jugador') {
+      try {
+        // Crear progreso
+        await pool.query(`
+          INSERT INTO gamification_progress (user_id, current_level, xp_current, xp_lifetime)
+          VALUES (?, 1, 0, 0)
+        `, [newUser.id]);
+
+        // Crear quests iniciales
+        await pool.query(`
+          INSERT INTO daily_quests (user_id, quest_name, quest_type, target_value, xp_reward)
+          VALUES 
+            (?, 'Primera victoria', 'WIN', 1, 100),
+            (?, 'Jugar 3 partidas', 'PLAY', 3, 50),
+            (?, 'Completar un cartón', 'COMPLETE_CARD', 1, 75)
+        `, [newUser.id, newUser.id, newUser.id]);
+
+        console.log(`✓ Gamificación inicializada para ${newUser.username}`);
+      } catch (gamErr) {
+        console.error('⚠️ Error inicializando gamificación:', gamErr.message);
+        // No bloquear el registro si falla gamificación
+      }
+    }
+
     const token = generateToken(newUser.id, newUser.role);
 
     res.status(201).json({

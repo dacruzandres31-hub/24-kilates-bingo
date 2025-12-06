@@ -74,7 +74,7 @@ async function addXPToPlayer(userId, cardPrice) {
 
       // Obtener progreso actual del usuario
       let [userProgress] = await connection.query(
-        `SELECT * FROM user_progress WHERE user_id = ?`,
+        `SELECT * FROM gamification_progress WHERE user_id = ?`,
         [userId]
       );
 
@@ -82,19 +82,19 @@ async function addXPToPlayer(userId, cardPrice) {
       if (userProgress.length === 0) {
         // Primera vez del usuario
         await connection.query(
-          `INSERT INTO user_progress (user_id, current_xp, current_level, total_xp_lifetime)
+          `INSERT INTO gamification_progress (user_id, xp_current, current_level, xp_lifetime)
            VALUES (?, ?, 1, ?)`,
           [userId, xpToAdd, xpToAdd]
         );
         progressData = {
-          current_xp: xpToAdd,
+          xp_current: xpToAdd,
           current_level: 1,
-          total_xp_lifetime: xpToAdd
+          xp_lifetime: xpToAdd
         };
       } else {
         progressData = userProgress[0];
-        progressData.current_xp += xpToAdd;
-        progressData.total_xp_lifetime += xpToAdd;
+        progressData.xp_current += xpToAdd;
+        progressData.xp_lifetime += xpToAdd;
       }
 
       // Verificar si hay level-up
@@ -104,7 +104,7 @@ async function addXPToPlayer(userId, cardPrice) {
 
       for (let i = progressData.current_level + 1; i <= LEVEL_CONFIG.length; i++) {
         const levelReq = LEVEL_CONFIG[i - 1];
-        if (progressData.total_xp_lifetime >= levelReq.xpRequired) {
+        if (progressData.xp_lifetime >= levelReq.xpRequired) {
           newLevel = i;
           leveledUp = true;
           
@@ -126,12 +126,12 @@ async function addXPToPlayer(userId, cardPrice) {
 
       // Actualizar progreso
       await connection.query(
-        `UPDATE user_progress 
-         SET current_xp = ?, current_level = ?, total_xp_lifetime = ?, 
+        `UPDATE gamification_progress 
+         SET xp_current = ?, current_level = ?, xp_lifetime = ?, 
              last_levelup_at = CASE WHEN ? THEN NOW() ELSE last_levelup_at END,
              updated_at = NOW()
          WHERE user_id = ?`,
-        [progressData.current_xp, newLevel, progressData.total_xp_lifetime, leveledUp, userId]
+        [progressData.xp_current, newLevel, progressData.xp_lifetime, leveledUp, userId]
       );
 
       await connection.query('COMMIT');
@@ -141,7 +141,7 @@ async function addXPToPlayer(userId, cardPrice) {
         leveledUp,
         newLevel,
         rewards: leveledUp ? rewards : null,
-        currentXP: progressData.current_xp,
+        currentXP: progressData.xp_current,
         nextLevelXP: newLevel < LEVEL_CONFIG.length ? LEVEL_CONFIG[newLevel].xpRequired : null
       };
 
@@ -163,7 +163,7 @@ async function addXPToPlayer(userId, cardPrice) {
 async function getPlayerProgress(userId) {
   try {
     const [result] = await pool.query(
-      `SELECT * FROM user_progress WHERE user_id = ?`,
+      `SELECT * FROM gamification_progress WHERE user_id = ?`,
       [userId]
     );
 
@@ -183,9 +183,9 @@ async function getPlayerProgress(userId) {
     const nextLevelConfig = progress.current_level < LEVEL_CONFIG.length ? LEVEL_CONFIG[progress.current_level] : null;
 
     const xpForCurrentLevel = currentLevelConfig.xpRequired;
-    const xpForNextLevel = nextLevelConfig ? nextLevelConfig.xpRequired : progress.total_xp_lifetime;
+    const xpForNextLevel = nextLevelConfig ? nextLevelConfig.xpRequired : progress.xp_lifetime;
     
-    const xpInCurrentLevel = progress.total_xp_lifetime - xpForCurrentLevel;
+    const xpInCurrentLevel = progress.xp_lifetime - xpForCurrentLevel;
     const xpNeededForNextLevel = xpForNextLevel - xpForCurrentLevel;
     const progressPercent = Math.min(100, Math.round((xpInCurrentLevel / xpNeededForNextLevel) * 100));
 
@@ -194,7 +194,7 @@ async function getPlayerProgress(userId) {
       rankName: currentLevelConfig.name,
       currentXP: xpInCurrentLevel,
       nextLevelXP: xpNeededForNextLevel,
-      totalXPLifetime: progress.total_xp_lifetime,
+      totalXPLifetime: progress.xp_lifetime,
       progressPercent,
       achievements: progress.achievements_unlocked || [],
       visualBenefit: currentLevelConfig.visualBenefit,
@@ -231,7 +231,7 @@ function getAllLevels() {
 async function getNextLevelRequirement(userId) {
   try {
     const [progress] = await pool.query(
-      `SELECT current_level, total_xp_lifetime FROM user_progress WHERE user_id = ?`,
+      `SELECT current_level, xp_lifetime FROM gamification_progress WHERE user_id = ?`,
       [userId]
     );
 
@@ -249,9 +249,9 @@ async function getNextLevelRequirement(userId) {
     if (data.current_level >= LEVEL_CONFIG.length) {
       return {
         currentLevel: data.current_level,
-        currentXP: data.total_xp_lifetime,
+        currentXP: data.xp_lifetime,
         nextLevelName: 'Máximo',
-        xpRequired: data.total_xp_lifetime,
+        xpRequired: data.xp_lifetime,
         xpRemaining: 0
       };
     }
@@ -259,10 +259,10 @@ async function getNextLevelRequirement(userId) {
     const nextLevel = LEVEL_CONFIG[data.current_level];
     return {
       currentLevel: data.current_level,
-      currentXP: data.total_xp_lifetime,
+      currentXP: data.xp_lifetime,
       nextLevelName: nextLevel.name,
       xpRequired: nextLevel.xpRequired,
-      xpRemaining: Math.max(0, nextLevel.xpRequired - data.total_xp_lifetime)
+      xpRemaining: Math.max(0, nextLevel.xpRequired - data.xp_lifetime)
     };
 
   } catch (err) {
@@ -279,11 +279,11 @@ async function getNextLevelRequirement(userId) {
 async function getTopPlayers(limit = 10) {
   try {
     const [result] = await pool.query(
-      `SELECT u.id, u.username, up.current_level, up.total_xp_lifetime
-       FROM user_progress up
+      `SELECT u.id, u.username, up.current_level, up.xp_lifetime
+       FROM gamification_progress up
        JOIN users u ON u.id = up.user_id
        WHERE u.role = 'jugador'
-       ORDER BY up.total_xp_lifetime DESC
+       ORDER BY up.xp_lifetime DESC
        LIMIT ?`,
       [limit]
     );
@@ -292,7 +292,7 @@ async function getTopPlayers(limit = 10) {
       userId: row.id,
       username: row.username,
       level: row.current_level,
-      totalXP: row.total_xp_lifetime,
+      totalXP: row.xp_lifetime,
       rankName: LEVEL_CONFIG[row.current_level - 1]?.name || 'Novato'
     }));
 
@@ -309,7 +309,7 @@ async function getTopPlayers(limit = 10) {
 async function initializePlayerProgress(userId) {
   try {
     await pool.query(
-      `INSERT INTO user_progress (user_id, current_xp, current_level, total_xp_lifetime)
+      `INSERT INTO gamification_progress (user_id, xp_current, current_level, xp_lifetime)
        VALUES (?, 0, 1, 0)
        ON DUPLICATE KEY UPDATE user_id = user_id`,
       [userId]

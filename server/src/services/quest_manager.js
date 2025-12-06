@@ -60,7 +60,7 @@ async function createDailyQuests(userId, questDate = null) {
 
       // Eliminar misiones previas del mismo día para ese usuario
       await connection.query(
-        `DELETE FROM quests_daily 
+        `DELETE FROM daily_quests 
          WHERE user_id = ? AND quest_date = ? AND category IN ('daily', 'special')`,
         [userId, date]
       );
@@ -74,7 +74,7 @@ async function createDailyQuests(userId, questDate = null) {
 
       for (const quest of questsToInsert) {
         await connection.query(
-          `INSERT INTO quests_daily 
+          `INSERT INTO daily_quests 
            (user_id, quest_type, quest_name, description, reward_type, reward_amount, 
             progress_target, progress_current, quest_date, is_completed)
            VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, false)`,
@@ -121,7 +121,7 @@ async function getPlayerQuests(userId, questDate = null) {
     const result = await pool.query(
       `SELECT id, quest_type, quest_name, description, is_completed, 
               reward_type, reward_amount, progress_current, progress_target, completed_at
-       FROM quests_daily
+       FROM daily_quests
        WHERE user_id = ? AND quest_date = ?
        ORDER BY is_completed ASC, quest_name ASC`,
       [userId, date]
@@ -167,7 +167,7 @@ async function updateQuestProgress(userId, questType, increment = 1) {
       // Obtener la misión
       const [questResult] = await connection.query(
         `SELECT id, progress_current, progress_target, reward_type, reward_amount, is_completed
-         FROM quests_daily
+         FROM daily_quests
          WHERE user_id = ? AND quest_type = ? AND quest_date = ? AND is_completed = false
          LIMIT 1`,
         [userId, questType, date]
@@ -186,7 +186,7 @@ async function updateQuestProgress(userId, questType, increment = 1) {
       if (isCompleted) {
         // Completar misión
         await connection.query(
-          `UPDATE quests_daily
+          `UPDATE daily_quests
            SET is_completed = true, progress_current = ?, completed_at = NOW()
            WHERE id = ?`,
           [newProgress, quest.id]
@@ -212,7 +212,7 @@ async function updateQuestProgress(userId, questType, increment = 1) {
       } else {
         // Solo actualizar progreso
         await connection.query(
-          `UPDATE quests_daily
+          `UPDATE daily_quests
            SET progress_current = ?
            WHERE id = ?`,
           [newProgress, quest.id]
@@ -251,7 +251,7 @@ async function recordCardLoss(userId, hasLine) {
     if (hasLine) {
       // Resetear contador de pérdidas
       await pool.query(
-        `UPDATE quests_daily 
+        `UPDATE daily_quests 
          SET progress_current = 0
          WHERE user_id = ? AND quest_type = 'mala_racha' AND quest_date = CURRENT_DATE`,
         [userId]
@@ -315,7 +315,7 @@ async function getQuestStats(userId) {
         COUNT(*) as total_quests,
         SUM(CASE WHEN is_completed = true THEN 1 ELSE 0 END) as completed_quests,
         SUM(CASE WHEN is_completed = true AND reward_type = 'credits' THEN reward_amount ELSE 0 END) as total_credits_earned
-       FROM quests_daily
+       FROM daily_quests
        WHERE user_id = ? AND quest_date = CURRENT_DATE`,
       [userId]
     );
