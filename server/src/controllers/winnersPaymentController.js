@@ -80,6 +80,13 @@ exports.submitPaymentInfo = async (req, res) => {
       ]
     );
 
+    // Emitir confirmación por Socket.IO
+    const io = req.app.get('io');
+    if (io) {
+      const { confirmPaymentDataSubmitted } = require('../socket/winnerEvents');
+      confirmPaymentDataSubmitted(io, userId, result.insertId);
+    }
+
     res.json({
       success: true,
       message: 'Datos bancarios registrados exitosamente. El pago será procesado en breve.',
@@ -280,6 +287,13 @@ exports.processWinnerPayment = async (req, res) => {
       );
 
       await connection.query('COMMIT');
+
+      // Emitir evento Socket.IO al ganador
+      const io = req.app.get('io');
+      if (io) {
+        const { notifyPaymentCompleted } = require('../socket/winnerEvents');
+        notifyPaymentCompleted(io, payment.user_id, parseFloat(payment.prize_amount), paymentReceipt);
+      }
 
       res.json({
         success: true,

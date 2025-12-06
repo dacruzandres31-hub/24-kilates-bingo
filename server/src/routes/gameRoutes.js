@@ -41,4 +41,13 @@ router.get('/sessions/:sessionId', gameController.getSessionStatus);
 // Sesiones activas
 router.get('/sessions', gameController.getActiveSessions);
 
+// NUEVO: Cantar línea en salas monetizadas
+router.post('/claim-line', gameController.claimLine);
+
+// NUEVO: Cantar BINGO en salas monetizadas
+router.post('/claim-bingo', gameController.claimBingo);
+
+// NUEVO: Análisis y ordenamiento inteligente de cartones
+router.get('/my-cards-analysis/:gameSessionId', gameController.getMyCardsAnalysis);
+
 module.exports = router;

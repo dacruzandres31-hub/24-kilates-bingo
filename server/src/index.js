@@ -19,6 +19,8 @@ const chipsRoutes = require('./routes/chipsRoutes');
 const withdrawalRoutes = require('./routes/withdrawalRoutes');
 const winnersPaymentRoutes = require('./routes/winnersPaymentRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const gameAdminRoutes = require('./routes/gameAdminRoutes');
+const gameAdminController = require('./controllers/gameAdminController');
 
 // CONFIGURACIÓN INICIAL
 const PORT = process.env.PORT || 3000;
@@ -58,6 +60,9 @@ const io = socketIo(server, {
 
 // INICIALIZAR NOTIFICATION SERVICE
 notificationService.initialize(io);
+
+// INICIALIZAR MOTOR DE JUEGO AUTOMÁTICO
+gameAdminController.initGameEngine(io);
 
 // Almacenar instancia de Socket.IO en app para acceso desde controllers
 app.set('io', io);
@@ -113,6 +118,7 @@ app.use('/api/chips', chipsRoutes);
 app.use('/api/withdrawals', withdrawalRoutes);
 app.use('/api/winners-payment', winnersPaymentRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/game-admin', gameAdminRoutes);
 
 // HEALTH CHECK
 app.get('/health', (req, res) => {

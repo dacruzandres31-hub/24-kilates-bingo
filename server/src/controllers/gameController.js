@@ -6,6 +6,7 @@ const questManager = require('../services/quest_manager');
 const rankingEngine = require('../services/ranking_engine');
 const notificationService = require('../services/notificationService');
 const inventoryService = require('../services/inventoryService');
+const CardAnalyzer = require('../services/cardAnalyzer');
 
 // COMPRAR CARTÓN - Agregar a session del usuario
 exports.buyCard = async (req, res) => {
@@ -683,3 +684,602 @@ exports.end_free_game = async (req, res) => {
     });
   }
 };
+
+// ============================================
+// CANTAR LÍNEA (Salas Monetizadas)
+// ============================================
+exports.claimLine = async (req, res) => {
+  try {
+    const { gameSessionId, cardId, lineType } = req.body;
+    const userId = req.user.userId;
+
+    // Validar parámetros
+    if (!gameSessionId || !cardId || !lineType) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Parámetros requeridos: gameSessionId, cardId, lineType' 
+      });
+    }
+
+    const validLineTypes = ['horizontal_1', 'horizontal_2', 'horizontal_3', 'vertical_1', 'vertical_2', 'vertical_3', 'vertical_4', 'vertical_5', 'diagonal_1', 'diagonal_2', 'four_corners'];
+    if (!validLineTypes.includes(lineType)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `lineType inválido. Opciones: ${validLineTypes.join(', ')}` 
+      });
+    }
+
+    // 1. Obtener sesión de juego
+    const [sessions] = await pool.query(
+      `SELECT * FROM game_sessions WHERE id = ?`,
+      [gameSessionId]
+    );
+
+    if (sessions.length === 0) {
+      return res.status(404).json({ success: false, message: 'Sesión no encontrada' });
+    }
+
+    const session = sessions[0];
+
+    // Solo permitir en salas monetizadas (Bronce, Plata, Oro)
+    const monetizedRooms = ['Bronce', 'Plata', 'Oro'];
+    const isMonetized = monetizedRooms.includes(session.room);
+    
+    if (!isMonetized) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Solo se puede cantar línea en salas monetizadas (Bronce, Plata, Oro)' 
+      });
+    }
+
+    // Verificar que la sesión esté activa
+    if (session.status !== 'active') {
+      return res.status(400).json({ 
+        success: false, 
+        message: `Sesión no está activa (estado actual: ${session.status})` 
+      });
+    }
+
+    // 2. Obtener cartón del usuario
+    const [cards] = await pool.query(
+      `SELECT * FROM bingo_cards 
+       WHERE id = ? AND user_id = ? AND session_id = ?`,
+      [cardId, userId, gameSessionId]
+    );
+
+    if (cards.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Cartón no encontrado o no pertenece al usuario' 
+      });
+    }
+
+    const card = cards[0];
+
+    // Obtener números del cartón
+    let cardNumbers;
+    if (card.numbers) {
+      cardNumbers = typeof card.numbers === 'string' ? JSON.parse(card.numbers) : card.numbers;
+    } else if (card.grid_data) {
+      const gridData = typeof card.grid_data === 'string' ? JSON.parse(card.grid_data) : card.grid_data;
+      cardNumbers = convertGridDataToMatrix(gridData);
+    } else {
+      return res.status(500).json({ success: false, message: 'Cartón sin datos' });
+    }
+
+    // 3. Obtener números cantados en esta sesión
+    const [balls] = await pool.query(
+      `SELECT ball_number FROM game_session_balls 
+       WHERE game_session_id = ? 
+       ORDER BY draw_order`,
+      [gameSessionId]
+    );
+
+    const calledNumbers = balls.map(b => b.ball_number);
+
+    // 4. Validar línea
+    const validation = validateLine(cardNumbers, calledNumbers, lineType);
+
+    if (!validation.isValid) {
+      return res.status(400).json({ 
+        success: false, 
+        message: validation.message || 'Línea inválida - verifica los números' 
+      });
+    }
+
+    // 5. Verificar que no haya ganado ya esta línea
+    const [existing] = await pool.query(
+      `SELECT id FROM game_winners 
+       WHERE game_session_id = ? AND user_id = ? AND card_id = ? 
+         AND prize_type = 'linea' AND line_type = ?`,
+      [gameSessionId, userId, cardId, lineType]
+    );
+
+    if (existing.length > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Ya cantaste esta línea' 
+      });
+    }
+
+    // 6. Registrar ganador
+    const prizeAmount = session.line_prize || 2500;
+
+    const [insertResult] = await pool.query(
+      `INSERT INTO game_winners 
+       (game_session_id, user_id, card_id, prize_type, prize_amount, line_type, winning_numbers, verified) 
+       VALUES (?, ?, ?, 'linea', ?, ?, ?, TRUE)`,
+      [gameSessionId, userId, cardId, prizeAmount, lineType, JSON.stringify(validation.winningNumbers)]
+    );
+
+    // 7. Emitir eventos Socket.IO
+    const io = req.app.get('io');
+    const winner = { 
+      id: userId, 
+      username: req.user.username 
+    };
+
+    const { notifyLineWinner } = require('../socket/winnerEvents');
+    notifyLineWinner(io, session.room_id, winner, prizeAmount, lineType);
+
+    res.json({ 
+      success: true, 
+      prizeAmount,
+      lineType,
+      winningNumbers: validation.winningNumbers,
+      message: `¡Línea ${lineType} válida! Ganaste $${prizeAmount.toLocaleString()}` 
+    });
+
+  } catch (error) {
+    console.error('Error en claimLine:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ============================================
+// CANTAR BINGO (Salas Monetizadas)
+// ============================================
+exports.claimBingo = async (req, res) => {
+  try {
+    const { gameSessionId, cardId } = req.body;
+    const userId = req.user.userId;
+
+    // Validar parámetros
+    if (!gameSessionId || !cardId) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Parámetros requeridos: gameSessionId, cardId' 
+      });
+    }
+
+    // 1. Obtener sesión de juego
+    const [sessions] = await pool.query(
+      `SELECT * FROM game_sessions WHERE id = ?`,
+      [gameSessionId]
+    );
+
+    if (sessions.length === 0) {
+      return res.status(404).json({ success: false, message: 'Sesión no encontrada' });
+    }
+
+    const session = sessions[0];
+
+    // Solo permitir en salas monetizadas (Bronce, Plata, Oro)
+    const monetizedRooms = ['Bronce', 'Plata', 'Oro'];
+    const isMonetized = monetizedRooms.includes(session.room);
+    
+    if (!isMonetized) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Solo se puede cantar BINGO en salas monetizadas' 
+      });
+    }
+
+    // Verificar que la sesión esté activa
+    if (session.status !== 'active') {
+      return res.status(400).json({ 
+        success: false, 
+        message: `Sesión no está activa (estado actual: ${session.status})` 
+      });
+    }
+
+    // 2. Obtener cartón del usuario
+    const [cards] = await pool.query(
+      `SELECT * FROM bingo_cards 
+       WHERE id = ? AND user_id = ? AND session_id = ?`,
+      [cardId, userId, gameSessionId]
+    );
+
+    if (cards.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Cartón no encontrado o no pertenece al usuario' 
+      });
+    }
+
+    const card = cards[0];
+
+    // Obtener números del cartón
+    let cardNumbers;
+    if (card.numbers) {
+      cardNumbers = typeof card.numbers === 'string' ? JSON.parse(card.numbers) : card.numbers;
+    } else if (card.grid_data) {
+      const gridData = typeof card.grid_data === 'string' ? JSON.parse(card.grid_data) : card.grid_data;
+      cardNumbers = convertGridDataToMatrix(gridData);
+    } else {
+      return res.status(500).json({ success: false, message: 'Cartón sin datos' });
+    }
+
+    // 3. Obtener números cantados
+    const [balls] = await pool.query(
+      `SELECT ball_number FROM game_session_balls 
+       WHERE game_session_id = ? 
+       ORDER BY draw_order`,
+      [gameSessionId]
+    );
+
+    const calledNumbers = balls.map(b => b.ball_number);
+
+    // 4. Validar BINGO completo (24 números, excluyendo el centro FREE)
+    const validation = validateBingo(cardNumbers, calledNumbers);
+
+    if (!validation.isValid) {
+      return res.status(400).json({ 
+        success: false, 
+        message: validation.message || 'BINGO inválido - faltan números' 
+      });
+    }
+
+    // 5. Verificar que no haya ganado ya BINGO
+    const [existing] = await pool.query(
+      `SELECT id FROM game_winners 
+       WHERE game_session_id = ? AND user_id = ? AND card_id = ? AND prize_type = 'bingo'`,
+      [gameSessionId, userId, cardId]
+    );
+
+    if (existing.length > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Ya cantaste BINGO con este cartón' 
+      });
+    }
+
+    // 6. Registrar ganador de BINGO
+    const prizeAmount = session.bingo_prize || 25000;
+
+    await pool.query(
+      `INSERT INTO game_winners 
+       (game_session_id, user_id, card_id, prize_type, prize_amount, winning_numbers, verified) 
+       VALUES (?, ?, ?, 'bingo', ?, ?, TRUE)`,
+      [gameSessionId, userId, cardId, prizeAmount, JSON.stringify(validation.winningNumbers)]
+    );
+
+    // 7. Finalizar sesión (primer BINGO termina el juego)
+    await pool.query(
+      `UPDATE game_sessions SET status = 'completed', updated_at = NOW() WHERE id = ?`,
+      [gameSessionId]
+    );
+
+    // 8. Emitir eventos Socket.IO
+    const io = req.app.get('io');
+    const winner = { 
+      id: userId, 
+      username: req.user.username 
+    };
+
+    const { notifyBingoWinner, showPaymentForms } = require('../socket/winnerEvents');
+    
+    // Notificar BINGO ganador
+    notifyBingoWinner(io, session.room_id, winner, prizeAmount, gameSessionId);
+
+    // Obtener TODOS los ganadores de esta sesión (líneas + bingo)
+    setTimeout(async () => {
+      const winners = await getGameWinners(gameSessionId);
+      showPaymentForms(io, gameSessionId, winners);
+    }, 5000); // Esperar 5 segundos antes de mostrar formularios
+
+    res.json({ 
+      success: true, 
+      prizeAmount,
+      winningNumbers: validation.winningNumbers,
+      gameEnded: true,
+      message: `¡BINGO! Ganaste $${prizeAmount.toLocaleString()}` 
+    });
+
+  } catch (error) {
+    console.error('Error en claimBingo:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ============================================
+// FUNCIONES AUXILIARES DE VALIDACIÓN
+// ============================================
+
+/**
+ * Valida si una línea es correcta
+ * @param {Array} cardNumbers - Matriz 5x5 de números del cartón
+ * @param {Array} calledNumbers - Números que han sido cantados
+ * @param {String} lineType - Tipo de línea a validar
+ * @returns {Object} { isValid, message, winningNumbers }
+ */
+function validateLine(cardNumbers, calledNumbers, lineType) {
+  const positions = [];
+  
+  // Definir posiciones según tipo de línea
+  switch(lineType) {
+    case 'horizontal_1':
+      positions.push([0,0], [0,1], [0,2], [0,3], [0,4]);
+      break;
+    case 'horizontal_2':
+      positions.push([1,0], [1,1], [1,2], [1,3], [1,4]);
+      break;
+    case 'horizontal_3':
+      positions.push([2,0], [2,1], [2,2], [2,3], [2,4]);
+      break;
+    case 'horizontal_4':
+      positions.push([3,0], [3,1], [3,2], [3,3], [3,4]);
+      break;
+    case 'horizontal_5':
+      positions.push([4,0], [4,1], [4,2], [4,3], [4,4]);
+      break;
+    case 'vertical_1':
+      positions.push([0,0], [1,0], [2,0], [3,0], [4,0]);
+      break;
+    case 'vertical_2':
+      positions.push([0,1], [1,1], [2,1], [3,1], [4,1]);
+      break;
+    case 'vertical_3':
+      positions.push([0,2], [1,2], [2,2], [3,2], [4,2]);
+      break;
+    case 'vertical_4':
+      positions.push([0,3], [1,3], [2,3], [3,3], [4,3]);
+      break;
+    case 'vertical_5':
+      positions.push([0,4], [1,4], [2,4], [3,4], [4,4]);
+      break;
+    case 'diagonal_1':
+      positions.push([0,0], [1,1], [2,2], [3,3], [4,4]);
+      break;
+    case 'diagonal_2':
+      positions.push([0,4], [1,3], [2,2], [3,1], [4,0]);
+      break;
+    case 'four_corners':
+      positions.push([0,0], [0,4], [4,0], [4,4]);
+      break;
+    default:
+      return { isValid: false, message: 'Tipo de línea no reconocido' };
+  }
+
+  // Verificar cada número en las posiciones
+  const winningNumbers = [];
+  const missingNumbers = [];
+
+  for (const [row, col] of positions) {
+    const number = cardNumbers[row][col];
+    
+    // El centro (2,2) es FREE - siempre cuenta
+    if (row === 2 && col === 2) {
+      winningNumbers.push('FREE');
+      continue;
+    }
+
+    if (calledNumbers.includes(number)) {
+      winningNumbers.push(number);
+    } else {
+      missingNumbers.push(number);
+    }
+  }
+
+  const isValid = missingNumbers.length === 0;
+
+  return {
+    isValid,
+    winningNumbers,
+    missingNumbers,
+    message: isValid 
+      ? `Línea ${lineType} válida` 
+      : `Faltan números: ${missingNumbers.join(', ')}`
+  };
+}
+
+/**
+ * Valida si un cartón tiene BINGO completo
+ * @param {Array} cardNumbers - Matriz 5x5 de números del cartón
+ * @param {Array} calledNumbers - Números que han sido cantados
+ * @returns {Object} { isValid, message, winningNumbers }
+ */
+function validateBingo(cardNumbers, calledNumbers) {
+  const winningNumbers = [];
+  const missingNumbers = [];
+
+  // Recorrer toda la matriz 5x5
+  for (let row = 0; row < 5; row++) {
+    for (let col = 0; col < 5; col++) {
+      const number = cardNumbers[row][col];
+
+      // El centro (2,2) es FREE - siempre cuenta
+      if (row === 2 && col === 2) {
+        winningNumbers.push('FREE');
+        continue;
+      }
+
+      if (calledNumbers.includes(number)) {
+        winningNumbers.push(number);
+      } else {
+        missingNumbers.push(number);
+      }
+    }
+  }
+
+  const isValid = missingNumbers.length === 0;
+
+  return {
+    isValid,
+    winningNumbers,
+    missingNumbers,
+    totalMarked: winningNumbers.length,
+    totalNeeded: 24, // 25 casillas - 1 FREE
+    message: isValid 
+      ? 'BINGO completo' 
+      : `Faltan ${missingNumbers.length} números: ${missingNumbers.slice(0, 5).join(', ')}${missingNumbers.length > 5 ? '...' : ''}`
+  };
+}
+
+/**
+ * Obtiene todos los ganadores de una sesión agrupados por usuario
+ * @param {Number} gameSessionId 
+ * @returns {Array} Array de objetos con userId, username, prizes
+ */
+async function getGameWinners(gameSessionId) {
+  const [winners] = await pool.query(
+    `SELECT 
+       gw.user_id,
+       u.username,
+       gw.prize_type,
+       gw.prize_amount
+     FROM game_winners gw
+     JOIN users u ON gw.user_id = u.id
+     WHERE gw.game_session_id = ?
+     ORDER BY gw.claimed_at`,
+    [gameSessionId]
+  );
+
+  // Agrupar premios por usuario
+  const grouped = {};
+  winners.forEach(w => {
+    if (!grouped[w.user_id]) {
+      grouped[w.user_id] = {
+        userId: w.user_id,
+        username: w.username,
+        prizes: []
+      };
+    }
+    grouped[w.user_id].prizes.push({
+      type: w.prize_type,
+      amount: parseFloat(w.prize_amount)
+    });
+  });
+
+  return Object.values(grouped);
+}
+
+/**
+ * Convierte grid_data (formato actual) a matriz 5x5
+ * @param {Object|Array} gridData - Datos del cartón
+ * @returns {Array} Matriz 5x5 de números
+ */
+function convertGridDataToMatrix(gridData) {
+  // Si grid_data ya es una matriz 5x5, devolverla directamente
+  if (Array.isArray(gridData) && gridData.length === 5) {
+    return gridData;
+  }
+
+  // Si es un objeto con columnas B, I, N, G, O
+  if (typeof gridData === 'object' && gridData.B && gridData.I && gridData.N && gridData.G && gridData.O) {
+    // Transponer: cada letra es una COLUMNA, no una fila
+    const matrix = [];
+    for (let row = 0; row < 5; row++) {
+      matrix.push([
+        gridData.B[row],
+        gridData.I[row],
+        gridData.N[row],
+        gridData.G[row],
+        gridData.O[row]
+      ]);
+    }
+    return matrix;
+  }
+
+  // Si es un array plano de 25 números
+  if (Array.isArray(gridData) && gridData.length === 25) {
+    const matrix = [];
+    for (let i = 0; i < 5; i++) {
+      matrix.push(gridData.slice(i * 5, (i + 1) * 5));
+    }
+    return matrix;
+  }
+
+  // Por defecto, devolver matriz vacía
+  console.warn('Formato de grid_data no reconocido:', gridData);
+  return [
+    [0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0]
+  ];
+}
+
+/**
+ * GET /api/game/my-cards-analysis/:gameSessionId
+ * Analiza y ordena los cartones del usuario en tiempo real
+ * Devuelve:
+ * - Cartones ordenados por progreso
+ * - Alertas: "4 cartones a 2 números de línea"
+ * - Configuración para vista apilada
+ */
+exports.getMyCardsAnalysis = async (req, res) => {
+  try {
+    const { gameSessionId } = req.params;
+    const userId = req.user.userId;
+
+    // Obtener cartones del usuario en esta sesión
+    const [cards] = await pool.query(
+      `SELECT * FROM bingo_cards 
+       WHERE user_id = ? AND session_id = ? AND status = 'active'
+       ORDER BY id ASC`,
+      [userId, gameSessionId]
+    );
+
+    if (cards.length === 0) {
+      return res.json({
+        success: true,
+        cards: [],
+        alerts: [],
+        summary: {
+          totalCards: 0,
+          totalMarked: 0,
+          averageProgress: 0
+        }
+      });
+    }
+
+    // Obtener números cantados en la sesión
+    const [balls] = await pool.query(
+      `SELECT ball_number FROM game_session_balls 
+       WHERE game_session_id = ? 
+       ORDER BY draw_order`,
+      [gameSessionId]
+    );
+
+    const calledNumbers = balls.map(b => b.ball_number);
+
+    // Analizar cartones con CardAnalyzer
+    const analysis = CardAnalyzer.analyzeUserCards(cards, calledNumbers);
+
+    // Generar vista apilada
+    const stackedCards = CardAnalyzer.generateStackedView(analysis.cards);
+
+    res.json({
+      success: true,
+      cards: stackedCards,
+      alerts: analysis.alerts,
+      summary: analysis.summary,
+      meta: {
+        gameSessionId: parseInt(gameSessionId),
+        totalCards: analysis.totalCards,
+        ballsDrawn: calledNumbers.length,
+        lastBall: calledNumbers[calledNumbers.length - 1] || null
+      }
+    });
+
+  } catch (error) {
+    console.error('[GameController] Error en análisis de cartones:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message 
+    });
+  }
+};
+
