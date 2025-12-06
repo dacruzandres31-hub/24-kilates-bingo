@@ -1,0 +1,1336 @@
+/* ============================================
+   SALA BRONCE - INDUSTRIAL, STEAMPUNK LIGERO
+   Paleta: Bronce Metálico, Cobre, Marrón Óxido, Naranja Ámbar
+   ============================================ */
+
+.bronze-room {
+  min-height: 100vh;
+  background: #1a1510;
+  background-image: 
+    radial-gradient(circle at 20% 30%, rgba(205, 127, 50, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 80% 70%, rgba(184, 115, 51, 0.1) 0%, transparent 50%),
+    repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, 0.1) 2px, rgba(0, 0, 0, 0.1) 4px);
+  color: #f5e6d3;
+  display: flex;
+  flex-direction: column;
+  padding: 15px;
+  overflow-x: hidden;
+}
+
+/* ============================================
+   HEADER
+   ============================================ */
+
+.bronze-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 25px;
+  background: 
+    linear-gradient(135deg, rgba(205, 127, 50, 0.2), rgba(139, 69, 19, 0.3)),
+    repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0, 0, 0, 0.1) 10px, rgba(0, 0, 0, 0.1) 20px);
+  border: 3px solid #8b5a2b;
+  border-radius: 10px;
+  box-shadow: 
+    inset 0 2px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.5),
+    0 4px 10px rgba(0, 0, 0, 0.6);
+  margin-bottom: 15px;
+  position: relative;
+}
+
+.bronze-header::before,
+.bronze-header::after {
+  content: '';
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: radial-gradient(circle, #3a3a3a, #1a1a1a);
+  border: 2px solid #5a5a5a;
+  border-radius: 50%;
+  box-shadow: inset 0 2px 2px rgba(0, 0, 0, 0.6);
+}
+
+.bronze-header::before { top: 10px; left: 10px; }
+.bronze-header::after { top: 10px; right: 10px; }
+
+.room-title {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.title-icon {
+  font-size: 2.5rem;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+}
+
+.title-text {
+  font-size: 2rem;
+  font-weight: 900;
+  letter-spacing: 4px;
+  background: linear-gradient(135deg, #cd7f32 0%, #d4a86a 50%, #b87333 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+  font-family: 'Georgia', serif;
+}
+
+.title-plate {
+  background: linear-gradient(135deg, #cd7f32, #b87333);
+  color: #1a1510;
+  padding: 8px 20px;
+  border-radius: 5px;
+  font-weight: 900;
+  font-size: 1.2rem;
+  letter-spacing: 2px;
+  border: 2px solid #8b5a2b;
+  box-shadow: 
+    inset 0 2px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.4),
+    0 4px 6px rgba(0, 0, 0, 0.4);
+  font-family: 'Courier New', monospace;
+}
+
+.game-info {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+
+.info-gauge {
+  background: rgba(0, 0, 0, 0.6);
+  border: 3px solid #8b5a2b;
+  border-radius: 8px;
+  padding: 10px 15px;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.gauge-label {
+  font-size: 0.7rem;
+  color: #cd7f32;
+  letter-spacing: 2px;
+  font-weight: 700;
+  margin-bottom: 5px;
+  text-align: center;
+}
+
+.gauge-display {
+  font-family: 'Courier New', monospace;
+  font-size: 1.2rem;
+  font-weight: 900;
+  color: #ff8c00;
+  text-align: center;
+  text-shadow: 0 0 10px rgba(255, 140, 0, 0.6);
+}
+
+.gauge-separator {
+  color: #8b5a2b;
+  margin: 0 3px;
+}
+
+.gauge-max {
+  color: #cd7f32;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 3px solid #8b5a2b;
+  border-radius: 8px;
+  padding: 10px 20px;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.indicator-light {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 0, 0, 0.5);
+  box-shadow: 
+    0 0 5px currentColor,
+    inset 0 2px 2px rgba(255, 255, 255, 0.3);
+}
+
+.status-indicator.waiting .indicator-light {
+  background: #d4a86a;
+  box-shadow: 0 0 10px #d4a86a;
+}
+
+.status-indicator.active .indicator-light {
+  background: #ff8c00;
+  box-shadow: 0 0 15px #ff8c00;
+  animation: bulb-flicker 2s ease-in-out infinite;
+}
+
+@keyframes bulb-flicker {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.status-indicator.ended .indicator-light {
+  background: #8b5a2b;
+  box-shadow: none;
+}
+
+.indicator-text {
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #cd7f32;
+  font-family: 'Courier New', monospace;
+}
+
+/* ============================================
+   MITAD SUPERIOR - LA MESA
+   ============================================ */
+
+.game-table-bronze {
+  display: grid;
+  grid-template-columns: 60% 40%;
+  gap: 20px;
+  padding: 20px;
+  background: 
+    linear-gradient(135deg, rgba(26, 21, 16, 0.95), rgba(39, 29, 19, 0.95)),
+    repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(205, 127, 50, 0.05) 1px, rgba(205, 127, 50, 0.05) 2px);
+  border: 4px solid #8b5a2b;
+  border-radius: 15px;
+  box-shadow: 
+    inset 0 4px 8px rgba(0, 0, 0, 0.6),
+    0 6px 20px rgba(0, 0, 0, 0.7);
+  min-height: 45vh;
+  position: relative;
+}
+
+/* ============================================
+   CUADRÍCULA NIXIE (IZQUIERDA)
+   ============================================ */
+
+.nixie-grid {
+  background: 
+    linear-gradient(135deg, rgba(0, 0, 0, 0.7), rgba(20, 15, 10, 0.8)),
+    url('data:image/svg+xml,<svg width="20" height="20" xmlns="http://www.w3.org/2000/svg"><rect width="20" height="20" fill="%23000"/><rect width="1" height="20" fill="%234a3520" x="19"/><rect width="20" height="1" fill="%234a3520" y="19"/></svg>');
+  border: 5px solid #6b4423;
+  border-radius: 10px;
+  padding: 20px;
+  position: relative;
+  box-shadow: 
+    inset 0 0 20px rgba(0, 0, 0, 0.8),
+    0 4px 10px rgba(0, 0, 0, 0.5);
+}
+
+/* Marco metálico oxidado */
+.metal-frame {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+
+.frame-corner {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  border: 3px solid #8b5a2b;
+}
+
+.frame-corner.tl { top: -3px; left: -3px; border-right: none; border-bottom: none; }
+.frame-corner.tr { top: -3px; right: -3px; border-left: none; border-bottom: none; }
+.frame-corner.bl { bottom: -3px; left: -3px; border-right: none; border-top: none; }
+.frame-corner.br { bottom: -3px; right: -3px; border-left: none; border-top: none; }
+
+.frame-rivet {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: radial-gradient(circle, #4a4a4a, #2a2a2a);
+  border: 1px solid #6a6a6a;
+  border-radius: 50%;
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.5);
+}
+
+.frame-rivet.tl { top: 5px; left: 5px; }
+.frame-rivet.tr { top: 5px; right: 5px; }
+.frame-rivet.bl { bottom: 5px; left: 5px; }
+.frame-rivet.br { bottom: 5px; right: 5px; }
+
+.grid-title-bronze {
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.title-plate-small {
+  display: inline-block;
+  background: linear-gradient(135deg, #cd7f32, #b87333);
+  color: #1a1510;
+  padding: 6px 20px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  border: 2px solid #8b5a2b;
+  box-shadow: 
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 2px 4px rgba(0, 0, 0, 0.5);
+  font-family: 'Courier New', monospace;
+}
+
+.nixie-columns {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+}
+
+.nixie-column {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.column-header-bronze {
+  text-align: center;
+  padding: 8px 5px;
+  background: rgba(0, 0, 0, 0.7);
+  border: 2px solid #8b5a2b;
+  border-radius: 5px;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+.header-letter {
+  display: block;
+  font-size: 1.3rem;
+  font-weight: 900;
+  font-family: 'Georgia', serif;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.header-range {
+  display: block;
+  font-size: 0.7rem;
+  color: #8b5a2b;
+  font-family: 'Courier New', monospace;
+}
+
+/* Tubos Nixie */
+.nixie-tubes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nixie-tube {
+  position: relative;
+  height: 32px;
+}
+
+.tube-glass {
+  position: relative;
+  height: 100%;
+  background: 
+    linear-gradient(135deg, rgba(255, 140, 0, 0.05), rgba(139, 69, 19, 0.1));
+  border: 2px solid rgba(139, 90, 43, 0.4);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-shadow: 
+    inset 0 2px 4px rgba(0, 0, 0, 0.4),
+    0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.tube-cathode {
+  position: relative;
+  z-index: 2;
+}
+
+.nixie-glow {
+  font-size: 1.1rem;
+  font-weight: 900;
+  font-family: 'Courier New', monospace;
+  animation: nixie-flicker 0.1s infinite alternate;
+}
+
+@keyframes nixie-flicker {
+  0% { opacity: 0.95; }
+  100% { opacity: 1; }
+}
+
+.nixie-tube.flickering .nixie-glow {
+  animation: nixie-intense-flicker 0.15s infinite alternate;
+}
+
+@keyframes nixie-intense-flicker {
+  0% { opacity: 0.8; }
+  50% { opacity: 1; }
+  100% { opacity: 0.9; }
+}
+
+.tube-number-dark {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #3a3a3a;
+  font-family: 'Courier New', monospace;
+}
+
+.tube-filament {
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80%;
+  height: 2px;
+  background: linear-gradient(to right, transparent, rgba(255, 140, 0, 0.3), transparent);
+  z-index: 1;
+}
+
+.nixie-tube.lit .tube-filament {
+  background: linear-gradient(to right, transparent, rgba(255, 140, 0, 0.6), transparent);
+  box-shadow: 0 0 4px rgba(255, 140, 0, 0.8);
+}
+
+/* Panel de últimas bolas */
+.recent-panel-bronze {
+  margin-top: 15px;
+  background: rgba(0, 0, 0, 0.7);
+  border: 3px solid #6b4423;
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.8);
+}
+
+.panel-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #cd7f32;
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+  text-align: center;
+  font-family: 'Courier New', monospace;
+}
+
+.recent-balls-strip {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.ball-tag-bronze {
+  position: relative;
+  background: linear-gradient(135deg, #cd7f32, #b87333);
+  color: #1a1510;
+  padding: 6px 15px;
+  border-radius: 4px;
+  font-weight: 900;
+  font-size: 0.9rem;
+  border: 2px solid #8b5a2b;
+  box-shadow: 
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 2px 4px rgba(0, 0, 0, 0.5);
+  font-family: 'Courier New', monospace;
+}
+
+.tag-rivet {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  background: radial-gradient(circle, #3a3a3a, #1a1a1a);
+  border: 1px solid #5a5a5a;
+  border-radius: 50%;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.tag-rivet:first-child { left: 3px; }
+.tag-rivet:last-child { right: 3px; }
+
+.tag-dash {
+  margin: 0 3px;
+  opacity: 0.6;
+}
+
+/* ============================================
+   BOLILLERO MECÁNICO (DERECHA)
+   ============================================ */
+
+.mechanical-bingo-machine {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+
+.machine-crown {
+  width: 90%;
+  height: 20px;
+  background: linear-gradient(135deg, #8b5a2b, #6b4423);
+  border: 2px solid #5a3a1b;
+  border-radius: 10px 10px 0 0;
+  box-shadow: 
+    inset 0 2px 0 rgba(255, 255, 255, 0.2),
+    0 2px 4px rgba(0, 0, 0, 0.5);
+  position: relative;
+}
+
+.crown-detail {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 60%;
+  height: 4px;
+  background: linear-gradient(to right, transparent, #cd7f32, transparent);
+  border-radius: 2px;
+}
+
+/* Cámara mecánica tipo relojería */
+.clockwork-chamber {
+  width: 320px;
+  height: 320px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.copper-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 8px solid;
+  box-shadow: 
+    inset 0 4px 8px rgba(0, 0, 0, 0.6),
+    0 4px 10px rgba(0, 0, 0, 0.5);
+}
+
+.copper-ring.outer {
+  width: 100%;
+  height: 100%;
+  border-color: #8b5a2b;
+  background: 
+    radial-gradient(circle at 30% 30%, rgba(205, 127, 50, 0.3), transparent 60%),
+    conic-gradient(from 0deg, #8b5a2b, #6b4423, #8b5a2b);
+}
+
+.copper-ring.middle {
+  width: 95%;
+  height: 95%;
+  border-color: #6b4423;
+  border-width: 4px;
+}
+
+/* Vidrio con tinte ámbar */
+.amber-glass {
+  position: absolute;
+  width: 88%;
+  height: 88%;
+  border-radius: 50%;
+  background: 
+    radial-gradient(circle at 35% 35%, rgba(255, 200, 100, 0.15), transparent 70%),
+    radial-gradient(circle at 70% 70%, rgba(205, 127, 50, 0.1), transparent);
+  backdrop-filter: blur(5px);
+  border: 3px solid rgba(212, 168, 106, 0.3);
+  box-shadow: 
+    inset 0 0 30px rgba(255, 140, 0, 0.1),
+    0 4px 15px rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* Engranajes mecánicos de fondo */
+.clockwork-gears {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  animation: gears-rotate 20s linear infinite;
+}
+
+@keyframes gears-rotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.gear {
+  position: absolute;
+  width: 60px;
+  height: 60px;
+  top: 50%;
+  left: 50%;
+  margin: -30px 0 0 -30px;
+  background: 
+    radial-gradient(circle, #8b5a2b 40%, #6b4423 70%, transparent 70%);
+  border-radius: 50%;
+  animation: gear-spin 10s linear infinite;
+}
+
+@keyframes gear-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(-360deg); }
+}
+
+.gear-tooth {
+  position: absolute;
+  width: 10px;
+  height: 20px;
+  background: #8b5a2b;
+  top: -10px;
+  left: 50%;
+  margin-left: -5px;
+  transform-origin: center 40px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.gear-tooth:nth-child(1) { transform: rotate(0deg); }
+.gear-tooth:nth-child(2) { transform: rotate(90deg); }
+.gear-tooth:nth-child(3) { transform: rotate(180deg); }
+.gear-tooth:nth-child(4) { transform: rotate(270deg); }
+
+/* Bola vintage crema */
+.current-ball-display-bronze {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+  z-index: 10;
+  animation: ball-emerge 2.5s ease-out;
+}
+
+@keyframes ball-emerge {
+  0% {
+    transform: scale(0.3) translateY(50px);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.1) translateY(-10px);
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+.vintage-ball {
+  width: 140px;
+  height: 140px;
+  perspective: 1000px;
+}
+
+.ball-surface-cream {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: 
+    radial-gradient(circle at 35% 35%, #f5ead6, #e8d8c0);
+  border: 3px solid #d4a86a;
+  box-shadow: 
+    inset -5px -5px 15px rgba(0, 0, 0, 0.2),
+    inset 5px 5px 15px rgba(255, 255, 255, 0.4),
+    0 8px 20px rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  animation: ball-rotate 3s linear infinite;
+}
+
+@keyframes ball-rotate {
+  0% { transform: rotateY(0deg); }
+  100% { transform: rotateY(360deg); }
+}
+
+.ball-wear {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  top: 20%;
+  right: 20%;
+  background: rgba(139, 90, 43, 0.1);
+  border-radius: 50%;
+  filter: blur(3px);
+}
+
+.ball-text {
+  text-align: center;
+  position: relative;
+  z-index: 1;
+}
+
+.ball-letter-bronze {
+  font-size: 2rem;
+  font-weight: 900;
+  color: #1a1510;
+  font-family: 'Georgia', serif;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+  line-height: 1;
+}
+
+.ball-number-bronze {
+  font-size: 2.8rem;
+  font-weight: 900;
+  color: #1a1510;
+  font-family: 'Georgia', serif;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+  line-height: 1;
+}
+
+.ball-label-plate {
+  position: relative;
+  background: linear-gradient(135deg, #cd7f32, #b87333);
+  color: #1a1510;
+  padding: 8px 25px;
+  border-radius: 5px;
+  font-weight: 900;
+  font-size: 1.3rem;
+  border: 2px solid #8b5a2b;
+  box-shadow: 
+    inset 0 2px 0 rgba(255, 255, 255, 0.3),
+    0 4px 6px rgba(0, 0, 0, 0.5);
+  font-family: 'Courier New', monospace;
+}
+
+.plate-rivet {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: radial-gradient(circle, #3a3a3a, #1a1a1a);
+  border: 1px solid #5a5a5a;
+  border-radius: 50%;
+  top: 50%;
+  transform: translateY(-50%);
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.5);
+}
+
+.plate-rivet.left { left: 5px; }
+.plate-rivet.right { right: 5px; }
+
+/* Estado de espera */
+.waiting-state-bronze {
+  text-align: center;
+  color: #8b5a2b;
+}
+
+.waiting-gear {
+  font-size: 4rem;
+  animation: gear-idle-spin 4s linear infinite;
+}
+
+@keyframes gear-idle-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.waiting-text-bronze {
+  font-size: 1rem;
+  margin-top: 15px;
+  letter-spacing: 2px;
+  font-family: 'Georgia', serif;
+}
+
+/* Tornillos externos */
+.machine-bolt {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: 
+    radial-gradient(circle, #4a4a4a, #2a2a2a);
+  border: 2px solid #6a6a6a;
+  border-radius: 50%;
+  box-shadow: 
+    inset 0 2px 2px rgba(0, 0, 0, 0.6),
+    0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.machine-bolt::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 60%;
+  height: 2px;
+  background: #1a1a1a;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.machine-bolt.tl { top: 20px; left: 20px; }
+.machine-bolt.tr { top: 20px; right: 20px; }
+.machine-bolt.bl { bottom: 20px; left: 20px; }
+.machine-bolt.br { bottom: 20px; right: 20px; }
+
+/* Pedestal */
+.machine-pedestal {
+  width: 85%;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.pedestal-plate {
+  height: 15px;
+  background: linear-gradient(135deg, #8b5a2b, #6b4423);
+  border: 2px solid #5a3a1b;
+  box-shadow: 
+    inset 0 2px 0 rgba(255, 255, 255, 0.2),
+    0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.pedestal-plate.top {
+  border-radius: 0 0 8px 8px;
+}
+
+.pedestal-plate.bottom {
+  border-radius: 8px 8px 0 0;
+}
+
+.pedestal-body {
+  height: 40px;
+  background: 
+    linear-gradient(to right, #6b4423, #8b5a2b, #6b4423),
+    repeating-linear-gradient(90deg, transparent, transparent 10px, rgba(0, 0, 0, 0.1) 10px, rgba(0, 0, 0, 0.1) 11px);
+  border-left: 3px solid #5a3a1b;
+  border-right: 3px solid #5a3a1b;
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.4);
+}
+
+.brass-nameplate {
+  margin-top: 10px;
+  background: linear-gradient(135deg, #d4a86a, #c19a6b);
+  color: #1a1510;
+  padding: 5px 15px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-align: center;
+  border: 2px solid #8b5a2b;
+  box-shadow: 
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    0 2px 4px rgba(0, 0, 0, 0.5);
+  font-family: 'Courier New', monospace;
+}
+
+/* ============================================
+   SEPARADOR INDUSTRIAL
+   ============================================ */
+
+.industrial-divider {
+  height: 30px;
+  position: relative;
+  margin: 15px 0;
+}
+
+.divider-plate {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 8px;
+  transform: translateY(-50%);
+  background: 
+    linear-gradient(135deg, #6b4423, #8b5a2b, #6b4423),
+    repeating-linear-gradient(90deg, transparent, transparent 15px, rgba(0, 0, 0, 0.3) 15px, rgba(0, 0, 0, 0.3) 16px);
+  border-top: 2px solid #5a3a1b;
+  border-bottom: 2px solid #5a3a1b;
+  box-shadow: 
+    inset 0 2px 4px rgba(0, 0, 0, 0.5),
+    0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.rivet-line {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  gap: 40px;
+}
+
+.rivet {
+  width: 10px;
+  height: 10px;
+  background: radial-gradient(circle, #4a4a4a, #2a2a2a);
+  border: 2px solid #6a6a6a;
+  border-radius: 50%;
+  box-shadow: 
+    inset 0 2px 2px rgba(0, 0, 0, 0.6),
+    0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* ============================================
+   MITAD INFERIOR - CARTONES PERGAMINO
+   ============================================ */
+
+.parchment-cards-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: 
+    linear-gradient(135deg, rgba(26, 21, 16, 0.9), rgba(39, 29, 19, 0.9)),
+    repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(205, 127, 50, 0.05) 20px, rgba(205, 127, 50, 0.05) 21px);
+  border: 4px solid #8b5a2b;
+  border-radius: 12px;
+  padding: 20px;
+  min-height: 35vh;
+  max-height: 45vh;
+  box-shadow: inset 0 4px 8px rgba(0, 0, 0, 0.6);
+}
+
+.section-header-bronze {
+  margin-bottom: 15px;
+}
+
+.header-plate {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  background: linear-gradient(135deg, #cd7f32, #b87333);
+  color: #1a1510;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: 3px solid #8b5a2b;
+  box-shadow: 
+    inset 0 2px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.4),
+    0 4px 8px rgba(0, 0, 0, 0.5);
+}
+
+.plate-icon {
+  font-size: 1.8rem;
+}
+
+.plate-title {
+  flex: 1;
+  font-size: 1.3rem;
+  font-weight: 900;
+  letter-spacing: 3px;
+  font-family: 'Georgia', serif;
+}
+
+.plate-badge {
+  background: rgba(0, 0, 0, 0.5);
+  color: #ff8c00;
+  padding: 5px 15px;
+  border-radius: 20px;
+  font-weight: 900;
+  font-size: 1rem;
+  border: 2px solid #5a3a1b;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+/* Scroll Container */
+.cards-scroll-bronze {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding-right: 8px;
+}
+
+/* Scrollbar Personalizado */
+.cards-scroll-bronze::-webkit-scrollbar {
+  width: 10px;
+}
+
+.cards-scroll-bronze::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.5);
+  border: 2px solid #5a3a1b;
+  border-radius: 10px;
+}
+
+.cards-scroll-bronze::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #cd7f32, #b87333);
+  border: 2px solid #8b5a2b;
+  border-radius: 10px;
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.3);
+}
+
+/* ============================================
+   CARTÓN DE BINGO - ESTILO PERGAMINO
+   ============================================ */
+
+.bingo-card-bronze {
+  position: relative;
+  background: 
+    linear-gradient(135deg, #f5ead6, #e8d8c0),
+    url('data:image/svg+xml,<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><filter id="paper"><feTurbulence baseFrequency="0.05" numOctaves="2" result="noise"/><feDiffuseLighting in="noise" lighting-color="%23f5ead6" surfaceScale="2"><feDistantLight azimuth="45" elevation="60"/></feDiffuseLighting></filter><rect width="100" height="100" fill="%23f5ead6" filter="url(%23paper)"/></svg>');
+  border: 3px solid #d4a86a;
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 
+    0 6px 15px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  transition: all 0.3s ease;
+}
+
+.bingo-card-bronze:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.7);
+}
+
+/* Marco metálico de cobre */
+.copper-frame {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+
+.frame-edge {
+  position: absolute;
+  background: linear-gradient(135deg, #cd7f32, #b87333);
+  box-shadow: 
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4);
+}
+
+.frame-edge.top { top: 0; left: 0; right: 0; height: 8px; }
+.frame-edge.right { top: 0; right: 0; bottom: 0; width: 8px; }
+.frame-edge.bottom { bottom: 0; left: 0; right: 0; height: 8px; }
+.frame-edge.left { top: 0; left: 0; bottom: 0; width: 8px; }
+
+.corner-ornament {
+  position: absolute;
+  font-size: 1.5rem;
+  color: #8b5a2b;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.corner-ornament.tl { top: -5px; left: -5px; }
+.corner-ornament.tr { top: -5px; right: -5px; }
+.corner-ornament.bl { bottom: -5px; left: -5px; }
+.corner-ornament.br { bottom: -5px; right: -5px; }
+
+.parchment-texture {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  opacity: 0.3;
+  background-image: 
+    repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(139, 90, 43, 0.1) 1px, rgba(139, 90, 43, 0.1) 2px);
+  pointer-events: none;
+}
+
+.card-header-bronze {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid rgba(139, 90, 43, 0.3);
+}
+
+.card-seal {
+  background: radial-gradient(circle, #8b0000, #660000);
+  color: #f5e6d3;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 0.85rem;
+  border: 3px solid #5a0000;
+  box-shadow: 
+    0 4px 8px rgba(0, 0, 0, 0.5),
+    inset 0 2px 4px rgba(255, 255, 255, 0.2);
+  position: relative;
+}
+
+.card-seal::before {
+  content: '';
+  position: absolute;
+  width: 120%;
+  height: 120%;
+  border: 2px dashed rgba(139, 0, 0, 0.3);
+  border-radius: 50%;
+}
+
+.vintage-stamp {
+  background: rgba(139, 90, 43, 0.2);
+  color: #8b5a2b;
+  padding: 5px 15px;
+  border: 2px dashed #8b5a2b;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  transform: rotate(-3deg);
+  font-family: 'Courier New', monospace;
+}
+
+.card-grid-bronze {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.card-letters-bronze {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+
+.card-letter-bronze {
+  font-size: 1.6rem;
+  font-weight: 900;
+  text-align: center;
+  padding: 8px 0;
+  background: rgba(139, 90, 43, 0.1);
+  border: 2px solid currentColor;
+  border-radius: 6px;
+  font-family: 'Georgia', serif;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.card-numbers-grid-bronze {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+
+.card-column-bronze {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.card-cell-bronze {
+  aspect-ratio: 1;
+  background: rgba(255, 255, 255, 0.7);
+  border: 2px solid rgba(139, 90, 43, 0.4);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: #1a1510;
+  font-family: 'Georgia', serif;
+  position: relative;
+  box-shadow: 
+    inset 0 2px 4px rgba(0, 0, 0, 0.1),
+    0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+}
+
+.card-cell-bronze.free {
+  background: radial-gradient(circle, #cd7f32, #b87333);
+  border-color: #8b5a2b;
+}
+
+.wax-seal {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  color: #8b0000;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.seal-star {
+  animation: seal-shimmer 3s ease-in-out infinite;
+}
+
+@keyframes seal-shimmer {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 1; }
+}
+
+.card-cell-bronze.stamped {
+  background: rgba(139, 0, 0, 0.15);
+  border-color: #8b0000;
+}
+
+.cell-number-bronze {
+  position: relative;
+  z-index: 1;
+}
+
+/* Marca de tinta roja */
+.red-ink-mark {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+.x-mark {
+  width: 80%;
+  height: 80%;
+  opacity: 0.9;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.4));
+  animation: ink-appear 0.6s ease-out;
+}
+
+@keyframes ink-appear {
+  0% {
+    transform: scale(0) rotate(0deg);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.2) rotate(10deg);
+  }
+  100% {
+    transform: scale(1) rotate(5deg);
+    opacity: 0.9;
+  }
+}
+
+.card-signature {
+  margin-top: 15px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(139, 90, 43, 0.3);
+}
+
+.signature-line {
+  width: 40%;
+  height: 2px;
+  background: rgba(139, 90, 43, 0.3);
+  margin: 0 auto;
+}
+
+/* ============================================
+   TEST CONTROLS
+   ============================================ */
+
+.test-controls-bronze {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+}
+
+.brass-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.brass-button:hover {
+  transform: scale(1.05);
+}
+
+.button-plate {
+  background: linear-gradient(135deg, #cd7f32, #b87333);
+  color: #1a1510;
+  padding: 12px 30px;
+  border-radius: 8px;
+  font-weight: 900;
+  font-size: 1rem;
+  letter-spacing: 2px;
+  border: 3px solid #8b5a2b;
+  box-shadow: 
+    inset 0 2px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.4),
+    0 6px 12px rgba(0, 0, 0, 0.5);
+  font-family: 'Courier New', monospace;
+  position: relative;
+}
+
+.brass-button:active .button-plate {
+  box-shadow: 
+    inset 0 2px 6px rgba(0, 0, 0, 0.6),
+    0 2px 4px rgba(0, 0, 0, 0.3);
+  transform: translateY(2px);
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+
+@media (max-width: 1024px) {
+  .game-table-bronze {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+
+  .clockwork-chamber {
+    width: 280px;
+    height: 280px;
+  }
+}
+
+@media (max-width: 768px) {
+  .bronze-header {
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .room-title {
+    flex-direction: column;
+    text-align: center;
+    gap: 10px;
+  }
+
+  .title-text {
+    font-size: 1.5rem;
+  }
+
+  .game-table-bronze {
+    padding: 15px;
+  }
+
+  .nixie-columns {
+    gap: 6px;
+  }
+
+  .header-letter {
+    font-size: 1rem;
+  }
+
+  .nixie-tube {
+    height: 26px;
+  }
+
+  .nixie-glow {
+    font-size: 0.9rem;
+  }
+
+  .clockwork-chamber {
+    width: 240px;
+    height: 240px;
+  }
+
+  .vintage-ball {
+    width: 100px;
+    height: 100px;
+  }
+
+  .ball-letter-bronze {
+    font-size: 1.5rem;
+  }
+
+  .ball-number-bronze {
+    font-size: 2rem;
+  }
+
+  .card-letter-bronze {
+    font-size: 1.2rem;
+    padding: 5px 0;
+  }
+
+  .card-cell-bronze {
+    font-size: 1.1rem;
+  }
+}
