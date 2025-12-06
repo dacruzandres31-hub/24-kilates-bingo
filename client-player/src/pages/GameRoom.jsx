@@ -3,11 +3,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useSocket } from '../hooks/useSocket';
 import BallDraw from '../components/BallDraw';
 import BingoCard from '../components/BingoCard';
+import StackedBingoCards from '../components/StackedBingoCards';
+import WinnerNotifications from '../components/WinnerNotifications';
 import PrizeOdometer from '../components/PrizeOdometer';
 import WinnerModal from '../components/WinnerModal';
 import GlobalTicker from '../components/GlobalTicker';
 import CelebrationModal from '../components/CelebrationModal';
-import { LogOut, Home } from 'lucide-react';
+import { LogOut, Home, Grid, Layers } from 'lucide-react';
 
 /**
  * GameRoom Page - Sala de Juego Principal
@@ -37,6 +39,7 @@ export default function GameRoom() {
   const [showCelebration, setShowCelebration] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [equippedSkin, setEquippedSkin] = useState(null);
+  const [viewMode, setViewMode] = useState('stacked'); // 'stacked' | 'single'
 
   // Socket listeners
   useEffect(() => {
@@ -171,6 +174,9 @@ export default function GameRoom() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 to-slate-900 p-4">
+      {/* Winner Notifications (Floating) */}
+      <WinnerNotifications socket={socket} currentUser={currentUser} />
+
       {/* Header */}
       <div className="max-w-7xl mx-auto mb-6">
         <div className="flex items-center justify-between bg-gradient-to-r from-cyan-600 to-blue-600 rounded-lg p-4">
@@ -226,27 +232,74 @@ export default function GameRoom() {
 
           {/* Mis Cartones - 1 columna */}
           <div className="space-y-4">
-            <h2 className="text-2xl font-bold text-white">🎟️ Mis Cartones</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-white">🎟️ Mis Cartones</h2>
+              
+              {/* Toggle View Mode */}
+              {myCards.length > 1 && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setViewMode('stacked')}
+                    className={`p-2 rounded-lg transition-all ${
+                      viewMode === 'stacked'
+                        ? 'bg-cyan-600 text-white'
+                        : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                    }`}
+                    title="Vista Apilada"
+                  >
+                    <Layers size={20} />
+                  </button>
+                  <button
+                    onClick={() => setViewMode('single')}
+                    className={`p-2 rounded-lg transition-all ${
+                      viewMode === 'single'
+                        ? 'bg-cyan-600 text-white'
+                        : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                    }`}
+                    title="Vista Lista"
+                  >
+                    <Grid size={20} />
+                  </button>
+                </div>
+              )}
+            </div>
             
             {myCards.length > 0 ? (
-              <div className="space-y-2 max-h-96 overflow-y-auto">
-                {myCards.map((card, idx) => (
-                  <div
-                    key={card.id}
-                    onClick={() => setSelectedCard(card)}
-                    className={`
-                      p-3 rounded-lg border-2 cursor-pointer transition-all
-                      ${selectedCard?.id === card.id
-                        ? 'bg-cyan-600 border-cyan-400 scale-105'
-                        : 'bg-slate-800 border-slate-700 hover:border-cyan-400'
-                      }
-                    `}
-                  >
-                    <p className="text-white font-bold">Cartón #{card.serialNumber}</p>
-                    <p className="text-slate-300 text-sm">Serie {card.id}</p>
-                  </div>
-                ))}
-              </div>
+              viewMode === 'stacked' && myCards.length > 1 ? (
+                // Vista Apilada Inteligente
+                <StackedBingoCards
+                  gameSessionId={gameState.sessionId}
+                  socket={socket}
+                  onCardSelect={(card) => {
+                    if (card) {
+                      const fullCard = myCards.find(c => c.id === card.cardId);
+                      setSelectedCard(fullCard);
+                    } else {
+                      setSelectedCard(null);
+                    }
+                  }}
+                />
+              ) : (
+                // Vista Lista Simple
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {myCards.map((card, idx) => (
+                    <div
+                      key={card.id}
+                      onClick={() => setSelectedCard(card)}
+                      className={`
+                        p-3 rounded-lg border-2 cursor-pointer transition-all
+                        ${selectedCard?.id === card.id
+                          ? 'bg-cyan-600 border-cyan-400 scale-105'
+                          : 'bg-slate-800 border-slate-700 hover:border-cyan-400'
+                        }
+                      `}
+                    >
+                      <p className="text-white font-bold">Cartón #{card.serialNumber}</p>
+                      <p className="text-slate-300 text-sm">Serie {card.id}</p>
+                    </div>
+                  ))}
+                </div>
+              )
             ) : (
               <div className="bg-slate-800 rounded-lg p-6 text-center">
                 <p className="text-slate-400">No tienes cartones en esta sala</p>

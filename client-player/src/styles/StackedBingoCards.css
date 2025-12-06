@@ -1,0 +1,565 @@
+/* ========================================
+   STACKED BINGO CARDS - Vista Apilada
+   ======================================== */
+
+.stacked-cards-container {
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.stacked-cards-container.collapsed {
+  max-height: 60px;
+}
+
+/* Header */
+.stacked-cards-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.stacked-cards-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.header-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-icon {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  border-radius: 8px;
+  padding: 8px;
+  cursor: pointer;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.btn-icon:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+/* Alerts Panel */
+.alerts-panel {
+  padding: 12px 16px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.alert {
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 500;
+  font-size: 14px;
+  animation: slideInLeft 0.3s ease-out;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.alert:last-child {
+  margin-bottom: 0;
+}
+
+.alert-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.alert-message {
+  flex: 1;
+}
+
+.alert-super-critical {
+  background: linear-gradient(135deg, #e91e63, #ff6090);
+  color: white;
+  border: 2px solid gold;
+  animation: pulse 1.5s infinite, slideInLeft 0.3s ease-out;
+}
+
+.alert-critical {
+  background: linear-gradient(135deg, #ff4444, #ff6b6b);
+  color: white;
+  box-shadow: 0 4px 12px rgba(255, 68, 68, 0.3);
+}
+
+.alert-warning {
+  background: linear-gradient(135deg, #ffaa00, #ffcc44);
+  color: #333;
+}
+
+.alert-info {
+  background: linear-gradient(135deg, #4a90e2, #67b5ff);
+  color: white;
+}
+
+.alert-success {
+  background: linear-gradient(135deg, #28a745, #5cb85c);
+  color: white;
+}
+
+@keyframes pulse {
+  0%, 100% { 
+    transform: scale(1); 
+    box-shadow: 0 4px 12px rgba(233, 30, 99, 0.3);
+  }
+  50% { 
+    transform: scale(1.02); 
+    box-shadow: 0 6px 20px rgba(233, 30, 99, 0.5);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Summary Bar */
+.summary-bar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: 12px;
+  padding: 14px 16px;
+  background: #ffffff;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.summary-item .label {
+  font-size: 11px;
+  color: #6c757d;
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.summary-item .value {
+  font-size: 20px;
+  font-weight: bold;
+  color: #212529;
+}
+
+.value.last-ball {
+  color: #e91e63;
+  font-size: 28px;
+  text-shadow: 0 2px 4px rgba(233, 30, 99, 0.2);
+}
+
+/* Cards Stack Wrapper */
+.cards-stack-wrapper {
+  padding: 20px 16px;
+  background: linear-gradient(to bottom, #f8f9fa 0%, #ffffff 100%);
+  min-height: 450px;
+}
+
+.cards-stack {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  height: 500px;
+  margin: 0 auto;
+}
+
+/* Individual Stacked Card */
+.bingo-card-stacked {
+  position: absolute;
+  top: 40px;
+  left: 50%;
+  width: 90%;
+  max-width: 380px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.bingo-card-stacked:hover {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+  transform: translate(-50%, -2px) !important;
+}
+
+.bingo-card-stacked.top-card {
+  border: 3px solid #4CAF50;
+  box-shadow: 0 6px 24px rgba(76, 175, 80, 0.3);
+}
+
+.bingo-card-stacked.expanded {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  width: 95% !important;
+  max-width: 500px !important;
+  max-height: 90vh !important;
+  overflow-y: auto;
+  z-index: 9999 !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3) !important;
+  animation: expandCard 0.3s ease-out;
+}
+
+@keyframes expandCard {
+  from {
+    transform: translate(-50%, -50%) scale(0.9);
+    opacity: 0.8;
+  }
+  to {
+    transform: translate(-50%, -50%) scale(1.05);
+    opacity: 1;
+  }
+}
+
+/* Card Badges */
+.card-badges {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  gap: 6px;
+  z-index: 10;
+}
+
+.card-badges span {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: bold;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.badge-position {
+  background: #333;
+  color: white;
+}
+
+.badge-progress {
+  background: linear-gradient(135deg, #4CAF50, #8BC34A);
+  color: white;
+}
+
+.badge-best {
+  background: linear-gradient(135deg, #FFD700, #FFA500);
+  color: #333;
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
+}
+
+/* Close Button (expanded) */
+.btn-close-expanded {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: rgba(0, 0, 0, 0.7);
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: white;
+  z-index: 11;
+  transition: all 0.2s;
+}
+
+.btn-close-expanded:hover {
+  background: rgba(0, 0, 0, 0.9);
+  transform: rotate(90deg);
+}
+
+/* Bingo Grid */
+.bingo-grid {
+  padding: 50px 20px 16px;
+}
+
+.grid-header {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  margin-bottom: 10px;
+  font-weight: bold;
+  font-size: 20px;
+  text-align: center;
+  color: #667eea;
+}
+
+.grid-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.grid-cell {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f0f0f0;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 16px;
+  transition: all 0.2s;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.grid-cell.marked {
+  background: linear-gradient(135deg, #4CAF50, #8BC34A);
+  color: white;
+  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.4);
+  transform: scale(0.95);
+}
+
+.grid-cell.free {
+  background: linear-gradient(135deg, #FFD700, #FFA500);
+  color: #333;
+  font-size: 22px;
+  box-shadow: 0 3px 10px rgba(255, 215, 0, 0.4);
+}
+
+/* Card Info */
+.card-info {
+  padding: 12px 20px;
+  background: linear-gradient(to bottom, rgba(255, 243, 205, 0.3), rgba(255, 243, 205, 0.6));
+  border-top: 2px solid #ffc107;
+}
+
+.almost-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.line-hint {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  background: white;
+  border-radius: 6px;
+  font-size: 13px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.line-hint.complete {
+  background: linear-gradient(135deg, #d4edda, #c3e6cb);
+  border: 1px solid #28a745;
+}
+
+.line-name {
+  font-weight: bold;
+  color: #333;
+}
+
+.line-missing {
+  color: #666;
+  font-size: 12px;
+}
+
+.line-hint.complete .line-missing {
+  color: #155724;
+  font-weight: 600;
+}
+
+/* Card Score */
+.card-score {
+  padding: 10px 20px;
+  background: #f8f9fa;
+  border-top: 1px solid #e9ecef;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.score-label {
+  font-size: 13px;
+  color: #6c757d;
+  font-weight: 600;
+}
+
+.score-value {
+  font-size: 20px;
+  font-weight: bold;
+  color: #667eea;
+}
+
+/* Controls */
+.controls {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  padding: 16px;
+  background: #f8f9fa;
+  border-top: 1px solid #e9ecef;
+}
+
+.btn-control {
+  padding: 10px 20px;
+  border: 2px solid #667eea;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: white;
+  color: #667eea;
+}
+
+.btn-control:hover {
+  background: #667eea;
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.btn-control.btn-primary {
+  background: #667eea;
+  color: white;
+}
+
+.btn-control.btn-primary:hover {
+  background: #5568d3;
+}
+
+/* Loading State */
+.stacked-cards-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  gap: 16px;
+}
+
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.stacked-cards-loader p {
+  font-size: 16px;
+  color: #6c757d;
+  margin: 0;
+}
+
+/* No Cards State */
+.no-cards {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  gap: 20px;
+}
+
+.no-cards p {
+  font-size: 16px;
+  color: #6c757d;
+  margin: 0;
+}
+
+.btn-buy-card {
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-buy-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .stacked-cards-container {
+    border-radius: 0;
+  }
+
+  .cards-stack {
+    height: 450px;
+  }
+
+  .bingo-card-stacked {
+    width: 95%;
+  }
+
+  .bingo-card-stacked.expanded {
+    width: 98% !important;
+    max-width: none !important;
+  }
+
+  .grid-cell {
+    font-size: 14px;
+  }
+
+  .summary-bar {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .grid-cell {
+    font-size: 12px;
+  }
+
+  .grid-header {
+    font-size: 16px;
+  }
+
+  .card-badges span {
+    font-size: 10px;
+    padding: 3px 8px;
+  }
+}
