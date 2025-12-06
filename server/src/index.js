@@ -17,6 +17,7 @@ const inventoryRoutes = require('./routes/inventoryRoutes');
 const shopRoutes = require('./routes/shopRoutes');
 const chipsRoutes = require('./routes/chipsRoutes');
 const withdrawalRoutes = require('./routes/withdrawalRoutes');
+const winnersPaymentRoutes = require('./routes/winnersPaymentRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 
 // CONFIGURACIÓN INICIAL
@@ -110,6 +111,7 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/shop', shopRoutes);
 app.use('/api/chips', chipsRoutes);
 app.use('/api/withdrawals', withdrawalRoutes);
+app.use('/api/winners-payment', winnersPaymentRoutes);
 app.use('/api/admin', adminRoutes);
 
 // HEALTH CHECK
