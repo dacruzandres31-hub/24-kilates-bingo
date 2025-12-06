@@ -140,6 +140,65 @@ class GameEngineAuto {
 
     // VALIDAR AUTOMÁTICAMENTE TODOS LOS CARTONES
     await this.validateAllCards(gameSessionId, pauseOnWinner);
+
+    // EMITIR REORDENAMIENTO DE CARTONES (para usuarios con múltiples cartones)
+    await this.emitCardsReordering(gameSessionId);
+  }
+
+  /**
+   * Emite evento de reordenamiento de cartones a cada usuario
+   */
+  async emitCardsReordering(gameSessionId) {
+    try {
+      const CardAnalyzer = require('./cardAnalyzer');
+
+      // Obtener todos los usuarios con cartones activos en esta sesión
+      const [users] = await pool.query(
+        `SELECT DISTINCT user_id FROM bingo_cards 
+         WHERE session_id = ? AND status = 'active'`,
+        [gameSessionId]
+      );
+
+      // Para cada usuario, analizar sus cartones y emitir evento personal
+      for (const { user_id } of users) {
+        // Obtener cartones del usuario
+        const [userCards] = await pool.query(
+          `SELECT * FROM bingo_cards 
+           WHERE user_id = ? AND session_id = ? AND status = 'active'
+           ORDER BY id ASC`,
+          [user_id, gameSessionId]
+        );
+
+        if (userCards.length <= 1) continue; // Skip si tiene 1 o menos cartones
+
+        // Obtener números cantados
+        const gameState = this.activeGames.get(gameSessionId);
+        const calledNumbers = gameState ? gameState.ballsDrawn : [];
+
+        // Analizar con CardAnalyzer
+        const analysis = CardAnalyzer.analyzeUserCards(userCards, calledNumbers);
+        const stackedCards = CardAnalyzer.generateStackedView(analysis.cards);
+
+        // Emitir evento personal al usuario
+        this.io.to(`user_${user_id}`).emit('cards_reordered', {
+          gameSessionId,
+          cards: stackedCards.map(c => ({
+            cardId: c.cardId,
+            score: c.score,
+            progress: c.progress,
+            markedCount: c.markedCount,
+            viewConfig: c.viewConfig
+          })),
+          alerts: analysis.alerts,
+          summary: {
+            totalCards: analysis.totalCards,
+            averageProgress: analysis.summary.averageProgress
+          }
+        });
+      }
+    } catch (error) {
+      console.error('[GameEngine] Error emitiendo reordenamiento:', error);
+    }
   }
 
   /**

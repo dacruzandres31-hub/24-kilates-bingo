@@ -62,7 +62,7 @@ export default function StackedBingoCards({ gameSessionId, socket, onCardSelect 
     fetchCardsAnalysis();
   }, [gameSessionId]);
 
-  // Socket.IO: Actualizar cuando se canta número
+  // Socket.IO: Actualizar cuando se canta número O cuando llega reordenamiento
   useEffect(() => {
     if (!socket) return;
 
@@ -79,17 +79,50 @@ export default function StackedBingoCards({ gameSessionId, socket, onCardSelect 
       }, 500);
     };
 
+    // NUEVO: Escuchar evento de reordenamiento directo desde backend
+    const handleCardsReordered = (data) => {
+      console.log('[StackedCards] Cards reordered (WebSocket):', data);
+      
+      // Cancelar debounce si existe
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
+      }
+
+      // Actualizar directamente con los datos del backend (sin fetch adicional)
+      if (data.cards && data.cards.length > 0) {
+        setCardsData({
+          success: true,
+          cards: data.cards,
+          alerts: data.alerts || [],
+          summary: data.summary || {
+            totalCards: data.cards.length,
+            totalMarked: 0,
+            averageProgress: data.summary?.averageProgress || 0
+          },
+          meta: {
+            gameSessionId: data.gameSessionId,
+            totalCards: data.cards.length,
+            ballsDrawn: lastBallCount + 1,
+            lastBall: null
+          }
+        });
+        setLastBallCount(lastBallCount + 1);
+      }
+    };
+
     socket.on('ball_drawn', handleBallDrawn);
     socket.on('number_drawn', handleBallDrawn); // Alias
+    socket.on('cards_reordered', handleCardsReordered); // NUEVO
 
     return () => {
       socket.off('ball_drawn', handleBallDrawn);
       socket.off('number_drawn', handleBallDrawn);
+      socket.off('cards_reordered', handleCardsReordered);
       if (refreshTimeoutRef.current) {
         clearTimeout(refreshTimeoutRef.current);
       }
     };
-  }, [socket, gameSessionId]);
+  }, [socket, gameSessionId, lastBallCount]);
 
   // Handlers
   const handleCardClick = (card) => {

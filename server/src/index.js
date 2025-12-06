@@ -71,6 +71,15 @@ app.set('io', io);
 io.on('connection', (socket) => {
   console.log(`[Socket.IO] Cliente conectado: ${socket.id}`);
 
+  // Join a room personal del usuario
+  socket.on('join_personal_room', (data) => {
+    const { userId } = data;
+    if (userId) {
+      socket.join(`user_${userId}`);
+      console.log(`[Socket.IO] Usuario ${userId} joined personal room: user_${userId}`);
+    }
+  });
+
   // Eventos del juego
   socket.on('join_game', (data) => {
     console.log(`[Socket.IO] Join game: ${data.userId} en sala ${data.room}`);
