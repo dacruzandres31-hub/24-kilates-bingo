@@ -1,11 +1,11 @@
 # 🎰 BINGO 24K - Setup y Deploy
 
-Plataforma de bingo online con sistema multinivel, gamificación y automatización completa.
+Plataforma de bingo online con sistema de fichas interno, gamificación y automatización completa.
 
 ## 📋 Requisitos Previos
 
 - **Node.js**: 18+ LTS
-- **PostgreSQL**: 12+
+- **MySQL**: 8.0+
 - **npm**: 9+ o yarn
 - **Git**: para versionado
 
@@ -33,17 +33,21 @@ npm install -w client-admin
 ### 3. Configurar Base de Datos
 
 ```bash
-# Conectarse a PostgreSQL
-psql -U postgres
+# Conectarse a MySQL
+mysql -u root -p
 
 # Crear database
 CREATE DATABASE bingo_24k;
 
 # Salir
-\q
+exit;
 
 # Ejecutar schema
-psql -U postgres -d bingo_24k -f server/schema.sql
+mysql -u root -p bingo_24k < server/schema.sql
+
+# Ejecutar migraciones
+mysql -u root -p bingo_24k < server/CHIPS_MOVEMENTS_MIGRATION.sql
+mysql -u root -p bingo_24k < server/WITHDRAWAL_REQUESTS_MIGRATION.sql
 ```
 
 ### 4. Configurar Variables de Entorno
@@ -56,11 +60,15 @@ cp server/.env.example server/.env
 Edita `server/.env`:
 
 ```env
-# Database
-DATABASE_URL=postgresql://usuario:contraseña@localhost:5432/bingo_24k
+# Database MySQL
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=tu_password
+DB_NAME=bingo_24k
+DB_PORT=3306
 
 # Server
-PORT=3000
+PORT=3001
 NODE_ENV=development
 
 # JWT
@@ -90,7 +98,7 @@ npm run dev
 ├── server/
 │   ├── src/
 │   │   ├── index.js                 (Entrada principal + Socket.IO)
-│   │   ├── db.js                    (Pool PostgreSQL)
+│   │   ├── db.js                    (Pool MySQL 8.0)
 │   │   ├── controllers/             (Lógica de negocio)
 │   │   │   ├── authController.js
 │   │   │   ├── gameController.js
@@ -104,7 +112,12 @@ npm run dev
 │   │   │   ├── gameEngine.js        (RNG + winner detection)
 │   │   │   ├── cascadeLogic.js      (Jackpot transfers)
 │   │   │   ├── dailyGenerator.js    (10k cartones/día)
+│   │   │   ├── chipsService.js      (Sistema de fichas interno)
+│   │   │   ├── commissionService.js (Comisiones por cajero)
 │   │   │   └── stockManager.js      (Inventory)
+│   │   ├── utils/                   (Utilidades)
+│   │   │   ├── moneyMath.js         (Cálculos precisos decimal.js)
+│   │   │   └── victoryChecker.js    (Detector de ganadores optimizado)
 │   │   └── models/                  (Database queries)
 │   ├── schema.sql                   (Estructura BD)
 │   └── package.json
@@ -151,16 +164,25 @@ npm run dev
 - JWT con expiration 7 días
 - Bcrypt 10+ salt rounds
 - Middleware en todas las rutas protegidas
+- Roles: player, cajero, admin, superadmin
 
 ### Retiros (20-min Rule)
-- Bloqueo de retiros durante 20 minutos después del depósito
-- Excepciones: SuperAdmin, Cajero Oficial
-- Validación en middleware
+- Bloqueo de retiros durante 20 minutos después del último crédito
+- Cajero: puede procesar < 20 minutos
+- SuperAdmin: puede procesar siempre
+- Requiere CBU (22 dígitos) y nombre del titular
+
+### Sistema de Fichas Interno
+- Pagos externos a la plataforma
+- Solo fichas/chips dentro del sistema
+- Cálculos precisos con MoneyMath (decimal.js)
+- Transacciones atómicas (START TRANSACTION / COMMIT / ROLLBACK)
 
 ### Auditoría
-- Money trail: `agent_path` JSON en cada transacción
-- Timestamps en todas las operaciones
-- Tabla `audit_revenue` para compliance
+- Tabla `chips_movements`: historial completo de movimientos
+- `balance_before` y `balance_after` en cada operación
+- Timestamps automáticos
+- Trigger de validación de balances
 
 ## ⚙️ Scheduler & Cron Jobs
 
@@ -211,26 +233,46 @@ npm run dev
 
 ```
 
-## 📊 Distribución de Dinero
+## 📊 Distribución de Ingresos
 
-Precio cartón: $50 (ej.)
+**Sistema de Fichas Interno:**
+- Pagos se manejan FUERA de la plataforma
+- Solo se registran movimientos de fichas internos
 
-- **50%** → BINGO pot ($25)
-- **15%** → LÍNEA pot ($7.50)
-- **5%** → JACKPOT pot ($2.50)
-- **30%** → Casa ($15)
+**Distribución de Ingresos Netos:**
+- **10%** → Casa (ganancia neta del negocio)
+- **5%** → Admins (deuda con socios/inversores)
+- **15%** → Cajeros (comisión INDIVIDUAL por sus ventas)
+- **70%** → Pozos (distribución en línea + bingo + acumulativo)
 
-La casa cubre: servidores, staff, mantenimiento, costo de retiros.
+**Cálculos Precisos:**
+- MoneyMath con decimal.js evita errores de punto flotante
+- Todas las operaciones en transacciones atómicas
+- CommissionService calcula 15% por CADA cajero individualmente
 
 ## 🗄️ Base de Datos
 
 ### Tablas Principales
 
-1. **users** - Usuarios con jerarquía multinivel
+1. **users** - Usuarios con roles (player, cajero, admin, superadmin)
 2. **game_sessions** - Partidas activas/completadas
-3. **daily_stock_cards** - 10k cartones por sala/día
-4. **prize_claims** - Premios a cobrar
-5. **audit_revenue** - Money trail completo
+3. **daily_stock_cards** - 10k cartones por sala/día (incluye `seller_id`)
+4. **chips_movements** - Historial completo de fichas (con balance_before/after)
+5. **withdrawal_requests** - Solicitudes de retiro con CBU y regla 20min
+6. **bingo_cards** - Cartones vendidos (vinculados a `seller_id` para comisiones)
+
+### Funciones MySQL
+
+```sql
+-- Verifica regla de 20 minutos para retiros
+CREATE FUNCTION can_process_withdrawal_time_rule(...) RETURNS BOOLEAN;
+
+-- Obtiene minutos desde último crédito
+CREATE FUNCTION get_minutes_since_last_credit(...) RETURNS INT;
+
+-- Procesa retiro completo (atómico)
+CREATE PROCEDURE process_withdrawal_complete(...);
+```
 
 ### Indexes Optimizados
 
@@ -238,6 +280,8 @@ La casa cubre: servidores, staff, mantenimiento, costo de retiros.
 CREATE INDEX idx_available_cards ON daily_stock_cards(room, play_date, status);
 CREATE INDEX idx_daily_stock_date ON daily_stock_cards(play_date);
 CREATE INDEX idx_daily_stock_buyer ON daily_stock_cards(buyer_id, play_date);
+CREATE INDEX idx_chips_movements_user ON chips_movements(user_id, created_at);
+CREATE INDEX idx_withdrawal_status ON withdrawal_requests(status, requested_at);
 ```
 
 ## 🚢 Deployment (Production)
@@ -246,17 +290,18 @@ CREATE INDEX idx_daily_stock_buyer ON daily_stock_cards(buyer_id, play_date);
 - SSL certificate (Let's Encrypt)
 - Nginx con proxy inverso
 - PM2 para process management
-- PostgreSQL backup automático
+- MySQL 8.0 con backup automático (mysqldump)
+- Instalar decimal.js: `npm install decimal.js`
 
-### Subdomios Recomendados
-- `api.24kilates.com` → Server (3000)
+### Subdominios Recomendados
+- `api.24kilates.com` → Server (3001)
 - `jugar.24kilates.com` → Player PWA (5173)
 - `panel.24kilates.com` → Admin (5174)
 
 ### Nginx Config (Ej.)
 ```nginx
 upstream api {
-  server localhost:3000;
+  server localhost:3001;
 }
 
 upstream player {
@@ -308,10 +353,24 @@ npm run test:load
 - `POST /api/game/finish-session` - Terminar partida
 - `GET /api/game/sessions` - Sesiones activas
 
-### Finance
-- `GET /api/finance/balance` - Mi balance
-- `POST /api/finance/withdrawal` - Solicitar retiro
-- `GET /api/finance/transactions` - Historial
+### Chips (Sistema de Fichas)
+- `POST /api/chips/deposit` - Depositar fichas (admin)
+- `GET /api/chips/balance/:userId` - Ver balance de fichas
+- `GET /api/chips/movements/:userId` - Historial de movimientos
+
+### Withdrawals (Retiros)
+- `POST /api/withdrawals/request` - Solicitar retiro (requiere CBU)
+- `POST /api/withdrawals/:id/process` - Procesar retiro (cajero/admin)
+- `POST /api/withdrawals/:id/reject` - Rechazar retiro
+- `GET /api/withdrawals/pending` - Ver retiros pendientes
+- `GET /api/withdrawals/:id/check-permissions` - Verificar permisos 20min
+
+### Admin Dashboard
+- `GET /api/admin/dashboard/stats` - Estadísticas consolidadas
+- `POST /api/admin/broadcast` - Mensaje global (Socket.IO)
+- `GET /api/admin/sessions/stats` - Estadísticas de sesiones
+- `GET /api/admin/users/stats` - Estadísticas de usuarios
+- `GET /api/admin/revenue/breakdown` - Desglose de ingresos
 
 ### Users (Admin)
 - `POST /api/users` - Crear usuario
@@ -320,19 +379,34 @@ npm run test:load
 
 ## 🆘 Troubleshooting
 
-### Puerto 3000 en uso
+### Puerto 3001 en uso
 ```bash
-lsof -i :3000
+# Windows
+netstat -ano | findstr :3001
+taskkill /PID <PID> /F
+
+# Linux/Mac
+lsof -i :3001
 kill -9 <PID>
 ```
 
-### PostgreSQL no conecta
+### MySQL no conecta
 ```bash
-# Verificar servicio
-sudo service postgresql status
+# Windows
+net start MySQL80
 
-# Reiniciar
-sudo service postgresql restart
+# Linux
+sudo service mysql status
+sudo service mysql restart
+
+# Verificar conexión
+mysql -u root -p -e "SELECT VERSION();"
+```
+
+### Error de decimales en cálculos
+```
+Solución: Verificar que MoneyMath se esté usando en lugar de operaciones nativas
+Revisar: PUNTOS_CRITICOS_PRODUCCION.md
 ```
 
 ### Socket.IO desconecta
@@ -348,6 +422,29 @@ Para issues o preguntas, contactar al equipo de desarrollo.
 
 ---
 
-**Versión:** 1.0.0  
-**Última actualización:** 2024  
-**Estado:** Ready for MVP Launch 🚀
+## 🎯 Módulos Implementados
+
+- ✅ **MÓDULO 5:** Victory Checker (detector de ganadores optimizado)
+- ✅ **MÓDULO 7:** Admin Dashboard API (estadísticas en tiempo real)
+- ✅ Sistema de fichas interno con MoneyMath
+- ✅ Retiros con regla de 20 minutos y CBU
+- ✅ Comisiones individuales por cajero (15%)
+- ✅ Transacciones atómicas (ACID compliance)
+- ✅ Socket.IO para mensajes globales
+- ✅ Gamificación completa
+
+## 📚 Documentación Adicional
+
+- `PUNTOS_CRITICOS_PRODUCCION.md` - 3 puntos clave para producción
+- `SISTEMA_RETIROS_20MIN.md` - Documentación completa de retiros
+- `MODULO_7_DASHBOARD_API.md` - API del dashboard administrativo
+- `ROADMAP_COMERCIALIZACION_v2.md` - Plan de comercialización
+- `BACKUP_DEPLOYMENT_GUIDE.md` - Guía de respaldo y deployment
+
+---
+
+**Versión:** 1.3.0  
+**Base de Datos:** MySQL 8.0  
+**Sistema de Pagos:** Externo (solo fichas internas)  
+**Última actualización:** Diciembre 2025  
+**Estado:** Production Ready 🚀
