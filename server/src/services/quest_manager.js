@@ -61,7 +61,7 @@ async function createDailyQuests(userId, questDate = null) {
       // Eliminar misiones previas del mismo día para ese usuario
       await connection.query(
         `DELETE FROM daily_quests 
-         WHERE user_id = ? AND quest_date = ? AND category IN ('daily', 'special')`,
+         WHERE user_id = ? AND quest_date = ?`,
         [userId, date]
       );
 
@@ -75,17 +75,14 @@ async function createDailyQuests(userId, questDate = null) {
       for (const quest of questsToInsert) {
         await connection.query(
           `INSERT INTO daily_quests 
-           (user_id, quest_type, quest_name, description, reward_type, reward_amount, 
-            progress_target, progress_current, quest_date, is_completed)
-           VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, false)`,
+           (user_id, quest_type, quest_name, target_value, xp_reward, quest_date)
+           VALUES (?, ?, ?, ?, ?, ?)`,
           [
             userId,
             quest.type,
             quest.name,
-            quest.description,
-            quest.rewardType,
-            quest.rewardAmount,
             quest.progressTarget,
+            quest.rewardAmount || 50,
             date
           ]
         );
@@ -100,7 +97,7 @@ async function createDailyQuests(userId, questDate = null) {
       };
 
     } finally {
-      client.release();
+      connection.release();
     }
 
   } catch (err) {
@@ -118,27 +115,27 @@ async function getPlayerQuests(userId, questDate = null) {
   try {
     const date = questDate || new Date().toISOString().split('T')[0];
 
-    const result = await pool.query(
-      `SELECT id, quest_type, quest_name, description, is_completed, 
-              reward_type, reward_amount, progress_current, progress_target, completed_at
+    const [result] = await pool.query(
+      `SELECT id, quest_type, quest_name, completed, 
+              xp_reward, current_value, target_value, completed_at
        FROM daily_quests
        WHERE user_id = ? AND quest_date = ?
-       ORDER BY is_completed ASC, quest_name ASC`,
+       ORDER BY completed ASC, quest_name ASC`,
       [userId, date]
     );
 
-    return result[0].map(row => ({
+    return result.map(row => ({
       questId: row.id,
       type: row.quest_type,
       name: row.quest_name,
-      description: row.description,
-      isCompleted: row.is_completed,
-      rewardType: row.reward_type,
-      rewardAmount: row.reward_amount,
+      description: `${row.quest_name} - ${row.current_value}/${row.target_value}`,
+      isCompleted: row.completed === 1,
+      rewardType: 'xp',
+      rewardAmount: row.xp_reward,
       progress: {
-        current: row.progress_current,
-        target: row.progress_target,
-        percent: Math.round((row.progress_current / row.progress_target) * 100)
+        current: row.current_value,
+        target: row.target_value,
+        percent: Math.round((row.current_value / row.target_value) * 100)
       },
       completedAt: row.completed_at
     }));

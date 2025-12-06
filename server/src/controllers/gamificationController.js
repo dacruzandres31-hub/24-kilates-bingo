@@ -75,18 +75,18 @@ exports.getNextLevelRequirement = async (req, res) => {
  */
 exports.getTopPlayers = async (req, res) => {
   try {
-    const limit = req.query.limit || 10;
+    const limit = parseInt(req.query.limit) || 10;
 
     const players = await gamificationEngine.getTopPlayers(limit);
 
     res.json({
       success: true,
-      players
+      topPlayers: players
     });
 
   } catch (error) {
     console.error('❌ getTopPlayers error:', error);
-    res.status(500).json({ error: 'Error al obtener top players' });
+    res.status(500).json({ error: 'Error al obtener top players', details: error.message });
   }
 };
 
