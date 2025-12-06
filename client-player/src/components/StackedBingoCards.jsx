@@ -235,11 +235,21 @@ export default function StackedBingoCards({ gameSessionId, socket, onCardSelect 
                 const { viewConfig } = card;
                 const isExpanded = expandedCard === card.cardId;
                 const isTop = viewConfig.isTop;
+                
+                // Detectar si el cartón está a 1 número de ganar línea
+                const isAlmostWinning = card.lineAnalysis?.some(
+                  line => line.missing === 1 && !line.isComplete
+                );
+                
+                // Encontrar números faltantes para líneas casi completas
+                const missingForWin = card.lineAnalysis
+                  ?.filter(line => line.missing === 1 && !line.isComplete)
+                  .flatMap(line => line.missingNumbers) || [];
 
                 return (
                   <div
                     key={card.cardId}
-                    className={`bingo-card-stacked ${isExpanded ? 'expanded' : ''} ${isTop ? 'top-card' : ''}`}
+                    className={`bingo-card-stacked ${isExpanded ? 'expanded' : ''} ${isTop ? 'top-card' : ''} ${isAlmostWinning ? 'card-almost-winning' : ''}`}
                     style={{
                       zIndex: isExpanded ? 9999 : viewConfig.zIndex,
                       transform: isExpanded 
@@ -255,6 +265,7 @@ export default function StackedBingoCards({ gameSessionId, socket, onCardSelect 
                       <span className="badge-position">#{index + 1}</span>
                       <span className="badge-progress">{card.progress}%</span>
                       {isTop && <span className="badge-best">★ MEJOR</span>}
+                      {isAlmostWinning && <span className="badge-almost-winning">⚡ CASI</span>}
                     </div>
 
                     {/* Cerrar expandido */}
@@ -280,7 +291,7 @@ export default function StackedBingoCards({ gameSessionId, socket, onCardSelect 
                         <span>O</span>
                       </div>
 
-                      {card.markedPositions && renderGrid(card.markedPositions)}
+                      {card.markedPositions && renderGrid(card.markedPositions, missingForWin)}
                     </div>
 
                     {/* Información de líneas cercanas (solo cartón superior o expandido) */}
@@ -345,8 +356,10 @@ export default function StackedBingoCards({ gameSessionId, socket, onCardSelect 
 }
 
 // Helper: Renderizar grid 5x5
-const renderGrid = (positions) => {
+const renderGrid = (positions, missingForWin = []) => {
   const rows = [];
+  const missingSet = new Set(missingForWin);
+  
   for (let row = 0; row < 5; row++) {
     const cells = [];
     for (let col = 0; col < 5; col++) {
@@ -354,11 +367,12 @@ const renderGrid = (positions) => {
       const isFree = row === 2 && col === 2;
       const isMarked = pos?.marked || isFree;
       const number = isFree ? 'FREE' : pos?.number;
+      const isMissingForWin = !isFree && missingSet.has(number);
 
       cells.push(
         <div
           key={`${row}-${col}`}
-          className={`grid-cell ${isMarked ? 'marked' : ''} ${isFree ? 'free' : ''}`}
+          className={`grid-cell ${isMarked ? 'marked' : ''} ${isFree ? 'free' : ''} ${isMissingForWin ? 'missing-for-win' : ''}`}
         >
           {isFree ? '★' : number}
         </div>

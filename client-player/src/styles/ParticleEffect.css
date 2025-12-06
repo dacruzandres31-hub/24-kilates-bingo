@@ -1,0 +1,121 @@
+/* ============================
+   PARTICLE EFFECT (LINE WINS)
+   ============================ */
+
+.particle-container {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 9998;
+  width: 0;
+  height: 0;
+}
+
+.particle-burst {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.particle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 50%;
+  animation: particle-burst 1.5s ease-out forwards;
+  will-change: transform, opacity;
+  box-shadow: 0 0 4px currentColor;
+}
+
+/* Animación de explosión radial */
+@keyframes particle-burst {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: 
+      translate(
+        calc(cos(var(--angle)) * 150px * var(--speed)),
+        calc(sin(var(--angle)) * 150px * var(--speed))
+      ) 
+      scale(0);
+    opacity: 0;
+  }
+}
+
+/* Efecto de pulso en el centro */
+.particle-burst::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,0.8), transparent);
+  animation: center-pulse 0.6s ease-out;
+}
+
+@keyframes center-pulse {
+  0% {
+    transform: scale(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(3);
+    opacity: 0;
+  }
+}
+
+/* Variaciones para diferentes tipos de línea */
+.particle-container[data-line-type="horizontal"] .particle {
+  animation-duration: 1.2s;
+}
+
+.particle-container[data-line-type="vertical"] .particle {
+  animation-duration: 1.3s;
+}
+
+.particle-container[data-line-type="diagonal"] .particle {
+  animation-duration: 1.5s;
+  box-shadow: 0 0 8px currentColor;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .particle {
+    animation: particle-burst-simple 1s ease-out forwards;
+  }
+  
+  @keyframes particle-burst-simple {
+    from {
+      opacity: 1;
+      transform: scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: scale(0);
+    }
+  }
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  @keyframes particle-burst {
+    100% {
+      transform: 
+        translate(
+          calc(cos(var(--angle)) * 100px * var(--speed)),
+          calc(sin(var(--angle)) * 100px * var(--speed))
+        ) 
+        scale(0);
+      opacity: 0;
+    }
+  }
+}

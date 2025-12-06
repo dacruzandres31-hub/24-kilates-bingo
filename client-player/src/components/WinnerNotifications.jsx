@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Trophy, DollarSign, X, Sparkles } from 'lucide-react';
+import ConfettiEffect from './ConfettiEffect';
+import ParticleEffect from './ParticleEffect';
 import '../styles/WinnerNotifications.css';
 
 /**
@@ -15,12 +17,17 @@ import '../styles/WinnerNotifications.css';
  * - Animaciones de entrada/salida
  * - Diferentes estilos por tipo de premio
  * - Formulario de retiro modal
+ * - Confetti en BINGO wins
+ * - Partículas en line wins
  */
 
 export default function WinnerNotifications({ socket, currentUser }) {
   const [notifications, setNotifications] = useState([]);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [winnerInfo, setWinnerInfo] = useState(null);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [showParticles, setShowParticles] = useState(false);
+  const [particleLineType, setParticleLineType] = useState('horizontal');
   const notificationIdRef = useRef(0);
 
   useEffect(() => {
@@ -37,11 +44,17 @@ export default function WinnerNotifications({ socket, currentUser }) {
         isMe: currentUser && data.username === currentUser.username
       });
 
-      // Si soy yo, vibrar dispositivo
+      // Si soy yo, efectos especiales
       if (currentUser && data.username === currentUser.username) {
+        // Vibrar dispositivo
         if ('vibrate' in navigator) {
           navigator.vibrate([200, 100, 200]);
         }
+        
+        // Mostrar partículas
+        setParticleLineType(data.lineType || 'horizontal');
+        setShowParticles(true);
+        setTimeout(() => setShowParticles(false), 1600);
       }
     });
 
@@ -55,11 +68,16 @@ export default function WinnerNotifications({ socket, currentUser }) {
         isMe: currentUser && data.username === currentUser.username
       });
 
-      // Si soy yo, vibrar intenso
+      // Si soy yo, efectos especiales intensos
       if (currentUser && data.username === currentUser.username) {
+        // Vibrar intenso
         if ('vibrate' in navigator) {
           navigator.vibrate([300, 100, 300, 100, 300]);
         }
+        
+        // Mostrar confetti
+        setShowConfetti(true);
+        setTimeout(() => setShowConfetti(false), 3100);
       }
     });
 
@@ -149,6 +167,20 @@ export default function WinnerNotifications({ socket, currentUser }) {
 
   return (
     <>
+      {/* Efectos visuales */}
+      <ConfettiEffect 
+        isActive={showConfetti} 
+        duration={3000}
+        onComplete={() => setShowConfetti(false)}
+      />
+      
+      <ParticleEffect 
+        isActive={showParticles}
+        lineType={particleLineType}
+        duration={1500}
+        onComplete={() => setShowParticles(false)}
+      />
+
       {/* Stack de notificaciones */}
       <div className="winner-notifications-stack">
         {notifications.map((notif, index) => (

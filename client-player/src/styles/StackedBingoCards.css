@@ -590,3 +590,123 @@
     padding: 3px 8px;
   }
 }
+
+/* ============================
+   SHAKE EFFECT (ALMOST WIN)
+   ============================ */
+
+/* Shake cuando el cartón está a 1 número de ganar */
+@keyframes shake-horizontal {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-8px); }
+  20%, 40%, 60%, 80% { transform: translateX(8px); }
+}
+
+@keyframes shake-scale {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { 
+    box-shadow: 0 4px 20px rgba(255, 215, 0, 0.3);
+  }
+  50% { 
+    box-shadow: 0 4px 30px rgba(255, 215, 0, 0.6), 
+                0 0 40px rgba(255, 215, 0, 0.4);
+  }
+}
+
+/* Clase para cartón a punto de ganar */
+.card-almost-winning {
+  animation: 
+    shake-horizontal 0.6s ease-in-out infinite,
+    pulse-glow 1.5s ease-in-out infinite;
+}
+
+/* Variante para cartón con alta probabilidad */
+.card-high-priority {
+  animation: shake-scale 0.8s ease-in-out infinite;
+  border-color: #FFD700 !important;
+  box-shadow: 0 4px 25px rgba(255, 215, 0, 0.5);
+}
+
+/* Badge especial para cartón casi ganador */
+.badge-almost-winning {
+  background: linear-gradient(135deg, #FFD700 0%, #FFA000 100%);
+  color: #000;
+  font-weight: 700;
+  animation: pulse-badge 1s ease-in-out infinite;
+}
+
+@keyframes pulse-badge {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+/* Efecto de brillo en números faltantes */
+.grid-cell.missing-for-win {
+  animation: highlight-missing 1.5s ease-in-out infinite;
+  position: relative;
+}
+
+@keyframes highlight-missing {
+  0%, 100% {
+    background-color: #fff3cd;
+    box-shadow: 0 0 0 rgba(255, 215, 0, 0);
+  }
+  50% {
+    background-color: #ffe082;
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
+  }
+}
+
+/* Indicador visual en el cartón */
+.card-almost-winning::before {
+  content: '⚡';
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 24px;
+  animation: rotate-icon 2s linear infinite;
+  z-index: 10;
+}
+
+@keyframes rotate-icon {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Reduced motion para accesibilidad */
+@media (prefers-reduced-motion: reduce) {
+  .card-almost-winning,
+  .card-high-priority {
+    animation: none;
+    border-color: #FFD700 !important;
+    box-shadow: 0 4px 20px rgba(255, 215, 0, 0.5);
+  }
+  
+  .grid-cell.missing-for-win {
+    animation: none;
+    background-color: #ffe082;
+  }
+  
+  .card-almost-winning::before {
+    animation: none;
+  }
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  @keyframes shake-horizontal {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+    20%, 40%, 60%, 80% { transform: translateX(5px); }
+  }
+  
+  .card-almost-winning::before {
+    font-size: 18px;
+    top: 5px;
+    right: 5px;
+  }
+}
