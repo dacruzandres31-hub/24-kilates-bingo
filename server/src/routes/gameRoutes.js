@@ -15,7 +15,7 @@ const router = express.Router();
  */
 
 // Todos requieren autenticación
-router.use(authMiddleware);
+router.use(authMiddleware.authenticateToken);
 
 // Comprar cartón
 router.post('/buy-card', gameController.buyCard);

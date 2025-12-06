@@ -34,7 +34,7 @@ const authMiddleware = require('../middleware/authMiddleware');
  *   "cardsAssigned": 1
  * }
  */
-router.post('/buy-card', authMiddleware, async (req, res) => {
+router.post('/buy-card', authMiddleware.authenticateToken, async (req, res) => {
   req.body.userId = req.user.id;
   await shopController.buyCard(req, res);
 });
@@ -59,7 +59,7 @@ router.post('/buy-card', authMiddleware, async (req, res) => {
  *   "total": 3
  * }
  */
-router.get('/my-tickets', authMiddleware, async (req, res) => {
+router.get('/my-tickets', authMiddleware.authenticateToken, async (req, res) => {
   req.params.userId = req.user.id;
   await shopController.getUserTickets(req, res);
 });
@@ -81,7 +81,7 @@ router.get('/my-tickets', authMiddleware, async (req, res) => {
  *   "remaining": 2
  * }
  */
-router.post('/consume-ticket', authMiddleware, async (req, res) => {
+router.post('/consume-ticket', authMiddleware.authenticateToken, async (req, res) => {
   req.body.userId = req.user.id;
   await shopController.consumeTicket(req, res);
 });

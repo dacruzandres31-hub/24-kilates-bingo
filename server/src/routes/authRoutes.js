@@ -20,12 +20,12 @@ router.post('/register', authController.register);
 router.post('/login', authController.login);
 
 // Refresh token (con autenticación)
-router.post('/refresh', authMiddleware, authController.refreshToken);
+router.post('/refresh', authMiddleware.authenticateToken, authController.refreshToken);
 
 // Logout (con autenticación)
-router.post('/logout', authMiddleware, authController.logout);
+router.post('/logout', authMiddleware.authenticateToken, authController.logout);
 
 // Verificar token (con autenticación)
-router.get('/verify', authMiddleware, authController.verifyToken);
+router.get('/verify', authMiddleware.authenticateToken, authController.verifyToken);
 
 module.exports = router;

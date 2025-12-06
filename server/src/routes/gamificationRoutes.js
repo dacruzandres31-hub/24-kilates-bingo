@@ -15,58 +15,58 @@ const router = express.Router();
  * GET /api/gamification/progress
  * Obtener progreso de XP y nivel del jugador actual
  */
-router.get('/progress', authMiddleware, gamificationController.getPlayerProgress);
+router.get('/progress', authMiddleware.authenticateToken, gamificationController.getPlayerProgress);
 
 /**
  * GET /api/gamification/levels
  * Obtener configuración de todos los niveles
  */
-router.get('/levels', authMiddleware, gamificationController.getLevels);
+router.get('/levels', authMiddleware.authenticateToken, gamificationController.getLevels);
 
 /**
  * GET /api/gamification/next-level
  * Obtener requisitos para próximo nivel
  */
-router.get('/next-level', authMiddleware, gamificationController.getNextLevelRequirement);
+router.get('/next-level', authMiddleware.authenticateToken, gamificationController.getNextLevelRequirement);
 
 /**
  * GET /api/gamification/top-players
  * Obtener top jugadores por XP
  * Query params: ?limit=10
  */
-router.get('/top-players', authMiddleware, gamificationController.getTopPlayers);
+router.get('/top-players', authMiddleware.authenticateToken, gamificationController.getTopPlayers);
 
 /**
  * GET /api/gamification/quests
  * Obtener misiones del jugador
  * Query params: ?date=YYYY-MM-DD (opcional)
  */
-router.get('/quests', authMiddleware, gamificationController.getPlayerQuests);
+router.get('/quests', authMiddleware.authenticateToken, gamificationController.getPlayerQuests);
 
 /**
  * GET /api/gamification/quest-stats
  * Obtener estadísticas de misiones del día
  */
-router.get('/quest-stats', authMiddleware, gamificationController.getQuestStats);
+router.get('/quest-stats', authMiddleware.authenticateToken, gamificationController.getQuestStats);
 
 /**
  * GET /api/gamification/ranking/weekly
  * Obtener ranking semanal de agentes
  * Query params: ?week=YYYY-MM-DD (opcional)
  */
-router.get('/ranking/weekly', authMiddleware, gamificationController.getWeeklyRanking);
+router.get('/ranking/weekly', authMiddleware.authenticateToken, gamificationController.getWeeklyRanking);
 
 /**
  * GET /api/gamification/agent/:agentId/stats
  * Obtener estadísticas del agente
  */
-router.get('/agent/:agentId/stats', authMiddleware, gamificationController.getAgentStats);
+router.get('/agent/:agentId/stats', authMiddleware.authenticateToken, gamificationController.getAgentStats);
 
 /**
  * GET /api/gamification/agent/:agentId/achievements
  * Obtener logros del agente
  */
-router.get('/agent/:agentId/achievements', authMiddleware, gamificationController.getAgentAchievements);
+router.get('/agent/:agentId/achievements', authMiddleware.authenticateToken, gamificationController.getAgentAchievements);
 
 // ========== RUTAS ADMIN ==========
 
@@ -75,13 +75,13 @@ router.get('/agent/:agentId/achievements', authMiddleware, gamificationControlle
  * [SUPERADMIN] Inicializar progreso para nuevo usuario
  * Body: { userId }
  */
-router.post('/admin/initialize-player', authMiddleware, gamificationController.initializePlayerProgress);
+router.post('/admin/initialize-player', authMiddleware.authenticateToken, gamificationController.initializePlayerProgress);
 
 /**
  * POST /api/gamification/admin/unlock-achievement
  * [SUPERADMIN] Desbloquear logro manualmente
  * Body: { agentId, achievementType }
  */
-router.post('/admin/unlock-achievement', authMiddleware, gamificationController.unlockAchievementAdmin);
+router.post('/admin/unlock-achievement', authMiddleware.authenticateToken, gamificationController.unlockAchievementAdmin);
 
 module.exports = router;

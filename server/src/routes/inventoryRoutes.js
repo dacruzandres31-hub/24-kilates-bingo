@@ -10,7 +10,7 @@ const authMiddleware = require('../middleware/authMiddleware');
 const router = express.Router();
 
 // Todas las rutas requieren autenticación
-router.use(authMiddleware);
+router.use(authMiddleware.authenticateToken);
 
 // GET - Obtener inventario
 router.get('/', inventoryController.getInventory);
