@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import '../styles/CasinoLobby.css';
 
 export default function CasinoLobby() {
-  const navigate = useNavigate();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [tickerOffset, setTickerOffset] = useState(0);
   const [roomPots, setRoomPots] = useState({
@@ -134,13 +133,6 @@ export default function CasinoLobby() {
     }).format(amount);
   };
 
-  const handleRoomClick = (room) => {
-    if (room.status === 'available') {
-      // Navegar a la sala seleccionada
-      navigate(`/room/${room.id}`);
-    }
-  };
-
   const getTimeStatus = (roomTime) => {
     const current = currentTime.getHours() * 60 + currentTime.getMinutes();
     const [hours, minutes] = roomTime.split(':').map(Number);
@@ -182,10 +174,9 @@ export default function CasinoLobby() {
           const timeStatus = getTimeStatus(room.time);
           
           return (
+            <Link to={`/sala/${room.id}`} key={room.id} className="room-link">
             <div
-              key={room.id}
               className={`room-card room-${room.color} ${room.featured ? 'featured' : ''} ${timeStatus}`}
-              onClick={() => handleRoomClick(room)}
               style={{
                 background: room.gradient,
                 boxShadow: room.glow,
@@ -300,6 +291,7 @@ export default function CasinoLobby() {
               {/* Efecto de brillo al hover */}
               <div className="room-shine"></div>
             </div>
+            </Link>
           );
         })}
       </div>

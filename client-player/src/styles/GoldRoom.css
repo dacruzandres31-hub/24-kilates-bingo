@@ -1,0 +1,224 @@
+/* === GOLD ROOM - LUXURY THEME === */
+
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Roboto:wght@300;400&display=swap');
+
+.gold-room-container {
+  background: radial-gradient(ellipse at center, #1a1a1a 0%, #000000 100%);
+  color: #E0C56E; /* Tono dorado pálido */
+  font-family: 'Roboto', sans-serif;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  text-shadow: 0 0 5px rgba(224, 197, 110, 0.3);
+  border: 2px solid #4a3f1e;
+  box-shadow: 0 0 30px rgba(224, 197, 110, 0.2) inset;
+}
+
+/* --- Header --- */
+.gold-room-header {
+  padding: 20px 40px;
+  background: rgba(10, 10, 10, 0.5);
+  border-bottom: 1px solid #4a3f1e;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+}
+
+.room-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 2.8rem;
+  font-weight: 700;
+  color: #F9E79F;
+  letter-spacing: 2px;
+  margin: 0;
+  text-transform: uppercase;
+  text-shadow: 0 0 15px #F9E79F, 0 0 25px #F9E79F;
+}
+
+.header-pots {
+  display: flex;
+  gap: 30px;
+}
+
+.pot-display {
+  background: linear-gradient(145deg, #2a2a2a, #1a1a1a);
+  border: 1px solid #5a4d2c;
+  border-radius: 10px;
+  padding: 10px 20px;
+  text-align: center;
+  min-width: 180px;
+  box-shadow: 0 0 15px rgba(0,0,0,0.7);
+  transition: all 0.3s ease;
+}
+
+.pot-display:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.5), 0 0 25px #E0C56E;
+}
+
+.pot-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.pot-title {
+  font-size: 1rem;
+  font-weight: 400;
+  color: #D4AF37;
+  text-transform: uppercase;
+}
+
+.pot-amount {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.pot-amount-value {
+    color: #F9E79F;
+}
+
+/* --- Main Content --- */
+.gold-room-main {
+  display: flex;
+  flex-grow: 1;
+  padding: 30px 40px;
+  gap: 30px;
+}
+
+.left-panel, .right-panel {
+  background: rgba(10, 10, 10, 0.3);
+  border: 1px solid #4a3f1e;
+  border-radius: 15px;
+  padding: 25px;
+  box-shadow: 0 0 20px rgba(0,0,0,0.6) inset;
+}
+
+.left-panel {
+  flex: 0 0 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+.right-panel {
+  flex-grow: 1;
+}
+
+/* --- Last Number Display --- */
+.last-number-display {
+    background: radial-gradient(circle, #4a3f1e 0%, #1a1a1a 70%);
+    border-radius: 50%;
+    width: 250px;
+    height: 250px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 0 auto;
+    box-shadow: 0 0 30px #D4AF37, 0 0 50px #000 inset;
+    border: 3px solid #D4AF37;
+}
+
+.last-number-value {
+    font-family: 'Playfair Display', serif;
+    font-size: 10rem;
+    color: #FFFFFF;
+    text-shadow: 0 0 15px #fff, 0 0 30px #F9E79F;
+    animation: pulse-gold 2s infinite;
+}
+
+@keyframes pulse-gold {
+    0% { transform: scale(1); text-shadow: 0 0 15px #fff, 0 0 30px #F9E79F; }
+    50% { transform: scale(1.05); text-shadow: 0 0 25px #fff, 0 0 45px #F9E79F; }
+    100% { transform: scale(1); text-shadow: 0 0 15px #fff, 0 0 30px #F9E79F; }
+}
+
+.last-number-display-placeholder {
+    /* Estilos para el placeholder de carga */
+    color: #D4AF37;
+    text-align: center;
+    font-size: 1.5rem;
+}
+
+/* --- Game Info --- */
+.game-info {
+  background: rgba(0,0,0,0.3);
+  border-radius: 10px;
+  padding: 20px;
+  border-top: 1px solid #4a3f1e;
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 1.1rem;
+  margin-bottom: 15px;
+}
+
+.info-label {
+  color: #D4AF37;
+  font-weight: 300;
+  text-transform: uppercase;
+}
+
+.info-value {
+  color: #fff;
+  font-weight: 700;
+  font-size: 1.3rem;
+}
+
+.info-value.status {
+    color: #28a745; /* Verde para estado 'Activo' */
+    text-shadow: 0 0 10px #28a745;
+}
+
+/* --- Number Grid --- */
+.number-grid-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+}
+
+.number-grid {
+  display: grid;
+  grid-template-columns: repeat(15, 1fr);
+  gap: 8px;
+  max-width: 800px;
+}
+
+.grid-ball {
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 1.2rem;
+  font-weight: 700;
+  background: linear-gradient(145deg, #333, #111);
+  color: #888;
+  border: 1px solid #444;
+  transition: all 0.4s ease;
+}
+
+.grid-ball.drawn {
+  background: radial-gradient(circle, #F9E79F 0%, #D4AF37 100%);
+  color: #000;
+  font-weight: bold;
+  transform: scale(1.1);
+  box-shadow: 0 0 15px #F9E79F, 0 0 5px #fff inset;
+  border-color: #F9E79F;
+}
+
+/* --- Font Awesome Icons (si los usas) --- */
+.fas {
+    color: #D4AF37;
+    margin-right: 5px;
+}
