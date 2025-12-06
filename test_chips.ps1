@@ -38,13 +38,17 @@ try {
     Write-Host " FAIL - $($_.Exception.Response.StatusCode)" -ForegroundColor Red
 }
 
-# TEST 2: Get Balance by ID
-Write-Host "`n[2/6] GET Balance by ID..." -ForegroundColor Yellow
+# TEST 2: Get Balance by ID (should fail - admin only route)
+Write-Host "`n[2/6] GET Balance by ID (admin route)..." -ForegroundColor Yellow
 try {
-    $response = Invoke-RestMethod -Uri "$BaseURL/api/chips/balance/$userId" -Headers $authHeaders
-    Write-Host " PASS - Balance: $($response.balance)" -ForegroundColor Green
+    $response = Invoke-RestMethod -Uri "$BaseURL/api/chips/balance/$userId" -Headers $authHeaders -ErrorAction Stop
+    Write-Host " UNEXPECTED PASS - This route should require admin" -ForegroundColor Yellow
 } catch {
-    Write-Host " FAIL - $($_.Exception.Response.StatusCode)" -ForegroundColor Red
+    if ($_.Exception.Response.StatusCode.value__ -eq 403) {
+        Write-Host " PASS - Correctly denied (403 Forbidden)" -ForegroundColor Green
+    } else {
+        Write-Host " FAIL - Wrong error: $($_.Exception.Response.StatusCode)" -ForegroundColor Red
+    }
 }
 
 # TEST 3: Get History
@@ -84,7 +88,7 @@ try {
     }
 }
 
-# TEST 6: Transfer (if implemented)
+# TEST 6: Transfer (should fail with insufficient balance)
 Write-Host "`n[6/6] POST Transfer..." -ForegroundColor Yellow
 $transferBody = @{
     toUserId = 1
@@ -94,12 +98,12 @@ $transferBody = @{
 
 try {
     $response = Invoke-RestMethod -Uri "$BaseURL/api/chips/transfer" -Method Post -Headers $authHeaders -Body $transferBody -ErrorAction Stop
-    Write-Host " PASS - Transfer: $($response.success)" -ForegroundColor Green
+    Write-Host " UNEXPECTED PASS - Should fail with 0 balance" -ForegroundColor Yellow
 } catch {
     if ($_.Exception.Response.StatusCode.value__ -eq 400) {
-        Write-Host " EXPECTED FAIL - Insufficient balance" -ForegroundColor Yellow
+        Write-Host " PASS - Correctly rejected (400 Insufficient balance)" -ForegroundColor Green
     } else {
-        Write-Host " FAIL - $($_.Exception.Response.StatusCode)" -ForegroundColor Red
+        Write-Host " FAIL - Wrong status code: $($_.Exception.Response.StatusCode.value__)" -ForegroundColor Red
     }
 }
 

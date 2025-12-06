@@ -10,7 +10,7 @@ const ChipsService = require('../services/chipsService');
 exports.depositChips = async (req, res) => {
   try {
     const { userId, amount, reason } = req.body;
-    const adminId = req.user.id; // Asumiendo middleware de autenticación
+    const adminId = req.user.userId; // Asumiendo middleware de autenticación
 
     if (!userId || !amount) {
       return res.status(400).json({
@@ -47,7 +47,7 @@ exports.depositChips = async (req, res) => {
 exports.withdrawChips = async (req, res) => {
   try {
     const { userId, amount, reason } = req.body;
-    const adminId = req.user.id;
+    const adminId = req.user.userId;
 
     if (!userId || !amount) {
       return res.status(400).json({
@@ -83,8 +83,8 @@ exports.withdrawChips = async (req, res) => {
 // ============================================
 exports.transferChips = async (req, res) => {
   try {
-    const { toUserId, amount, reason } = req.body;
-    const fromUserId = req.user.id; // Usuario que envía
+    const { toUserId, amount, description } = req.body;
+    const fromUserId = req.user.userId; // Usuario que envía
 
     if (!toUserId || !amount) {
       return res.status(400).json({
@@ -97,7 +97,7 @@ exports.transferChips = async (req, res) => {
       fromUserId,
       toUserId,
       parseFloat(amount),
-      reason || 'Transferencia entre usuarios'
+      description || 'Transferencia entre usuarios'
     );
 
     res.json({
@@ -108,6 +108,17 @@ exports.transferChips = async (req, res) => {
 
   } catch (error) {
     console.error('Error en transferencia de fichas:', error);
+    
+    // Business logic errors should return 400
+    if (error.message.includes('insuficientes') || 
+        error.message.includes('no encontrado') ||
+        error.message.includes('mismo')) {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+    
     res.status(500).json({
       success: false,
       message: error.message
@@ -121,7 +132,7 @@ exports.transferChips = async (req, res) => {
 exports.adjustChips = async (req, res) => {
   try {
     const { userId, amount, reason } = req.body;
-    const adminId = req.user.id;
+    const adminId = req.user.userId;
 
     if (!userId || !amount || !reason) {
       return res.status(400).json({
@@ -157,7 +168,7 @@ exports.adjustChips = async (req, res) => {
 // ============================================
 exports.getMovementHistory = async (req, res) => {
   try {
-    const userId = req.params.userId || req.user.id;
+    const userId = req.params.userId || req.user.userId;
     const { movementType, startDate, endDate, limit, offset } = req.query;
 
     const filters = {
@@ -212,7 +223,7 @@ exports.auditUserBalance = async (req, res) => {
 // ============================================
 exports.getMovementStats = async (req, res) => {
   try {
-    const userId = req.params.userId || req.user.id;
+    const userId = req.params.userId || req.user.userId;
     const { period } = req.query; // '7d', '30d', '90d'
 
     const result = await ChipsService.getMovementStats(userId, period || '30d');
@@ -236,7 +247,7 @@ exports.getMovementStats = async (req, res) => {
 // ============================================
 exports.getUserBalance = async (req, res) => {
   try {
-    const userId = req.params.userId || req.user.id;
+    const userId = req.params.userId || req.user.userId;
     
     const pool = require('../db');
     const [users] = await pool.query(
