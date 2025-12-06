@@ -1,0 +1,1432 @@
+/* ============================================
+   SALA PLATA - FUTURISMO, ALTA TECNOLOGÍA
+   Paleta: Plata Cromada, Gris Acero, Blanco Hielo, Azul Frío
+   ============================================ */
+
+.silver-room {
+  min-height: 100vh;
+  background: #0a0e14;
+  background-image: 
+    radial-gradient(circle at 30% 20%, rgba(0, 212, 255, 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 70% 80%, rgba(192, 192, 192, 0.05) 0%, transparent 50%),
+    linear-gradient(180deg, #0a0e14 0%, #121820 100%);
+  color: #e0e8f0;
+  display: flex;
+  flex-direction: column;
+  padding: 15px;
+  overflow-x: hidden;
+  font-family: 'Segoe UI', 'Roboto', sans-serif;
+}
+
+/* ============================================
+   HEADER FUTURISTA
+   ============================================ */
+
+.silver-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 30px;
+  background: 
+    linear-gradient(135deg, rgba(192, 192, 192, 0.15), rgba(160, 168, 176, 0.1)),
+    linear-gradient(to right, rgba(0, 212, 255, 0.05), transparent);
+  border: 2px solid rgba(192, 192, 192, 0.3);
+  border-radius: 12px;
+  box-shadow: 
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 8px 20px rgba(0, 0, 0, 0.6),
+    0 0 40px rgba(0, 212, 255, 0.1);
+  margin-bottom: 15px;
+  position: relative;
+  backdrop-filter: blur(10px);
+}
+
+.silver-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.5), transparent);
+}
+
+.room-title-silver {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.title-icon-silver {
+  font-size: 2.5rem;
+  filter: drop-shadow(0 0 10px rgba(192, 192, 192, 0.8));
+}
+
+.title-text-chrome {
+  font-size: 2rem;
+  font-weight: 300;
+  letter-spacing: 8px;
+  background: linear-gradient(135deg, #ffffff 0%, #c0c0c0 30%, #e0e8f0 60%, #c0c0c0 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+  font-weight: 700;
+}
+
+.title-chip {
+  background: linear-gradient(135deg, #c0c0c0, #a0a8b0);
+  color: #0a0e14;
+  padding: 8px 20px;
+  border-radius: 20px;
+  font-weight: 900;
+  font-size: 1.1rem;
+  letter-spacing: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 4px 10px rgba(0, 0, 0, 0.5),
+    0 0 20px rgba(192, 192, 192, 0.3);
+}
+
+.game-info-silver {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+
+.info-display-digital {
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  border-radius: 10px;
+  padding: 12px 20px;
+  box-shadow: 
+    inset 0 2px 6px rgba(0, 0, 0, 0.8),
+    0 0 20px rgba(0, 212, 255, 0.2);
+}
+
+.digital-label {
+  font-size: 0.65rem;
+  color: #00d4ff;
+  letter-spacing: 2px;
+  font-weight: 700;
+  margin-bottom: 5px;
+  text-align: center;
+}
+
+.digital-counter {
+  font-family: 'Courier New', monospace;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #ffffff;
+  text-align: center;
+  text-shadow: 0 0 15px rgba(0, 212, 255, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.counter-digit {
+  color: #00d4ff;
+}
+
+.counter-separator {
+  color: rgba(192, 192, 192, 0.5);
+}
+
+.counter-max {
+  color: rgba(192, 192, 192, 0.8);
+}
+
+.status-led {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  border-radius: 10px;
+  padding: 12px 20px;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.8);
+}
+
+.led-ring {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 212, 255, 0.3);
+  left: 12px;
+}
+
+.led-core {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.3);
+  margin-left: 2px;
+}
+
+.status-led.waiting .led-core {
+  background: #a0a8b0;
+  box-shadow: 0 0 10px #a0a8b0;
+}
+
+.status-led.active .led-core {
+  background: #00d4ff;
+  box-shadow: 
+    0 0 20px #00d4ff,
+    0 0 40px rgba(0, 212, 255, 0.5);
+  animation: led-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes led-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.status-led.active .led-ring {
+  border-color: #00d4ff;
+  animation: ring-expand 1.5s ease-in-out infinite;
+}
+
+@keyframes ring-expand {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.3; }
+}
+
+.status-led.ended .led-core {
+  background: #4a5a6a;
+  box-shadow: none;
+}
+
+.status-text-silver {
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #00d4ff;
+  padding-left: 20px;
+}
+
+/* ============================================
+   MITAD SUPERIOR - LA MESA
+   ============================================ */
+
+.game-table-silver {
+  display: grid;
+  grid-template-columns: 60% 40%;
+  gap: 20px;
+  padding: 20px;
+  background: 
+    linear-gradient(135deg, rgba(10, 14, 20, 0.95), rgba(18, 24, 32, 0.95)),
+    radial-gradient(circle at 50% 50%, rgba(0, 212, 255, 0.03), transparent 70%);
+  border: 2px solid rgba(192, 192, 192, 0.2);
+  border-radius: 15px;
+  box-shadow: 
+    inset 0 2px 10px rgba(0, 0, 0, 0.8),
+    0 8px 25px rgba(0, 0, 0, 0.7),
+    0 0 50px rgba(0, 212, 255, 0.1);
+  min-height: 45vh;
+  position: relative;
+}
+
+/* ============================================
+   PANEL HOLOGRÁFICO (IZQUIERDA)
+   ============================================ */
+
+.holographic-panel {
+  position: relative;
+  background: 
+    linear-gradient(135deg, rgba(0, 212, 255, 0.03), rgba(192, 192, 192, 0.02)),
+    linear-gradient(to bottom, transparent, rgba(0, 212, 255, 0.05));
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 
+    inset 0 0 30px rgba(0, 212, 255, 0.1),
+    0 0 30px rgba(0, 212, 255, 0.15);
+  backdrop-filter: blur(5px);
+}
+
+.glass-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, transparent 50%),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.08), transparent 30%);
+  pointer-events: none;
+  border-radius: 12px;
+}
+
+.grid-title-silver {
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.title-chip-small {
+  display: inline-block;
+  background: rgba(0, 212, 255, 0.15);
+  color: #00d4ff;
+  padding: 6px 20px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  border: 1px solid rgba(0, 212, 255, 0.4);
+  box-shadow: 
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 0 15px rgba(0, 212, 255, 0.3);
+}
+
+.holographic-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+}
+
+.holo-column {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.column-header-silver {
+  text-align: center;
+  padding: 10px 5px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  border-radius: 8px;
+  box-shadow: 
+    inset 0 1px 3px rgba(0, 0, 0, 0.8),
+    0 0 10px rgba(0, 212, 255, 0.2);
+}
+
+.header-letter-chrome {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #ffffff, #c0c0c0, #e0e8f0);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1;
+}
+
+.header-range-silver {
+  display: block;
+  font-size: 0.65rem;
+  color: rgba(0, 212, 255, 0.7);
+  margin-top: 3px;
+  letter-spacing: 1px;
+}
+
+.holo-numbers {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.holo-cell {
+  position: relative;
+  height: 30px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(0, 212, 255, 0.2);
+  border-radius: 6px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.cell-glass {
+  position: relative;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: 
+    linear-gradient(135deg, rgba(255, 255, 255, 0.02), transparent);
+  z-index: 1;
+}
+
+.laser-number {
+  font-size: 1.1rem;
+  font-weight: 900;
+  text-shadow: 
+    0 0 10px currentColor,
+    0 0 20px currentColor,
+    0 0 30px currentColor;
+  animation: laser-flicker 0.1s infinite alternate;
+}
+
+@keyframes laser-flicker {
+  0% { opacity: 0.95; }
+  100% { opacity: 1; }
+}
+
+.holo-cell.projected {
+  background: rgba(0, 212, 255, 0.1);
+  border-color: rgba(0, 212, 255, 0.6);
+  box-shadow: 
+    inset 0 0 10px rgba(0, 212, 255, 0.3),
+    0 0 15px rgba(0, 212, 255, 0.4);
+}
+
+.holo-cell.pulsing {
+  animation: cell-pulse 1s ease-in-out infinite;
+}
+
+@keyframes cell-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.cell-flare {
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.4), transparent);
+  animation: flare-sweep 2s ease-in-out infinite;
+  z-index: 2;
+}
+
+@keyframes flare-sweep {
+  0% { left: -100%; }
+  100% { left: 100%; }
+}
+
+.dormant-number {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: rgba(192, 192, 192, 0.2);
+}
+
+/* Panel de últimas bolas */
+.recent-panel-silver {
+  margin-top: 15px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  border-radius: 10px;
+  padding: 12px;
+  box-shadow: 
+    inset 0 2px 8px rgba(0, 0, 0, 0.8),
+    0 0 15px rgba(0, 212, 255, 0.15);
+}
+
+.panel-label-digital {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #00d4ff;
+  letter-spacing: 2px;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.recent-balls-digital {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.ball-chip-silver {
+  background: linear-gradient(135deg, currentColor, rgba(255, 255, 255, 0.8));
+  color: #0a0e14;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-weight: 900;
+  font-size: 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 2px 6px rgba(0, 0, 0, 0.5),
+    0 0 10px currentColor;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.chip-separator {
+  opacity: 0.6;
+}
+
+/* ============================================
+   BOLILLERO LEVITANTE (DERECHA)
+   ============================================ */
+
+.magnetic-bingo-machine {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+}
+
+.levitation-chamber {
+  position: relative;
+  width: 340px;
+  height: 400px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Campo magnético */
+.magnetic-field {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  animation: field-rotate 20s linear infinite;
+}
+
+@keyframes field-rotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.field-particle {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 50%;
+  left: 50%;
+  margin: -50% 0 0 -50%;
+}
+
+.particle-dot {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: #00d4ff;
+  border-radius: 50%;
+  top: 0;
+  left: 50%;
+  margin-left: -2px;
+  box-shadow: 0 0 10px #00d4ff;
+  animation: particle-pulse 2s ease-in-out infinite;
+}
+
+@keyframes particle-pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
+/* Cápsula de vidrio templado */
+.tempered-glass-capsule {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.capsule-top {
+  width: 140px;
+  height: 30px;
+  background: linear-gradient(135deg, rgba(192, 192, 192, 0.4), rgba(160, 168, 176, 0.3));
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 70px 70px 0 0;
+  box-shadow: 
+    inset 0 2px 0 rgba(255, 255, 255, 0.5),
+    0 4px 10px rgba(0, 0, 0, 0.6);
+  position: relative;
+}
+
+.capsule-top::before {
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: 10%;
+  right: 10%;
+  height: 8px;
+  background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.6), transparent);
+  border-radius: 10px;
+}
+
+.capsule-body {
+  position: relative;
+  width: 280px;
+  height: 280px;
+  background: 
+    radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.15), transparent 60%),
+    linear-gradient(135deg, rgba(0, 212, 255, 0.08), rgba(192, 192, 192, 0.05));
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  box-shadow: 
+    inset 0 0 40px rgba(0, 212, 255, 0.15),
+    0 10px 30px rgba(0, 0, 0, 0.6),
+    0 0 50px rgba(0, 212, 255, 0.2);
+  backdrop-filter: blur(5px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.chrome-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 3px solid;
+  border-color: rgba(192, 192, 192, 0.4);
+  box-shadow: 
+    inset 0 2px 4px rgba(255, 255, 255, 0.3),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.5),
+    0 0 20px rgba(192, 192, 192, 0.2);
+}
+
+.chrome-ring.top {
+  width: 95%;
+  height: 95%;
+  top: 2.5%;
+  left: 2.5%;
+}
+
+.chrome-ring.middle {
+  width: 85%;
+  height: 85%;
+  top: 7.5%;
+  left: 7.5%;
+  border-width: 2px;
+}
+
+.chrome-ring.bottom {
+  width: 75%;
+  height: 75%;
+  top: 12.5%;
+  left: 12.5%;
+  border-width: 1px;
+}
+
+.viewing-area {
+  position: relative;
+  width: 70%;
+  height: 70%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+}
+
+/* Efecto de levitación */
+.levitation-effect {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.energy-waves {
+  position: absolute;
+  width: 80px;
+  height: 80px;
+  border: 2px solid rgba(0, 212, 255, 0.5);
+  border-radius: 50%;
+  animation: wave-expand 2s ease-out infinite;
+}
+
+@keyframes wave-expand {
+  0% {
+    width: 80px;
+    height: 80px;
+    opacity: 1;
+  }
+  100% {
+    width: 160px;
+    height: 160px;
+    opacity: 0;
+  }
+}
+
+.magnetic-core {
+  width: 60px;
+  height: 60px;
+  background: radial-gradient(circle, rgba(0, 212, 255, 0.5), transparent 70%);
+  border-radius: 50%;
+  animation: core-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes core-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.2); opacity: 1; }
+}
+
+/* Bola metálica */
+.current-ball-silver {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  animation: ball-levitate 3s ease-in-out infinite;
+}
+
+@keyframes ball-levitate {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-15px); }
+}
+
+.metallic-ball {
+  position: relative;
+  width: 130px;
+  height: 130px;
+  perspective: 1000px;
+  animation: ball-entry 2s ease-out;
+}
+
+@keyframes ball-entry {
+  0% {
+    transform: scale(0.2) translateY(-100px);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+.ball-surface-chrome {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: 
+    radial-gradient(circle at 35% 35%, #ffffff, #e0e8f0 30%, #c0c0c0 60%, #a0a8b0);
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 
+    inset -8px -8px 20px rgba(0, 0, 0, 0.3),
+    inset 8px 8px 20px rgba(255, 255, 255, 0.6),
+    0 10px 30px rgba(0, 0, 0, 0.6),
+    0 0 40px rgba(192, 192, 192, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  animation: ball-spin 4s linear infinite;
+}
+
+@keyframes ball-spin {
+  0% { transform: rotateY(0deg); }
+  100% { transform: rotateY(360deg); }
+}
+
+.chrome-highlight {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  top: 15%;
+  left: 25%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.9), transparent 60%);
+  border-radius: 50%;
+  filter: blur(5px);
+}
+
+.ball-data {
+  position: relative;
+  text-align: center;
+  z-index: 1;
+}
+
+.ball-letter-silver {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #0a0e14;
+  line-height: 1;
+  text-shadow: 0 2px 4px rgba(255, 255, 255, 0.8);
+}
+
+.ball-number-silver {
+  font-size: 2.8rem;
+  font-weight: 900;
+  color: #0a0e14;
+  line-height: 1;
+  text-shadow: 0 2px 4px rgba(255, 255, 255, 0.8);
+}
+
+.ball-shadow {
+  position: absolute;
+  bottom: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80px;
+  height: 15px;
+  background: radial-gradient(ellipse, rgba(0, 0, 0, 0.6), transparent 70%);
+  border-radius: 50%;
+  filter: blur(8px);
+}
+
+/* Estado en espera */
+.waiting-state-silver {
+  text-align: center;
+  color: rgba(192, 192, 192, 0.4);
+}
+
+.standby-icon {
+  font-size: 4rem;
+  opacity: 0.3;
+  animation: standby-blink 2s ease-in-out infinite;
+}
+
+@keyframes standby-blink {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 0.5; }
+}
+
+.standby-text {
+  font-size: 0.9rem;
+  margin-top: 15px;
+  letter-spacing: 2px;
+  font-weight: 600;
+}
+
+.capsule-bottom {
+  width: 140px;
+  height: 30px;
+  background: linear-gradient(135deg, rgba(192, 192, 192, 0.4), rgba(160, 168, 176, 0.3));
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 0 0 70px 70px;
+  box-shadow: 
+    inset 0 -2px 0 rgba(255, 255, 255, 0.5),
+    0 4px 10px rgba(0, 0, 0, 0.6);
+}
+
+/* Base magnética */
+.magnetic-base {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 10px;
+  gap: 0;
+}
+
+.base-plate {
+  width: 180px;
+  height: 20px;
+  background: linear-gradient(135deg, rgba(192, 192, 192, 0.5), rgba(160, 168, 176, 0.4));
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 4px 8px rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.base-plate.top {
+  border-radius: 10px 10px 0 0;
+}
+
+.base-plate.bottom {
+  border-radius: 0 0 10px 10px;
+}
+
+.plate-lights {
+  display: flex;
+  gap: 8px;
+}
+
+.indicator-light {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.5);
+}
+
+.indicator-light.blue {
+  background: #00d4ff;
+  box-shadow: 0 0 8px #00d4ff;
+}
+
+.indicator-light.cyan {
+  background: #00ffff;
+  box-shadow: 0 0 8px #00ffff;
+}
+
+.base-cylinder {
+  width: 160px;
+  height: 50px;
+  background: 
+    linear-gradient(to right, rgba(160, 168, 176, 0.3), rgba(192, 192, 192, 0.5), rgba(160, 168, 176, 0.3)),
+    repeating-linear-gradient(90deg, transparent, transparent 8px, rgba(0, 0, 0, 0.1) 8px, rgba(0, 0, 0, 0.1) 9px);
+  border-left: 2px solid rgba(255, 255, 255, 0.2);
+  border-right: 2px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 
+    inset 0 0 20px rgba(0, 0, 0, 0.4),
+    0 0 30px rgba(0, 212, 255, 0.15);
+}
+
+.holo-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #00d4ff;
+  text-shadow: 0 0 10px #00d4ff;
+}
+
+/* ============================================
+   SEPARADOR METÁLICO
+   ============================================ */
+
+.steel-divider {
+  height: 30px;
+  position: relative;
+  margin: 15px 0;
+}
+
+.divider-line {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 4px;
+  transform: translateY(-50%);
+  background: 
+    linear-gradient(135deg, rgba(192, 192, 192, 0.3), rgba(160, 168, 176, 0.2));
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.5);
+  box-shadow: 
+    inset 0 1px 2px rgba(0, 0, 0, 0.5),
+    0 0 20px rgba(0, 212, 255, 0.1);
+}
+
+.divider-bolts {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  gap: 50px;
+}
+
+.bolt {
+  width: 10px;
+  height: 10px;
+  background: 
+    radial-gradient(circle, rgba(192, 192, 192, 0.8), rgba(160, 168, 176, 0.5));
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 50%;
+  box-shadow: 
+    inset 0 1px 2px rgba(255, 255, 255, 0.5),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.5),
+    0 2px 4px rgba(0, 0, 0, 0.5);
+  position: relative;
+}
+
+.bolt::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 60%;
+  height: 1px;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.bolt::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(90deg);
+  width: 60%;
+  height: 1px;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+/* ============================================
+   MITAD INFERIOR - CARTONES ALUMINIO
+   ============================================ */
+
+.aluminum-cards-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: 
+    linear-gradient(135deg, rgba(10, 14, 20, 0.9), rgba(18, 24, 32, 0.9)),
+    radial-gradient(circle at 50% 50%, rgba(0, 212, 255, 0.03), transparent);
+  border: 2px solid rgba(192, 192, 192, 0.2);
+  border-radius: 12px;
+  padding: 20px;
+  min-height: 35vh;
+  max-height: 45vh;
+  box-shadow: 
+    inset 0 2px 10px rgba(0, 0, 0, 0.8),
+    0 0 30px rgba(0, 212, 255, 0.1);
+}
+
+.section-header-silver {
+  margin-bottom: 15px;
+}
+
+.header-bar {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  background: linear-gradient(135deg, rgba(0, 212, 255, 0.15), rgba(192, 192, 192, 0.1));
+  color: #e0e8f0;
+  padding: 12px 25px;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  box-shadow: 
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 0 20px rgba(0, 212, 255, 0.2);
+}
+
+.bar-icon {
+  font-size: 1.8rem;
+}
+
+.bar-title {
+  flex: 1;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 4px;
+}
+
+.bar-badge {
+  background: rgba(0, 212, 255, 0.3);
+  color: #00d4ff;
+  padding: 5px 15px;
+  border-radius: 20px;
+  font-weight: 900;
+  font-size: 1rem;
+  border: 1px solid rgba(0, 212, 255, 0.5);
+  box-shadow: 
+    inset 0 1px 2px rgba(0, 0, 0, 0.5),
+    0 0 15px rgba(0, 212, 255, 0.3);
+}
+
+/* Scroll Container */
+.cards-scroll-silver {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding-right: 8px;
+}
+
+/* Scrollbar */
+.cards-scroll-silver::-webkit-scrollbar {
+  width: 8px;
+}
+
+.cards-scroll-silver::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(0, 212, 255, 0.2);
+  border-radius: 10px;
+}
+
+.cards-scroll-silver::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, rgba(0, 212, 255, 0.5), rgba(192, 192, 192, 0.3));
+  border: 1px solid rgba(0, 212, 255, 0.4);
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+}
+
+/* ============================================
+   CARTÓN DE BINGO - ALUMINIO CEPILLADO
+   ============================================ */
+
+.bingo-card-silver {
+  position: relative;
+  background: 
+    linear-gradient(135deg, rgba(192, 192, 192, 0.3), rgba(160, 168, 176, 0.25)),
+    repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(255, 255, 255, 0.03) 2px, rgba(255, 255, 255, 0.03) 3px);
+  border: 2px solid rgba(192, 192, 192, 0.4);
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 
+    0 6px 20px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 0 30px rgba(0, 212, 255, 0.1);
+  transition: all 0.3s ease;
+  backdrop-filter: blur(5px);
+}
+
+.bingo-card-silver:hover {
+  transform: translateY(-5px);
+  box-shadow: 
+    0 10px 30px rgba(0, 0, 0, 0.8),
+    0 0 40px rgba(0, 212, 255, 0.2);
+}
+
+/* Marco de aluminio */
+.aluminum-frame {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+
+.frame-bar {
+  position: absolute;
+  background: linear-gradient(135deg, rgba(192, 192, 192, 0.5), rgba(160, 168, 176, 0.4));
+  box-shadow: 
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.5);
+}
+
+.frame-bar.top { top: 0; left: 0; right: 0; height: 6px; }
+.frame-bar.right { top: 0; right: 0; bottom: 0; width: 6px; }
+.frame-bar.bottom { bottom: 0; left: 0; right: 0; height: 6px; }
+.frame-bar.left { top: 0; left: 0; bottom: 0; width: 6px; }
+
+.brushed-texture {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  opacity: 0.3;
+  background: repeating-linear-gradient(90deg, transparent, transparent 1px, rgba(255, 255, 255, 0.05) 1px, rgba(255, 255, 255, 0.05) 2px);
+  pointer-events: none;
+}
+
+.card-header-silver {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(0, 212, 255, 0.2);
+}
+
+.card-id-chip {
+  background: rgba(0, 0, 0, 0.6);
+  color: #00d4ff;
+  padding: 5px 15px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  border: 1px solid rgba(0, 212, 255, 0.4);
+  box-shadow: 
+    inset 0 1px 2px rgba(0, 0, 0, 0.8),
+    0 0 10px rgba(0, 212, 255, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.chip-hash {
+  opacity: 0.6;
+}
+
+.card-barcode {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+
+.barcode-line {
+  width: 2px;
+  height: 20px;
+  background: rgba(0, 212, 255, 0.5);
+  border-radius: 1px;
+}
+
+.barcode-line:nth-child(1) { height: 18px; }
+.barcode-line:nth-child(2) { height: 22px; }
+.barcode-line:nth-child(3) { height: 16px; }
+.barcode-line:nth-child(4) { height: 20px; }
+.barcode-line:nth-child(5) { height: 19px; }
+
+.card-grid-silver {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card-letters-silver {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+
+.card-letter-silver {
+  font-size: 1.5rem;
+  font-weight: 700;
+  text-align: center;
+  padding: 8px 0;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  box-shadow: 
+    inset 0 1px 3px rgba(0, 0, 0, 0.6),
+    0 0 10px currentColor;
+}
+
+.card-numbers-grid-silver {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+
+.card-column-silver {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.card-cell-silver {
+  aspect-ratio: 1;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(192, 192, 192, 0.3);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  position: relative;
+  box-shadow: 
+    inset 0 1px 3px rgba(255, 255, 255, 0.2),
+    0 2px 4px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+  background: linear-gradient(135deg, rgba(224, 232, 240, 0.9), rgba(192, 192, 192, 0.8));
+}
+
+.card-cell-silver.free {
+  background: 
+    radial-gradient(circle, rgba(0, 212, 255, 0.3), rgba(192, 192, 192, 0.2)),
+    linear-gradient(135deg, rgba(192, 192, 192, 0.5), rgba(160, 168, 176, 0.4));
+  border-color: rgba(0, 212, 255, 0.5);
+}
+
+.laser-symbol {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  color: #00d4ff;
+  text-shadow: 0 0 15px #00d4ff;
+}
+
+.symbol-star {
+  animation: laser-pulse 2s ease-in-out infinite;
+}
+
+@keyframes laser-pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+.card-cell-silver.pressed {
+  background: 
+    linear-gradient(135deg, rgba(0, 212, 255, 0.2), rgba(168, 184, 200, 0.3));
+  border-color: rgba(0, 212, 255, 0.6);
+  box-shadow: 
+    inset 0 2px 6px rgba(0, 0, 0, 0.6),
+    0 0 15px rgba(0, 212, 255, 0.3);
+  transform: translateY(2px);
+}
+
+.cell-number-silver {
+  position: relative;
+  z-index: 1;
+}
+
+.steel-press {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+.press-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 212, 255, 0.15);
+  border-radius: 8px;
+}
+
+.press-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 80%;
+  height: 80%;
+  background: radial-gradient(circle, rgba(0, 212, 255, 0.4), transparent 70%);
+  border-radius: 50%;
+  animation: glow-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+.card-footer-silver {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(0, 212, 255, 0.2);
+}
+
+.footer-line {
+  width: 50%;
+  height: 2px;
+  background: linear-gradient(to right, rgba(0, 212, 255, 0.5), transparent);
+  margin: 0 auto;
+}
+
+/* ============================================
+   TEST CONTROLS
+   ============================================ */
+
+.test-controls-silver {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+}
+
+.chrome-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.chrome-button:hover {
+  transform: scale(1.05);
+}
+
+.button-surface {
+  background: linear-gradient(135deg, rgba(0, 212, 255, 0.3), rgba(192, 192, 192, 0.2));
+  color: #00d4ff;
+  padding: 12px 30px;
+  border-radius: 25px;
+  font-weight: 900;
+  font-size: 1rem;
+  letter-spacing: 2px;
+  border: 2px solid rgba(0, 212, 255, 0.5);
+  box-shadow: 
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 6px 15px rgba(0, 0, 0, 0.6),
+    0 0 30px rgba(0, 212, 255, 0.3);
+  text-shadow: 0 0 10px #00d4ff;
+}
+
+.chrome-button:active .button-surface {
+  box-shadow: 
+    inset 0 2px 8px rgba(0, 0, 0, 0.6),
+    0 2px 6px rgba(0, 0, 0, 0.4);
+  transform: translateY(2px);
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+
+@media (max-width: 1024px) {
+  .game-table-silver {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+
+  .levitation-chamber {
+    width: 300px;
+    height: 360px;
+  }
+
+  .capsule-body {
+    width: 240px;
+    height: 240px;
+  }
+}
+
+@media (max-width: 768px) {
+  .silver-header {
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .room-title-silver {
+    flex-direction: column;
+    text-align: center;
+    gap: 10px;
+  }
+
+  .title-text-chrome {
+    font-size: 1.5rem;
+    letter-spacing: 4px;
+  }
+
+  .game-table-silver {
+    padding: 15px;
+  }
+
+  .holographic-grid {
+    gap: 6px;
+  }
+
+  .header-letter-chrome {
+    font-size: 1.2rem;
+  }
+
+  .holo-cell {
+    height: 26px;
+  }
+
+  .laser-number {
+    font-size: 0.95rem;
+  }
+
+  .levitation-chamber {
+    width: 260px;
+    height: 320px;
+  }
+
+  .capsule-body {
+    width: 200px;
+    height: 200px;
+  }
+
+  .metallic-ball {
+    width: 100px;
+    height: 100px;
+  }
+
+  .ball-letter-silver {
+    font-size: 1.5rem;
+  }
+
+  .ball-number-silver {
+    font-size: 2rem;
+  }
+
+  .card-letter-silver {
+    font-size: 1.2rem;
+    padding: 6px 0;
+  }
+
+  .card-cell-silver {
+    font-size: 1.1rem;
+  }
+}
