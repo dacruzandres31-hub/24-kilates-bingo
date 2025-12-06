@@ -1,0 +1,368 @@
+const pool = require('../db');
+
+/**
+ * USER CONTROLLER - Gestión de Usuarios
+ * 
+ * Responsabilidades:
+ * - CRUD de usuarios
+ * - Duplicado checking
+ * - Red jerárquica (multinivel)
+ * - Network traversal
+ */
+
+// CREATE - Crear nuevo usuario
+exports.createUser = async (req, res) => {
+  try {
+    const { userId, role } = req.user;
+    const { username, password, newRole = 'jugador', parent_id } = req.body;
+
+    // Solo admins pueden crear usuarios
+    if (role !== 'superadmin' && role !== 'agente') {
+      return res.status(403).json({ error: 'No autorizado para crear usuarios' });
+    }
+
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username y password requeridos' });
+    }
+
+    // Validar rol
+    const validRoles = ['agente', 'jugador'];
+    if (!validRoles.includes(newRole)) {
+      return res.status(400).json({ error: 'Rol inválido' });
+    }
+
+    // Verificar duplicado (MURO FINAL)
+    const existingUser = await pool.query(
+      'SELECT id FROM users WHERE username = $1',
+      [username]
+    );
+
+    if (existingUser.rows.length > 0) {
+      return res.status(409).json({ error: 'Usuario ya existe' });
+    }
+
+    // Hash password
+    const bcrypt = require('bcryptjs');
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Validar parent_id si se proporciona
+    let validParentId = parent_id;
+    if (parent_id) {
+      const [parentResult] = await pool.query(
+        'SELECT id, role FROM users WHERE id = ?',
+        [parent_id]
+      );
+
+      if (parentResult.length === 0) {
+        return res.status(400).json({ error: 'Parent user no encontrado' });
+      }
+
+      // SuperAdmin no puede tener parent
+      if (newRole === 'superadmin') {
+        return res.status(400).json({ error: 'SuperAdmin no puede tener parent' });
+      }
+    } else {
+      // Asignar parent actual si no se especifica
+      validParentId = role === 'superadmin' ? null : userId;
+    }
+
+    // Insertar usuario
+    const [result] = await pool.query(
+      `INSERT INTO users (username, password_hash, role, parent_id, balance)
+       VALUES (?, ?, ?, ?, ?)`,
+      [username, hashedPassword, newRole, validParentId, 0.00]
+    );
+
+    const [newUserResult] = await pool.query(
+      'SELECT id, username, role, parent_id, balance, created_at FROM users WHERE id = ?',
+      [result.insertId]
+    );
+    const newUser = newUserResult[0];
+
+    res.status(201).json({
+      success: true,
+      user: newUser
+    });
+  } catch (error) {
+    console.error('Create user error:', error);
+    res.status(500).json({ error: 'Error creando usuario' });
+  }
+};
+
+// READ - Obtener usuario por ID
+exports.getUserById = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const result = await pool.query(
+      `SELECT id, username, role, parent_id, balance, can_process_payouts, 
+              last_deposit_at, created_at
+       FROM users 
+       WHERE id = $1`,
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    res.json({ user: result.rows[0] });
+  } catch (error) {
+    console.error('Get user error:', error);
+    res.status(500).json({ error: 'Error obteniendo usuario' });
+  }
+};
+
+// READ ALL - Listar todos los usuarios (admin)
+exports.getAllUsers = async (req, res) => {
+  try {
+    const { role } = req.user;
+
+    if (role !== 'superadmin') {
+      return res.status(403).json({ error: 'No autorizado' });
+    }
+
+    const { page = 1, limit = 20 } = req.query;
+    const offset = (page - 1) * limit;
+
+    // Contar total
+    const [countResult] = await pool.query('SELECT COUNT(*) as total FROM users');
+    const total = countResult[0].total;
+
+    // Obtener usuarios paginados
+    const [result] = await pool.query(
+      `SELECT id, username, role, parent_id, balance, created_at
+       FROM users
+       ORDER BY created_at DESC
+       LIMIT ? OFFSET ?`,
+      [limit, offset]
+    );
+
+    res.json({
+      users: result,
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error) {
+    console.error('Get all users error:', error);
+    res.status(500).json({ error: 'Error obteniendo usuarios' });
+  }
+};
+
+// UPDATE - Actualizar usuario
+exports.updateUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { balance, can_process_payouts } = req.body;
+    const { role } = req.user;
+
+    if (role !== 'superadmin') {
+      return res.status(403).json({ error: 'No autorizado' });
+    }
+
+    // Construir update dinámico
+    const updates = [];
+    const params = [];
+
+    if (balance !== undefined) {
+      updates.push(`balance = ?`);
+      params.push(balance);
+    }
+
+    if (can_process_payouts !== undefined) {
+      updates.push(`can_process_payouts = ?`);
+      params.push(can_process_payouts);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'Nada para actualizar' });
+    }
+
+    // Add userId at the end for WHERE clause
+    params.push(userId);
+
+    const query = `
+      UPDATE users 
+      SET ${updates.join(', ')}, updated_at = NOW()
+      WHERE id = ?
+    `;
+
+    await pool.query(query, params);
+
+    // Get updated user
+    const [result] = await pool.query(
+      'SELECT id, username, role, balance, can_process_payouts FROM users WHERE id = ?',
+      [userId]
+    );
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    res.json({ user: result[0] });
+  } catch (error) {
+    console.error('Update user error:', error);
+    res.status(500).json({ error: 'Error actualizando usuario' });
+  }
+};
+
+// DELETE - Eliminar usuario (soft delete con cascada)
+exports.deleteUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { role } = req.user;
+
+    if (role !== 'superadmin') {
+      return res.status(403).json({ error: 'No autorizado' });
+    }
+
+    // Verificar si el usuario existe
+    const [userResult] = await pool.query(
+      'SELECT id FROM users WHERE id = ?',
+      [userId]
+    );
+
+    if (userResult.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    const connection = await pool.getConnection();
+    try {
+      await connection.query('START TRANSACTION');
+
+      // 1. Reasignar children a null (huérfanos)
+      await connection.query(
+        'UPDATE users SET parent_id = NULL WHERE parent_id = ?',
+        [userId]
+      );
+
+      // 2. Marcar cartones como discarded
+      await connection.query(
+        `UPDATE daily_stock_cards SET status = 'discarded'
+         WHERE buyer_id = ?`,
+        [userId]
+      );
+
+      // 3. Eliminar usuario
+      await connection.query('DELETE FROM users WHERE id = ?', [userId]);
+
+      // 4. Auditoría
+      await connection.query(
+        `INSERT INTO audit_revenue (amount, transaction_type)
+         VALUES (?, ?)`,
+        [userId, 'user_deleted']
+      );
+
+      await connection.query('COMMIT');
+
+      res.json({ success: true, message: 'Usuario eliminado' });
+    } catch (error) {
+      await connection.query('ROLLBACK');
+      throw error;
+    } finally {
+      connection.release();
+    }
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(500).json({ error: 'Error eliminando usuario' });
+  }
+};
+
+// SPECIAL - Obtener red de usuarios (árbol jerárquico)
+exports.getUserNetwork = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Query recursiva: obtener árbol desde usuario hasta raíz
+    const [result] = await pool.query(
+      `WITH RECURSIVE user_hierarchy AS (
+         SELECT id, username, role, parent_id, balance, 1 as depth
+         FROM users WHERE id = ?
+         UNION ALL
+         SELECT u.id, u.username, u.role, u.parent_id, u.balance, uh.depth + 1
+         FROM users u
+         INNER JOIN user_hierarchy uh ON u.id = uh.parent_id
+       )
+       SELECT * FROM user_hierarchy
+       ORDER BY depth ASC`,
+      [userId]
+    );
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    // Construir árbol
+    const tree = {
+      user: result[0],
+      ancestors: result.slice(1)
+    };
+
+    // Obtener descendientes
+    const [descendantsResult] = await pool.query(
+      `WITH RECURSIVE descendants AS (
+         SELECT id, username, role, parent_id, balance, 1 as depth
+         FROM users WHERE parent_id = ?
+         UNION ALL
+         SELECT u.id, u.username, u.role, u.parent_id, u.balance, d.depth + 1
+         FROM users u
+         INNER JOIN descendants d ON u.parent_id = d.id
+       )
+       SELECT * FROM descendants
+       ORDER BY depth ASC`,
+      [userId]
+    );
+
+    tree.descendants = descendantsResult;
+
+    res.json(tree);
+  } catch (error) {
+    console.error('Get user network error:', error);
+    res.status(500).json({ error: 'Error obteniendo red' });
+  }
+};
+
+// SPECIAL - Obtener estadísticas de red (downline)
+exports.getNetworkStats = async (req, res) => {
+  try {
+    const { userId } = req.user;
+
+    const [result] = await pool.query(
+      `WITH RECURSIVE downline AS (
+         SELECT id, role, 1 as depth
+         FROM users WHERE parent_id = ?
+         UNION ALL
+         SELECT u.id, u.role, d.depth + 1
+         FROM users u
+         INNER JOIN downline d ON u.parent_id = d.id
+       )
+       SELECT 
+         role, COUNT(*) as count, MAX(depth) as max_depth
+       FROM downline
+       GROUP BY role`,
+      [userId]
+    );
+
+    // Calcular stats
+    const stats = {
+      totalAgentes: 0,
+      totalJugadores: 0,
+      maxDepth: 0
+    };
+
+    for (const row of result) {
+      if (row.role === 'agente') stats.totalAgentes = row.count;
+      if (row.role === 'jugador') stats.totalJugadores = row.count;
+      stats.maxDepth = Math.max(stats.maxDepth, row.max_depth || 0);
+    }
+
+    res.json(stats);
+  } catch (error) {
+    console.error('Get network stats error:', error);
+    res.status(500).json({ error: 'Error obteniendo estadísticas' });
+  }
+};

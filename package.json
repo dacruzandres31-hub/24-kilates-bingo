@@ -1,0 +1,19 @@
+{
+  "name": "bingo-24k-platform",
+  "version": "1.0.0",
+  "description": "Bingo 24K - Plataforma de juego en línea con sistema gamificado multinivel",
+  "private": true,
+  "workspaces": [
+    "server",
+    "client-player",
+    "client-admin"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w server\" \"npm run dev -w client-player\" \"npm run dev -w client-admin\"",
+    "build": "npm run build -w server && npm run build -w client-player && npm run build -w client-admin",
+    "start": "npm start -w server"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  }
+}
