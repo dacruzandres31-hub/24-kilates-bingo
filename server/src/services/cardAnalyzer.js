@@ -95,23 +95,19 @@ class CardAnalyzer {
   }
 
   /**
-   * Analiza todas las líneas posibles (13 tipos)
+   * Analiza todas las líneas posibles
+   * NUEVA REGLA: Solo líneas HORIZONTALES se pagan en el juego
+   * (Mantenemos análisis de otras para información, pero no se pagan)
    */
   static analyzeLines(cardNumbers, calledSet) {
     const lineTypes = [
-      { type: 'horizontal_1', name: 'Horizontal 1', positions: [[0,0],[0,1],[0,2],[0,3],[0,4]] },
-      { type: 'horizontal_2', name: 'Horizontal 2', positions: [[1,0],[1,1],[1,2],[1,3],[1,4]] },
-      { type: 'horizontal_3', name: 'Horizontal 3', positions: [[2,0],[2,1],[2,2],[2,3],[2,4]] },
-      { type: 'horizontal_4', name: 'Horizontal 4', positions: [[3,0],[3,1],[3,2],[3,3],[3,4]] },
-      { type: 'horizontal_5', name: 'Horizontal 5', positions: [[4,0],[4,1],[4,2],[4,3],[4,4]] },
-      { type: 'vertical_1', name: 'Vertical 1', positions: [[0,0],[1,0],[2,0],[3,0],[4,0]] },
-      { type: 'vertical_2', name: 'Vertical 2', positions: [[0,1],[1,1],[2,1],[3,1],[4,1]] },
-      { type: 'vertical_3', name: 'Vertical 3', positions: [[0,2],[1,2],[2,2],[3,2],[4,2]] },
-      { type: 'vertical_4', name: 'Vertical 4', positions: [[0,3],[1,3],[2,3],[3,3],[4,3]] },
-      { type: 'vertical_5', name: 'Vertical 5', positions: [[0,4],[1,4],[2,4],[3,4],[4,4]] },
-      { type: 'diagonal_1', name: 'Diagonal \\', positions: [[0,0],[1,1],[2,2],[3,3],[4,4]] },
-      { type: 'diagonal_2', name: 'Diagonal /', positions: [[0,4],[1,3],[2,2],[3,1],[4,0]] },
-      { type: 'four_corners', name: '4 Esquinas', positions: [[0,0],[0,4],[4,0],[4,4]] }
+      // SOLO HORIZONTALES (las que se pagan)
+      { type: 'horizontal_1', name: 'Horizontal 1', positions: [[0,0],[0,1],[0,2],[0,3],[0,4]], payable: true },
+      { type: 'horizontal_2', name: 'Horizontal 2', positions: [[1,0],[1,1],[1,2],[1,3],[1,4]], payable: true },
+      { type: 'horizontal_3', name: 'Horizontal 3', positions: [[2,0],[2,1],[2,2],[2,3],[2,4]], payable: true },
+      { type: 'horizontal_4', name: 'Horizontal 4', positions: [[3,0],[3,1],[3,2],[3,3],[3,4]], payable: true },
+      { type: 'horizontal_5', name: 'Horizontal 5', positions: [[4,0],[4,1],[4,2],[4,3],[4,4]], payable: true }
+      // Verticales, diagonales y esquinas NO SE PAGAN (eliminadas)
     ];
 
     const analysis = [];
@@ -148,7 +144,8 @@ class CardAnalyzer {
         missingNumbers,
         isComplete,
         almostComplete,
-        progress: (marked / total * 100).toFixed(0)
+        progress: (marked / total * 100).toFixed(0),
+        payable: lineType.payable || false  // Indicar si esta línea se paga
       });
     }
 

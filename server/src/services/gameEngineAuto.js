@@ -51,8 +51,10 @@ class GameEngineAuto {
       availableBalls: this.generateBallPool(),
       interval: null,
       isPaused: false,
-      lineWinnersFound: new Set(),
-      bingoWinner: null
+      lineWinnersPaid: false,           // Solo se paga UNA VEZ la primera línea
+      lineWinnersThisBall: [],          // Ganadores de línea en esta bolilla
+      bingoWinnersPaid: false,          // Control de BINGO pagado
+      bingoWinnersThisBall: []          // Ganadores de BINGO en esta bolilla
     };
 
     this.activeGames.set(gameSessionId, gameState);
@@ -203,6 +205,11 @@ class GameEngineAuto {
 
   /**
    * Valida automáticamente todos los cartones activos
+   * REGLAS NUEVAS:
+   * - Solo LÍNEAS HORIZONTALES
+   * - Solo se paga la PRIMERA línea de toda la partida
+   * - Si múltiples cartones completan en la misma bolilla: SE DIVIDE el pozo
+   * - BINGO: cartón completo (25/25), división si múltiples ganadores
    */
   async validateAllCards(gameSessionId, pauseOnWinner) {
     const gameState = this.activeGames.get(gameSessionId);
@@ -219,154 +226,202 @@ class GameEngineAuto {
 
     const calledNumbers = gameState.ballsDrawn;
 
-    for (const card of cards) {
-      const userId = card.user_id;
-      const username = card.username;
+    // Limpiar arrays de ganadores de esta bolilla
+    gameState.lineWinnersThisBall = [];
+    gameState.bingoWinnersThisBall = [];
 
-      let cardNumbers;
-      if (card.numbers) {
-        cardNumbers = typeof card.numbers === 'string' ? JSON.parse(card.numbers) : card.numbers;
-      } else if (card.grid_data) {
-        const gridData = typeof card.grid_data === 'string' ? JSON.parse(card.grid_data) : card.grid_data;
-        cardNumbers = this.convertGridDataToMatrix(gridData);
-      } else {
-        continue;
-      }
+    // FASE 1: Detectar todos los ganadores de LÍNEA en esta bolilla
+    if (!gameState.lineWinnersPaid) {
+      for (const card of cards) {
+        const userId = card.user_id;
+        const username = card.username;
 
-      // VERIFICAR LÍNEAS
-      const lineKey = `${userId}_${card.id}`;
-      if (!gameState.lineWinnersFound.has(lineKey)) {
-        const lineResult = await this.checkLines(
-          gameSessionId, 
-          card.id, 
-          userId, 
-          username,
-          cardNumbers, 
-          calledNumbers
-        );
+        let cardNumbers;
+        if (card.numbers) {
+          cardNumbers = typeof card.numbers === 'string' ? JSON.parse(card.numbers) : card.numbers;
+        } else if (card.grid_data) {
+          const gridData = typeof card.grid_data === 'string' ? JSON.parse(card.grid_data) : card.grid_data;
+          cardNumbers = this.convertGridDataToMatrix(gridData);
+        } else {
+          continue;
+        }
 
-        if (lineResult) {
-          gameState.lineWinnersFound.add(lineKey);
-          
-          // PAUSAR sorteo para celebrar
-          gameState.isPaused = true;
-          setTimeout(() => {
-            gameState.isPaused = false;
-          }, pauseOnWinner);
+        // Verificar si tiene alguna línea horizontal completa
+        const lineResult = this.checkHorizontalLines(cardNumbers, calledNumbers);
+        
+        if (lineResult.hasLine) {
+          gameState.lineWinnersThisBall.push({
+            cardId: card.id,
+            userId,
+            username,
+            lineType: lineResult.lineType,
+            winningNumbers: lineResult.winningNumbers
+          });
         }
       }
 
-      // VERIFICAR BINGO
-      if (!gameState.bingoWinner) {
-        const bingoResult = await this.checkBingo(
-          gameSessionId,
-          card.id,
-          userId,
-          username,
-          cardNumbers,
-          calledNumbers
-        );
+      // Si encontramos ganadores de línea, pagar
+      if (gameState.lineWinnersThisBall.length > 0) {
+        await this.payLineWinners(gameSessionId, gameState.lineWinnersThisBall);
+        gameState.lineWinnersPaid = true;
+        
+        // PAUSAR para celebrar
+        gameState.isPaused = true;
+        setTimeout(() => {
+          gameState.isPaused = false;
+        }, pauseOnWinner);
+      }
+    }
 
-        if (bingoResult) {
-          gameState.bingoWinner = { userId, username };
-          await this.endGame(gameSessionId, 'completed');
-          return;
+    // FASE 2: Detectar todos los ganadores de BINGO en esta bolilla
+    if (!gameState.bingoWinnersPaid) {
+      for (const card of cards) {
+        const userId = card.user_id;
+        const username = card.username;
+
+        let cardNumbers;
+        if (card.numbers) {
+          cardNumbers = typeof card.numbers === 'string' ? JSON.parse(card.numbers) : card.numbers;
+        } else if (card.grid_data) {
+          const gridData = typeof card.grid_data === 'string' ? JSON.parse(card.grid_data) : card.grid_data;
+          cardNumbers = this.convertGridDataToMatrix(gridData);
+        } else {
+          continue;
         }
+
+        const bingoResult = this.validateBingo(cardNumbers, calledNumbers);
+        
+        if (bingoResult.isValid) {
+          gameState.bingoWinnersThisBall.push({
+            cardId: card.id,
+            userId,
+            username,
+            winningNumbers: bingoResult.winningNumbers
+          });
+        }
+      }
+
+      // Si encontramos ganadores de BINGO, pagar y terminar
+      if (gameState.bingoWinnersThisBall.length > 0) {
+        await this.payBingoWinners(gameSessionId, gameState.bingoWinnersThisBall);
+        gameState.bingoWinnersPaid = true;
+        await this.endGame(gameSessionId, 'completed');
       }
     }
   }
 
   /**
-   * Valida todas las líneas posibles en un cartón
+   * Verifica si el cartón tiene alguna línea HORIZONTAL completa
+   * (Solo líneas horizontales según nuevas reglas)
    */
-  async checkLines(gameSessionId, cardId, userId, username, cardNumbers, calledNumbers) {
-    const lineTypes = [
-      'horizontal_1', 'horizontal_2', 'horizontal_3', 'horizontal_4', 'horizontal_5',
-      'vertical_1', 'vertical_2', 'vertical_3', 'vertical_4', 'vertical_5',
-      'diagonal_1', 'diagonal_2', 'four_corners'
+  checkHorizontalLines(cardNumbers, calledNumbers) {
+    const horizontalLines = [
+      { type: 'horizontal_1', row: 0 },
+      { type: 'horizontal_2', row: 1 },
+      { type: 'horizontal_3', row: 2 },
+      { type: 'horizontal_4', row: 3 },
+      { type: 'horizontal_5', row: 4 }
     ];
 
-    for (const lineType of lineTypes) {
-      const [existing] = await pool.query(
-        `SELECT id FROM game_winners 
-         WHERE game_session_id = ? AND user_id = ? AND card_id = ? 
-         AND prize_type = 'linea' AND line_type = ?`,
-        [gameSessionId, userId, cardId, lineType]
-      );
+    for (const line of horizontalLines) {
+      const winningNumbers = [];
+      let isComplete = true;
 
-      if (existing.length > 0) continue;
+      for (let col = 0; col < 5; col++) {
+        const number = cardNumbers[line.row][col];
+        
+        if (line.row === 2 && col === 2) {
+          winningNumbers.push('FREE');
+        } else if (calledNumbers.includes(number)) {
+          winningNumbers.push(number);
+        } else {
+          isComplete = false;
+          break;
+        }
+      }
 
-      const validation = this.validateLine(cardNumbers, calledNumbers, lineType);
-
-      if (validation.isValid) {
-        const [session] = await pool.query('SELECT * FROM game_sessions WHERE id = ?', [gameSessionId]);
-        const prizeAmount = session[0].line_prize || 2500;
-
-        await pool.query(
-          `INSERT INTO game_winners 
-           (game_session_id, user_id, card_id, prize_type, prize_amount, line_type, winning_numbers, verified)
-           VALUES (?, ?, ?, 'linea', ?, ?, ?, TRUE)`,
-          [gameSessionId, userId, cardId, prizeAmount, lineType, JSON.stringify(validation.winningNumbers)]
-        );
-
-        console.log(`[GameEngine] 🎉 LÍNEA (${lineType}) - ${username} - $${prizeAmount}`);
-
-        const gameState = this.activeGames.get(gameSessionId);
-        notifyLineWinner(
-          this.io, 
-          gameState.roomId, 
-          { id: userId, username }, 
-          prizeAmount, 
-          lineType
-        );
-
-        return true;
+      if (isComplete) {
+        return {
+          hasLine: true,
+          lineType: line.type,
+          winningNumbers
+        };
       }
     }
 
-    return false;
+    return { hasLine: false };
   }
 
   /**
-   * Valida BINGO completo
+   * Paga a los ganadores de línea (puede haber múltiples)
    */
-  async checkBingo(gameSessionId, cardId, userId, username, cardNumbers, calledNumbers) {
-    const [existing] = await pool.query(
-      `SELECT id FROM game_winners 
-       WHERE game_session_id = ? AND user_id = ? AND card_id = ? AND prize_type = 'bingo'`,
-      [gameSessionId, userId, cardId]
-    );
+  async payLineWinners(gameSessionId, winners) {
+    const [session] = await pool.query('SELECT * FROM game_sessions WHERE id = ?', [gameSessionId]);
+    const totalPrize = session[0].line_prize || 2500;
+    const prizePerWinner = totalPrize / winners.length;
 
-    if (existing.length > 0) return false;
+    const gameState = this.activeGames.get(gameSessionId);
 
-    const validation = this.validateBingo(cardNumbers, calledNumbers);
+    console.log(`[GameEngine] 🎉 LÍNEA COMPLETADA - ${winners.length} ganador(es)`);
+    
+    for (const winner of winners) {
+      await pool.query(
+        `INSERT INTO game_winners 
+         (game_session_id, user_id, card_id, prize_type, prize_amount, line_type, winning_numbers, verified)
+         VALUES (?, ?, ?, 'linea', ?, ?, ?, TRUE)`,
+        [gameSessionId, winner.userId, winner.cardId, prizePerWinner, winner.lineType, JSON.stringify(winner.winningNumbers)]
+      );
 
-    if (validation.isValid) {
-      const [session] = await pool.query('SELECT * FROM game_sessions WHERE id = ?', [gameSessionId]);
-      const prizeAmount = session[0].bingo_prize || 25000;
+      console.log(`   → ${winner.username}: $${prizePerWinner.toFixed(2)} (${winner.lineType})`);
 
+      notifyLineWinner(
+        this.io,
+        gameState.roomId,
+        { id: winner.userId, username: winner.username },
+        prizePerWinner,
+        winner.lineType
+      );
+    }
+
+    if (winners.length > 1) {
+      console.log(`   💰 Pozo dividido: $${totalPrize} / ${winners.length} = $${prizePerWinner.toFixed(2)} c/u`);
+    }
+  }
+
+  /**
+   * Paga a los ganadores de BINGO (puede haber múltiples)
+   */
+  async payBingoWinners(gameSessionId, winners) {
+    const [session] = await pool.query('SELECT * FROM game_sessions WHERE id = ?', [gameSessionId]);
+    const totalPrize = session[0].bingo_prize || 25000;
+    const prizePerWinner = totalPrize / winners.length;
+
+    const gameState = this.activeGames.get(gameSessionId);
+
+    console.log(`[GameEngine] 🎊 BINGO COMPLETADO - ${winners.length} ganador(es)`);
+    
+    for (const winner of winners) {
       await pool.query(
         `INSERT INTO game_winners 
          (game_session_id, user_id, card_id, prize_type, prize_amount, winning_numbers, verified)
          VALUES (?, ?, ?, 'bingo', ?, ?, TRUE)`,
-        [gameSessionId, userId, cardId, prizeAmount, JSON.stringify(validation.winningNumbers)]
+        [gameSessionId, winner.userId, winner.cardId, prizePerWinner, JSON.stringify(winner.winningNumbers)]
       );
 
-      console.log(`[GameEngine] 🎊 BINGO - ${username} - $${prizeAmount}`);
+      console.log(`   → ${winner.username}: $${prizePerWinner.toFixed(2)}`);
 
-      const gameState = this.activeGames.get(gameSessionId);
       notifyBingoWinner(
         this.io,
         gameState.roomId,
-        { id: userId, username },
-        prizeAmount,
+        { id: winner.userId, username: winner.username },
+        prizePerWinner,
         gameSessionId
       );
-
-      return true;
     }
 
-    return false;
+    if (winners.length > 1) {
+      console.log(`   💰 Pozo dividido: $${totalPrize} / ${winners.length} = $${prizePerWinner.toFixed(2)} c/u`);
+    }
   }
 
   /**
