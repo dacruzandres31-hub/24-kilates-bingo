@@ -340,7 +340,6 @@ class ChipsService {
       SELECT 
         wr.*,
         u.username,
-        u.email,
         u.balance,
         get_minutes_since_last_credit(wr.user_id) as minutes_since_credit,
         CASE 

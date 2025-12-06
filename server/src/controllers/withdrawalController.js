@@ -9,8 +9,10 @@ const ChipsService = require('../services/chipsService');
 // ============================================
 exports.createWithdrawalRequest = async (req, res) => {
   try {
-    const userId = req.user.id; // Usuario autenticado
+    const userId = req.user.userId; // Usuario autenticado
     const { amount, bankAccountHolder, cbu, bankName, accountType } = req.body;
+
+    console.log('[DEBUG] createWithdrawalRequest - userId:', userId, 'amount:', amount);
 
     if (!amount || !bankAccountHolder || !cbu) {
       return res.status(400).json({
@@ -50,7 +52,7 @@ exports.processWithdrawalRequest = async (req, res) => {
   try {
     const { withdrawalRequestId } = req.params;
     const { transferReceipt } = req.body;
-    const processorId = req.user.id;
+    const processorId = req.user.userId;
     const processorRole = req.user.role; // 'cajero' o 'superadmin'
 
     // Validar rol
@@ -90,7 +92,7 @@ exports.rejectWithdrawalRequest = async (req, res) => {
   try {
     const { withdrawalRequestId } = req.params;
     const { rejectionReason } = req.body;
-    const processorId = req.user.id;
+    const processorId = req.user.userId;
 
     if (!rejectionReason) {
       return res.status(400).json({
@@ -130,7 +132,7 @@ exports.getPendingWithdrawals = async (req, res) => {
     // Si no es admin/cajero, solo puede ver sus propias solicitudes
     let filterUserId = null;
     if (req.user.role === 'player') {
-      filterUserId = req.user.id;
+      filterUserId = req.user.userId;
     } else if (userId) {
       filterUserId = parseInt(userId);
     }
@@ -168,7 +170,7 @@ exports.getWithdrawalHistory = async (req, res) => {
     // Si no es admin/cajero, solo puede ver su propio historial
     let filterUserId = null;
     if (req.user.role === 'player') {
-      filterUserId = req.user.id;
+      filterUserId = req.user.userId;
     } else if (userId) {
       filterUserId = parseInt(userId);
     }
