@@ -6,6 +6,11 @@ export default function CasinoLobby() {
   const navigate = useNavigate();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [tickerOffset, setTickerOffset] = useState(0);
+  const [roomPots, setRoomPots] = useState({
+    bronze: { bingo: 80000, line: 2500, pre40: 5000 },
+    silver: { bingo: 250000, line: 7500, pre40: 15000 },
+    gold: { bingo: 1200000, line: 30000, pre40: 60000 }
+  });
 
   // Actualizar reloj
   useEffect(() => {
@@ -19,6 +24,30 @@ export default function CasinoLobby() {
       setTickerOffset(prev => prev - 1);
     }, 50);
     return () => clearInterval(tickerTimer);
+  }, []);
+
+  // Simulación de actualización de pozos (reemplazar con Socket.IO en producción)
+  useEffect(() => {
+    const potUpdateTimer = setInterval(() => {
+      setRoomPots(prev => ({
+        bronze: {
+          bingo: prev.bronze.bingo + Math.floor(Math.random() * 500),
+          line: prev.bronze.line + Math.floor(Math.random() * 50),
+          pre40: prev.bronze.pre40 + Math.floor(Math.random() * 100)
+        },
+        silver: {
+          bingo: prev.silver.bingo + Math.floor(Math.random() * 1000),
+          line: prev.silver.line + Math.floor(Math.random() * 100),
+          pre40: prev.silver.pre40 + Math.floor(Math.random() * 200)
+        },
+        gold: {
+          bingo: prev.gold.bingo + Math.floor(Math.random() * 2000),
+          line: prev.gold.line + Math.floor(Math.random() * 300),
+          pre40: prev.gold.pre40 + Math.floor(Math.random() * 500)
+        }
+      }));
+    }, 3000); // Actualizar cada 3 segundos
+    return () => clearInterval(potUpdateTimer);
   }, []);
 
   const winners = [
@@ -55,8 +84,6 @@ export default function CasinoLobby() {
       time: '20:00',
       price: '$500',
       priceValue: 500,
-      pot: 80000,
-      potLabel: 'Pozo Acumulado',
       color: 'bronze',
       description: 'Entrada accesible',
       icon: '🥉',
@@ -71,8 +98,6 @@ export default function CasinoLobby() {
       time: '21:00',
       price: '$1.000',
       priceValue: 1000,
-      pot: 250000,
-      potLabel: 'Pozo Acumulado',
       color: 'silver',
       description: 'Premios destacados',
       icon: '🥈',
@@ -87,8 +112,6 @@ export default function CasinoLobby() {
       time: '22:00',
       price: '$2.000',
       priceValue: 2000,
-      pot: 1200000,
-      potLabel: 'POZO MILLONARIO',
       color: 'gold',
       description: 'Evento Principal VIP',
       icon: '🥇',
@@ -223,29 +246,48 @@ export default function CasinoLobby() {
                 <div className="room-price">{room.price}</div>
               </div>
 
-              {/* Pozo */}
-              {room.pot !== null ? (
-                <div className="room-pot">
-                  <div className="pot-label">{room.potLabel}</div>
-                  <div className="pot-amount">
-                    {formatPot(room.pot)}
-                  </div>
-                  <div className="pot-odometer">
-                    {[...Array(8)].map((_, i) => (
-                      <div key={i} className="odometer-digit">
-                        {Math.floor(Math.random() * 10)}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
+              {/* Pozos - Starter no tiene pozos, las demás salas sí */}
+              {room.id === 'starter' ? (
                 <div className="room-pot starter-rewards">
-                  <div className="pot-label">{room.potLabel}</div>
+                  <div className="pot-label">Skins & Premios</div>
                   <div className="rewards-icons">
                     <span className="reward-icon">🎨</span>
                     <span className="reward-icon">👕</span>
                     <span className="reward-icon">🎁</span>
                     <span className="reward-icon">⭐</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="room-pots-container">
+                  {/* Pozo BINGO (Principal) */}
+                  <div className="pot-main">
+                    <div className="pot-label">🎰 POZO BINGO</div>
+                    <div className="pot-amount">
+                      {formatPot(roomPots[room.id]?.bingo || 0)}
+                    </div>
+                  </div>
+
+                  {/* Pozos Secundarios (Línea y Pre-40) */}
+                  <div className="pots-secondary">
+                    <div className="pot-secondary">
+                      <div className="pot-secondary-icon">➖</div>
+                      <div className="pot-secondary-info">
+                        <div className="pot-secondary-label">Línea</div>
+                        <div className="pot-secondary-amount">
+                          {formatPot(roomPots[room.id]?.line || 0)}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pot-secondary">
+                      <div className="pot-secondary-icon">⚡</div>
+                      <div className="pot-secondary-info">
+                        <div className="pot-secondary-label">Pre-Bolilla 40</div>
+                        <div className="pot-secondary-amount">
+                          {formatPot(roomPots[room.id]?.pre40 || 0)}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
