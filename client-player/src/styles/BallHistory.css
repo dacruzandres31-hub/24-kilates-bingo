@@ -1,0 +1,371 @@
+/* ============================
+   BALL HISTORY - HISTORIAL
+   ============================ */
+
+.ball-history {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+/* Header */
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 15px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.history-header h2 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+  text-shadow: 0 2px 10px rgba(74, 144, 226, 0.5);
+}
+
+.total-balls {
+  background: linear-gradient(135deg, #667EEA, #764BA2);
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 16px;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+/* ============================
+   CUADRÍCULA DE BOLAS
+   ============================ */
+
+.history-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  overflow-y: auto;
+  padding-right: 5px;
+}
+
+/* Scrollbar personalizado */
+.history-grid::-webkit-scrollbar {
+  width: 6px;
+}
+
+.history-grid::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+}
+
+.history-grid::-webkit-scrollbar-thumb {
+  background: rgba(74, 144, 226, 0.5);
+  border-radius: 10px;
+}
+
+.history-grid::-webkit-scrollbar-thumb:hover {
+  background: rgba(74, 144, 226, 0.7);
+}
+
+/* ============================
+   COLUMNAS (B-I-N-G-O)
+   ============================ */
+
+.history-column {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.column-header {
+  padding: 10px;
+  border-radius: 10px 10px 0 0;
+  text-align: center;
+  font-weight: 700;
+  color: white;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.header-letter {
+  display: block;
+  font-size: 24px;
+  margin-bottom: 2px;
+}
+
+.header-range {
+  display: block;
+  font-size: 11px;
+  opacity: 0.9;
+  font-weight: 500;
+}
+
+/* ============================
+   NÚMEROS
+   ============================ */
+
+.column-numbers {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.history-number {
+  width: 100%;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid transparent;
+  position: relative;
+  transition: all 0.3s ease;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+/* Número cantado */
+.history-number.called {
+  background: var(--ball-color);
+  color: white;
+  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow: 
+    0 4px 15px rgba(0, 0, 0, 0.3),
+    inset 0 -2px 5px rgba(0, 0, 0, 0.2),
+    inset 0 2px 5px rgba(255, 255, 255, 0.2);
+  animation: mark-number 0.6s ease-out;
+}
+
+@keyframes mark-number {
+  0% {
+    transform: scale(0.5) rotate(0deg);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2) rotate(180deg);
+  }
+  100% {
+    transform: scale(1) rotate(360deg);
+    opacity: 1;
+  }
+}
+
+/* Marca de verificación */
+.check-mark {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 900;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* Número reciente (última bola) */
+.history-number.recent {
+  animation: pulse-recent 1.5s ease-in-out infinite;
+  border-color: #FFD700 !important;
+  box-shadow: 
+    0 4px 20px rgba(255, 215, 0, 0.6),
+    inset 0 -2px 5px rgba(0, 0, 0, 0.2),
+    inset 0 2px 5px rgba(255, 255, 255, 0.2);
+}
+
+@keyframes pulse-recent {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 
+      0 4px 20px rgba(255, 215, 0, 0.6),
+      inset 0 -2px 5px rgba(0, 0, 0, 0.2),
+      inset 0 2px 5px rgba(255, 255, 255, 0.2);
+  }
+  50% {
+    transform: scale(1.1);
+    box-shadow: 
+      0 4px 30px rgba(255, 215, 0, 0.9),
+      inset 0 -2px 5px rgba(0, 0, 0, 0.2),
+      inset 0 2px 5px rgba(255, 255, 255, 0.2);
+  }
+}
+
+/* Anillo pulsante */
+.pulse-ring {
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
+  border: 2px solid #FFD700;
+  border-radius: 10px;
+  animation: pulse-ring 1.5s ease-out infinite;
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.3);
+    opacity: 0;
+  }
+}
+
+/* ============================
+   ÚLTIMAS 5 BOLAS
+   ============================ */
+
+.recent-balls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 15px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 15px;
+  border-top: 2px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(5px);
+}
+
+.recent-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  white-space: nowrap;
+}
+
+.recent-balls-list {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  flex: 1;
+  padding: 5px 0;
+}
+
+.recent-balls-list::-webkit-scrollbar {
+  height: 4px;
+}
+
+.recent-balls-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+}
+
+.recent-balls-list::-webkit-scrollbar-thumb {
+  background: rgba(74, 144, 226, 0.5);
+  border-radius: 10px;
+}
+
+.recent-ball {
+  padding: 8px 15px;
+  border-radius: 20px;
+  color: white;
+  font-weight: 700;
+  font-size: 14px;
+  white-space: nowrap;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  animation: slide-in 0.5s ease-out;
+}
+
+@keyframes slide-in {
+  from {
+    transform: translateX(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* ============================
+   RESPONSIVE
+   ============================ */
+
+@media (max-width: 1024px) {
+  .history-grid {
+    gap: 8px;
+  }
+
+  .history-number {
+    font-size: 14px;
+  }
+
+  .header-letter {
+    font-size: 20px;
+  }
+
+  .header-range {
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 768px) {
+  .history-grid {
+    gap: 5px;
+  }
+
+  .history-number {
+    font-size: 12px;
+    border-radius: 6px;
+  }
+
+  .column-header {
+    padding: 8px;
+  }
+
+  .header-letter {
+    font-size: 18px;
+  }
+
+  .recent-balls {
+    padding: 10px;
+  }
+
+  .recent-ball {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  .check-mark {
+    width: 14px;
+    height: 14px;
+    font-size: 10px;
+  }
+}
+
+/* ============================
+   ANIMACIÓN DE ENTRADA
+   ============================ */
+
+.history-column {
+  animation: slide-up 0.6s ease-out backwards;
+}
+
+.history-column:nth-child(1) { animation-delay: 0.1s; }
+.history-column:nth-child(2) { animation-delay: 0.2s; }
+.history-column:nth-child(3) { animation-delay: 0.3s; }
+.history-column:nth-child(4) { animation-delay: 0.4s; }
+.history-column:nth-child(5) { animation-delay: 0.5s; }
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
