@@ -199,7 +199,7 @@ export default function StarterRoom() {
       {/* LAYOUT REORGANIZADO */}
       <div className="game-table">
         {/* Cuadrícula Digital - IZQUIERDA COMPLETA - 3 FILAS */}
-        <div className="digital-grid digital-grid-full">
+        <div className="digital-grid-full">
           <div className="grid-header">
             <div className="grid-title">NÚMEROS CANTADOS</div>
             <div className="grid-glow"></div>
