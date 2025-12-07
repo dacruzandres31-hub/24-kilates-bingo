@@ -458,12 +458,6 @@ export default function StarterRoom() {
         </div>
       </div>
 
-      {/* Divider con efecto neón */}
-      <div className="neon-divider">
-        <div className="divider-line"></div>
-        <div className="divider-pulse"></div>
-      </div>
-
       {/* MITAD INFERIOR - LOS CARTONES */}
       <div className="player-cards-section">
         <div className="cards-header">

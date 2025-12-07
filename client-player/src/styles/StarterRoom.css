@@ -287,7 +287,7 @@
     0 0 40px rgba(0, 212, 255, 0.2),
     inset 0 0 40px rgba(0, 212, 255, 0.05);
   min-height: 60vh;
-  margin-bottom: 20px;
+  margin-bottom: 10px;
   position: relative;
   z-index: 2;
   overflow: hidden;
