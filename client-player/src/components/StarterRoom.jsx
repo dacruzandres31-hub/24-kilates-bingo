@@ -272,13 +272,6 @@ export default function StarterRoom() {
             </div>
           )}
         </div>
-                    <span className="ball-number">{ball.number}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
 
         {/* Sección derecha: Título/Info arriba, Bolillero abajo */}
         <div className="right-section">
