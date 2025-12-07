@@ -17,19 +17,158 @@
 }
 
 /* ============================================
-   HEADER
+   ALERTA DE CASI LÍNEA
    ============================================ */
 
-.starter-header {
+.almost-line-alert {
+  position: relative;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 15px 20px;
-  background: rgba(0, 0, 0, 0.6);
-  border: 2px solid rgba(0, 212, 255, 0.3);
+  gap: 15px;
+  padding: 15px 25px;
+  background: linear-gradient(135deg, rgba(255, 165, 0, 0.95) 0%, rgba(255, 69, 0, 0.95) 100%);
+  border: 3px solid #ffd700;
   border-radius: 15px;
-  box-shadow: 0 0 30px rgba(0, 212, 255, 0.2);
+  box-shadow: 
+    0 0 40px rgba(255, 165, 0, 0.6),
+    0 0 60px rgba(255, 165, 0, 0.4),
+    inset 0 0 30px rgba(255, 255, 255, 0.1);
   margin-bottom: 15px;
+  overflow: hidden;
+  animation: alert-entrance 0.5s ease-out, alert-glow 2s ease-in-out infinite;
+}
+
+@keyframes alert-entrance {
+  0% {
+    transform: translateY(-50px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes alert-glow {
+  0%, 100% {
+    box-shadow: 
+      0 0 40px rgba(255, 165, 0, 0.6),
+      0 0 60px rgba(255, 165, 0, 0.4),
+      inset 0 0 30px rgba(255, 255, 255, 0.1);
+  }
+  50% {
+    box-shadow: 
+      0 0 60px rgba(255, 165, 0, 0.8),
+      0 0 80px rgba(255, 165, 0, 0.6),
+      inset 0 0 40px rgba(255, 255, 255, 0.2);
+  }
+}
+
+.alert-icon {
+  font-size: 2.5rem;
+  animation: alert-bounce 1s ease-in-out infinite;
+}
+
+@keyframes alert-bounce {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+  }
+  25% {
+    transform: scale(1.2) rotate(-10deg);
+  }
+  75% {
+    transform: scale(1.2) rotate(10deg);
+  }
+}
+
+.alert-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.alert-title {
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: #ffffff;
+  text-shadow: 
+    2px 2px 4px rgba(0, 0, 0, 0.5),
+    0 0 10px rgba(255, 255, 255, 0.5);
+  letter-spacing: 2px;
+}
+
+.alert-message {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #fffacd;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.alert-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 5px;
+}
+
+.alert-subtext {
+  margin-top: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #fff;
+  text-align: center;
+  padding: 6px 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+  animation: subtext-pulse 2s ease-in-out infinite;
+}
+
+@keyframes subtext-pulse {
+  0%, 100% {
+    opacity: 0.9;
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+}
+
+.card-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #ffffff;
+  backdrop-filter: blur(5px);
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.alert-pulse {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    rgba(255, 255, 255, 0.3) 50%, 
+    transparent 100%);
+  animation: alert-shine 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes alert-shine {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 .room-title {
@@ -139,7 +278,7 @@
 
 .game-table {
   display: grid;
-  grid-template-columns: 60% 40%;
+  grid-template-columns: 50% 50%;
   gap: 15px;
   padding: 15px;
   background: rgba(0, 0, 0, 0.8);
@@ -148,7 +287,11 @@
   box-shadow: 
     0 0 40px rgba(0, 212, 255, 0.2),
     inset 0 0 40px rgba(0, 212, 255, 0.05);
-  min-height: 45vh;
+  min-height: 25vh;
+  max-height: 30vh;
+  margin-bottom: 20px;
+  position: relative;
+  z-index: 2;
 }
 
 /* ============================================
@@ -159,21 +302,23 @@
   background: rgba(0, 0, 0, 0.6);
   border: 2px solid rgba(0, 255, 0, 0.3);
   border-radius: 15px;
-  padding: 15px;
+  padding: 8px;
   position: relative;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .grid-header {
   text-align: center;
-  margin-bottom: 15px;
+  margin-bottom: 8px;
   position: relative;
 }
 
 .grid-title {
-  font-size: 0.9rem;
+  font-size: 0.75rem;
   font-weight: 700;
-  letter-spacing: 3px;
+  letter-spacing: 2px;
   color: #00ff00;
   text-shadow: 0 0 15px rgba(0, 255, 0, 0.8);
   font-family: 'Courier New', monospace;
@@ -203,14 +348,14 @@
 }
 
 .column-letter {
-  font-size: 1.3rem;
+  font-size: 1rem;
   font-weight: 900;
   text-align: center;
-  padding: 8px 0;
+  padding: 4px 0;
   background: rgba(0, 0, 0, 0.8);
-  border-radius: 8px;
+  border-radius: 6px;
   border: 2px solid currentColor;
-  letter-spacing: 2px;
+  letter-spacing: 1px;
   animation: letter-glow 2s ease-in-out infinite;
 }
 
@@ -222,16 +367,16 @@
 .column-numbers {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
 }
 
 .grid-number {
   background: rgba(0, 0, 0, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 5px;
-  padding: 6px 4px;
+  border-radius: 4px;
+  padding: 3px 2px;
   text-align: center;
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   font-weight: 600;
   color: #444;
   font-family: 'Courier New', monospace;
@@ -299,8 +444,8 @@
 
 /* Barra de últimas bolas */
 .recent-balls-bar {
-  margin-top: 15px;
-  padding: 10px;
+  margin-top: 8px;
+  padding: 6px;
   background: rgba(0, 0, 0, 0.8);
   border: 2px solid rgba(0, 212, 255, 0.3);
   border-radius: 10px;
@@ -357,6 +502,119 @@
 }
 
 /* ============================================
+   SECCIÓN DERECHA - TÍTULO + INFO + BOLILLERO
+   ============================================ */
+
+.right-section {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.side-info {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.room-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.5rem;
+  font-weight: 900;
+  letter-spacing: 2px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 2px solid rgba(0, 212, 255, 0.3);
+  border-radius: 12px;
+}
+
+.title-icon {
+  font-size: 2rem;
+  animation: icon-float 2s ease-in-out infinite;
+}
+
+.title-text {
+  color: #00d4ff;
+  text-shadow: 0 0 20px rgba(0, 212, 255, 0.8);
+}
+
+.title-tag {
+  background: linear-gradient(135deg, #00ff00, #00aa00);
+  color: #000;
+  font-size: 0.8rem;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  box-shadow: 0 0 15px rgba(0, 255, 0, 0.6);
+}
+
+.game-info {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.info-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 8px 15px;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 212, 255, 0.3);
+}
+
+.badge-label {
+  font-size: 0.9rem;
+  color: #888;
+  font-weight: 600;
+}
+
+.badge-value {
+  font-size: 1.1rem;
+  font-weight: 900;
+  color: #00d4ff;
+  text-shadow: 0 0 10px rgba(0, 212, 255, 0.6);
+}
+
+.status-badge {
+  padding: 8px 15px;
+  border-radius: 10px;
+  font-weight: 900;
+  font-size: 0.95rem;
+  border: 2px solid;
+  letter-spacing: 1px;
+}
+
+.status-badge.waiting {
+  background: rgba(128, 128, 128, 0.2);
+  border-color: rgba(128, 128, 128, 0.5);
+  color: #888;
+}
+
+.status-badge.active {
+  background: rgba(255, 0, 0, 0.2);
+  border-color: rgba(255, 0, 0, 0.5);
+  color: #ff0000;
+  animation: status-pulse 1.5s ease-in-out infinite;
+}
+
+.status-badge.ended {
+  background: rgba(0, 255, 0, 0.2);
+  border-color: rgba(0, 255, 0, 0.5);
+  color: #00ff00;
+}
+
+@keyframes status-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* ============================================
    BOLILLERO MODERNO (DERECHA)
    ============================================ */
 
@@ -365,8 +623,10 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 15px;
+  gap: 10px;
   position: relative;
+  flex: 1;
+  min-height: 0;
 }
 
 .machine-top-led {
@@ -630,7 +890,8 @@
 .neon-divider {
   height: 20px;
   position: relative;
-  margin: 15px 0;
+  margin: 30px 0 40px 0;
+  z-index: 1;
 }
 
 .divider-line {
@@ -686,14 +947,15 @@
   padding: 15px;
   min-height: 35vh;
   max-height: 45vh;
+  margin-top: 20px;
 }
 
 .cards-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 15px;
-  padding-bottom: 10px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
   border-bottom: 2px solid rgba(255, 0, 255, 0.3);
 }
 
@@ -701,7 +963,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   font-weight: 700;
   letter-spacing: 2px;
   color: #ff00ff;
@@ -709,26 +971,29 @@
 }
 
 .cards-icon {
-  font-size: 1.5rem;
+  font-size: 1.3rem;
 }
 
 .cards-count {
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: #888;
   background: rgba(255, 0, 255, 0.1);
-  padding: 5px 15px;
+  padding: 4px 12px;
   border-radius: 15px;
   border: 1px solid rgba(255, 0, 255, 0.3);
 }
 
-/* Scroll Container */
+/* Scroll Container - Con superposición vertical */
 .cards-scroll-container {
   flex: 1;
-  overflow-y: auto;
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 15px;
-  padding-right: 5px;
+  align-items: center;
+  gap: 8px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 20px 10px;
 }
 
 /* Scrollbar Personalizado */
@@ -748,142 +1013,209 @@
 }
 
 /* ============================================
-   CARTÓN DE BINGO - DISEÑO MODERNO
+   CARTÓN DE BINGO - ESTILO CARTAS SUPERPUESTAS VERTICAL
    ============================================ */
 
 .bingo-card-starter {
-  background: rgba(0, 0, 0, 0.8);
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  margin-left: auto;
+  margin-right: auto;
+  background: linear-gradient(135deg, rgba(10, 10, 10, 0.95), rgba(30, 30, 30, 0.95));
   border: 3px solid transparent;
   border-image: linear-gradient(135deg, #00d4ff, #ff00ff) 1;
-  border-radius: 15px;
-  padding: 15px;
+  border-radius: 12px;
+  padding: 10px;
   box-shadow: 
-    0 0 30px rgba(0, 212, 255, 0.2),
-    0 0 30px rgba(255, 0, 255, 0.2);
+    0 8px 32px rgba(0, 0, 0, 0.8),
+    0 0 20px rgba(0, 212, 255, 0.3),
+    0 0 20px rgba(255, 0, 255, 0.3);
   transition: all 0.3s ease;
+  cursor: pointer;
+  margin-bottom: -210px;
 }
 
+/* Primer cartón - totalmente visible con mayor z-index */
+.bingo-card-starter:first-child {
+  margin-top: 0;
+  z-index: 10;
+}
+
+/* Segundo cartón - desplazado 50px hacia abajo */
+.bingo-card-starter:nth-child(2) {
+  margin-top: 50px;
+  z-index: 9;
+}
+
+/* Tercer cartón - desplazado 100px hacia abajo */
+.bingo-card-starter:nth-child(3) {
+  margin-top: 100px;
+  z-index: 8;
+}
+
+/* Cuarto cartón - desplazado 150px hacia abajo */
+.bingo-card-starter:nth-child(4) {
+  margin-top: 150px;
+  z-index: 7;
+}
+
+/* Quinto cartón y siguientes */
+.bingo-card-starter:nth-child(n+5) {
+  z-index: 6;
+}
+
+/* Último cartón - debe tener margen normal para no cortar */
+.bingo-card-starter:last-child {
+  margin-bottom: 0;
+}
+
+/* Hover - expandir cartón */
 .bingo-card-starter:hover {
-  transform: translateY(-5px);
+  transform: scale(1.03);
+  z-index: 20 !important;
   box-shadow: 
-    0 0 40px rgba(0, 212, 255, 0.4),
-    0 0 40px rgba(255, 0, 255, 0.4);
+    0 20px 60px rgba(0, 0, 0, 0.9),
+    0 0 40px rgba(0, 212, 255, 0.6),
+    0 0 40px rgba(255, 0, 255, 0.6);
+}
+
+.bingo-card-starter:last-child:hover {
+  margin-bottom: 0;
 }
 
 .card-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   position: relative;
 }
 
 .card-number {
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 700;
-  color: #00ffff;
-  background: rgba(0, 212, 255, 0.2);
-  padding: 5px 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(0, 212, 255, 0.4);
+  color: #00d4ff;
+  background: rgba(0, 212, 255, 0.1);
+  padding: 3px 10px;
+  border-radius: 15px;
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  text-shadow: 0 0 10px rgba(0, 212, 255, 0.8);
+  letter-spacing: 1px;
 }
 
 .card-glow-border {
   position: absolute;
-  top: -15px;
-  left: -15px;
-  right: -15px;
-  bottom: -15px;
-  border-radius: 15px;
-  background: linear-gradient(135deg, 
-    rgba(0, 212, 255, 0.1), 
-    rgba(255, 0, 255, 0.1));
-  filter: blur(20px);
+  top: -5px;
+  left: -5px;
+  right: -5px;
+  bottom: -5px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #00d4ff, #ff00ff);
+  opacity: 0;
   z-index: -1;
+  filter: blur(10px);
+  transition: opacity 0.3s ease;
+}
+
+.bingo-card-starter:hover .card-glow-border {
+  opacity: 0.3;
 }
 
 .card-grid {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
 }
 
 .card-letters {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 5px;
+  gap: 3px;
+  margin-bottom: 4px;
 }
 
 .card-letter {
-  font-size: 1.5rem;
-  font-weight: 900;
   text-align: center;
-  padding: 8px 0;
-  background: rgba(0, 0, 0, 0.6);
-  border-radius: 8px;
-  border: 2px solid currentColor;
-  letter-spacing: 2px;
+  font-size: 0.9rem;
+  font-weight: 900;
+  padding: 3px;
+  letter-spacing: 1px;
 }
 
 .card-numbers-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 5px;
+  gap: 3px;
 }
 
 .card-column {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 3px;
 }
 
 .card-cell {
+  position: relative;
   aspect-ratio: 1;
   background: rgba(20, 20, 20, 0.8);
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  border-radius: 8px;
+  border: 1px solid rgba(0, 212, 255, 0.2);
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.3rem;
-  font-weight: 900;
+  font-size: 0.85rem;
+  font-weight: 700;
   color: #ffffff;
-  font-family: 'Arial Rounded', 'Arial', sans-serif;
-  position: relative;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
 }
 
 .card-cell.free {
-  background: linear-gradient(135deg, #00d4ff, #ff00ff);
-  border-color: transparent;
-  font-size: 2rem;
-  color: #000;
+  background: radial-gradient(circle, rgba(255, 215, 0, 0.3), rgba(255, 165, 0, 0.2));
+  border-color: rgba(255, 215, 0, 0.5);
 }
 
 .free-space {
-  animation: star-rotate 4s linear infinite;
+  font-size: 1.2rem;
+  color: #ffd700;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.8);
+  animation: star-pulse 2s ease-in-out infinite;
 }
 
-@keyframes star-rotate {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+@keyframes star-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.15); opacity: 0.8; }
+}
+
+.cell-number {
+  z-index: 1;
 }
 
 .card-cell.marked {
-  border-color: transparent;
-  animation: cell-marked 0.5s ease-out;
+  background: rgba(0, 212, 255, 0.2);
+  border-color: currentColor;
+  border-width: 2px;
+  animation: cell-mark-pulse 1s ease-out;
 }
 
-@keyframes cell-marked {
-  0% {
-    transform: scale(0.8);
-  }
-  50% {
-    transform: scale(1.15);
-  }
-  100% {
-    transform: scale(1);
-  }
+@keyframes cell-mark-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+.cell-mark {
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  opacity: 0.3;
+  z-index: 0;
+  animation: mark-glow 2s ease-in-out infinite;
+}
+
+@keyframes mark-glow {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.6; }
 }
 
 .cell-number {

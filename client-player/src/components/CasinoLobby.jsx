@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import '../styles/CasinoLobby.css';
 import '../styles/Countdown.css';
 import Countdown from './Countdown';
-import { FaClock, FaUsers, FaMoneyBillWave, FaTrophy, FaStar, FaGlassCheers, FaGift, FaHeadset, FaTicketAlt } from 'react-icons/fa';
+import { FaClock, FaUsers, FaMoneyBillWave, FaTrophy, FaStar, FaGlassCheers, FaGift, FaHeadset, FaTicketAlt, FaEye, FaEyeSlash } from 'react-icons/fa';
 import logo from '../assets/logo.png';
 import giftIcon from '../assets/Gift_icon.png';
 import bronzeIcon from '../assets/bronze_icon.png';
@@ -25,7 +25,7 @@ const roomsData = [
   {
     id: 'starter',
     name: 'Starter',
-    path: '/sala-starter',
+    path: '/sala/starter',
     status: 'active',
     targetTime: getTargetTime(19),
     description: 'Premios en tickets para canjear en la tienda.',
@@ -38,7 +38,7 @@ const roomsData = [
   {
     id: 'bronze',
     name: 'Bronce',
-    path: '/sala-bronce',
+    path: '/sala/bronze',
     status: 'active',
     targetTime: getTargetTime(20),
     description: 'La sala clásica para empezar a ganar.',
@@ -55,7 +55,7 @@ const roomsData = [
   {
     id: 'silver',
     name: 'Plata',
-    path: '/sala-plata',
+    path: '/sala/silver',
     status: 'active',
     targetTime: getTargetTime(21),
     description: 'Apuestas más altas, premios más grandes.',
@@ -72,7 +72,7 @@ const roomsData = [
   {
     id: 'gold',
     name: 'Oro',
-    path: '/sala-oro',
+    path: '/sala/gold',
     status: 'active',
     targetTime: getTargetTime(22),
     description: 'La experiencia VIP con pozos millonarios.',
@@ -223,6 +223,7 @@ const WinnersTicker = () => {
 
 const CasinoLobby = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [showBalance, setShowBalance] = useState(false);
 
   // Actualizar reloj
   useEffect(() => {
@@ -240,10 +241,19 @@ const CasinoLobby = () => {
             <span className="info-value">JugadorPro24</span>
           </div>
           
-          <div className="player-info-item player-balance">
+          <div className="player-info-item player-balance" onClick={() => setShowBalance(!showBalance)}>
             <img src={bronzeIcon} alt="Saldo" className="balance-icon" />
             <span className="info-label">Saldo:</span>
-            <span className="info-value balance-amount">$12,500</span>
+            {showBalance ? (
+              <span className="info-value balance-amount">$12,500</span>
+            ) : (
+              <div className="balance-hidden">
+                <span className="hidden-dots">•••••</span>
+              </div>
+            )}
+            <button className="balance-toggle" onClick={(e) => { e.stopPropagation(); setShowBalance(!showBalance); }}>
+              {showBalance ? <FaEye /> : <FaEyeSlash />}
+            </button>
           </div>
           
           <div className="player-info-separator"></div>
@@ -256,6 +266,11 @@ const CasinoLobby = () => {
           <div className="player-info-item ticket-count">
             <span className="ticket-label">Starter:</span>
             <span className="ticket-value">3</span>
+          </div>
+          
+          <div className="player-info-item ticket-count">
+            <span className="ticket-label">Bronce:</span>
+            <span className="ticket-value">5</span>
           </div>
           
           <div className="player-info-item ticket-count">

@@ -9,6 +9,7 @@ export default function StarterRoom() {
   const [gameStatus, setGameStatus] = useState('waiting'); // waiting, active, ended
   const [currentBall, setCurrentBall] = useState(null);
   const [floatingBalls, setFloatingBalls] = useState([]);
+  const [almostLineCards, setAlmostLineCards] = useState([]); // Cartones a 2 bolillas de línea
 
   // Simular bolillas flotantes en el bolillero
   useEffect(() => {
@@ -110,31 +111,102 @@ export default function StarterRoom() {
     return ballsDrawn.some(ball => ball.number === number);
   };
 
+  // Detectar líneas (horizontal, vertical, diagonal)
+  const checkLineStatus = (card) => {
+    const lines = [];
+    const letters = ['B', 'I', 'N', 'G', 'O'];
+
+    // Líneas horizontales
+    for (let row = 0; row < 5; row++) {
+      const line = letters.map(letter => card.numbers[letter][row]);
+      lines.push({ type: 'horizontal', row, line });
+    }
+
+    // Líneas verticales
+    letters.forEach((letter, col) => {
+      const line = card.numbers[letter];
+      lines.push({ type: 'vertical', col, line });
+    });
+
+    // Diagonal principal (top-left to bottom-right)
+    const diagonal1 = letters.map((letter, idx) => card.numbers[letter][idx]);
+    lines.push({ type: 'diagonal', dir: 'main', line: diagonal1 });
+
+    // Diagonal secundaria (top-right to bottom-left)
+    const diagonal2 = letters.map((letter, idx) => card.numbers[letter][4 - idx]);
+    lines.push({ type: 'diagonal', dir: 'secondary', line: diagonal2 });
+
+    // Verificar cuántas bolillas faltan en cada línea
+    const linesStatus = lines.map(lineData => {
+      const missing = lineData.line.filter(num => num !== 0 && !isNumberCalled(num));
+      const marked = lineData.line.filter(num => num === 0 || isNumberCalled(num));
+      return {
+        ...lineData,
+        missing: missing.length,
+        markedCount: marked.length,
+        missingNumbers: missing
+      };
+    });
+
+    return linesStatus;
+  };
+
+  // Detectar cartones a 2 bolillas de línea
+  useEffect(() => {
+    if (ballsDrawn.length === 0) {
+      setAlmostLineCards([]);
+      return;
+    }
+
+    const cardsAlmostThere = [];
+    
+    playerCards.forEach(card => {
+      const linesStatus = checkLineStatus(card);
+      const almostLines = linesStatus.filter(line => line.missing === 2);
+      
+      if (almostLines.length > 0) {
+        cardsAlmostThere.push({
+          cardId: card.id,
+          almostLineCount: almostLines.length,
+          lines: almostLines
+        });
+      }
+    });
+
+    setAlmostLineCards(cardsAlmostThere);
+  }, [ballsDrawn, playerCards]);
+
   return (
     <div className="starter-room">
-      {/* Header */}
-      <div className="starter-header">
-        <div className="room-title">
-          <span className="title-icon">🎟️</span>
-          <span className="title-text">SALA STARTER</span>
-          <span className="title-tag">FREE</span>
-        </div>
-        <div className="game-info">
-          <div className="info-badge">
-            <span className="badge-label">Bolas:</span>
-            <span className="badge-value">{ballsDrawn.length}/75</span>
+      {/* Alerta de casi línea - Personalizada para el jugador */}
+      {almostLineCards.length > 0 && (
+        <div className="almost-line-alert">
+          <div className="alert-icon">⚠️</div>
+          <div className="alert-content">
+            <div className="alert-title">¡ESTÁS A 2 BOLILLAS DE LÍNEA!</div>
+            <div className="alert-message">
+              {almostLineCards.length === 1 
+                ? `Tienes 1 cartón cerca de ganar`
+                : `Tienes ${almostLineCards.length} cartones cerca de ganar`}
+            </div>
+            <div className="alert-details">
+              {almostLineCards.map(card => (
+                <span key={card.cardId} className="card-badge">
+                  Tu Cartón #{card.cardId}: {card.almostLineCount} {card.almostLineCount === 1 ? 'línea posible' : 'líneas posibles'}
+                </span>
+              ))}
+            </div>
+            <div className="alert-subtext">
+              🎯 ¡Concéntrate! Solo necesitas 2 números más para cantar LÍNEA
+            </div>
           </div>
-          <div className={`status-badge ${gameStatus}`}>
-            {gameStatus === 'waiting' && '⏸️ ESPERANDO'}
-            {gameStatus === 'active' && '🔴 EN VIVO'}
-            {gameStatus === 'ended' && '✅ FINALIZADO'}
-          </div>
+          <div className="alert-pulse"></div>
         </div>
-      </div>
+      )}
 
-      {/* MITAD SUPERIOR - LA MESA */}
+      {/* LAYOUT REORGANIZADO */}
       <div className="game-table">
-        {/* Cuadrícula Digital (Izquierda) */}
+        {/* Cuadrícula Digital - IZQUIERDA COMPLETA */}
         <div className="digital-grid">
           <div className="grid-header">
             <div className="grid-title">NÚMEROS CANTADOS</div>
@@ -204,8 +276,30 @@ export default function StarterRoom() {
           )}
         </div>
 
-        {/* Bolillero Moderno (Derecha) */}
-        <div className="modern-bingo-machine">
+        {/* Sección derecha: Título/Info arriba, Bolillero abajo */}
+        <div className="right-section">
+          {/* Info superior */}
+          <div className="side-info">
+            <div className="room-title">
+              <span className="title-icon">🎟️</span>
+              <span className="title-text">SALA STARTER</span>
+              <span className="title-tag">FREE</span>
+            </div>
+            <div className="game-info">
+              <div className="info-badge">
+                <span className="badge-label">Bolas:</span>
+                <span className="badge-value">{ballsDrawn.length}/75</span>
+              </div>
+              <div className={`status-badge ${gameStatus}`}>
+                {gameStatus === 'waiting' && '⏸️ ESPERANDO'}
+                {gameStatus === 'active' && '🔴 EN VIVO'}
+                {gameStatus === 'ended' && '✅ FINALIZADO'}
+              </div>
+            </div>
+          </div>
+
+          {/* Bolillero Moderno */}
+          <div className="modern-bingo-machine">
           <div className="machine-top-led"></div>
           
           <div className="acrylic-sphere">
@@ -274,6 +368,7 @@ export default function StarterRoom() {
             </div>
           </div>
         </div>
+        </div>
       </div>
 
       {/* Divider con efecto neón */}
@@ -293,10 +388,10 @@ export default function StarterRoom() {
         </div>
 
         <div className="cards-scroll-container">
-          {playerCards.map((card, cardIndex) => (
+          {[...playerCards].reverse().map((card, cardIndex) => (
             <div key={card.id} className="bingo-card-starter">
               <div className="card-header">
-                <span className="card-number">#{cardIndex + 1}</span>
+                <span className="card-number">#{playerCards.length - cardIndex}</span>
                 <div className="card-glow-border"></div>
               </div>
               
