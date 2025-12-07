@@ -278,7 +278,7 @@
 
 .game-table {
   display: flex;
-  gap: 15px;
+  gap: 0px;
   padding: 15px;
   background: rgba(0, 0, 0, 0.8);
   border: 3px solid rgba(0, 212, 255, 0.3);
