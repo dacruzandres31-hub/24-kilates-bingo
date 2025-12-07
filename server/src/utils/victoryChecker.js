@@ -4,6 +4,7 @@
 // Detector ultra-rápido de ganadores de LÍNEA y BINGO
 // Se ejecuta cada vez que sale una bolilla nueva
 // Optimizado con Set para búsqueda O(1) en lugar de O(n)
+// ACTUALIZADO PARA BINGO 90 (3 filas x 9 columnas, 15 números)
 
 /**
  * REVISOR DE CARTONES - ALGORITMO DE DETECCIÓN DE GANADORES
@@ -23,7 +24,7 @@
  *     {
  *       id: 123,
  *       user_id: 456,
- *       grid_numbers: [[1,2,3,4,5], [6,7,8,9,10], ...], // Matriz 5x5
+ *       grid_numbers: [[n,n,null,n,null,n,null,n,n], [n,null,n,n,null,n,n,null,n], ...], // Matriz 3x9 con nulls
  *       already_won_line: false  // Flag para evitar premiar línea 2 veces
  *     },
  *     ...
@@ -42,34 +43,37 @@ function checkWinners(allCards, drawnBalls) {
 
   // ⚡ OPTIMIZACIÓN CRÍTICA:
   // Convertimos las bolillas salidas a un Set para búsqueda instantánea O(1)
-  // Esto hace que el sistema no se cuelgue aunque haya 5.000 cartones
-  // Set.has(number) es 100x más rápido que Array.includes(number)
   const ballsSet = new Set(drawnBalls);
 
   // Iteramos cartón por cartón
   for (let card of allCards) {
-    const grid = card.grid_numbers; // Matriz 5x5
-    let fullCardCount = 0; // Contador para el BINGO
+    const grid = card.grid_numbers; // Matriz 3x9
+    let markedCount = 0; // Contador de números marcados (para BINGO)
     let hasLine = false;
 
     // --- 1. CHEQUEO DE LÍNEAS HORIZONTALES ---
-    // Revisamos las 5 filas del cartón
-    for (let row = 0; row < 5; row++) {
+    // En BINGO 90 solo hay líneas horizontales (no verticales ni diagonales)
+    // Cada cartón tiene 3 filas, cada fila tiene 5 números y 4 espacios vacíos
+    for (let row = 0; row < 3; row++) {
       let rowCount = 0;
+      let numbersInRow = 0; // Total de números (no nulls) en la fila
       
-      for (let col = 0; col < 5; col++) {
+      for (let col = 0; col < 9; col++) {
         const number = grid[row][col];
         
-        // ⚠️ REGLA: Si el número salió O es el centro ("FREE"), cuenta como marcado
-        // En algunos bingos el centro es gratis, ajusta según tus reglas
-        if (ballsSet.has(number) || number === 'FREE' || number === null) {
-          rowCount++;
-          fullCardCount++; // También sumamos para el contador de BINGO
+        if (number !== null && number !== undefined) {
+          numbersInRow++;
+          
+          if (ballsSet.has(number)) {
+            rowCount++;
+            markedCount++; // También sumamos para el contador de BINGO
+          }
         }
       }
       
-      // Si la fila tiene 5 aciertos, es LÍNEA
-      if (rowCount === 5) {
+      // Una línea está completa si todos los números (5) han salido
+      // numbersInRow siempre debe ser 5 en un cartón válido
+      if (rowCount === numbersInRow && numbersInRow === 5) {
         hasLine = true;
       }
     }
@@ -77,7 +81,6 @@ function checkWinners(allCards, drawnBalls) {
     // --- 2. CLASIFICACIÓN DE GANADORES ---
     
     // ⚠️ IMPORTANTE: Si ya tenía línea premiada antes, no lo volvemos a contar
-    // Esto evita que un jugador gane "línea" múltiples veces con el mismo cartón
     if (hasLine && !card.already_won_line) {
       lineWinners.push({
         userId: card.user_id,
@@ -85,10 +88,9 @@ function checkWinners(allCards, drawnBalls) {
       });
     }
 
-    // ⚠️ BINGO: Si tiene 25 aciertos (toda la grilla 5x5)
-    // Un cartón de bingo tiene 25 espacios (5 filas x 5 columnas)
-    // Si el centro es "FREE", ya está contado en fullCardCount
-    if (fullCardCount === 25) {
+    // ⚠️ BINGO: Si tiene 15 aciertos (todos los números del cartón)
+    // Un cartón de BINGO 90 tiene 15 números
+    if (markedCount === 15) {
       bingoWinners.push({
         userId: card.user_id,
         cardId: card.id
@@ -105,8 +107,9 @@ function checkWinners(allCards, drawnBalls) {
 /**
  * VERSIÓN ALTERNATIVA: Detección con validación estricta
  * 
- * Esta versión NO considera el centro como "FREE" automáticamente.
+ * Esta versión NO considera espacios FREE.
  * Usa la lógica original de que TODOS los números deben haber salido.
+ * Actualizada para BINGO 90 (3x9, 15 números)
  * 
  * @param {Array} allCards - Cartones activos
  * @param {Array} drawnBalls - Bolillas salidas
@@ -119,25 +122,33 @@ function checkWinnersStrict(allCards, drawnBalls) {
   const ballsSet = new Set(drawnBalls);
 
   for (let card of allCards) {
-    const grid = card.grid_numbers;
+    const grid = card.grid_numbers; // Matriz 3x9
     let hasLine = false;
     let allNumbersDrawn = true;
+    let markedCount = 0;
 
     // --- CHEQUEO DE LÍNEAS ---
-    for (let row = 0; row < 5; row++) {
+    for (let row = 0; row < 3; row++) {
       let rowComplete = true;
+      let rowMarked = 0;
       
-      for (let col = 0; col < 5; col++) {
+      for (let col = 0; col < 9; col++) {
         const number = grid[row][col];
         
-        // Solo cuenta si el número salió (sin considerar FREE)
-        if (number !== null && !ballsSet.has(number)) {
-          rowComplete = false;
-          allNumbersDrawn = false;
+        // Solo procesar celdas con números (no nulls)
+        if (number !== null && number !== undefined) {
+          if (ballsSet.has(number)) {
+            rowMarked++;
+            markedCount++;
+          } else {
+            rowComplete = false;
+            allNumbersDrawn = false;
+          }
         }
       }
       
-      if (rowComplete) {
+      // En BINGO 90, cada fila tiene exactamente 5 números
+      if (rowComplete && rowMarked === 5) {
         hasLine = true;
       }
     }
@@ -149,6 +160,18 @@ function checkWinnersStrict(allCards, drawnBalls) {
         cardId: card.id
       });
     }
+
+    // BINGO: todos los 15 números marcados
+    if (markedCount === 15) {
+      bingoWinners.push({
+        userId: card.user_id,
+        cardId: card.id
+      });
+    }
+  }
+
+  return { lineWinners, bingoWinners };
+}
 
     if (allNumbersDrawn) {
       bingoWinners.push({
@@ -166,6 +189,7 @@ function checkWinnersStrict(allCards, drawnBalls) {
  * 
  * Detiene la búsqueda apenas encuentra el PRIMER ganador de BINGO.
  * Esto es útil si solo quieres un ganador por sesión.
+ * Actualizada para BINGO 90 (3x9, 15 números)
  * 
  * @param {Array} allCards - Cartones activos
  * @param {Array} drawnBalls - Bolillas salidas
@@ -186,24 +210,30 @@ function checkWinnersWithEarlyExit(allCards, drawnBalls) {
       break;
     }
 
-    const grid = card.grid_numbers;
-    let fullCardCount = 0;
+    const grid = card.grid_numbers; // Matriz 3x9
+    let markedCount = 0;
     let hasLine = false;
 
-    // Revisar filas
-    for (let row = 0; row < 5; row++) {
+    // Revisar las 3 filas
+    for (let row = 0; row < 3; row++) {
       let rowCount = 0;
+      let numbersInRow = 0;
       
-      for (let col = 0; col < 5; col++) {
+      for (let col = 0; col < 9; col++) {
         const number = grid[row][col];
         
-        if (ballsSet.has(number) || number === null) {
-          rowCount++;
-          fullCardCount++;
+        if (number !== null && number !== undefined) {
+          numbersInRow++;
+          
+          if (ballsSet.has(number)) {
+            rowCount++;
+            markedCount++;
+          }
         }
       }
       
-      if (rowCount === 5) {
+      // Línea completa: 5 números marcados
+      if (rowCount === numbersInRow && numbersInRow === 5) {
         hasLine = true;
       }
     }
@@ -216,8 +246,8 @@ function checkWinnersWithEarlyExit(allCards, drawnBalls) {
       };
     }
 
-    // Guardar primer ganador de bingo
-    if (fullCardCount === 25 && !firstBingoWinner) {
+    // Guardar primer ganador de bingo (15 números marcados)
+    if (markedCount === 15 && !firstBingoWinner) {
       firstBingoWinner = {
         userId: card.user_id,
         cardId: card.id
@@ -233,6 +263,7 @@ function checkWinnersWithEarlyExit(allCards, drawnBalls) {
  * 
  * Verifica que un cartón tenga la estructura correcta antes de revisarlo.
  * Esto previene errores si hay datos corruptos en la base de datos.
+ * Actualizada para BINGO 90 (3x9, 15 números)
  * 
  * @param {Object} card - Cartón a validar
  * @returns {Boolean} true si el cartón es válido
@@ -244,13 +275,19 @@ function isValidCard(card) {
 
   const grid = card.grid_numbers;
 
-  // Verificar que sea una matriz 5x5
-  if (!Array.isArray(grid) || grid.length !== 5) {
+  // Verificar que sea una matriz 3x9
+  if (!Array.isArray(grid) || grid.length !== 3) {
     return false;
   }
 
   for (let row of grid) {
-    if (!Array.isArray(row) || row.length !== 5) {
+    if (!Array.isArray(row) || row.length !== 9) {
+      return false;
+    }
+    
+    // Verificar que cada fila tenga exactamente 5 números (no nulls)
+    const numbersInRow = row.filter(n => n !== null && n !== undefined).length;
+    if (numbersInRow !== 5) {
       return false;
     }
   }
@@ -261,18 +298,18 @@ function isValidCard(card) {
 /**
  * HELPER: Contar números marcados en un cartón
  * 
- * @param {Array} grid - Matriz 5x5 del cartón
+ * @param {Array} grid - Matriz 3x9 del cartón
  * @param {Set} ballsSet - Set de bolillas salidas
  * @returns {Number} Cantidad de números marcados
  */
 function countMarkedNumbers(grid, ballsSet) {
   let count = 0;
 
-  for (let row = 0; row < 5; row++) {
-    for (let col = 0; col < 5; col++) {
+  for (let row = 0; row < 3; row++) {
+    for (let col = 0; col < 9; col++) {
       const number = grid[row][col];
       
-      if (ballsSet.has(number) || number === null || number === 'FREE') {
+      if (number !== null && number !== undefined && ballsSet.has(number)) {
         count++;
       }
     }
@@ -284,27 +321,34 @@ function countMarkedNumbers(grid, ballsSet) {
 /**
  * HELPER: Verificar línea específica
  * 
- * @param {Array} grid - Matriz 5x5
- * @param {Number} rowIndex - Índice de la fila (0-4)
+ * @param {Array} grid - Matriz 3x9
+ * @param {Number} rowIndex - Índice de la fila (0-2)
  * @param {Set} ballsSet - Set de bolillas
  * @returns {Boolean} true si la línea está completa
  */
 function checkSpecificLine(grid, rowIndex, ballsSet) {
-  if (rowIndex < 0 || rowIndex >= 5) {
+  if (rowIndex < 0 || rowIndex >= 3) {
     return false;
   }
 
   const row = grid[rowIndex];
+  let numbersMarked = 0;
+  let totalNumbers = 0;
 
-  for (let col = 0; col < 5; col++) {
+  for (let col = 0; col < 9; col++) {
     const number = row[col];
     
-    if (number !== null && number !== 'FREE' && !ballsSet.has(number)) {
-      return false;
+    if (number !== null && number !== undefined) {
+      totalNumbers++;
+      
+      if (ballsSet.has(number)) {
+        numbersMarked++;
+      }
     }
   }
 
-  return true;
+  // Línea completa si todos los 5 números están marcados
+  return numbersMarked === 5 && totalNumbers === 5;
 }
 
 // ============================================

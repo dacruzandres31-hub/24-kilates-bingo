@@ -1348,3 +1348,105 @@
     font-size: 1rem;
   }
 }
+
+/* ===== BINGO 90 STYLES (3x9 Grid) ===== */
+
+.bingo-card-starter-90 {
+  max-width: 400px; /* Más ancho para acomodar 9 columnas */
+}
+
+.card-grid-90 {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.card-grid-90 .card-row {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 3px;
+}
+
+.card-grid-90 .card-cell {
+  aspect-ratio: 1 / 1;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(34, 211, 238, 0.3);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #CBD5E1;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.card-grid-90 .card-cell.empty {
+  background: rgba(15, 23, 42, 0.3);
+  border: 1px dashed rgba(100, 116, 139, 0.2);
+}
+
+.card-grid-90 .card-cell.marked {
+  background: rgba(34, 211, 238, 0.3);
+  border-color: rgba(34, 211, 238, 0.8);
+  color: #00ffff;
+}
+
+.ball-number-large {
+  font-size: 3.5rem;
+  font-weight: 900;
+  color: white;
+  text-shadow: 0 0 30px rgba(255, 255, 255, 0.8);
+}
+
+.announcement-number-large {
+  font-size: 4rem;
+  font-weight: 900;
+  text-shadow: 0 0 30px currentColor;
+  animation: pulse-number 1s ease-in-out infinite;
+}
+
+@media (max-width: 768px) {
+  .bingo-card-starter-90 {
+    max-width: 350px;
+  }
+
+  .card-grid-90 .card-cell {
+    font-size: 0.65rem;
+  }
+
+  .ball-number-large {
+    font-size: 2.5rem;
+  }
+
+  .announcement-number-large {
+    font-size: 3rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .bingo-card-starter-90 {
+    max-width: 100%;
+  }
+
+  .card-grid-90 {
+    gap: 2px;
+  }
+
+  .card-grid-90 .card-row {
+    gap: 2px;
+  }
+
+  .card-grid-90 .card-cell {
+    font-size: 0.55rem;
+  }
+
+  .ball-number-large {
+    font-size: 2rem;
+  }
+
+  .announcement-number-large {
+    font-size: 2.5rem;
+  }
+}

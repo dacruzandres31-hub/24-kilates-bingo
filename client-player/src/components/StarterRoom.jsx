@@ -23,18 +23,19 @@ export default function StarterRoom() {
     setFloatingBalls(balls);
   }, []);
 
-  // Simulación de sorteo (reemplazar con Socket.IO en producción)
+  // Simulación de sorteo BINGO 90 (reemplazar con Socket.IO en producción)
   useEffect(() => {
     if (gameStatus === 'active') {
       const drawTimer = setInterval(() => {
-        const letters = ['B', 'I', 'N', 'G', 'O'];
-        const ranges = { B: [1, 15], I: [16, 30], N: [31, 45], G: [46, 60], O: [61, 75] };
-        const letter = letters[Math.floor(Math.random() * letters.length)];
-        const range = ranges[letter];
-        const number = Math.floor(Math.random() * (range[1] - range[0] + 1)) + range[0];
+        // Generar número del 1 al 90
+        const number = Math.floor(Math.random() * 90) + 1;
+        
+        // Evitar duplicados
+        if (ballsDrawn.some(b => b.number === number)) {
+          return;
+        }
         
         const newBall = {
-          letter,
           number,
           drawOrder: ballsDrawn.length + 1,
           timestamp: Date.now()
@@ -49,61 +50,63 @@ export default function StarterRoom() {
 
       return () => clearInterval(drawTimer);
     }
-  }, [gameStatus, ballsDrawn.length]);
+  }, [gameStatus, ballsDrawn]);
 
-  const getBallColor = (letter) => {
-    const colors = {
-      'B': '#00d4ff',
-      'I': '#ff00ff',
-      'N': '#00ff00',
-      'G': '#ffff00',
-      'O': '#ff0099'
-    };
-    return colors[letter] || '#00ffff';
+  // Función para obtener color según el número (estilo arcoíris)
+  const getBallColor = (number) => {
+    if (number >= 1 && number <= 10) return '#ff0000'; // Rojo
+    if (number >= 11 && number <= 20) return '#ff7700'; // Naranja
+    if (number >= 21 && number <= 30) return '#ffdd00'; // Amarillo
+    if (number >= 31 && number <= 40) return '#00ff00'; // Verde
+    if (number >= 41 && number <= 50) return '#00ddff'; // Cian
+    if (number >= 51 && number <= 60) return '#0077ff'; // Azul
+    if (number >= 61 && number <= 70) return '#7700ff'; // Púrpura
+    if (number >= 71 && number <= 80) return '#ff00ff'; // Magenta
+    return '#ff0099'; // Rosa (81-90)
   };
 
-  const organizedBalls = {
-    B: ballsDrawn.filter(b => b.letter === 'B').sort((a, b) => a.number - b.number),
-    I: ballsDrawn.filter(b => b.letter === 'I').sort((a, b) => a.number - b.number),
-    N: ballsDrawn.filter(b => b.letter === 'N').sort((a, b) => a.number - b.number),
-    G: ballsDrawn.filter(b => b.letter === 'G').sort((a, b) => a.number - b.number),
-    O: ballsDrawn.filter(b => b.letter === 'O').sort((a, b) => a.number - b.number)
-  };
+  // Organizar bolillas por decenas para el grid
+  const organizedBalls = {};
+  for (let i = 0; i < 9; i++) {
+    const start = i * 10 + 1;
+    const end = (i + 1) * 10;
+    organizedBalls[i] = ballsDrawn.filter(b => b.number >= start && b.number <= (i === 8 ? 90 : end));
+  }
 
-  const letters = ['B', 'I', 'N', 'G', 'O'];
-  const ranges = { B: [1, 15], I: [16, 30], N: [31, 45], G: [46, 60], O: [61, 75] };
-
-  // Cartones de ejemplo (reemplazar con datos reales)
+  // Cartones de ejemplo BINGO 90 (reemplazar con datos reales)
+  // Formato: 3 filas x 9 columnas, 5 números por fila, nulls para espacios vacíos
   const [playerCards] = useState([
     {
       id: 1,
-      numbers: {
-        B: [3, 7, 12, 14, 15],
-        I: [16, 19, 24, 28, 30],
-        N: [32, 38, 0, 44, 45],
-        G: [51, 54, 58, 60, 61],
-        O: [65, 68, 72, 74, 75]
-      }
+      numbers: [
+        [3, null, 15, null, 34, 50, null, 72, 85],
+        [null, 12, null, 28, null, 51, 63, null, 88],
+        [5, null, 22, null, 39, null, 68, 77, null]
+      ]
     },
     {
       id: 2,
-      numbers: {
-        B: [1, 5, 9, 11, 13],
-        I: [17, 21, 25, 27, 29],
-        N: [33, 36, 0, 42, 46],
-        G: [49, 52, 56, 59, 62],
-        O: [64, 67, 70, 73, 75]
-      }
+      numbers: [
+        [null, 11, 20, null, 35, null, 60, 75, null],
+        [6, null, null, 29, null, 54, null, 79, 89],
+        [null, 18, 27, null, 42, null, 66, null, 90]
+      ]
     },
     {
       id: 3,
-      numbers: {
-        B: [2, 6, 8, 10, 14],
-        I: [18, 20, 23, 26, 30],
-        N: [31, 37, 0, 43, 47],
-        G: [50, 53, 57, 60, 63],
-        O: [66, 69, 71, 74, 75]
-      }
+      numbers: [
+        [8, null, null, 31, null, 55, 64, null, 86],
+        [null, 14, 24, null, 40, null, null, 78, 87],
+        [2, null, 26, null, 48, 59, 70, null, null]
+      ]
+    },
+    {
+      id: 4,
+      numbers: [
+        [null, 13, 23, null, 37, null, 62, 74, null],
+        [7, null, null, 32, null, 56, null, 76, 84],
+        [null, 19, 25, null, 45, null, 67, null, 90]
+      ]
     }
   ]);
 
@@ -111,35 +114,24 @@ export default function StarterRoom() {
     return ballsDrawn.some(ball => ball.number === number);
   };
 
-  // Detectar líneas (horizontal, vertical, diagonal)
+  // Detectar líneas en BINGO 90 (solo horizontales - 3 filas)
   const checkLineStatus = (card) => {
     const lines = [];
-    const letters = ['B', 'I', 'N', 'G', 'O'];
-
-    // Líneas horizontales
-    for (let row = 0; row < 5; row++) {
-      const line = letters.map(letter => card.numbers[letter][row]);
-      lines.push({ type: 'horizontal', row, line });
+    
+    // Revisar las 3 filas horizontales
+    for (let row = 0; row < 3; row++) {
+      const rowNumbers = card.numbers[row].filter(n => n !== null && n !== undefined);
+      lines.push({ 
+        type: 'horizontal', 
+        row, 
+        line: rowNumbers 
+      });
     }
-
-    // Líneas verticales
-    letters.forEach((letter, col) => {
-      const line = card.numbers[letter];
-      lines.push({ type: 'vertical', col, line });
-    });
-
-    // Diagonal principal (top-left to bottom-right)
-    const diagonal1 = letters.map((letter, idx) => card.numbers[letter][idx]);
-    lines.push({ type: 'diagonal', dir: 'main', line: diagonal1 });
-
-    // Diagonal secundaria (top-right to bottom-left)
-    const diagonal2 = letters.map((letter, idx) => card.numbers[letter][4 - idx]);
-    lines.push({ type: 'diagonal', dir: 'secondary', line: diagonal2 });
 
     // Verificar cuántas bolillas faltan en cada línea
     const linesStatus = lines.map(lineData => {
-      const missing = lineData.line.filter(num => num !== 0 && !isNumberCalled(num));
-      const marked = lineData.line.filter(num => num === 0 || isNumberCalled(num));
+      const missing = lineData.line.filter(num => !isNumberCalled(num));
+      const marked = lineData.line.filter(num => isNumberCalled(num));
       return {
         ...lineData,
         missing: missing.length,
@@ -206,7 +198,7 @@ export default function StarterRoom() {
 
       {/* LAYOUT REORGANIZADO */}
       <div className="game-table">
-        {/* Cuadrícula Digital - IZQUIERDA COMPLETA */}
+        {/* Cuadrícula Digital - IZQUIERDA COMPLETA (9 columnas x 10 filas) */}
         <div className="digital-grid">
           <div className="grid-header">
             <div className="grid-title">NÚMEROS CANTADOS</div>
@@ -214,43 +206,49 @@ export default function StarterRoom() {
           </div>
           
           <div className="grid-columns">
-            {letters.map(letter => (
-              <div key={letter} className="grid-column">
-                <div 
-                  className="column-letter" 
-                  style={{ 
-                    color: getBallColor(letter),
-                    textShadow: `0 0 20px ${getBallColor(letter)}`
-                  }}
-                >
-                  {letter}
+            {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(columnIndex => {
+              const start = columnIndex * 10 + 1;
+              const end = columnIndex === 8 ? 90 : (columnIndex + 1) * 10;
+              const columnLabel = `${start}-${end}`;
+              
+              return (
+                <div key={columnIndex} className="grid-column">
+                  <div 
+                    className="column-letter" 
+                    style={{ 
+                      color: getBallColor(start),
+                      textShadow: `0 0 20px ${getBallColor(start)}`
+                    }}
+                  >
+                    {columnLabel}
+                  </div>
+                  <div className="column-numbers">
+                    {Array.from({ length: end - start + 1 }, (_, i) => {
+                      const number = start + i;
+                      const isCalled = ballsDrawn.some(b => b.number === number);
+                      const isRecent = ballsDrawn.length > 0 && 
+                                       ballsDrawn[ballsDrawn.length - 1]?.number === number;
+                      
+                      return (
+                        <div 
+                          key={number} 
+                          className={`grid-number ${isCalled ? 'called' : ''} ${isRecent ? 'recent' : ''}`}
+                          style={isCalled ? {
+                            backgroundColor: getBallColor(number),
+                            boxShadow: `0 0 20px ${getBallColor(number)}`
+                          } : {}}
+                        >
+                          {number}
+                          {isCalled && (
+                            <div className="number-glow-ring" style={{ borderColor: getBallColor(number) }}></div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-                <div className="column-numbers">
-                  {[...Array(15)].map((_, i) => {
-                    const number = ranges[letter][0] + i;
-                    const isCalled = organizedBalls[letter].some(b => b.number === number);
-                    const isRecent = ballsDrawn.length > 0 && 
-                                     ballsDrawn[ballsDrawn.length - 1]?.number === number;
-                    
-                    return (
-                      <div 
-                        key={number} 
-                        className={`grid-number ${isCalled ? 'called' : ''} ${isRecent ? 'recent' : ''}`}
-                        style={isCalled ? {
-                          backgroundColor: getBallColor(letter),
-                          boxShadow: `0 0 20px ${getBallColor(letter)}`
-                        } : {}}
-                      >
-                        {number}
-                        {isCalled && (
-                          <div className="number-glow-ring" style={{ borderColor: getBallColor(letter) }}></div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Últimas 5 bolas */}
@@ -260,14 +258,20 @@ export default function StarterRoom() {
               <div className="recent-balls-list">
                 {ballsDrawn.slice(-5).reverse().map((ball, index) => (
                   <div 
-                    key={`${ball.letter}-${ball.number}-${index}`}
+                    key={`${ball.number}-${index}`}
                     className="recent-ball-chip"
                     style={{
-                      backgroundColor: getBallColor(ball.letter),
-                      boxShadow: `0 0 15px ${getBallColor(ball.letter)}`
+                      backgroundColor: getBallColor(ball.number),
+                      boxShadow: `0 0 15px ${getBallColor(ball.number)}`
                     }}
                   >
-                    <span className="ball-letter">{ball.letter}</span>
+                    <span className="ball-number">{ball.number}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
                     <span className="ball-number">{ball.number}</span>
                   </div>
                 ))}
@@ -288,7 +292,7 @@ export default function StarterRoom() {
             <div className="game-info">
               <div className="info-badge">
                 <span className="badge-label">Bolas:</span>
-                <span className="badge-value">{ballsDrawn.length}/75</span>
+                <span className="badge-value">{ballsDrawn.length}/90</span>
               </div>
               <div className={`status-badge ${gameStatus}`}>
                 {gameStatus === 'waiting' && '⏸️ ESPERANDO'}
@@ -330,22 +334,17 @@ export default function StarterRoom() {
                 <div 
                   className="showcase-ball"
                   style={{
-                    backgroundColor: getBallColor(currentBall.letter),
-                    boxShadow: `0 0 40px ${getBallColor(currentBall.letter)}`
+                    backgroundColor: getBallColor(currentBall.number),
+                    boxShadow: `0 0 40px ${getBallColor(currentBall.number)}`
                   }}
                 >
                   <div className="ball-shine"></div>
                   <div className="ball-content">
-                    <div className="ball-letter">{currentBall.letter}</div>
-                    <div className="ball-number">{currentBall.number}</div>
+                    <div className="ball-number-large">{currentBall.number}</div>
                   </div>
                 </div>
                 <div className="ball-announcement">
-                  <div className="announcement-letter" style={{ color: getBallColor(currentBall.letter) }}>
-                    {currentBall.letter}
-                  </div>
-                  <div className="announcement-separator">-</div>
-                  <div className="announcement-number" style={{ color: getBallColor(currentBall.letter) }}>
+                  <div className="announcement-number-large" style={{ color: getBallColor(currentBall.number) }}>
                     {currentBall.number}
                   </div>
                 </div>
@@ -389,60 +388,45 @@ export default function StarterRoom() {
 
         <div className="cards-scroll-container">
           {[...playerCards].reverse().map((card, cardIndex) => (
-            <div key={card.id} className="bingo-card-starter">
+            <div key={card.id} className="bingo-card-starter bingo-card-starter-90">
               <div className="card-header">
                 <span className="card-number">#{playerCards.length - cardIndex}</span>
                 <div className="card-glow-border"></div>
               </div>
               
-              <div className="card-grid">
-                <div className="card-letters">
-                  {letters.map(letter => (
-                    <div 
-                      key={letter} 
-                      className="card-letter"
-                      style={{ 
-                        color: getBallColor(letter),
-                        textShadow: `0 0 10px ${getBallColor(letter)}`
-                      }}
-                    >
-                      {letter}
-                    </div>
-                  ))}
-                </div>
-                
-                <div className="card-numbers-grid">
-                  {letters.map(letter => (
-                    <div key={letter} className="card-column">
-                      {card.numbers[letter].map((num, idx) => {
-                        const isCalled = num !== 0 && isNumberCalled(num);
-                        return (
-                          <div 
-                            key={idx} 
-                            className={`card-cell ${num === 0 ? 'free' : ''} ${isCalled ? 'marked' : ''}`}
-                          >
-                            {num === 0 ? (
-                              <span className="free-space">★</span>
-                            ) : (
-                              <>
-                                <span className="cell-number">{num}</span>
-                                {isCalled && (
-                                  <div 
-                                    className="cell-mark"
-                                    style={{
-                                      backgroundColor: getBallColor(letter),
-                                      boxShadow: `0 0 15px ${getBallColor(letter)}`
-                                    }}
-                                  />
-                                )}
-                              </>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </div>
+              <div className="card-grid card-grid-90">
+                {card.numbers.map((row, rowIndex) => (
+                  <div key={rowIndex} className="card-row">
+                    {row.map((num, colIndex) => {
+                      const isEmpty = num === null || num === undefined;
+                      const isCalled = !isEmpty && isNumberCalled(num);
+                      
+                      return (
+                        <div 
+                          key={colIndex} 
+                          className={`card-cell ${isEmpty ? 'empty' : ''} ${isCalled ? 'marked' : ''}`}
+                        >
+                          {isEmpty ? (
+                            <span className="empty-space"></span>
+                          ) : (
+                            <>
+                              <span className="cell-number">{num}</span>
+                              {isCalled && (
+                                <div 
+                                  className="cell-mark"
+                                  style={{
+                                    backgroundColor: getBallColor(num),
+                                    boxShadow: `0 0 15px ${getBallColor(num)}`
+                                  }}
+                                />
+                              )}
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
               </div>
             </div>
           ))}

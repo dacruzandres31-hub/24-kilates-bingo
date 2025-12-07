@@ -2,9 +2,9 @@ import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'rea
 import '../styles/BingoCard.css';
 
 /**
- * BingoCard - Cartón de Bingo con soporte para skins cosméticos
+ * BingoCard - Cartón de Bingo 90 con soporte para skins cosméticos
  * Props:
- *   - gridNumbers: Array 5x5 de números
+ *   - gridNumbers: Array 3x9 de números (incluye nulls para espacios vacíos)
  *   - cardNumber: Número serie del cartón
  *   - isSelected: Si está seleccionado
  *   - onSelect: Callback al seleccionar
@@ -29,28 +29,36 @@ const BingoCard = forwardRef((props, ref) => {
   const checkWin = () => {
     if (!gridNumbers || gridNumbers.length === 0) return null;
 
-    // Convertir a array plano para validación
-    const allNumbers = gridNumbers.flat();
+    // Convertir a array plano para validación (solo números, no nulls)
+    const allNumbers = gridNumbers.flat().filter(n => n !== null && n !== undefined);
     
-    // Check BINGO (todas menos la celda FREE)
+    // Check BINGO: todos los 15 números marcados
     const totalMarked = Array.from(markedNumbers).filter(n => 
-      n !== 0 && allNumbers.includes(n)
+      allNumbers.includes(n)
     ).length;
     
-    if (totalMarked === 24) { // 25 - 1 (FREE) = 24
+    if (totalMarked === 15) {
       return 'bingo';
     }
 
-    // Check LÍNEA horizontal (5 números)
-    for (let row = 0; row < 5; row++) {
+    // Check LÍNEA horizontal: cualquiera de las 3 filas completa (5 números)
+    for (let row = 0; row < 3; row++) {
       let lineMarked = 0;
-      for (let col = 0; col < 5; col++) {
-        const num = gridNumbers[col][row];
-        if (num === 0 || markedNumbers.has(num)) {
-          lineMarked++;
+      let lineTotal = 0;
+      
+      for (let col = 0; col < 9; col++) {
+        const num = gridNumbers[row][col];
+        
+        if (num !== null && num !== undefined) {
+          lineTotal++;
+          if (markedNumbers.has(num)) {
+            lineMarked++;
+          }
         }
       }
-      if (lineMarked === 5) {
+      
+      // Línea completa: 5 números marcados
+      if (lineMarked === 5 && lineTotal === 5) {
         return 'linea';
       }
     }
@@ -73,7 +81,7 @@ const BingoCard = forwardRef((props, ref) => {
 
   return (
     <div
-      className={`bingo-card ${isSelected ? 'selected' : ''} ${isBingo ? 'bingo' : ''} ${isLinea ? 'linea' : ''} ${skinClass}`}
+      className={`bingo-card bingo-card-90 ${isSelected ? 'selected' : ''} ${isBingo ? 'bingo' : ''} ${isLinea ? 'linea' : ''} ${skinClass}`}
       style={cardStyles}
       onClick={() => onSelect && onSelect(gridNumbers)}
     >
@@ -84,20 +92,20 @@ const BingoCard = forwardRef((props, ref) => {
       {/* Número de serie */}
       <div className="card-number">#{cardNumber}</div>
 
-      {/* Grilla */}
-      <div className="card-grid">
-        {gridNumbers.map((col, colIdx) => (
-          <div key={`col-${colIdx}`} className="column">
-            {col.map((number, rowIdx) => {
-              const isMarked = markedNumbers.has(number);
-              const isFree = number === 0;
+      {/* Grilla 3x9 */}
+      <div className="card-grid card-grid-90">
+        {gridNumbers.map((row, rowIdx) => (
+          <div key={`row-${rowIdx}`} className="card-row">
+            {row.map((number, colIdx) => {
+              const isMarked = number !== null && markedNumbers.has(number);
+              const isEmpty = number === null || number === undefined;
               
               return (
                 <div
-                  key={`${colIdx}-${rowIdx}`}
-                  className={`cell ${isMarked ? 'marked' : ''} ${isFree ? 'free' : ''}`}
+                  key={`${rowIdx}-${colIdx}`}
+                  className={`cell ${isMarked ? 'marked' : ''} ${isEmpty ? 'empty' : ''}`}
                 >
-                  {isFree ? '★' : number}
+                  {isEmpty ? '' : number}
                 </div>
               );
             })}

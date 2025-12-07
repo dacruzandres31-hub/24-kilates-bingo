@@ -166,54 +166,117 @@ class GameEngine {
     }
   }
 
-  // Verifica si un número cae en rango de la columna (BINGO tiene 5 columnas, cada una con 18 números)
-  // Columna 1 (B): 1-15
-  // Columna 2 (I): 16-30
-  // Columna 3 (N): 31-45
-  // Columna 4 (G): 46-60
-  // Columna 5 (O): 61-75
+  // Verifica si un número cae en rango de la columna (BINGO 90 tiene 9 columnas)
+  // Columna 1: 1-9
+  // Columna 2: 10-19
+  // Columna 3: 20-29
+  // Columna 4: 30-39
+  // Columna 5: 40-49
+  // Columna 6: 50-59
+  // Columna 7: 60-69
+  // Columna 8: 70-79
+  // Columna 9: 80-90
   static getColumnForNumber(number) {
-    if (number >= 1 && number <= 15) return 0;   // B
-    if (number >= 16 && number <= 30) return 1;  // I
-    if (number >= 31 && number <= 45) return 2;  // N
-    if (number >= 46 && number <= 60) return 3;  // G
-    if (number >= 61 && number <= 75) return 4;  // O
+    if (number >= 1 && number <= 9) return 0;
+    if (number >= 10 && number <= 19) return 1;
+    if (number >= 20 && number <= 29) return 2;
+    if (number >= 30 && number <= 39) return 3;
+    if (number >= 40 && number <= 49) return 4;
+    if (number >= 50 && number <= 59) return 5;
+    if (number >= 60 && number <= 69) return 6;
+    if (number >= 70 && number <= 79) return 7;
+    if (number >= 80 && number <= 90) return 8;
     return -1;
   }
 
-  // Genera un cartón válido (respeta distribución por columnas)
+  // Genera un cartón válido estilo BINGO 90 (3 filas x 9 columnas, 15 números)
+  // Reglas:
+  // - 3 filas x 9 columnas (27 celdas totales)
+  // - 5 números por fila (15 números en total)
+  // - 4 espacios vacíos por fila
+  // - Cada columna corresponde a un rango de números
+  // - Los números están ordenados ascendentemente por columna
   static generateValidCard() {
-    const card = Array(5).fill(null).map(() => Array(5).fill(null));
-    const usedNumbers = new Set();
+    const card = Array(3).fill(null).map(() => Array(9).fill(null));
+    
+    const columnRanges = [
+      [1, 9],    // Columna 1
+      [10, 19],  // Columna 2
+      [20, 29],  // Columna 3
+      [30, 39],  // Columna 4
+      [40, 49],  // Columna 5
+      [50, 59],  // Columna 6
+      [60, 69],  // Columna 7
+      [70, 79],  // Columna 8
+      [80, 90]   // Columna 9
+    ];
 
-    for (let col = 0; col < 5; col++) {
-      const columnRanges = [
-        [1, 15],   // B
-        [16, 30],  // I
-        [31, 45],  // N
-        [46, 60],  // G
-        [61, 75]   // O
-      ];
+    // Paso 1: Decidir qué columnas tendrán números (cada columna puede tener 1, 2, o 3 números)
+    // Necesitamos distribuir exactamente 15 números en 9 columnas
+    const numbersPerColumn = Array(9).fill(0);
+    let totalNumbers = 0;
+    
+    // Asegurar que cada columna tenga al menos 1 número si es posible
+    for (let col = 0; col < 9 && totalNumbers < 15; col++) {
+      numbersPerColumn[col] = 1;
+      totalNumbers++;
+    }
+    
+    // Distribuir los 6 números restantes (15 - 9 = 6) aleatoriamente
+    while (totalNumbers < 15) {
+      const col = Math.floor(Math.random() * 9);
+      if (numbersPerColumn[col] < 3) {  // Máximo 3 números por columna
+        numbersPerColumn[col]++;
+        totalNumbers++;
+      }
+    }
+
+    // Paso 2: Para cada columna, generar los números y colocarlos
+    for (let col = 0; col < 9; col++) {
+      const count = numbersPerColumn[col];
+      if (count === 0) continue;
 
       const [min, max] = columnRanges[col];
-
-      // Seleccionar 5 números únicos para esta columna
       const columnNumbers = [];
-      while (columnNumbers.length < 5) {
+      
+      // Generar números únicos para esta columna
+      while (columnNumbers.length < count) {
         const num = Math.floor(Math.random() * (max - min + 1)) + min;
-        if (!usedNumbers.has(num)) {
+        if (!columnNumbers.includes(num)) {
           columnNumbers.push(num);
-          usedNumbers.add(num);
         }
       }
+      
+      // Ordenar los números de menor a mayor
+      columnNumbers.sort((a, b) => a - b);
+      
+      // Decidir en qué filas colocar estos números
+      const availableRows = [0, 1, 2];
+      const selectedRows = [];
+      
+      for (let i = 0; i < count; i++) {
+        const rowIndex = Math.floor(Math.random() * availableRows.length);
+        selectedRows.push(availableRows[rowIndex]);
+        availableRows.splice(rowIndex, 1);
+      }
+      
+      // Ordenar las filas para mantener orden ascendente
+      selectedRows.sort((a, b) => a - b);
+      
+      // Colocar los números en las filas seleccionadas
+      for (let i = 0; i < count; i++) {
+        card[selectedRows[i]][col] = columnNumbers[i];
+      }
+    }
 
-      // Colocar en la columna
-      for (let row = 0; row < 5; row++) {
-        if (col === 2 && row === 2) {
-          card[row][col] = null; // FREE SPACE en el centro
-        } else {
-          card[row][col] = columnNumbers[row];
-        }
+    // Paso 3: Validar que cada fila tenga exactamente 5 números
+    for (let row = 0; row < 3; row++) {
+      const numbersInRow = card[row].filter(n => n !== null).length;
+      
+      if (numbersInRow !== 5) {
+        // Si no tiene 5 números, intentar rebalancear
+        // Por simplicidad, regeneramos el cartón
+        return this.generateValidCard();
       }
     }
 
@@ -236,6 +299,23 @@ class GameEngine {
     }
 
     return cards;
+  }
+
+  // Genera la próxima bolilla (1-90) que no haya salido
+  static generateNextBall(drawnNumbers) {
+    const availableNumbers = [];
+    for (let i = 1; i <= 90; i++) {
+      if (!drawnNumbers.has(i)) {
+        availableNumbers.push(i);
+      }
+    }
+    
+    if (availableNumbers.length === 0) {
+      throw new Error('No hay más bolillas disponibles');
+    }
+    
+    const randomIndex = Math.floor(Math.random() * availableNumbers.length);
+    return availableNumbers[randomIndex];
   }
 }
 
