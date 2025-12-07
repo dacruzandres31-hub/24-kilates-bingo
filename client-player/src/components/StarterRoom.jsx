@@ -198,15 +198,110 @@ export default function StarterRoom() {
 
       {/* LAYOUT REORGANIZADO */}
       <div className="game-table">
-        {/* Cuadrícula Digital - IZQUIERDA COMPLETA (9 columnas x 10 filas) */}
-        <div className="digital-grid">
+        {/* Cuadrícula Digital - IZQUIERDA COMPLETA - 3 FILAS */}
+        <div className="digital-grid digital-grid-full">
           <div className="grid-header">
             <div className="grid-title">NÚMEROS CANTADOS</div>
             <div className="grid-glow"></div>
           </div>
           
-          <div className="grid-columns">
-            {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(columnIndex => {
+          {/* FILA 1: 1-10, 11-20, 21-30 */}
+          <div className="grid-row">
+            {[0, 1, 2].map(columnIndex => {
+              const start = columnIndex * 10 + 1;
+              const end = (columnIndex + 1) * 10;
+              const columnLabel = `${start}-${end}`;
+              
+              return (
+                <div key={columnIndex} className="grid-column">
+                  <div 
+                    className="column-letter" 
+                    style={{ 
+                      color: getBallColor(start),
+                      textShadow: `0 0 20px ${getBallColor(start)}`
+                    }}
+                  >
+                    {columnLabel}
+                  </div>
+                  <div className="column-numbers">
+                    {Array.from({ length: 10 }, (_, i) => {
+                      const number = start + i;
+                      const isCalled = ballsDrawn.some(b => b.number === number);
+                      const isRecent = ballsDrawn.length > 0 && 
+                                       ballsDrawn[ballsDrawn.length - 1]?.number === number;
+                      
+                      return (
+                        <div 
+                          key={number} 
+                          className={`grid-number ${isCalled ? 'called' : ''} ${isRecent ? 'recent' : ''}`}
+                          style={isCalled ? {
+                            backgroundColor: getBallColor(number),
+                            boxShadow: `0 0 20px ${getBallColor(number)}`
+                          } : {}}
+                        >
+                          {number}
+                          {isCalled && (
+                            <div className="number-glow-ring" style={{ borderColor: getBallColor(number) }}></div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* FILA 2: 31-40, 41-50, 51-60 */}
+          <div className="grid-row">
+            {[3, 4, 5].map(columnIndex => {
+              const start = columnIndex * 10 + 1;
+              const end = (columnIndex + 1) * 10;
+              const columnLabel = `${start}-${end}`;
+              
+              return (
+                <div key={columnIndex} className="grid-column">
+                  <div 
+                    className="column-letter" 
+                    style={{ 
+                      color: getBallColor(start),
+                      textShadow: `0 0 20px ${getBallColor(start)}`
+                    }}
+                  >
+                    {columnLabel}
+                  </div>
+                  <div className="column-numbers">
+                    {Array.from({ length: 10 }, (_, i) => {
+                      const number = start + i;
+                      const isCalled = ballsDrawn.some(b => b.number === number);
+                      const isRecent = ballsDrawn.length > 0 && 
+                                       ballsDrawn[ballsDrawn.length - 1]?.number === number;
+                      
+                      return (
+                        <div 
+                          key={number} 
+                          className={`grid-number ${isCalled ? 'called' : ''} ${isRecent ? 'recent' : ''}`}
+                          style={isCalled ? {
+                            backgroundColor: getBallColor(number),
+                            boxShadow: `0 0 20px ${getBallColor(number)}`
+                          } : {}}
+                        >
+                          {number}
+                          {isCalled && (
+                            <div className="number-glow-ring" style={{ borderColor: getBallColor(number) }}></div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* FILA 3: 61-70, 71-80, 81-90 */}
+          <div className="grid-row">
+            {[6, 7, 8].map(columnIndex => {
               const start = columnIndex * 10 + 1;
               const end = columnIndex === 8 ? 90 : (columnIndex + 1) * 10;
               const columnLabel = `${start}-${end}`;
