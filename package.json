@@ -9,7 +9,7 @@
     "client-admin"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev -w server\" \"npm run dev -w client-player\" \"npm run dev -w client-admin\"",
+    "dev": "npm run dev -w client-player",
     "build": "npm run build -w server && npm run build -w client-player && npm run build -w client-admin",
     "start": "npm start -w server"
   },

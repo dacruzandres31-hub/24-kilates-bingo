@@ -1,15 +1,228 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import '../styles/CasinoLobby.css';
+import '../styles/Countdown.css';
+import Countdown from './Countdown';
+import { FaClock, FaUsers, FaMoneyBillWave, FaTrophy, FaStar, FaGlassCheers, FaGift, FaHeadset, FaTicketAlt } from 'react-icons/fa';
+import logo from '../assets/logo.png';
+import giftIcon from '../assets/Gift_icon.png';
+import bronzeIcon from '../assets/bronze_icon.png';
+import silverIcon from '../assets/silver_icon.png';
+import goldIcon from '../assets/gold_icon.png';
+import lobbyBackground from '../assets/lobby-background.jpg';
 
-export default function CasinoLobby() {
+const getTargetTime = (hour) => {
+  const target = new Date();
+  target.setHours(hour, 0, 0, 0);
+  // Si la hora ya pasó hoy, programarla para mañana
+  if (target < new Date()) {
+    target.setDate(target.getDate() + 1);
+  }
+  return target;
+};
+
+const roomsData = [
+  {
+    id: 'starter',
+    name: 'Starter',
+    path: '/sala-starter',
+    status: 'active',
+    targetTime: getTargetTime(19),
+    description: 'Premios en tickets para canjear en la tienda.',
+    price: 'Tickets',
+    className: 'room-turquoise',
+    iconImage: giftIcon,
+    rewards: ['ticket', 'ticket', 'ticket', 'ticket'],
+    featured: false,
+  },
+  {
+    id: 'bronze',
+    name: 'Bronce',
+    path: '/sala-bronce',
+    status: 'active',
+    targetTime: getTargetTime(20),
+    description: 'La sala clásica para empezar a ganar.',
+    price: '$500',
+    pots: {
+      bingo: '$1,500',
+      line: '$150',
+      pre40: '$300',
+    },
+    className: 'room-bronze',
+    iconImage: bronzeIcon,
+    featured: false,
+  },
+  {
+    id: 'silver',
+    name: 'Plata',
+    path: '/sala-plata',
+    status: 'active',
+    targetTime: getTargetTime(21),
+    description: 'Apuestas más altas, premios más grandes.',
+    price: '$1.000',
+    pots: {
+      bingo: '$8,000',
+      line: '$800',
+      pre40: '$1,600',
+    },
+    className: 'room-silver',
+    iconImage: silverIcon,
+    featured: false,
+  },
+  {
+    id: 'gold',
+    name: 'Oro',
+    path: '/sala-oro',
+    status: 'active',
+    targetTime: getTargetTime(22),
+    description: 'La experiencia VIP con pozos millonarios.',
+    price: '$2.000',
+    pots: {
+      bingo: '$50,000',
+      line: '$5,000',
+      pre40: '$10,000',
+    },
+    className: 'room-gold',
+    iconImage: goldIcon,
+    featured: true,
+  },
+];
+
+const fakeWinners = [
+  { name: 'Juanito123', amount: '$150', room: 'oro' },
+  { name: 'MariaGana', amount: '$75', room: 'plata' },
+  { name: 'CarlosElGrande', amount: '$200', room: 'oro' },
+  { name: 'SofiaLaIncreible', amount: '$50', room: 'bronce' },
+  { name: 'PedroPicaPiedra', amount: '$100', room: 'plata' },
+  { name: 'LuisaFernanda', amount: '$300', room: 'oro' },
+  { name: 'GamerXtreme', amount: '$20', room: 'bronce' },
+  { name: 'QueenOfCards', amount: '$55', room: 'bronce' },
+];
+
+const RoomCard = ({ room }) => {
+  const statusText = {
+    active: 'Habilitada',
+    drawing: 'Sorteando',
+    soon: 'Próximamente',
+    closed: 'Cerrada',
+  };
+
+  const renderParticles = () => {
+    return Array.from({ length: 10 }).map((_, i) => (
+      <div
+        key={i}
+        className="particle"
+        style={{
+          left: `${Math.random() * 100}%`,
+          animationDelay: `${Math.random() * 8}s`,
+          width: `${Math.random() * 3 + 1}px`,
+          height: `${Math.random() * 3 + 1}px`,
+        }}
+      />
+    ));
+  };
+
+  return (
+    <Link to={room.path} className={`room-link ${room.className} ${room.featured ? 'featured' : ''}`}>
+      <div className="room-card">
+        {room.id === 'starter' && (
+          <div className="ribbon-wrapper">
+            <div className="ribbon">GRATIS</div>
+          </div>
+        )}
+        <div className="room-particles">{renderParticles()}</div>
+        <div className="room-texture"></div>
+        <div className="room-shine"></div>
+
+        {room.status && (
+          <div className={`room-status-badge ${room.status}`}>
+            {statusText[room.status]}
+          </div>
+        )}
+
+        <div className="room-icon">
+          <img src={room.iconImage} alt={room.name} className="room-icon-img" />
+        </div>
+        <h3 className="room-name">{room.name}</h3>
+        <div className="room-time">
+          <Countdown targetDate={room.targetTime} />
+        </div>
+        <p className="room-description">{room.description}</p>
+
+        <div className="room-divider"></div>
+
+        <div className="room-price-section">
+          <div className="price-label">Cartón</div>
+          <div className="room-price">{room.price}</div>
+        </div>
+
+        {room.pots ? (
+          <div className="room-pots-container">
+            <div className="pot-main">
+              <div className="pot-label">Pozo Bingo</div>
+              <div className="pot-amount">{room.pots.bingo}</div>
+            </div>
+            <div className="pots-secondary">
+              <div className="pot-secondary">
+                <FaTrophy className="pot-secondary-icon" />
+                <div className="pot-secondary-info">
+                  <div className="pot-secondary-label">Línea</div>
+                  <div className="pot-secondary-amount">{room.pots.line}</div>
+                </div>
+              </div>
+              <div className="pot-secondary">
+                <FaStar className="pot-secondary-icon" />
+                <div className="pot-secondary-info">
+                  <div className="pot-secondary-label">Pre-40</div>
+                  <div className="pot-secondary-amount">{room.pots.pre40}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="starter-rewards">
+             <div className="price-label">Premios</div>
+            <div className="rewards-icons">
+              {room.rewards.map((reward, index) => (
+                <FaGift key={index} className="reward-icon" />
+              ))}
+            </div>
+          </div>
+        )}
+
+        <button className="room-enter-btn">Entrar</button>
+      </div>
+    </Link>
+  );
+};
+
+const WinnersTicker = () => {
+  const duplicatedWinners = [...fakeWinners, ...fakeWinners];
+
+  return (
+    <div className="winners-ticker">
+      <div className="ticker-label">🏆 GANADORES RECIENTES</div>
+      <div className="ticker-content">
+        <div className="ticker-track">
+          {duplicatedWinners.map((winner, index) => (
+            <div key={index} className="ticker-item">
+              <span className="winner-name">{winner.name}</span>
+              <span className="winner-separator">ganó</span>
+              <span className="winner-amount">{winner.amount}</span>
+              <span className={`winner-room room-${winner.room}`}>
+                {winner.room}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
+const CasinoLobby = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [tickerOffset, setTickerOffset] = useState(0);
-  const [roomPots, setRoomPots] = useState({
-    bronze: { bingo: 80000, line: 2500, pre40: 5000 },
-    silver: { bingo: 250000, line: 7500, pre40: 15000 },
-    gold: { bingo: 1200000, line: 30000, pre40: 60000 }
-  });
 
   // Actualizar reloj
   useEffect(() => {
@@ -17,324 +230,126 @@ export default function CasinoLobby() {
     return () => clearInterval(timer);
   }, []);
 
-  // Animación del ticker de ganadores
-  useEffect(() => {
-    const tickerTimer = setInterval(() => {
-      setTickerOffset(prev => prev - 1);
-    }, 50);
-    return () => clearInterval(tickerTimer);
-  }, []);
-
-  // Simulación de actualización de pozos (reemplazar con Socket.IO en producción)
-  useEffect(() => {
-    const potUpdateTimer = setInterval(() => {
-      setRoomPots(prev => ({
-        bronze: {
-          bingo: prev.bronze.bingo + Math.floor(Math.random() * 500),
-          line: prev.bronze.line + Math.floor(Math.random() * 50),
-          pre40: prev.bronze.pre40 + Math.floor(Math.random() * 100)
-        },
-        silver: {
-          bingo: prev.silver.bingo + Math.floor(Math.random() * 1000),
-          line: prev.silver.line + Math.floor(Math.random() * 100),
-          pre40: prev.silver.pre40 + Math.floor(Math.random() * 200)
-        },
-        gold: {
-          bingo: prev.gold.bingo + Math.floor(Math.random() * 2000),
-          line: prev.gold.line + Math.floor(Math.random() * 300),
-          pre40: prev.gold.pre40 + Math.floor(Math.random() * 500)
-        }
-      }));
-    }, 3000); // Actualizar cada 3 segundos
-    return () => clearInterval(potUpdateTimer);
-  }, []);
-
-  const winners = [
-    { name: 'María G.', amount: '1.200.000', room: 'ORO' },
-    { name: 'Carlos R.', amount: '250.000', room: 'PLATA' },
-    { name: 'Ana M.', amount: '80.000', room: 'BRONCE' },
-    { name: 'Luis F.', amount: '1.200.000', room: 'ORO' },
-    { name: 'Patricia S.', amount: '250.000', room: 'PLATA' },
-    { name: 'Jorge T.', amount: '80.000', room: 'BRONCE' },
-    { name: 'Sofía L.', amount: '1.200.000', room: 'ORO' },
-    { name: 'Diego P.', amount: '250.000', room: 'PLATA' }
-  ];
-
-  const rooms = [
-    {
-      id: 'starter',
-      name: 'SALA STARTER',
-      time: '19:00',
-      price: 'GRATIS',
-      priceValue: 0,
-      pot: null,
-      potLabel: 'Skins & Premios',
-      color: 'turquoise',
-      description: 'Diversión sin costo',
-      icon: '🎟️',
-      gradient: 'linear-gradient(135deg, #00d4ff 0%, #00ffc8 100%)',
-      glow: '0 0 40px rgba(0, 255, 200, 0.6)',
-      particles: true,
-      status: 'available'
-    },
-    {
-      id: 'bronze',
-      name: 'SALA BRONCE',
-      time: '20:00',
-      price: '$500',
-      priceValue: 500,
-      color: 'bronze',
-      description: 'Entrada accesible',
-      icon: '🥉',
-      gradient: 'linear-gradient(135deg, #cd7f32 0%, #b87333 50%, #8b4513 100%)',
-      glow: '0 0 40px rgba(205, 127, 50, 0.6)',
-      texture: 'radial-gradient(circle at 30% 30%, rgba(255, 165, 0, 0.3), transparent)',
-      status: 'available'
-    },
-    {
-      id: 'silver',
-      name: 'SALA PLATA',
-      time: '21:00',
-      price: '$1.000',
-      priceValue: 1000,
-      color: 'silver',
-      description: 'Premios destacados',
-      icon: '🥈',
-      gradient: 'linear-gradient(135deg, #c0c0c0 0%, #e8e8e8 50%, #a8a8a8 100%)',
-      glow: '0 0 40px rgba(192, 192, 192, 0.8)',
-      texture: 'linear-gradient(45deg, rgba(255, 255, 255, 0.2) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.2) 75%)',
-      status: 'available'
-    },
-    {
-      id: 'gold',
-      name: 'SALA ORO',
-      time: '22:00',
-      price: '$2.000',
-      priceValue: 2000,
-      color: 'gold',
-      description: 'Evento Principal VIP',
-      icon: '🥇',
-      gradient: 'linear-gradient(135deg, #ffd700 0%, #ffed4e 50%, #ffaa00 100%)',
-      glow: '0 0 60px rgba(255, 215, 0, 0.9)',
-      texture: 'radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.3), transparent)',
-      particles: true,
-      featured: true,
-      status: 'available'
-    }
-  ];
-
-  const formatPot = (amount) => {
-    if (!amount) return null;
-    return new Intl.NumberFormat('es-AR', {
-      style: 'currency',
-      currency: 'ARS',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount);
-  };
-
-  const getTimeStatus = (roomTime) => {
-    const current = currentTime.getHours() * 60 + currentTime.getMinutes();
-    const [hours, minutes] = roomTime.split(':').map(Number);
-    const roomMinutes = hours * 60 + minutes;
-    
-    if (current < roomMinutes - 30) return 'soon';
-    if (current < roomMinutes) return 'opening';
-    if (current >= roomMinutes && current < roomMinutes + 60) return 'active';
-    return 'closed';
-  };
-
   return (
-    <div className="casino-lobby">
+    <div className="casino-lobby" style={{ '--lobby-bg-image': `url(${lobbyBackground})` }}>
+      {/* Barra de Información del Jugador */}
+      <div className="player-info-bar">
+        <div className="player-info-content">
+          <div className="player-info-item player-username">
+            <span className="info-label">Usuario:</span>
+            <span className="info-value">JugadorPro24</span>
+          </div>
+          
+          <div className="player-info-item player-balance">
+            <img src={bronzeIcon} alt="Saldo" className="balance-icon" />
+            <span className="info-label">Saldo:</span>
+            <span className="info-value balance-amount">$12,500</span>
+          </div>
+          
+          <div className="player-info-separator"></div>
+          
+          <div className="player-info-item player-tickets">
+            <FaTicketAlt className="info-icon" />
+            <span className="info-label">Mis Cartones:</span>
+          </div>
+          
+          <div className="player-info-item ticket-count">
+            <span className="ticket-label">Starter:</span>
+            <span className="ticket-value">3</span>
+          </div>
+          
+          <div className="player-info-item ticket-count">
+            <span className="ticket-label">Plata:</span>
+            <span className="ticket-value">2</span>
+          </div>
+          
+          <div className="player-info-item ticket-count">
+            <span className="ticket-label">Oro:</span>
+            <span className="ticket-value">1</span>
+          </div>
+          
+          <div className="player-info-separator"></div>
+          
+          <button className="support-button" title="Contactar Soporte Técnico">
+            <FaHeadset className="support-icon" />
+            <span>Soporte</span>
+          </button>
+        </div>
+      </div>
+
       {/* Header con Logo */}
       <header className="lobby-header">
+        {/* Stats Izquierda */}
+        <div className="header-stats left">
+          <div className="stat-card">
+            <FaUsers className="stat-icon" />
+            <div className="stat-content">
+              <div className="stat-value">2,847</div>
+              <div className="stat-label">Jugadores Online</div>
+            </div>
+          </div>
+          <div className="stat-card">
+            <FaClock className="stat-icon" />
+            <div className="stat-content">
+              <div className="stat-value">{currentTime.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</div>
+              <div className="stat-label">Hora Argentina</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Logo Central */}
         <div className="logo-container">
           <div className="logo-shine"></div>
-          <h1 className="logo-text">
-            <span className="logo-bingo">BINGO</span>
-            <span className="logo-karat">24 KILATES</span>
-          </h1>
-          <div className="logo-tagline">El Casino Virtual de Alta Gama</div>
+          <img src={logo} alt="Bingo 24 Kilates" className="logo-image" />
+          <div className="logo-tagline">El Bingo Virtual de Alta Gama</div>
         </div>
-        <div className="header-clock">
-          <div className="clock-icon">🕐</div>
-          <div className="clock-time">{currentTime.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</div>
+
+        {/* Stats Derecha */}
+        <div className="header-stats right">
+          <div className="stat-card">
+            <FaTrophy className="stat-icon" />
+            <div className="stat-content">
+              <div className="stat-value">$284,500</div>
+              <div className="stat-label">Pagado Hoy</div>
+            </div>
+          </div>
+          <div className="stat-card">
+            <FaStar className="stat-icon" />
+            <div className="stat-content">
+              <div className="stat-value">4/4</div>
+              <div className="stat-label">Salas Activas</div>
+            </div>
+          </div>
         </div>
       </header>
 
-      {/* Título de Salas */}
-      <div className="lobby-title">
-        <h2>Selecciona Tu Sala</h2>
-        <p>Cuatro experiencias únicas, un solo destino: LA VICTORIA</p>
-      </div>
-
       {/* Grid de Salas */}
       <div className="rooms-grid">
-        {rooms.map((room, index) => {
-          const timeStatus = getTimeStatus(room.time);
-          
-          return (
-            <Link to={`/sala/${room.id}`} key={room.id} className="room-link">
-            <div
-              className={`room-card room-${room.color} ${room.featured ? 'featured' : ''} ${timeStatus}`}
-              style={{
-                background: room.gradient,
-                boxShadow: room.glow,
-                animationDelay: `${index * 0.1}s`
-              }}
-            >
-              {/* Partículas flotantes para Starter y Gold */}
-              {room.particles && (
-                <div className="room-particles">
-                  {[...Array(20)].map((_, i) => (
-                    <div
-                      key={i}
-                      className="particle"
-                      style={{
-                        left: `${Math.random() * 100}%`,
-                        animationDelay: `${Math.random() * 3}s`,
-                        animationDuration: `${3 + Math.random() * 2}s`
-                      }}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {/* Textura metálica */}
-              {room.texture && (
-                <div className="room-texture" style={{ background: room.texture }}></div>
-              )}
-
-              {/* Badge de estado */}
-              <div className={`room-status-badge ${timeStatus}`}>
-                {timeStatus === 'active' && '🔴 EN VIVO'}
-                {timeStatus === 'opening' && '⏰ ABRIENDO'}
-                {timeStatus === 'soon' && '📅 PRÓXIMAMENTE'}
-                {timeStatus === 'closed' && '🔒 CERRADA'}
-              </div>
-
-              {/* Icono de la sala */}
-              <div className="room-icon">{room.icon}</div>
-
-              {/* Nombre de la sala */}
-              <div className="room-name">{room.name}</div>
-
-              {/* Horario */}
-              <div className="room-time">
-                <span className="time-icon">🕐</span>
-                <span>{room.time} hs</span>
-              </div>
-
-              {/* Descripción */}
-              <div className="room-description">{room.description}</div>
-
-              {/* Separador decorativo */}
-              <div className="room-divider"></div>
-
-              {/* Precio */}
-              <div className="room-price-section">
-                <div className="price-label">Entrada</div>
-                <div className="room-price">{room.price}</div>
-              </div>
-
-              {/* Pozos - Starter no tiene pozos, las demás salas sí */}
-              {room.id === 'starter' ? (
-                <div className="room-pot starter-rewards">
-                  <div className="pot-label">Skins & Premios</div>
-                  <div className="rewards-icons">
-                    <span className="reward-icon">🎨</span>
-                    <span className="reward-icon">👕</span>
-                    <span className="reward-icon">🎁</span>
-                    <span className="reward-icon">⭐</span>
-                  </div>
-                </div>
-              ) : (
-                <div className="room-pots-container">
-                  {/* Pozo BINGO (Principal) */}
-                  <div className="pot-main">
-                    <div className="pot-label">🎰 POZO BINGO</div>
-                    <div className="pot-amount">
-                      {formatPot(roomPots[room.id]?.bingo || 0)}
-                    </div>
-                  </div>
-
-                  {/* Pozos Secundarios (Línea y Pre-40) */}
-                  <div className="pots-secondary">
-                    <div className="pot-secondary">
-                      <div className="pot-secondary-icon">➖</div>
-                      <div className="pot-secondary-info">
-                        <div className="pot-secondary-label">Línea</div>
-                        <div className="pot-secondary-amount">
-                          {formatPot(roomPots[room.id]?.line || 0)}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="pot-secondary">
-                      <div className="pot-secondary-icon">⚡</div>
-                      <div className="pot-secondary-info">
-                        <div className="pot-secondary-label">Pre-Bolilla 40</div>
-                        <div className="pot-secondary-amount">
-                          {formatPot(roomPots[room.id]?.pre40 || 0)}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Botón de entrada */}
-              <button className="room-enter-btn">
-                {timeStatus === 'active' ? '🎮 ENTRAR AHORA' : '🎟️ RESERVAR'}
-              </button>
-
-              {/* Efecto de brillo al hover */}
-              <div className="room-shine"></div>
-            </div>
-            </Link>
-          );
-        })}
+        {roomsData.map((room, index) => (
+          <RoomCard key={room.id} room={room} style={{ animationDelay: `${index * 100}ms` }} />
+        ))}
       </div>
 
-      {/* Ticker de ganadores */}
-      <div className="winners-ticker">
-        <div className="ticker-label">🏆 GANADORES RECIENTES</div>
-        <div className="ticker-content">
-          <div className="ticker-track" style={{ transform: `translateX(${tickerOffset}px)` }}>
-            {[...winners, ...winners, ...winners].map((winner, index) => (
-              <div key={index} className="ticker-item">
-                <span className="winner-name">{winner.name}</span>
-                <span className="winner-separator">•</span>
-                <span className="winner-amount">${winner.amount}</span>
-                <span className="winner-separator">•</span>
-                <span className={`winner-room room-${winner.room.toLowerCase()}`}>{winner.room}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Footer con información */}
       <footer className="lobby-footer">
         <div className="footer-info">
           <div className="info-item">
-            <span className="info-icon">🎰</span>
-            <span>Juego Responsable</span>
+            <FaUsers className="info-icon" />
+            <span>+5,000 Jugadores Activos</span>
           </div>
           <div className="info-item">
-            <span className="info-icon">🔒</span>
-            <span>Pagos Seguros</span>
+            <FaMoneyBillWave className="info-icon" />
+            <span>+$150,000 Pagados Hoy</span>
           </div>
           <div className="info-item">
-            <span className="info-icon">⚡</span>
-            <span>Retiros en 20 min</span>
-          </div>
-          <div className="info-item">
-            <span className="info-icon">👥</span>
-            <span>Soporte 24/7</span>
+            <FaGlassCheers className="info-icon" />
+            <span>Salas VIP Exclusivas</span>
           </div>
         </div>
       </footer>
+
+      <WinnersTicker />
     </div>
   );
-}
+};
+
+export default CasinoLobby;

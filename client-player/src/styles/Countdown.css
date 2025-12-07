@@ -1,0 +1,121 @@
+/* ============================================
+   COUNTDOWN TIMER
+   ============================================ */
+
+.countdown-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.countdown-label-text {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #E0E0E0;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  text-shadow: 0 0 10px currentColor;
+  opacity: 0;
+  animation: label-fade-in 0.8s ease-out 0.3s forwards;
+  transition: all 0.3s ease;
+}
+
+.countdown-label-text.drawing {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #00BFFF;
+  letter-spacing: 2px;
+  text-shadow: 
+    0 0 10px #00BFFF,
+    0 0 20px #00BFFF,
+    0 0 30px #00BFFF;
+  animation: label-fade-in 0.8s ease-out 0.3s forwards, 
+             drawing-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes drawing-pulse {
+  0%, 100% {
+    opacity: 0.85;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes label-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 0.85;
+    transform: translateY(0);
+  }
+}
+
+.countdown-timer {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 5px;
+  font-family: 'Roboto', monospace;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  min-width: 130px;
+  text-align: center;
+}
+
+.countdown-segment {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+}
+
+.countdown-number {
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.countdown-label {
+  font-size: 0.6rem;
+  font-weight: 400;
+  color: #9E9E9E;
+  text-transform: uppercase;
+}
+
+.countdown-separator {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #616161;
+  animation: separator-blink 1s steps(1, end) infinite;
+}
+
+@keyframes separator-blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0.4; }
+}
+
+.live-text {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #FF5252; /* Rojo brillante para "en vivo" */
+  animation: live-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  0%, 100% {
+    transform: scale(1);
+    text-shadow: 0 0 10px rgba(255, 82, 82, 0.5);
+  }
+  50% {
+    transform: scale(1.05);
+    text-shadow: 0 0 20px rgba(255, 82, 82, 0.8);
+  }
+}

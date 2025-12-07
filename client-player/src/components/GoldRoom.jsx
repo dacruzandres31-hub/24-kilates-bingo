@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/GoldRoom.css';
-import { GameProvider, useGame } from '../hooks/useGame';
+import { GameProvider, useGame } from '../hooks/useGame.jsx';
 
 // --- Componentes Hijos ---
 
