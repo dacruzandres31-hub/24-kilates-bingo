@@ -93,10 +93,12 @@ CREATE DATABASE bingo_24k;
 # Salir
 exit;
 
-# Ejecutar schema
-mysql -u root -p bingo_24k < server/schema.sql
+# Ejecutar schema completo
+mysql -u root -p bingo_24k < server/schema_completo_mysql.sql
 
-# Ejecutar migraciones
+# O ejecutar schema base y migraciones por separado:
+mysql -u root -p bingo_24k < server/schema_mysql_base.sql
+mysql -u root -p bingo_24k < server/TICKETS_PREMIOS_HIBRIDOS_MIGRATION_MYSQL.sql
 mysql -u root -p bingo_24k < server/CHIPS_MOVEMENTS_MIGRATION.sql
 mysql -u root -p bingo_24k < server/WITHDRAWAL_REQUESTS_MIGRATION.sql
 ```
@@ -170,7 +172,11 @@ npm run dev
 │   │   │   ├── moneyMath.js         (Cálculos precisos decimal.js)
 │   │   │   └── victoryChecker.js    (Detector de ganadores optimizado)
 │   │   └── models/                  (Database queries)
-│   ├── schema.sql                   (Estructura BD)
+│   ├── schema_completo_mysql.sql    (Schema completo MySQL 8.0)
+│   ├── schema_mysql_base.sql        (Schema base)
+│   ├── TICKETS_PREMIOS_HIBRIDOS_MIGRATION_MYSQL.sql
+│   ├── CHIPS_MOVEMENTS_MIGRATION.sql
+│   ├── WITHDRAWAL_REQUESTS_MIGRATION.sql
 │   └── package.json
 │
 ├── client-player/
@@ -215,13 +221,15 @@ npm run dev
 - JWT con expiration 7 días
 - Bcrypt 10+ salt rounds
 - Middleware en todas las rutas protegidas
-- Roles: player, cajero, admin, superadmin
+- Roles: jugador, agente, superadmin
+- Jerarquía multinivel: SuperAdmin → Agentes → Jugadores
 
-### Retiros (20-min Rule)
-- Bloqueo de retiros durante 20 minutos después del último crédito
-- Cajero: puede procesar < 20 minutos
-- SuperAdmin: puede procesar siempre
-- Requiere CBU (22 dígitos) y nombre del titular
+### Retiros (Regla de 20 Minutos)
+- Bloqueo de retiros durante 20 minutos después del último depósito de fichas
+- SuperAdmin: puede procesar siempre (`can_process_payouts = true`)
+- Usuarios con permisos especiales: pueden procesar retiros sin restricción
+- Requiere CBU (22 dígitos), nombre del titular, banco y tipo de cuenta
+- Validación automática en `withdrawalController.js`
 
 ### Sistema de Fichas Interno
 - Pagos externos a la plataforma
@@ -305,25 +313,40 @@ npm run dev
 
 ### Tablas Principales
 
-1. **users** - Usuarios con roles (player, cajero, admin, superadmin)
-2. **game_sessions** - Partidas activas/completadas
-3. **daily_stock_cards** - 10k cartones por sala/día (incluye `seller_id`)
-4. **chips_movements** - Historial completo de fichas (con balance_before/after)
-5. **withdrawal_requests** - Solicitudes de retiro con CBU y regla 20min
-6. **bingo_cards** - Cartones vendidos (vinculados a `seller_id` para comisiones)
+1. **users** - Usuarios con roles (superadmin, agente, jugador) y jerarquía recursiva
+2. **game_sessions** - Partidas activas/completadas con soporte para cascada de jackpot
+3. **daily_stock_cards** - Stock de cartones con `seller_id` para comisiones
+4. **bingo_cards** - Cartones vendidos vinculados a usuarios y sesiones
+5. **chips_movements** - Historial completo de fichas con `balance_after` y `movement_type` ENUM
+6. **withdrawal_requests** - Solicitudes de retiro con regla de 20 minutos
+7. **cosmetic_items** - Ítems cosméticos y tickets consumibles
+8. **user_inventory** - Inventario de usuarios con ítems equipados
+9. **gamification_progress** - Progreso de XP y niveles VIP
+10. **daily_quests** - Misiones diarias para jugadores
 
-### Funciones MySQL
+### Enums MySQL
 
 ```sql
--- Verifica regla de 20 minutos para retiros
-CREATE FUNCTION can_process_withdrawal_time_rule(...) RETURNS BOOLEAN;
+-- Roles de usuario
+user_role: ENUM('superadmin', 'agente', 'jugador')
 
--- Obtiene minutos desde último crédito
-CREATE FUNCTION get_minutes_since_last_credit(...) RETURNS INT;
+-- Tipos de sala
+room_type: ENUM('bronce', 'plata', 'oro', 'free_starter')
 
--- Procesa retiro completo (atómico)
-CREATE PROCEDURE process_withdrawal_complete(...);
+-- Estado de stock
+stock_status: ENUM('available', 'sold', 'discarded')
+
+-- Tipos de movimiento de fichas
+movement_type: ENUM('deposit', 'withdrawal', 'purchase', 'prize', 'commission', 'bonus', 'refund')
 ```
+
+### Características MySQL 8.0
+
+- **Common Table Expressions (CTEs)**: `WITH RECURSIVE` para consultas de jerarquía de usuarios
+- **JSON Support**: Tipo de dato `JSON` para almacenar datos complejos (grid_data, agent_path)
+- **AUTO_INCREMENT**: IDs automáticos para todas las tablas
+- **ENUM Types**: Tipos enumerados nativos para roles, estados y tipos
+- **Triggers**: Validación automática de balances y auditoría
 
 ### Indexes Optimizados
 
@@ -333,6 +356,8 @@ CREATE INDEX idx_daily_stock_date ON daily_stock_cards(play_date);
 CREATE INDEX idx_daily_stock_buyer ON daily_stock_cards(buyer_id, play_date);
 CREATE INDEX idx_chips_movements_user ON chips_movements(user_id, created_at);
 CREATE INDEX idx_withdrawal_status ON withdrawal_requests(status, requested_at);
+CREATE INDEX idx_user_session ON bingo_cards(user_id, session_id);
+CREATE INDEX idx_session ON game_events(session_id);
 ```
 
 ## 🚢 Deployment (Production)
