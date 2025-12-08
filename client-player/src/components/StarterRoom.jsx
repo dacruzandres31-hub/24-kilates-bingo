@@ -289,11 +289,13 @@ celebrationAudio.volume = 0.7;
     // Reproducir efectos de festejo
     celebrationAudio.currentTime = 0;
 celebrationAudio.play();
-    // Pausar sorteo 20 segundos
+    // Pausar sorteo 20 segundos y cerrar modal automáticamente
     if (gameStatus === 'active') {
       setGameStatus('waiting');
       const timeout = setTimeout(() => {
         setGameStatus('active');
+        setWinnerCards([]);
+        setHighlightedLine(null);
       }, 20000);
       setPauseTimeout(timeout);
     }
@@ -391,15 +393,6 @@ useEffect(() => {
           </div>
         </div>
       )}
-      <button 
-        className="celebration-close"
-        onClick={() => {
-          setWinnerCards([]);
-          setHighlightedLine(null);
-        }}
-      >
-        CONTINUAR
-      </button>
     </div>
     <div className="confetti-container">
       {Array.from({ length: 50 }).map((_, i) => (

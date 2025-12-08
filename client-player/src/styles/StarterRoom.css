@@ -50,7 +50,7 @@
   border-radius: 20px;
   padding: 40px;
   text-align: center;
-  max-width: 600px;
+  max-width: 800px; /* Aumentado de 600px a 800px */
   box-shadow: 
     0 0 60px rgba(0, 212, 255, 0.8),
     0 0 100px rgba(255, 0, 255, 0.6);
@@ -179,6 +179,92 @@
     transform: translateY(100vh) rotate(720deg);
     opacity: 0;
   }
+}
+
+/* Estilos para el cartón en el modal de celebración */
+.celebration-card-expanded {
+  margin: 30px auto;
+  max-width: 700px;
+  background: rgba(0, 0, 0, 0.7);
+  border: 3px solid #ffd700;
+  border-radius: 15px;
+  padding: 20px;
+  box-shadow: 0 0 30px rgba(255, 215, 0, 0.6);
+}
+
+.celebration-card-expanded .card-header {
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.celebration-card-expanded .card-number {
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: #ffd700;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.8);
+}
+
+.celebration-card-expanded .card-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.celebration-card-expanded .card-row {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 8px;
+}
+
+.celebration-card-expanded .card-cell {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 20, 50, 0.9);
+  border: 2px solid rgba(0, 212, 255, 0.5);
+  border-radius: 8px;
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: #ffffff;
+  transition: all 0.3s ease;
+}
+
+.celebration-card-expanded .card-cell.empty {
+  background: rgba(10, 10, 30, 0.5);
+  border-color: rgba(100, 100, 150, 0.3);
+}
+
+.celebration-card-expanded .card-cell .cell-number {
+  font-size: 1.6rem;
+  font-weight: 900;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+}
+
+/* Línea resaltada en dorado */
+.celebration-card-expanded .card-cell.highlighted-line {
+  background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+  border: 3px solid #ffaa00;
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.9), inset 0 0 15px rgba(255, 215, 0, 0.4);
+  animation: pulse-highlight 1s infinite alternate;
+  color: #000000;
+  font-weight: 900;
+}
+
+@keyframes pulse-highlight {
+  from { 
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.9), inset 0 0 15px rgba(255, 215, 0, 0.4);
+    transform: scale(1);
+  }
+  to { 
+    box-shadow: 0 0 35px rgba(255, 215, 0, 1), inset 0 0 25px rgba(255, 215, 0, 0.6);
+    transform: scale(1.05);
+  }
+}
+
+.celebration-card-expanded .card-cell.highlighted-line .cell-number {
+  color: #000000;
+  text-shadow: 0 0 5px rgba(255, 215, 0, 0.8);
+  font-weight: 900;
 }
 
 /* ============================================
@@ -1963,21 +2049,24 @@
 }
 
 .control-btn {
-  background: linear-gradient(135deg, #00d4ff, #ff00ff);
-  border: none;
-  color: #000;
+  background: transparent;
+  border: 2px solid rgba(0, 212, 255, 0.6);
+  color: #00d4ff;
   font-size: 1rem;
   font-weight: 700;
   padding: 12px 25px;
   border-radius: 25px;
   cursor: pointer;
-  box-shadow: 0 0 30px rgba(0, 212, 255, 0.5);
+  box-shadow: 0 0 15px rgba(0, 212, 255, 0.3);
   transition: all 0.3s ease;
+  backdrop-filter: blur(5px);
 }
 
 .control-btn:hover {
   transform: scale(1.1);
-  box-shadow: 0 0 40px rgba(0, 212, 255, 0.8);
+  border-color: rgba(0, 212, 255, 1);
+  box-shadow: 0 0 30px rgba(0, 212, 255, 0.6);
+  color: #ffffff;
 }
 
 /* ============================================
@@ -2269,30 +2358,37 @@
 }
 
 .control-btn.voice-btn {
-  background: linear-gradient(135deg, #00d4ff, #0088ff);
+  background: transparent;
+  border: 2px solid rgba(0, 212, 255, 0.6);
+  color: #00d4ff;
 }
 
 .control-btn.voice-btn:hover {
-  background: linear-gradient(135deg, #00ffff, #00d4ff);
+  background: rgba(0, 212, 255, 0.1);
+  border-color: rgba(0, 255, 255, 1);
+  color: #00ffff;
 }
 
 .control-btn.audio-btn {
-  background: linear-gradient(135deg, #ff00ff, #ff0099);
+  background: transparent;
   padding: 10px 20px;
-  border: none;
+  border: 2px solid rgba(255, 0, 255, 0.6);
   border-radius: 8px;
-  color: #ffffff;
+  color: #ff00ff;
   font-weight: 700;
   font-size: 0.9rem;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 0 15px rgba(255, 0, 255, 0.4);
+  box-shadow: 0 0 15px rgba(255, 0, 255, 0.3);
+  backdrop-filter: blur(5px);
 }
 
 .control-btn.audio-btn:hover {
-  background: linear-gradient(135deg, #ff00cc, #ff0077);
+  background: rgba(255, 0, 255, 0.1);
   transform: scale(1.05);
+  border-color: rgba(255, 0, 255, 1);
   box-shadow: 0 0 25px rgba(255, 0, 255, 0.6);
+  color: #ff00ff;
 }
 
 .control-btn.audio-btn:active {
