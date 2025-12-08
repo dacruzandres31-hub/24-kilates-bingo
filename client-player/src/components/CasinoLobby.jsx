@@ -10,6 +10,7 @@ import bronzeIcon from '../assets/bronze_icon.png';
 import silverIcon from '../assets/silver_icon.png';
 import goldIcon from '../assets/gold_icon.png';
 import lobbyBackground from '../assets/lobby-background.jpg';
+import audioService from '../services/audioService';
 
 const getTargetTime = (hour) => {
   const target = new Date();
@@ -224,12 +225,38 @@ const WinnersTicker = () => {
 const CasinoLobby = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showBalance, setShowBalance] = useState(false);
+  const [audioInitialized, setAudioInitialized] = useState(false);
 
   // Actualizar reloj
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Inicializar audio del lobby al montar
+  useEffect(() => {
+    const initLobbyAudio = async () => {
+      await audioService.initialize('lobby');
+      await audioService.startBackgroundMusic();
+      setAudioInitialized(true);
+      console.log('🎵 Audio del lobby inicializado');
+    };
+    
+    // Iniciar audio con interacción del usuario
+    const handleFirstClick = () => {
+      if (!audioInitialized) {
+        initLobbyAudio();
+      }
+      document.removeEventListener('click', handleFirstClick);
+    };
+    
+    document.addEventListener('click', handleFirstClick);
+    
+    return () => {
+      document.removeEventListener('click', handleFirstClick);
+      // No detener el audio aquí para permitir transición suave a salas
+    };
+  }, [audioInitialized]);
 
   return (
     <div className="casino-lobby" style={{ '--lobby-bg-image': `url(${lobbyBackground})` }}>

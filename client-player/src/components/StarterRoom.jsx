@@ -1,15 +1,45 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import '../styles/StarterRoom.css';
+import GiftIcon from '../assets/Gift_icon.png';
+import voiceService from '../services/voiceService';
+import audioService from '../services/audioService';
 
 export default function StarterRoom() {
   const { sessionId } = useParams();
+  const navigate = useNavigate();
   const [ballsDrawn, setBallsDrawn] = useState([]);
   const [lastBall, setLastBall] = useState(null);
   const [gameStatus, setGameStatus] = useState('waiting'); // waiting, active, ended
+  const [previousGameStatus, setPreviousGameStatus] = useState('waiting'); // Para detectar cambios
   const [currentBall, setCurrentBall] = useState(null);
   const [floatingBalls, setFloatingBalls] = useState([]);
   const [almostLineCards, setAlmostLineCards] = useState([]); // Cartones a 2 bolillas de línea
+  const [expandedCard, setExpandedCard] = useState(null); // Cartón expandido actualmente
+  const [lastHitCard, setLastHitCard] = useState(null); // Último cartón con acierto
+  const [winnerCards, setWinnerCards] = useState([]); // Cartones ganadores con línea completa
+  const [showVoiceSelector, setShowVoiceSelector] = useState(false); // Selector de voz
+  const [availableVoices, setAvailableVoices] = useState([]); // Voces disponibles
+  const [currentVoice, setCurrentVoice] = useState(null); // Voz actual
+  const [audioInitialized, setAudioInitialized] = useState(false); // Estado de audio
+  const [audioStatus, setAudioStatus] = useState({ musicEnabled: true, efectosEnabled: true }); // Estado UI audio
+const [lineCelebrated, setLineCelebrated] = useState(false); // ¿Ya se festejó la línea?
+const [pauseTimeout, setPauseTimeout] = useState(null); // Controlar pausa automática
+const [highlightedLine, setHighlightedLine] = useState(null); // Línea a resaltar
+
+// Efectos de festejo (fuera del componente o arriba)
+const celebrationAudio = new Audio('/audio/celebration.mp3');
+celebrationAudio.volume = 0.7;
+
+  // Generar número de serie del cartón: DDMMYY-S0001
+  const generateCardSerial = (cardIndex, roomLetter = 'S') => {
+    const now = new Date();
+    const day = String(now.getDate()).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = String(now.getFullYear()).slice(-2);
+    const cardNumber = String(cardIndex + 1).padStart(4, '0');
+    return `${day}${month}${year}-${roomLetter}${cardNumber}`;
+  };
 
   // Simular bolillas flotantes en el bolillero
   useEffect(() => {
@@ -21,6 +51,37 @@ export default function StarterRoom() {
       duration: 3 + Math.random() * 2
     }));
     setFloatingBalls(balls);
+
+    // Inicializar audio y música
+    const initAudio = async () => {
+      await audioService.initialize('starter'); // Especificar sala STARTER
+      await audioService.startBackgroundMusic();
+      setAudioInitialized(true);
+      console.log('🎵 Sistema de audio inicializado para Sala Starter');
+    };
+    
+    // Iniciar audio con interacción del usuario (click en cualquier parte)
+    const handleFirstInteraction = () => {
+      if (!audioInitialized) {
+        initAudio();
+      }
+      document.removeEventListener('click', handleFirstInteraction);
+    };
+    
+    document.addEventListener('click', handleFirstInteraction);
+
+    // Cargar voces disponibles
+    setTimeout(() => {
+      const voices = voiceService.getSpanishVoices();
+      setAvailableVoices(voices);
+      setCurrentVoice(voiceService.getCurrentVoice());
+    }, 500);
+    
+    // Cleanup
+    return () => {
+      document.removeEventListener('click', handleFirstInteraction);
+      audioService.stopAll();
+    };
   }, []);
 
   // Simulación de sorteo BINGO 90 (reemplazar con Socket.IO en producción)
@@ -114,6 +175,37 @@ export default function StarterRoom() {
     return ballsDrawn.some(ball => ball.number === number);
   };
 
+  // Calcular progreso del cartón (números marcados de 15 totales)
+  const getCardProgress = (card) => {
+    const allNumbers = card.numbers.flat().filter(n => n !== null && n !== undefined);
+    const markedNumbers = allNumbers.filter(num => isNumberCalled(num));
+    return markedNumbers.length; // Retorna cantidad de números marcados (de 15)
+  };
+
+  // Expandir cartón (por click o por acierto)
+  const expandCard = (cardId) => {
+    setExpandedCard(cardId);
+    setTimeout(() => {
+      setExpandedCard(null);
+    }, 3500); // 3.5 segundos expandido
+  };
+
+  // Detectar cuando un número coincide con un cartón
+  useEffect(() => {
+    if (ballsDrawn.length > 0) {
+      const latestBall = ballsDrawn[ballsDrawn.length - 1];
+      
+      // Buscar cartones que tienen este número
+      playerCards.forEach(card => {
+        const hasNumber = card.numbers.flat().includes(latestBall.number);
+        if (hasNumber && expandedCard !== card.id) {
+          setLastHitCard(card.id);
+          expandCard(card.id);
+        }
+      });
+    }
+  }, [ballsDrawn]);
+
   // Detectar líneas en BINGO 90 (solo horizontales - 3 filas)
   const checkLineStatus = (card) => {
     const lines = [];
@@ -143,58 +235,187 @@ export default function StarterRoom() {
     return linesStatus;
   };
 
-  // Detectar cartones a 2 bolillas de línea
+  // Detectar cartones a 1-2 números de línea y líneas completas
   useEffect(() => {
-    if (ballsDrawn.length === 0) {
-      setAlmostLineCards([]);
-      return;
+  if (ballsDrawn.length === 0) {
+    setAlmostLineCards([]);
+    setWinnerCards([]);
+    setLineCelebrated(false);
+    setHighlightedLine(null);
+    return;
+  }
+
+  const cardsAlmostThere = [];
+  const cardsWithWinningLines = [];
+
+  playerCards.forEach(card => {
+    const linesStatus = checkLineStatus(card);
+    const almostLines = linesStatus.filter(line => line.missing === 1 || line.missing === 2);
+    const completedLines = linesStatus.filter(line => line.missing === 0);
+
+    if (almostLines.length > 0) {
+      const minMissing = Math.min(...almostLines.map(line => line.missing));
+      cardsAlmostThere.push({
+        cardId: card.id,
+        almostLineCount: almostLines.length,
+        lines: almostLines,
+        minMissing: minMissing
+      });
     }
 
-    const cardsAlmostThere = [];
-    
-    playerCards.forEach(card => {
-      const linesStatus = checkLineStatus(card);
-      const almostLines = linesStatus.filter(line => line.missing === 2);
-      
-      if (almostLines.length > 0) {
-        cardsAlmostThere.push({
-          cardId: card.id,
-          almostLineCount: almostLines.length,
-          lines: almostLines
-        });
-      }
-    });
+    if (completedLines.length > 0) {
+      cardsWithWinningLines.push({
+        cardId: card.id,
+        cardSerial: generateCardSerial(playerCards.indexOf(card)),
+        lineCount: completedLines.length,
+        lines: completedLines,
+        card // importante para renderizado
+      });
+    }
+  });
 
-    setAlmostLineCards(cardsAlmostThere);
-  }, [ballsDrawn, playerCards]);
+  setAlmostLineCards(cardsAlmostThere);
+
+  // Mostrar celebración si hay nuevos ganadores y no se festejó la línea
+  if (
+    cardsWithWinningLines.length > winnerCards.length &&
+    !lineCelebrated &&
+    cardsWithWinningLines.length > 0
+  ) {
+    setWinnerCards(cardsWithWinningLines);
+    setLineCelebrated(true);
+    // Anunciar línea ganadora
+    voiceService.speak('Ganaste Línea');
+    // Reproducir efectos de festejo
+    celebrationAudio.currentTime = 0;
+celebrationAudio.play();
+    // Pausar sorteo 20 segundos
+    if (gameStatus === 'active') {
+      setGameStatus('waiting');
+      const timeout = setTimeout(() => {
+        setGameStatus('active');
+      }, 20000);
+      setPauseTimeout(timeout);
+    }
+    // Resaltar la línea ganadora (primera del primer cartón)
+    if (cardsWithWinningLines[0]?.lines?.length > 0) {
+      setHighlightedLine(cardsWithWinningLines[0].lines[0].numbers);
+    }
+  }
+}, [ballsDrawn, playerCards]);
+
+useEffect(() => {
+  return () => {
+    if (pauseTimeout) clearTimeout(pauseTimeout);
+  };
+}, [pauseTimeout]);
+
+  // Detectar cambios en el estado del juego y anunciar + controlar bolillero
+  useEffect(() => {
+    if (gameStatus === 'active' && previousGameStatus === 'waiting') {
+      // Juego iniciado
+      voiceService.announceSorteoIniciado();
+      audioService.startBolilleroGirando(); // Iniciar sonido del bolillero
+      // Bajar volumen de música de fondo un 30%
+      audioService.setMusicVolume(audioService.backgroundMusicVolume * 0.7);
+    } else if (gameStatus === 'waiting' && previousGameStatus === 'active') {
+      // Juego pausado
+      voiceService.announceSorteoPausado();
+      audioService.stopBolilleroGirando(); // Detener sonido del bolillero
+      // Restaurar volumen de música de fondo
+      audioService.setMusicVolume(0.15);
+    } else if (gameStatus === 'active' && previousGameStatus === 'paused') {
+      // Juego reiniciado después de pausa
+      voiceService.announceSorteoReiniciado();
+      audioService.startBolilleroGirando(); // Reiniciar sonido del bolillero
+      // Bajar volumen de música de fondo un 30%
+      audioService.setMusicVolume(audioService.backgroundMusicVolume * 0.7);
+    }
+    setPreviousGameStatus(gameStatus);
+  }, [gameStatus]);
+
+  // Anunciar número cantado con sonido de bola cayendo
+  useEffect(() => {
+    if (ballsDrawn.length > 0 && gameStatus === 'active') {
+      const lastDrawnBall = ballsDrawn[ballsDrawn.length - 1];
+      
+      // Reproducir sonido de bola cayendo
+      audioService.playBolaCayendo();
+      
+      // Esperar 500ms y luego anunciar el número con voz
+      setTimeout(() => {
+        voiceService.announceNumber(lastDrawnBall.number);
+      }, 500);
+    }
+  }, [ballsDrawn.length, gameStatus]);
 
   return (
     <div className="starter-room">
-      {/* Alerta de casi línea - Personalizada para el jugador */}
-      {almostLineCards.length > 0 && (
-        <div className="almost-line-alert">
-          <div className="alert-icon">⚠️</div>
-          <div className="alert-content">
-            <div className="alert-title">¡ESTÁS A 2 BOLILLAS DE LÍNEA!</div>
-            <div className="alert-message">
-              {almostLineCards.length === 1 
-                ? `Tienes 1 cartón cerca de ganar`
-                : `Tienes ${almostLineCards.length} cartones cerca de ganar`}
-            </div>
-            <div className="alert-details">
-              {almostLineCards.map(card => (
-                <span key={card.cardId} className="card-badge">
-                  Tu Cartón #{card.cardId}: {card.almostLineCount} {card.almostLineCount === 1 ? 'línea posible' : 'líneas posibles'}
-                </span>
-              ))}
-            </div>
-            <div className="alert-subtext">
-              🎯 ¡Concéntrate! Solo necesitas 2 números más para cantar LÍNEA
-            </div>
+      {/* CELEBRACIÓN DE LÍNEA GANADORA */}
+      {winnerCards.length > 0 && (
+  <div className="winner-celebration-overlay">
+    <div className="celebration-content">
+      <div className="celebration-title">🎉 ¡LÍNEA! 🎉</div>
+      <div className="celebration-message">
+        {winnerCards.length === 1 
+          ? `¡Ganaste con el cartón ${winnerCards[0].cardSerial}!`
+          : `¡${winnerCards.length} cartones ganadores!`}
+      </div>
+      {/* Mostrar cartón completo y línea resaltada */}
+      {winnerCards[0] && (
+        <div className="celebration-card-expanded">
+          <div className="card-header">
+            <span className="card-number">N° Serie: {winnerCards[0].cardSerial}</span>
           </div>
-          <div className="alert-pulse"></div>
+          <div className="card-grid card-grid-90">
+            {winnerCards[0].card.numbers.map((row, rowIdx) => (
+              <div key={rowIdx} className="card-row">
+                {row.map((num, colIdx) => {
+                  const isEmpty = num === null || num === undefined;
+                  const isLineCell = highlightedLine && highlightedLine.includes(num);
+                  return (
+                    <div
+                      key={colIdx}
+                      className={`card-cell ${isEmpty ? 'empty' : ''} ${isLineCell ? 'highlighted-line' : ''}`}
+                    >
+                      {isEmpty ? (
+                        <span className="empty-space"></span>
+                      ) : (
+                        <span className="cell-number">{num}</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
         </div>
       )}
+      <button 
+        className="celebration-close"
+        onClick={() => {
+          setWinnerCards([]);
+          setHighlightedLine(null);
+        }}
+      >
+        CONTINUAR
+      </button>
+    </div>
+    <div className="confetti-container">
+      {Array.from({ length: 50 }).map((_, i) => (
+        <div 
+          key={i} 
+          className="confetti"
+          style={{
+            left: `${Math.random() * 100}%`,
+            animationDelay: `${Math.random() * 3}s`,
+            backgroundColor: getBallColor(Math.floor(Math.random() * 90) + 1)
+          }}
+        />
+      ))}
+    </div>
+  </div>
+)}
 
       {/* LAYOUT REORGANIZADO */}
       <div className="game-table">
@@ -345,27 +566,6 @@ export default function StarterRoom() {
               );
             })}
           </div>
-
-          {/* Últimas 5 bolas */}
-          {ballsDrawn.length > 0 && (
-            <div className="recent-balls-bar">
-              <span className="recent-label">ÚLTIMAS:</span>
-              <div className="recent-balls-list">
-                {ballsDrawn.slice(-5).reverse().map((ball, index) => (
-                  <div 
-                    key={`${ball.number}-${index}`}
-                    className="recent-ball-chip"
-                    style={{
-                      backgroundColor: getBallColor(ball.number),
-                      boxShadow: `0 0 15px ${getBallColor(ball.number)}`
-                    }}
-                  >
-                    <span className="ball-number">{ball.number}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Sección derecha: Título/Info arriba, Bolillero abajo */}
@@ -373,21 +573,46 @@ export default function StarterRoom() {
           {/* Info superior */}
           <div className="side-info">
             <div className="room-title">
-              <span className="title-icon">🎟️</span>
-              <span className="title-text">SALA STARTER</span>
-              <span className="title-tag">FREE</span>
-            </div>
-            <div className="game-info">
+              <img src={GiftIcon} alt="Gift" className="title-icon" />
+              <span className="title-text" style={{ 
+                color: '#00d4ff',
+                textShadow: '0 0 20px rgba(0, 212, 255, 1), 0 0 40px rgba(0, 212, 255, 0.8)',
+                WebkitTextFillColor: '#00d4ff'
+              }}>SALA STARTER</span>
+              <span className="title-tag">GRATIS</span>
+              <button 
+                className="lobby-btn"
+                onClick={() => navigate('/')}
+                title="Volver al lobby"
+              >
+                LOBBY
+              </button>
               <div className="info-badge">
                 <span className="badge-label">Bolas:</span>
                 <span className="badge-value">{ballsDrawn.length}/90</span>
               </div>
               <div className={`status-badge ${gameStatus}`}>
-                {gameStatus === 'waiting' && '⏸️ ESPERANDO'}
+                {gameStatus === 'waiting' && '⏸️ ESPERA'}
                 {gameStatus === 'active' && '🔴 EN VIVO'}
                 {gameStatus === 'ended' && '✅ FINALIZADO'}
               </div>
             </div>
+
+            {/* Alerta de casi línea - Compacta */}
+            {almostLineCards.length > 0 && (() => {
+              const minMissing = Math.min(...almostLineCards.map(card => card.minMissing));
+              return (
+                <div className="compact-line-alert">
+                  <div className="alert-flash"></div>
+                  <span className="alert-icon-compact">⚠️</span>
+                  <span className="alert-text-compact">
+                    ¡A {minMissing} NÚMERO{minMissing > 1 ? 'S' : ''} DE LÍNEA!
+                    {almostLineCards.length > 1 && ` (${almostLineCards.length} cartones)`}
+                  </span>
+                  <div className="alert-glow"></div>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Bolillero Moderno */}
@@ -454,6 +679,27 @@ export default function StarterRoom() {
               <div className="light-strip"></div>
             </div>
           </div>
+
+          {/* Últimas 5 bolas */}
+          {ballsDrawn.length > 0 && (
+            <div className="recent-balls-bar">
+              <span className="recent-label">ÚLTIMAS:</span>
+              <div className="recent-balls-list">
+                {ballsDrawn.slice(-5).reverse().map((ball, index) => (
+                  <div 
+                    key={`${ball.number}-${index}`}
+                    className="recent-ball-chip"
+                    style={{
+                      backgroundColor: getBallColor(ball.number),
+                      boxShadow: `0 0 15px ${getBallColor(ball.number)}`
+                    }}
+                  >
+                    <span className="ball-number">{ball.number}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
         </div>
       </div>
@@ -468,55 +714,163 @@ export default function StarterRoom() {
           <div className="cards-count">{playerCards.length} cartones</div>
         </div>
 
-        <div className="cards-scroll-container">
-          {[...playerCards].reverse().map((card, cardIndex) => (
-            <div key={card.id} className="bingo-card-starter bingo-card-starter-90">
-              <div className="card-header">
-                <span className="card-number">#{playerCards.length - cardIndex}</span>
-                <div className="card-glow-border"></div>
-              </div>
+        <div className="cards-grid-container">
+          {/* Grid compacto 5x4 */}
+          <div className="cards-compact-grid">
+            {playerCards.map((card, index) => {
+              const cardSerial = generateCardSerial(index);
+              const progress = getCardProgress(card);
+              const isExpanded = expandedCard === card.id;
               
-              <div className="card-grid card-grid-90">
-                {card.numbers.map((row, rowIndex) => (
-                  <div key={rowIndex} className="card-row">
-                    {row.map((num, colIndex) => {
-                      const isEmpty = num === null || num === undefined;
-                      const isCalled = !isEmpty && isNumberCalled(num);
-                      
-                      return (
-                        <div 
-                          key={colIndex} 
-                          className={`card-cell ${isEmpty ? 'empty' : ''} ${isCalled ? 'marked' : ''}`}
-                        >
-                          {isEmpty ? (
-                            <span className="empty-space"></span>
-                          ) : (
-                            <>
-                              <span className="cell-number">{num}</span>
-                              {isCalled && (
+              return (
+                <div 
+                  key={card.id} 
+                  className={`compact-card ${isExpanded ? 'expanded' : ''}`}
+                  onClick={() => !isExpanded && expandCard(card.id)}
+                  style={{
+                    cursor: 'pointer'
+                  }}
+                >
+                  {!isExpanded && (
+                    <>
+                      <div className="compact-card-serial">{cardSerial}</div>
+                      <div className="compact-card-progress">
+                        {Array.from({ length: 15 }).map((_, i) => (
+                          <div 
+                            key={i} 
+                            className={`progress-segment ${i < progress ? 'filled' : ''}`}
+                            style={{
+                              color: i < progress ? getBallColor((i + 1) * 6) : 'rgba(255,0,255,0.3)'
+                            }}
+                          />
+                        ))}
+                      </div>
+                      <div className="compact-card-count">{progress}/15</div>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Cartón expandido en el centro */}
+          {expandedCard && (
+            <div className="expanded-card-overlay">
+              {playerCards
+                .filter(card => card.id === expandedCard)
+                .map(card => {
+                  const cardSerial = generateCardSerial(playerCards.indexOf(card));
+                  
+                  return (
+                    <div key={card.id} className="bingo-card-expanded bingo-card-starter-90">
+                      <div className="card-header">
+                        <span className="card-number">N° Serie: {cardSerial}</span>
+                        <div className="card-glow-border"></div>
+                      </div>
+                    
+                      <div className="card-grid card-grid-90">
+                        {card.numbers.map((row, rowIndex) => (
+                          <div key={rowIndex} className="card-row">
+                            {row.map((num, colIndex) => {
+                              const isEmpty = num === null || num === undefined;
+                              const isCalled = !isEmpty && isNumberCalled(num);
+                              const isLatest = !isEmpty && ballsDrawn.length > 0 && 
+                                              ballsDrawn[ballsDrawn.length - 1].number === num;
+                              
+                              return (
                                 <div 
-                                  className="cell-mark"
-                                  style={{
-                                    backgroundColor: getBallColor(num),
-                                    boxShadow: `0 0 15px ${getBallColor(num)}`
-                                  }}
-                                />
-                              )}
-                            </>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
-              </div>
+                                  key={colIndex} 
+                                  className={`card-cell ${isEmpty ? 'empty' : ''} ${isCalled ? 'marked' : ''} ${isLatest ? 'latest-hit' : ''}`}
+                                >
+                                  {isEmpty ? (
+                                    <span className="empty-space"></span>
+                                  ) : (
+                                    <>
+                                      <span className="cell-number">{num}</span>
+                                      {isCalled && (
+                                        <div 
+                                          className="cell-mark"
+                                          style={{
+                                            backgroundColor: getBallColor(num),
+                                            boxShadow: `0 0 15px ${getBallColor(num)}`
+                                          }}
+                                        />
+                                      )}
+                                    </>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
-          ))}
+          )}
         </div>
       </div>
 
+      {/* Selector de Voz */}
+      {showVoiceSelector && (
+        <div className="voice-selector-overlay" onClick={() => setShowVoiceSelector(false)}>
+          <div className="voice-selector-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>🎤 Seleccionar Voz</h3>
+            <div className="voice-list">
+              {availableVoices.map((voice, index) => (
+                <button
+                  key={index}
+                  className={`voice-option ${currentVoice?.name === voice.name ? 'active' : ''}`}
+                  onClick={() => {
+                    voiceService.setVoice(voice);
+                    setCurrentVoice(voice);
+                    voiceService.speak('Hola, esta es mi voz');
+                  }}
+                >
+                  <span className="voice-name">{voice.name}</span>
+                  <span className="voice-lang">{voice.lang}</span>
+                </button>
+              ))}
+            </div>
+            <button className="close-voice-selector" onClick={() => setShowVoiceSelector(false)}>
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Botón de control (solo para testing) */}
       <div className="test-controls">
+        <button 
+          className="control-btn voice-btn"
+          onClick={() => setShowVoiceSelector(true)}
+          title="Cambiar voz del anunciador"
+        >
+          🎤 Voz
+        </button>
+        <button 
+          className="control-btn audio-btn"
+          onClick={() => {
+            const newState = audioService.toggleMusic();
+            setAudioStatus(audioService.getStatus());
+            console.log(`🎵 Música ${newState ? 'activada' : 'desactivada'}`);
+          }}
+          title="Activar/Desactivar música de fondo"
+        >
+          {audioStatus.musicEnabled ? '🎵 Música' : '🔇 Música'}
+        </button>
+        <button 
+          className="control-btn audio-btn"
+          onClick={() => {
+            const newState = audioService.toggleEfectos();
+            setAudioStatus(audioService.getStatus());
+            console.log(`🔊 Efectos ${newState ? 'activados' : 'desactivados'}`);
+          }}
+          title="Activar/Desactivar efectos de sonido"
+        >
+          {audioStatus.efectosEnabled ? '🔊 Efectos' : '🔇 Efectos'}
+        </button>
         <button 
           className="control-btn"
           onClick={() => setGameStatus(gameStatus === 'active' ? 'waiting' : 'active')}
