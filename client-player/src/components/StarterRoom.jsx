@@ -4,6 +4,7 @@ import '../styles/StarterRoom.css';
 import GiftIcon from '../assets/Gift_icon.png';
 import voiceService from '../services/voiceService';
 import audioService from '../services/audioService';
+import PlayerSidebar from './PlayerSidebar';
 
 export default function StarterRoom() {
   const { sessionId } = useParams();
@@ -26,6 +27,7 @@ export default function StarterRoom() {
 const [lineCelebrated, setLineCelebrated] = useState(false); // ¿Ya se festejó la línea?
 const [pauseTimeout, setPauseTimeout] = useState(null); // Controlar pausa automática
 const [highlightedLine, setHighlightedLine] = useState(null); // Línea a resaltar
+const [sidebarOpen, setSidebarOpen] = useState(false); // Estado del sidebar
 
 // Efectos de festejo (fuera del componente o arriba)
 const celebrationAudio = new Audio('/audio/celebration.mp3');
@@ -353,6 +355,12 @@ useEffect(() => {
 
   return (
     <div className="starter-room">
+      {/* Sidebar con información del jugador */}
+      <PlayerSidebar 
+        isOpen={sidebarOpen} 
+        onToggle={() => setSidebarOpen(!sidebarOpen)} 
+      />
+
       {/* CELEBRACIÓN DE LÍNEA GANADORA */}
       {winnerCards.length > 0 && (
   <div className="winner-celebration-overlay">
