@@ -1440,9 +1440,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 15px;
-  padding: 20px;
+  justify-content: flex-end;
+  padding: 0 20px 40px 20px;
   animation: sphere-pulse 2s ease-in-out infinite;
 }
 
@@ -1480,7 +1479,7 @@
 }
 
 .sphere-btn-image {
-  width: 220px;
+  width: 200px;
   height: auto;
   max-width: 100%;
   display: block;
@@ -1492,7 +1491,23 @@
   50% { transform: translateY(-10px); }
 }
 
-/* Contador de Cartones Disponibles */
+/* Contador de Cartones Disponibles - EXTERNO */
+.external-counter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 15px;
+  margin-bottom: 10px;
+  animation: counter-float 3s ease-in-out infinite;
+}
+
+@keyframes counter-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+/* Contador VIEJO dentro del círculo - mantener por compatibilidad */
 .sphere-btn-counter {
   display: flex;
   flex-direction: column;

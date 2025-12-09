@@ -713,12 +713,6 @@ useEffect(() => {
                     className="sphere-btn-image"
                   />
                 </button>
-                <div className="sphere-btn-counter">
-                  <div className="counter-line top-line"></div>
-                  <div className="counter-number">{cardsRemaining}</div>
-                  <div className="counter-line bottom-line"></div>
-                  <div className="counter-label">Cartones Disponibles</div>
-                </div>
               </div>
             )}
 
@@ -730,6 +724,16 @@ useEffect(() => {
               </div>
             )}
           </div>
+
+          {/* Contador de Cartones - Fuera del círculo */}
+          {gameStatus === 'waiting' && cardsRemaining > 0 && (
+            <div className="external-counter">
+              <div className="counter-line top-line"></div>
+              <div className="counter-number">{cardsRemaining}</div>
+              <div className="counter-line bottom-line"></div>
+              <div className="counter-label">Cartones Disponibles</div>
+            </div>
+          )}
 
           <div className="machine-base">
             <div className="base-panel"></div>
