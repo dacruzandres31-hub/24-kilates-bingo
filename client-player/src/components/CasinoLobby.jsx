@@ -12,6 +12,18 @@ import goldIcon from '../assets/gold_icon.png';
 import lobbyBackground from '../assets/lobby-background.jpg';
 import audioService from '../services/audioService';
 
+// Precargar todas las imágenes al inicio
+const preloadImages = () => {
+  const images = [logo, giftIcon, bronzeIcon, silverIcon, goldIcon, lobbyBackground];
+  images.forEach(src => {
+    const img = new Image();
+    img.src = src;
+  });
+};
+
+// Ejecutar precarga inmediatamente
+preloadImages();
+
 const getTargetTime = (hour) => {
   const target = new Date();
   target.setHours(hour, 0, 0, 0);
@@ -142,7 +154,17 @@ const RoomCard = ({ room }) => {
         )}
 
         <div className="room-icon">
-          <img src={room.iconImage} alt={room.name} className="room-icon-img" />
+          <img 
+            src={room.iconImage} 
+            alt={room.name} 
+            className="room-icon-img"
+            loading="eager"
+            decoding="async"
+            onError={(e) => {
+              e.target.style.opacity = '0.5';
+              e.target.style.filter = 'blur(2px)';
+            }}
+          />
         </div>
         <h3 className="room-name">{room.name}</h3>
         <div className="room-time">
@@ -335,7 +357,17 @@ const CasinoLobby = () => {
         {/* Logo Central */}
         <div className="logo-container">
           <div className="logo-shine"></div>
-          <img src={logo} alt="Bingo 24 Kilates" className="logo-image" />
+          <img 
+            src={logo} 
+            alt="Bingo 24 Kilates" 
+            className="logo-image"
+            loading="eager"
+            decoding="async"
+            onError={(e) => {
+              e.target.alt = 'BINGO 24K';
+              e.target.style.display = 'none';
+            }}
+          />
           <div className="logo-tagline">El Bingo Virtual de Alta Gama</div>
         </div>
 
