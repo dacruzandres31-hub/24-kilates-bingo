@@ -68,7 +68,7 @@ const roomsData = [
   {
     id: 'bronze',
     name: 'Bronce',
-    path: '/sala/bronze',
+    path: '/sala/bronce',
     status: 'active',
     targetTime: getTargetTime(20),
     description: 'La sala clásica para empezar a ganar.',
@@ -85,7 +85,7 @@ const roomsData = [
   {
     id: 'silver',
     name: 'Plata',
-    path: '/sala/silver',
+    path: '/sala/plata',
     status: 'active',
     targetTime: getTargetTime(21),
     description: 'Apuestas más altas, premios más grandes.',
@@ -102,7 +102,7 @@ const roomsData = [
   {
     id: 'gold',
     name: 'Oro',
-    path: '/sala/gold',
+    path: '/sala/oro',
     status: 'active',
     targetTime: getTargetTime(22),
     description: 'La experiencia VIP con pozos millonarios.',

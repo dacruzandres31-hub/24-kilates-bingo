@@ -12,9 +12,9 @@ function App() {
       <Routes>
         <Route path="/" element={<CasinoLobby />} />
         <Route path="/sala/starter" element={<StarterRoom />} />
-        <Route path="/sala/bronze" element={<BronzeRoom />} />
-        <Route path="/sala/silver" element={<SilverRoom />} />
-        <Route path="/sala/gold" element={<GoldRoom />} />
+        <Route path="/sala/bronce" element={<BronzeRoom />} />
+        <Route path="/sala/plata" element={<SilverRoom />} />
+        <Route path="/sala/oro" element={<GoldRoom />} />
       </Routes>
     </Router>
   );
