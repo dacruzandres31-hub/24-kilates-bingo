@@ -28,12 +28,18 @@ export default function StarterRoom() {
 const [lineCelebrated, setLineCelebrated] = useState(false); // ¿Ya se festejó la línea?
 const [pauseTimeout, setPauseTimeout] = useState(null); // Controlar pausa automática
 const [highlightedLine, setHighlightedLine] = useState(null); // Línea a resaltar
-const [sidebarOpen, setSidebarOpen] = useState(false); // Estado del sidebar
-const [showCardSelection, setShowCardSelection] = useState(false); // Mostrar lobby de selección de cartones
-const [selectedPlayerCards, setSelectedPlayerCards] = useState([]); // Cartones seleccionados por el jugador
-const [cardsRemaining, setCardsRemaining] = useState(20); // Cartones que faltan por seleccionar
-
-// Efectos de festejo (fuera del componente o arriba)
+  const [sidebarOpen, setSidebarOpen] = useState(false); // Estado del sidebar
+  const [showCardSelection, setShowCardSelection] = useState(false); // Mostrar lobby de selección de cartones
+  const [selectedPlayerCards, setSelectedPlayerCards] = useState([]); // Cartones seleccionados por el jugador
+  const [cardsRemaining, setCardsRemaining] = useState(20); // Cartones que faltan por seleccionar
+  
+  // Estados para mejoras visuales
+  const [toasts, setToasts] = useState([]); // Notificaciones toast
+  const [showTransition, setShowTransition] = useState(false); // Cortinilla de transición
+  const [showConfetti, setShowConfetti] = useState(false); // Confeti digital
+  const [luckMeter, setLuckMeter] = useState(0); // Medidor de suerte (0-100)
+  const [comboCount, setComboCount] = useState(0); // Contador de combo
+  const [lastComboTime, setLastComboTime] = useState(Date.now()); // Último tiempo de combo// Efectos de festejo (fuera del componente o arriba)
 const celebrationAudio = new Audio('/audio/celebration.mp3');
 celebrationAudio.volume = 0.7;
 
@@ -86,11 +92,55 @@ celebrationAudio.volume = 0.7;
     return `${day}${month}${year}-${roomLetter}${cardNumber}`;
   };
 
+  // Agregar toast notification
+  const addToast = (icon, title, message, duration = 4000) => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, icon, title, message }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, duration);
+  };
+
+  // Calcular medidor de suerte
+  const calculateLuck = () => {
+    if (playerCards.length === 0) return 0;
+    let totalProgress = 0;
+    playerCards.forEach(card => {
+      const progress = getCardProgress(card);
+      totalProgress += (progress / 15) * 100;
+    });
+    return Math.round(totalProgress / playerCards.length);
+  };
+
+  // Actualizar combo count
+  const updateCombo = () => {
+    const now = Date.now();
+    const timeSinceLastBall = now - lastComboTime;
+    
+    // Si pasó menos de 5 segundos, incrementar combo
+    if (timeSinceLastBall < 5000) {
+      setComboCount(prev => prev + 1);
+      if (comboCount > 0 && comboCount % 5 === 0) {
+        addToast('🔥', 'COMBO!', `${comboCount} números consecutivos`);
+      }
+    } else {
+      setComboCount(1);
+    }
+    setLastComboTime(now);
+  };
+
+  // Generar confeti
+  const triggerConfetti = () => {
+    setShowConfetti(true);
+    setTimeout(() => setShowConfetti(false), 5000);
+  };
+
   // Simular bolillas flotantes en el bolillero
   useEffect(() => {
     const colors = ['#ff00ff', '#00ff00', '#00ffff', '#ffff00', '#ff0099'];
     const balls = Array.from({ length: 15 }, (_, i) => ({
       id: i,
+      number: Math.floor(Math.random() * 90) + 1,
       color: colors[Math.floor(Math.random() * colors.length)],
       delay: Math.random() * 3,
       duration: 3 + Math.random() * 2
@@ -324,7 +374,14 @@ celebrationAudio.volume = 0.7;
     voiceService.speak('Ganaste Línea');
     // Reproducir efectos de festejo
     celebrationAudio.currentTime = 0;
-celebrationAudio.play();
+    celebrationAudio.play();
+    
+    // Activar confeti
+    triggerConfetti();
+    
+    // Toast de celebración
+    addToast('🎉', '¡LÍNEA!', 'Has completado una línea', 8000);
+    
     // Pausar sorteo 20 segundos y cerrar modal automáticamente
     if (gameStatus === 'active') {
       setGameStatus('waiting');
@@ -352,8 +409,13 @@ useEffect(() => {
   useEffect(() => {
     if (gameStatus === 'active' && previousGameStatus === 'waiting') {
       voiceService.announceSorteoIniciado();
+      // Mostrar transición
+      setShowTransition(true);
+      setTimeout(() => setShowTransition(false), 1500);
+      addToast('🎲', '¡Sorteo iniciado!', 'Buena suerte');
     } else if (gameStatus === 'waiting' && previousGameStatus === 'active') {
       voiceService.announceSorteoPausado();
+      addToast('⏸️', 'Sorteo pausado', 'Esperando...');
     } else if (gameStatus === 'active' && previousGameStatus === 'paused') {
       voiceService.announceSorteoReiniciado();
     }
@@ -369,11 +431,104 @@ useEffect(() => {
       setTimeout(() => {
         voiceService.announceNumber(lastDrawnBall.number);
       }, 500);
+      
+      // Actualizar combo y suerte
+      updateCombo();
+      const luck = calculateLuck();
+      setLuckMeter(luck);
+      
+      // Detectar si el jugador acertó un número
+      const hasMatch = playerCards.some(card => 
+        card.numbers.flat().includes(lastDrawnBall.number)
+      );
+      
+      if (hasMatch) {
+        addToast('✨', '¡Acierto!', `Número ${lastDrawnBall.number}`);
+      }
     }
   }, [ballsDrawn.length, gameStatus]);
 
   return (
     <div className="starter-room">
+      {/* Sistema de toasts */}
+      <div className="toast-container">
+        {toasts.map(toast => (
+          <div key={toast.id} className="toast-notification">
+            <div className="toast-icon">{toast.icon}</div>
+            <div className="toast-content">
+              <div className="toast-title">{toast.title}</div>
+              <div className="toast-message">{toast.message}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Contador de bolas restantes */}
+      {gameStatus === 'active' && (
+        <div className="balls-counter">
+          <div className="counter-icon">🎱</div>
+          <div className="counter-value">{90 - ballsDrawn.length}</div>
+          <div className="counter-label">Bolas restantes</div>
+        </div>
+      )}
+
+      {/* Panel de gamificación */}
+      {playerCards.length > 0 && (
+        <div className="gamification-panel">
+          {/* Avatar del jugador */}
+          <div className="player-avatar-widget">
+            <div className="avatar-icon">👤</div>
+          </div>
+
+          {/* Medidor de suerte */}
+          <div className="luck-meter">
+            <div className="luck-title">SUERTE</div>
+            <div className="luck-bar">
+              <div className="luck-fill" style={{ '--luck-percent': `${luckMeter}%` }}></div>
+              <div className="luck-percentage">{luckMeter}%</div>
+            </div>
+          </div>
+
+          {/* Combo meter */}
+          {comboCount > 1 && (
+            <div className="combo-meter">
+              <div className="combo-title">COMBO</div>
+              <div className="combo-value">{comboCount}x</div>
+              <div className="combo-label">consecutivos</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Confeti digital */}
+      {showConfetti && (
+        <div className="confetti-container">
+          {Array.from({ length: 100 }, (_, i) => {
+            const colors = ['#FFD700', '#FFA500', '#FF1493', '#00FF00', '#00D4FF'];
+            return (
+              <div
+                key={i}
+                className="confetti-piece"
+                style={{
+                  '--color': colors[Math.floor(Math.random() * colors.length)],
+                  '--left': `${Math.random() * 100}%`,
+                  '--duration': `${2 + Math.random() * 3}s`,
+                  '--rotation': `${Math.random() * 360}deg`,
+                  animationDelay: `${Math.random() * 0.5}s`
+                }}
+              />
+            );
+          })}
+        </div>
+      )}
+
+      {/* Cortinilla de transición */}
+      {showTransition && (
+        <div className="transition-curtain">
+          <div className="curtain-text">¡COMIENZA!</div>
+        </div>
+      )}
+
       {/* Lobby de selección de cartones (overlay sobre la sala) */}
       {showCardSelection && (
         <CardSelectionLobby
@@ -671,7 +826,9 @@ useEffect(() => {
                       animationDelay: `${ball.delay}s`,
                       animationDuration: `${ball.duration}s`
                     }}
-                  />
+                  >
+                    {ball.number}
+                  </div>
                 ))}
               </div>
             )}
@@ -789,14 +946,16 @@ useEffect(() => {
               
               const progress = getCardProgress(card);
               const isExpanded = expandedCard === card.id;
+              const isAlmostLine = almostLineCards.some(c => c.cardId === card.id);
               
               return (
                 <div 
                   key={card.id} 
-                  className={`compact-card ${isExpanded ? 'expanded' : ''}`}
+                  className={`compact-card ${isExpanded ? 'expanded' : ''} ${isAlmostLine ? 'almost-line' : ''}`}
                   onClick={() => !isExpanded && expandCard(card.id)}
                   style={{
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    '--progress': Math.round((progress / 15) * 100)
                   }}
                 >
                   {!isExpanded && (
