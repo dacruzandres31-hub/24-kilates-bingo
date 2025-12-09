@@ -377,6 +377,37 @@
   transform: translateY(-2px);
 }
 
+/* Collapse/Expand Icon */
+.expand-icon {
+  font-size: 1rem;
+  transition: transform 0.3s ease;
+  color: rgba(255, 255, 255, 0.6);
+  margin-left: auto;
+}
+
+.expand-icon.expanded {
+  transform: rotate(180deg);
+}
+
+/* Collapsible Header */
+.sidebar-section-header.collapsible {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border-radius: 8px;
+  transition: background-color 0.2s ease;
+}
+
+.sidebar-section-header.collapsible:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.sidebar-section-header.collapsible:active {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
 /* Controles de Audio */
 .audio-controls-section {
   margin-top: auto;

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import '../styles/CasinoLobby.css';
 import '../styles/Countdown.css';
 import Countdown from './Countdown';
-import { FaClock, FaUsers, FaMoneyBillWave, FaTrophy, FaStar, FaGlassCheers, FaGift, FaHeadset, FaTicketAlt, FaEye, FaEyeSlash } from 'react-icons/fa';
+import { FaClock, FaUsers, FaMoneyBillWave, FaTrophy, FaStar, FaGlassCheers, FaGift, FaHeadset, FaTicketAlt, FaEye, FaEyeSlash, FaMusic, FaVolumeUp, FaVolumeMute } from 'react-icons/fa';
 import logo from '../assets/logo.png';
 import giftIcon from '../assets/Gift_icon.png';
 import bronzeIcon from '../assets/bronze_icon.png';
@@ -263,6 +263,25 @@ const CasinoLobby = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showBalance, setShowBalance] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  
+  // Estado de audio
+  const [audioStatus, setAudioStatus] = useState({
+    musicEnabled: audioService.enabled,
+    efectosEnabled: audioService.efectosEnabled,
+  });
+  const [ticketsExpanded, setTicketsExpanded] = useState(false);
+  const [audioExpanded, setAudioExpanded] = useState(false);
+
+  // Handlers de audio
+  const toggleMusic = () => {
+    const newStatus = audioService.toggleMusic();
+    setAudioStatus(prev => ({ ...prev, musicEnabled: newStatus }));
+  };
+
+  const toggleEfectos = () => {
+    const newStatus = audioService.toggleEfectos();
+    setAudioStatus(prev => ({ ...prev, efectosEnabled: newStatus }));
+  };
 
   // Actualizar reloj
   useEffect(() => {
@@ -355,30 +374,68 @@ const CasinoLobby = () => {
             </div>
           </div>
 
-          {/* Mis Cartones */}
+          {/* Mis Cartones - Colapsable */}
           <div className="sidebar-section tickets-section">
-            <div className="section-header">
+            <div 
+              className="section-header collapsible"
+              onClick={() => setTicketsExpanded(!ticketsExpanded)}
+            >
               <FaTicketAlt className="section-icon" />
               <h3>Mis Cartones</h3>
+              <span className={`expand-icon ${ticketsExpanded ? 'expanded' : ''}`}>▼</span>
             </div>
-            <div className="tickets-list">
-              <div className="ticket-item">
-                <span className="ticket-room-name">Starter</span>
-                <span className="ticket-count-badge">3</span>
+            {ticketsExpanded && (
+              <div className="tickets-list">
+                <div className="ticket-item">
+                  <span className="ticket-room-name">Starter</span>
+                  <span className="ticket-count-badge">3</span>
+                </div>
+                <div className="ticket-item">
+                  <span className="ticket-room-name">Bronce</span>
+                  <span className="ticket-count-badge">5</span>
+                </div>
+                <div className="ticket-item">
+                  <span className="ticket-room-name">Plata</span>
+                  <span className="ticket-count-badge">2</span>
+                </div>
+                <div className="ticket-item">
+                  <span className="ticket-room-name">Oro</span>
+                  <span className="ticket-count-badge">1</span>
+                </div>
               </div>
-              <div className="ticket-item">
-                <span className="ticket-room-name">Bronce</span>
-                <span className="ticket-count-badge">5</span>
-              </div>
-              <div className="ticket-item">
-                <span className="ticket-room-name">Plata</span>
-                <span className="ticket-count-badge">2</span>
-              </div>
-              <div className="ticket-item">
-                <span className="ticket-room-name">Oro</span>
-                <span className="ticket-count-badge">1</span>
-              </div>
+            )}
+          </div>
+
+          {/* Controles de Audio - Colapsable */}
+          <div className="sidebar-section audio-controls-section">
+            <div 
+              className="section-header collapsible"
+              onClick={() => setAudioExpanded(!audioExpanded)}
+            >
+              <h3>Audio</h3>
+              <span className={`expand-icon ${audioExpanded ? 'expanded' : ''}`}>▼</span>
             </div>
+            {audioExpanded && (
+              <div className="audio-controls">
+                <button 
+                  className={`audio-control-btn ${audioStatus.musicEnabled ? 'active' : ''}`}
+                  onClick={toggleMusic}
+                  title={audioStatus.musicEnabled ? 'Desactivar música' : 'Activar música'}
+                >
+                  {audioStatus.musicEnabled ? <FaMusic /> : <FaVolumeMute />}
+                  <span>{audioStatus.musicEnabled ? 'Música ON' : 'Música OFF'}</span>
+                </button>
+                
+                <button 
+                  className={`audio-control-btn ${audioStatus.efectosEnabled ? 'active' : ''}`}
+                  onClick={toggleEfectos}
+                  title={audioStatus.efectosEnabled ? 'Desactivar efectos' : 'Activar efectos'}
+                >
+                  {audioStatus.efectosEnabled ? <FaVolumeUp /> : <FaVolumeMute />}
+                  <span>{audioStatus.efectosEnabled ? 'Efectos ON' : 'Efectos OFF'}</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Botón Soporte */}

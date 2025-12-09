@@ -60,6 +60,13 @@ class AudioService {
   async playForRoom(roomType) {
     console.log(`🎵 playForRoom llamado: ${roomType}`);
     
+    // Si la música está desactivada, no reproducir
+    if (!this.enabled) {
+      console.log('🔇 Música desactivada, no se reproduce');
+      this.currentRoom = roomType; // Guardar sala para cuando se reactive
+      return;
+    }
+    
     // Si ya está sonando esta sala, no hacer nada
     if (this.currentRoom === roomType && this.currentAudio && !this.currentAudio.paused) {
       console.log(`✅ Ya está sonando ${roomType}`);
@@ -172,14 +179,20 @@ class AudioService {
     }
   }
 
-  toggleMusica() {
+  toggleMusic() {
     this.enabled = !this.enabled;
     if (!this.enabled && this.currentAudio) {
       this.currentAudio.pause();
+      console.log('🔇 Música desactivada');
+    } else if (this.enabled && this.currentAudio) {
+      this.currentAudio.play().catch(err => {
+        console.warn('⚠️ No se pudo reanudar música:', err.message);
+      });
+      console.log('🎵 Música activada');
     }
     return this.enabled;
   }
-
+  
   toggleEfectos() {
     this.efectosEnabled = !this.efectosEnabled;
     if (!this.efectosEnabled) {

@@ -9,6 +9,8 @@ const PlayerSidebar = ({ isOpen, onToggle }) => {
   const navigate = useNavigate();
   const [showBalance, setShowBalance] = useState(false);
   const [audioStatus, setAudioStatus] = useState({ musicEnabled: true, efectosEnabled: true });
+  const [ticketsExpanded, setTicketsExpanded] = useState(false); // Colapsable cartones
+  const [audioExpanded, setAudioExpanded] = useState(false); // Colapsable audio
   const [userData, setUserData] = useState({
     username: 'JugadorPro24',
     balance: 12500,
@@ -121,31 +123,37 @@ const PlayerSidebar = ({ isOpen, onToggle }) => {
           </div>
         </div>
 
-        {/* Mis Cartones */}
+        {/* Mis Cartones - Colapsable */}
         <div className="sidebar-section">
-          <div className="sidebar-section-header">
+          <div 
+            className="sidebar-section-header collapsible" 
+            onClick={() => setTicketsExpanded(!ticketsExpanded)}
+          >
             <FaTicketAlt className="section-icon" />
             <h4 className="section-title">Mis Cartones</h4>
+            <span className={`expand-icon ${ticketsExpanded ? 'expanded' : ''}`}>▼</span>
           </div>
           
-          <div className="tickets-list">
-            <div className="ticket-item starter">
-              <span className="ticket-room">Starter</span>
-              <span className="ticket-count">{userData.tickets.starter}</span>
+          {ticketsExpanded && (
+            <div className="tickets-list">
+              <div className="ticket-item starter">
+                <span className="ticket-room">Starter</span>
+                <span className="ticket-count">{userData.tickets.starter}</span>
+              </div>
+              <div className="ticket-item bronze">
+                <span className="ticket-room">Bronce</span>
+                <span className="ticket-count">{userData.tickets.bronze}</span>
+              </div>
+              <div className="ticket-item silver">
+                <span className="ticket-room">Plata</span>
+                <span className="ticket-count">{userData.tickets.silver}</span>
+              </div>
+              <div className="ticket-item gold">
+                <span className="ticket-room">Oro</span>
+                <span className="ticket-count">{userData.tickets.gold}</span>
+              </div>
             </div>
-            <div className="ticket-item bronze">
-              <span className="ticket-room">Bronce</span>
-              <span className="ticket-count">{userData.tickets.bronze}</span>
-            </div>
-            <div className="ticket-item silver">
-              <span className="ticket-room">Plata</span>
-              <span className="ticket-count">{userData.tickets.silver}</span>
-            </div>
-            <div className="ticket-item gold">
-              <span className="ticket-room">Oro</span>
-              <span className="ticket-count">{userData.tickets.gold}</span>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Botones de Acción */}
@@ -161,28 +169,37 @@ const PlayerSidebar = ({ isOpen, onToggle }) => {
           </button>
         </div>
         
-        {/* Controles de Audio */}
+        {/* Controles de Audio - Colapsable */}
         <div className="sidebar-section audio-controls-section">
-          <h4 className="section-title">Audio</h4>
-          <div className="audio-controls">
-            <button 
-              className={`audio-control-btn ${audioStatus.musicEnabled ? 'active' : ''}`}
-              onClick={toggleMusic}
-              title={audioStatus.musicEnabled ? 'Desactivar música' : 'Activar música'}
-            >
-              {audioStatus.musicEnabled ? <FaMusic /> : <FaVolumeMute />}
-              <span>{audioStatus.musicEnabled ? 'Música ON' : 'Música OFF'}</span>
-            </button>
-            
-            <button 
-              className={`audio-control-btn ${audioStatus.efectosEnabled ? 'active' : ''}`}
-              onClick={toggleEfectos}
-              title={audioStatus.efectosEnabled ? 'Desactivar efectos' : 'Activar efectos'}
-            >
-              {audioStatus.efectosEnabled ? <FaVolumeUp /> : <FaVolumeMute />}
-              <span>{audioStatus.efectosEnabled ? 'Efectos ON' : 'Efectos OFF'}</span>
-            </button>
+          <div 
+            className="sidebar-section-header collapsible"
+            onClick={() => setAudioExpanded(!audioExpanded)}
+          >
+            <h4 className="section-title">Audio</h4>
+            <span className={`expand-icon ${audioExpanded ? 'expanded' : ''}`}>▼</span>
           </div>
+          
+          {audioExpanded && (
+            <div className="audio-controls">
+              <button 
+                className={`audio-control-btn ${audioStatus.musicEnabled ? 'active' : ''}`}
+                onClick={toggleMusic}
+                title={audioStatus.musicEnabled ? 'Desactivar música' : 'Activar música'}
+              >
+                {audioStatus.musicEnabled ? <FaMusic /> : <FaVolumeMute />}
+                <span>{audioStatus.musicEnabled ? 'Música ON' : 'Música OFF'}</span>
+              </button>
+              
+              <button 
+                className={`audio-control-btn ${audioStatus.efectosEnabled ? 'active' : ''}`}
+                onClick={toggleEfectos}
+                title={audioStatus.efectosEnabled ? 'Desactivar efectos' : 'Activar efectos'}
+              >
+                {audioStatus.efectosEnabled ? <FaVolumeUp /> : <FaVolumeMute />}
+                <span>{audioStatus.efectosEnabled ? 'Efectos ON' : 'Efectos OFF'}</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Footer */}

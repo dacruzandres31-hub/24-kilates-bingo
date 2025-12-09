@@ -16,17 +16,53 @@ class StarterRoomController {
    */
   async getAvailableCards(req, res) {
     try {
-      const { sessionId } = req.params;
-      const userId = req.user.id;
+      let { sessionId } = req.params;
+      const userId = req.user ? req.user.id : null;
 
-      // 🚫 GENERACIÓN AUTOMÁTICA DE CARTONES DESACTIVADA
-      // La generación manual se hará cuando esté lista
+      // Si es 'starter_default', buscar la sesión más reciente
+      if (sessionId === 'starter_default') {
+        const [sessions] = await require('../db').query(`
+          SELECT id FROM game_sessions 
+          WHERE room = 'starter' 
+          ORDER BY created_at DESC 
+          LIMIT 1
+        `);
+        
+        if (sessions.length === 0) {
+          return res.json({
+            success: true,
+            cards: [],
+            playersOnline: 0,
+            timeRemaining: null,
+            timeWindow: 'open',
+            poolInitialized: false,
+            message: 'No hay sesión activa. Contacta al administrador.'
+          });
+        }
+        
+        sessionId = sessions[0].id;
+        console.log(`🔍 Usando sesión más reciente: ${sessionId}`);
+      }
+
+      // Verificar si el pool ya está en memoria
       let stats = cardPoolService.getPoolStats(sessionId);
-      // if (!stats) {
-      //   console.log(`🎫 Pool no existe para sesión ${sessionId}, inicializando automáticamente...`);
-      //   await cardPoolService.initializePool(sessionId, 100, 'starter');
-      //   stats = cardPoolService.getPoolStats(sessionId);
-      // }
+      
+      // Si no está en memoria, intentar cargar desde BD
+      if (!stats) {
+        console.log(`🔄 Pool no encontrado en memoria para sesión ${sessionId}, cargando desde BD...`);
+        try {
+          await cardPoolService.loadPoolFromDB(sessionId);
+          stats = cardPoolService.getPoolStats(sessionId);
+          
+          if (stats) {
+            console.log(`✅ Pool cargado exitosamente: ${stats.totalCards} cartones`);
+          } else {
+            console.log(`⚠️ No se encontraron cartones en BD para sesión ${sessionId}`);
+          }
+        } catch (loadError) {
+          console.error(`❌ Error cargando pool desde BD:`, loadError.message);
+        }
+      }
 
       // Verificar estado de ventana de tiempo
       const timeWindowStatus = cardPoolService.getTimeWindowStatus(sessionId);
@@ -40,16 +76,16 @@ class StarterRoomController {
       }
 
       // Obtener cartones (excluir los ya reservados por este usuario)
-      // Si no hay pool, retornar array vacío sin intentar generar
-      const cards = stats ? await cardPoolService.getAvailableCards(sessionId, userId, true) : [];
+      const cards = stats ? await cardPoolService.getAvailableCards(sessionId, userId || 'guest', true) : [];
 
       res.json({
         success: true,
-        cards, // Puede estar vacío si no hay pool inicializado
+        cards,
         playersOnline: stats ? stats.uniquePlayers : 0,
         timeRemaining: this.calculateTimeRemaining(sessionId),
         timeWindow: timeWindowStatus,
-        poolInitialized: !!stats // Indicar si hay pool disponible
+        poolInitialized: !!stats,
+        actualSessionId: sessionId
       });
     } catch (error) {
       console.error('❌ Error obteniendo cartones:', error);

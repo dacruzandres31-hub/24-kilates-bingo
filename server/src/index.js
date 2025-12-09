@@ -22,6 +22,8 @@ const adminRoutes = require('./routes/adminRoutes');
 const gameAdminRoutes = require('./routes/gameAdminRoutes');
 const starterRoomRoutes = require('./routes/starterRoom');
 const gameAdminController = require('./controllers/gameAdminController');
+const cardPoolService = require('./services/cardPoolService');
+const db = require('./db');
 
 // CONFIGURACIÓN INICIAL
 const PORT = process.env.PORT || 3000;
@@ -154,9 +156,48 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Endpoint no encontrado' });
 });
 
+// CARGAR POOLS EXISTENTES AL INICIAR
+async function loadExistingPools() {
+  try {
+    console.log('🎫 Cargando pools de cartones desde BD...');
+    
+    // Buscar sesiones recientes de Starter con cartones
+    const [sessions] = await db.query(`
+      SELECT DISTINCT cp.session_id, COUNT(*) as card_count
+      FROM card_pool cp
+      INNER JOIN game_sessions gs ON cp.session_id = gs.id
+      WHERE gs.room = 'starter'
+      AND gs.created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)
+      GROUP BY cp.session_id
+      HAVING card_count > 0
+      ORDER BY gs.created_at DESC
+      LIMIT 5
+    `);
+
+    if (sessions.length === 0) {
+      console.log('ℹ️  No hay pools para cargar');
+      return;
+    }
+
+    // Cargar cada pool en memoria
+    for (const session of sessions) {
+      await cardPoolService.loadPoolFromDB(session.session_id);
+      console.log(`✅ Pool cargado: Sesión ${session.session_id} (${session.card_count} cartones)`);
+    }
+
+    console.log(`✅ ${sessions.length} pool(s) cargados en memoria\n`);
+  } catch (error) {
+    console.error('❌ Error cargando pools:', error.message);
+    // No fallar el inicio del servidor por esto
+  }
+}
+
 // INICIAR SERVIDOR
 const startServer = async () => {
   try {
+    // Cargar pools de cartones existentes desde BD
+    await loadExistingPools();
+
     // Iniciar scheduler
     scheduler.start();
 

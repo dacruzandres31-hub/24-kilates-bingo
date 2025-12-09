@@ -302,16 +302,22 @@ class CardPoolService {
     `;
 
     try {
-      const rows = await db.query(query, [sessionId]);
+      const [rows] = await db.query(query, [sessionId]);
       
       const cards = new Map();
       const reservations = new Map();
 
       rows.forEach(row => {
+        // Validar que numbers no sea null/undefined
+        if (!row.numbers) {
+          console.warn(`⚠️ Cartón ${row.id} sin números, saltando...`);
+          return;
+        }
+
         const card = {
           id: row.id,
           serial: row.serial,
-          numbers: JSON.parse(row.numbers),
+          numbers: typeof row.numbers === 'string' ? JSON.parse(row.numbers) : row.numbers,
           sessionId: row.session_id,
           status: row.status
         };
