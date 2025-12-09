@@ -19,7 +19,8 @@
   background-repeat: no-repeat;
   color: #EAEAEA;
   font-family: 'Roboto', sans-serif;
-  padding: 55px 20px 20px 20px;
+  padding: 20px;
+  padding-top: 90px; /* Espacio para el botón toggle */
   overflow-x: hidden;
   position: relative;
 }
@@ -1295,3 +1296,326 @@
   font-family: 'Playfair Display', serif;
   text-transform: uppercase;
 }
+
+/* ============================================
+   SIDEBAR LATERAL - ESTILO LOBBY
+   ============================================ */
+
+/* Botón Toggle Sidebar (Hamburger) */
+.sidebar-toggle-btn {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 1001;
+  width: 50px;
+  height: 50px;
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.2), rgba(212, 175, 55, 0.1));
+  border: 2px solid rgba(212, 175, 55, 0.4);
+  border-radius: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+}
+
+.sidebar-toggle-btn:hover {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.3), rgba(212, 175, 55, 0.2));
+  border-color: rgba(212, 175, 55, 0.6);
+  transform: scale(1.05);
+  box-shadow: 0 8px 20px rgba(212, 175, 55, 0.3);
+}
+
+.hamburger-icon {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.hamburger-icon span {
+  width: 25px;
+  height: 3px;
+  background: #D4AF37;
+  border-radius: 2px;
+  transition: all 0.3s ease;
+}
+
+.sidebar-toggle-btn:hover .hamburger-icon span {
+  background: #FFD700;
+}
+
+/* Overlay oscuro */
+.sidebar-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 999;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Sidebar Principal */
+.lobby-sidebar {
+  position: fixed;
+  top: 0;
+  left: -350px;
+  width: 350px;
+  height: 100vh;
+  background: linear-gradient(
+    180deg,
+    rgba(13, 12, 15, 0.98) 0%,
+    rgba(20, 18, 25, 0.98) 100%
+  );
+  backdrop-filter: blur(20px);
+  border-right: 2px solid rgba(212, 175, 55, 0.3);
+  box-shadow: 5px 0 30px rgba(0, 0, 0, 0.8);
+  z-index: 1000;
+  transition: left 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(212, 175, 55, 0.5) transparent;
+}
+
+.lobby-sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.lobby-sidebar::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.lobby-sidebar::-webkit-scrollbar-thumb {
+  background: rgba(212, 175, 55, 0.5);
+  border-radius: 3px;
+}
+
+.lobby-sidebar.open {
+  left: 0;
+}
+
+/* Header Sidebar */
+.sidebar-header {
+  padding: 25px 20px;
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.15), rgba(0, 191, 255, 0.1));
+  border-bottom: 2px solid rgba(212, 175, 55, 0.3);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sidebar-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #D4AF37;
+  text-shadow: 0 2px 10px rgba(212, 175, 55, 0.5);
+  margin: 0;
+}
+
+.sidebar-close-btn {
+  background: none;
+  border: none;
+  color: #D4AF37;
+  font-size: 2rem;
+  cursor: pointer;
+  width: 35px;
+  height: 35px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.sidebar-close-btn:hover {
+  background: rgba(212, 175, 55, 0.2);
+  color: #FFD700;
+  transform: rotate(90deg);
+}
+
+/* Contenido Sidebar */
+.sidebar-content {
+  padding: 20px;
+}
+
+.sidebar-section {
+  margin-bottom: 25px;
+  padding: 20px;
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.05), rgba(0, 191, 255, 0.03));
+  border: 1px solid rgba(212, 175, 55, 0.2);
+  border-radius: 15px;
+  transition: all 0.3s ease;
+}
+
+.sidebar-section:hover {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.08), rgba(0, 191, 255, 0.05));
+  border-color: rgba(212, 175, 55, 0.4);
+  transform: translateX(5px);
+  box-shadow: -5px 0 15px rgba(212, 175, 55, 0.2);
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.2);
+}
+
+.section-icon {
+  font-size: 1.3rem;
+  color: #D4AF37;
+}
+
+.section-header h3 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #EAEAEA;
+  margin: 0;
+}
+
+/* Player Section */
+.player-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.player-name {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #FFD700;
+  text-shadow: 0 2px 8px rgba(255, 215, 0, 0.4);
+}
+
+/* Balance Section */
+.balance-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  cursor: pointer;
+  padding: 15px;
+  background: rgba(212, 175, 55, 0.05);
+  border-radius: 10px;
+  transition: all 0.3s ease;
+}
+
+.balance-info:hover {
+  background: rgba(212, 175, 55, 0.1);
+  transform: scale(1.02);
+}
+
+.balance-icon-sidebar {
+  width: 30px;
+  height: 30px;
+  filter: drop-shadow(0 2px 5px rgba(212, 175, 55, 0.5));
+}
+
+.balance-amount-sidebar {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #00F5D4;
+  text-shadow: 0 2px 10px rgba(0, 245, 212, 0.5);
+  flex: 1;
+}
+
+.balance-hidden-sidebar {
+  font-size: 1.5rem;
+  color: #888;
+  flex: 1;
+}
+
+.balance-toggle-sidebar {
+  background: rgba(212, 175, 55, 0.2);
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  color: #D4AF37;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.balance-toggle-sidebar:hover {
+  background: rgba(212, 175, 55, 0.3);
+  color: #FFD700;
+}
+
+/* Tickets Section */
+.tickets-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ticket-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 15px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(212, 175, 55, 0.2);
+  border-radius: 10px;
+  transition: all 0.3s ease;
+}
+
+.ticket-item:hover {
+  background: rgba(212, 175, 55, 0.1);
+  border-color: rgba(212, 175, 55, 0.4);
+  transform: translateX(5px);
+}
+
+.ticket-room-name {
+  font-weight: 600;
+  color: #EAEAEA;
+  font-size: 1rem;
+}
+
+.ticket-count-badge {
+  background: linear-gradient(135deg, #D4AF37, #FFD700);
+  color: #0D0C0F;
+  padding: 5px 15px;
+  border-radius: 20px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  box-shadow: 0 3px 10px rgba(212, 175, 55, 0.4);
+}
+
+/* Support Section */
+.support-button-sidebar {
+  width: 100%;
+  padding: 15px;
+  background: linear-gradient(135deg, rgba(0, 245, 212, 0.2), rgba(0, 191, 255, 0.2));
+  border: 2px solid rgba(0, 245, 212, 0.4);
+  border-radius: 12px;
+  color: #00F5D4;
+  font-weight: 700;
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  transition: all 0.3s ease;
+}
+
+.support-button-sidebar:hover {
+  background: linear-gradient(135deg, rgba(0, 245, 212, 0.3), rgba(0, 191, 255, 0.3));
+  border-color: rgba(0, 245, 212, 0.6);
+  transform: scale(1.05);
+  box-shadow: 0 8px 20px rgba(0, 245, 212, 0.3);
+}
+
+.support-button-sidebar .support-icon {
+  font-size: 1.3rem;
+}
+

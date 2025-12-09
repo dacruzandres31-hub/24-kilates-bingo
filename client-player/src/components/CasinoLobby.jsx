@@ -262,6 +262,7 @@ const WinnersTicker = () => {
 const CasinoLobby = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showBalance, setShowBalance] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Actualizar reloj
   useEffect(() => {
@@ -290,62 +291,103 @@ const CasinoLobby = () => {
 
   return (
     <div className="casino-lobby" style={{ '--lobby-bg-image': `url(${lobbyBackground})` }}>
-      {/* Barra de Información del Jugador */}
-      <div className="player-info-bar">
-        <div className="player-info-content">
-          <div className="player-info-item player-username">
-            <span className="info-label">Usuario:</span>
-            <span className="info-value">JugadorPro24</span>
+      {/* Botón Toggle Sidebar */}
+      <button 
+        className="sidebar-toggle-btn"
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        title="Abrir Menú"
+      >
+        <div className="hamburger-icon">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      </button>
+
+      {/* Overlay oscuro cuando sidebar está abierto */}
+      {sidebarOpen && (
+        <div 
+          className="sidebar-overlay"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar Lateral Izquierda */}
+      <div className={`lobby-sidebar ${sidebarOpen ? 'open' : ''}`}>
+        <div className="sidebar-header">
+          <h2 className="sidebar-title">Menú Principal</h2>
+          <button 
+            className="sidebar-close-btn"
+            onClick={() => setSidebarOpen(false)}
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="sidebar-content">
+          {/* Información del Jugador */}
+          <div className="sidebar-section player-section">
+            <div className="section-header">
+              <FaUsers className="section-icon" />
+              <h3>Usuario</h3>
+            </div>
+            <div className="player-info">
+              <span className="player-name">JugadorPro24</span>
+            </div>
           </div>
-          
-          <div className="player-info-item player-balance" onClick={() => setShowBalance(!showBalance)}>
-            <img src={bronzeIcon} alt="Saldo" className="balance-icon" />
-            <span className="info-label">Saldo:</span>
-            {showBalance ? (
-              <span className="info-value balance-amount">$12,500</span>
-            ) : (
-              <div className="balance-hidden">
-                <span className="hidden-dots">•••••</span>
+
+          {/* Saldo */}
+          <div className="sidebar-section balance-section">
+            <div className="section-header">
+              <FaMoneyBillWave className="section-icon" />
+              <h3>Saldo</h3>
+            </div>
+            <div className="balance-info" onClick={() => setShowBalance(!showBalance)}>
+              <img src={bronzeIcon} alt="Saldo" className="balance-icon-sidebar" />
+              {showBalance ? (
+                <span className="balance-amount-sidebar">$12,500</span>
+              ) : (
+                <span className="balance-hidden-sidebar">•••••</span>
+              )}
+              <button className="balance-toggle-sidebar">
+                {showBalance ? <FaEye /> : <FaEyeSlash />}
+              </button>
+            </div>
+          </div>
+
+          {/* Mis Cartones */}
+          <div className="sidebar-section tickets-section">
+            <div className="section-header">
+              <FaTicketAlt className="section-icon" />
+              <h3>Mis Cartones</h3>
+            </div>
+            <div className="tickets-list">
+              <div className="ticket-item">
+                <span className="ticket-room-name">Starter</span>
+                <span className="ticket-count-badge">3</span>
               </div>
-            )}
-            <button className="balance-toggle" onClick={(e) => { e.stopPropagation(); setShowBalance(!showBalance); }}>
-              {showBalance ? <FaEye /> : <FaEyeSlash />}
+              <div className="ticket-item">
+                <span className="ticket-room-name">Bronce</span>
+                <span className="ticket-count-badge">5</span>
+              </div>
+              <div className="ticket-item">
+                <span className="ticket-room-name">Plata</span>
+                <span className="ticket-count-badge">2</span>
+              </div>
+              <div className="ticket-item">
+                <span className="ticket-room-name">Oro</span>
+                <span className="ticket-count-badge">1</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Botón Soporte */}
+          <div className="sidebar-section support-section">
+            <button className="support-button-sidebar">
+              <FaHeadset className="support-icon" />
+              <span>Contactar Soporte</span>
             </button>
           </div>
-          
-          <div className="player-info-separator"></div>
-          
-          <div className="player-info-item player-tickets">
-            <FaTicketAlt className="info-icon" />
-            <span className="info-label">Mis Cartones:</span>
-          </div>
-          
-          <div className="player-info-item ticket-count">
-            <span className="ticket-label">Starter:</span>
-            <span className="ticket-value">3</span>
-          </div>
-          
-          <div className="player-info-item ticket-count">
-            <span className="ticket-label">Bronce:</span>
-            <span className="ticket-value">5</span>
-          </div>
-          
-          <div className="player-info-item ticket-count">
-            <span className="ticket-label">Plata:</span>
-            <span className="ticket-value">2</span>
-          </div>
-          
-          <div className="player-info-item ticket-count">
-            <span className="ticket-label">Oro:</span>
-            <span className="ticket-value">1</span>
-          </div>
-          
-          <div className="player-info-separator"></div>
-          
-          <button className="support-button" title="Contactar Soporte Técnico">
-            <FaHeadset className="support-icon" />
-            <span>Soporte</span>
-          </button>
         </div>
       </div>
 
