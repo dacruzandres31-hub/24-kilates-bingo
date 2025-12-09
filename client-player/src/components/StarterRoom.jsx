@@ -39,7 +39,18 @@ const [highlightedLine, setHighlightedLine] = useState(null); // Línea a resalt
   const [showConfetti, setShowConfetti] = useState(false); // Confeti digital
   const [luckMeter, setLuckMeter] = useState(0); // Medidor de suerte (0-100)
   const [comboCount, setComboCount] = useState(0); // Contador de combo
-  const [lastComboTime, setLastComboTime] = useState(Date.now()); // Último tiempo de combo// Efectos de festejo (fuera del componente o arriba)
+  const [lastComboTime, setLastComboTime] = useState(Date.now()); // Último tiempo de combo
+  
+  // Nuevos estados para mejoras visuales adicionales
+  const [cardsDealing, setCardsDealing] = useState(false); // Animación de entrada de cartones
+  const [markedNumbers, setMarkedNumbers] = useState([]); // Números marcados con efecto
+  const [floatingEmojis, setFloatingEmojis] = useState([]); // Emojis flotantes
+  const [celebrationMode, setCelebrationMode] = useState(false); // Modo celebración full
+  const [winAmount, setWinAmount] = useState(0); // Monto ganado para animación
+  const [stateTransition, setStateTransition] = useState(''); // Transición entre estados
+  const [columnCounts, setColumnCounts] = useState([0,0,0,0,0,0,0,0,0]); // Contador por columna
+  
+// Efectos de festejo (fuera del componente o arriba)
 const celebrationAudio = new Audio('/audio/celebration.mp3');
 celebrationAudio.volume = 0.7;
 
@@ -134,6 +145,60 @@ celebrationAudio.volume = 0.7;
     setShowConfetti(true);
     setTimeout(() => setShowConfetti(false), 5000);
   };
+  
+  // Agregar emoji flotante
+  const addFloatingEmoji = (emoji) => {
+    const id = Date.now() + Math.random();
+    const startX = Math.random() * window.innerWidth;
+    setFloatingEmojis(prev => [...prev, { id, emoji, x: startX }]);
+    setTimeout(() => {
+      setFloatingEmojis(prev => prev.filter(e => e.id !== id));
+    }, 3000);
+  };
+  
+  // Marcar número con efecto
+  const markNumberWithEffect = (number) => {
+    setMarkedNumbers(prev => [...prev, { number, timestamp: Date.now() }]);
+    audioService.playBolaCayendo(); // Sonido de match
+    setTimeout(() => {
+      setMarkedNumbers(prev => prev.filter(n => n.number !== number));
+    }, 1500);
+  };
+  
+  // Activar modo celebración al ganar
+  const activateCelebration = (amount) => {
+    setCelebrationMode(true);
+    setWinAmount(amount);
+    triggerConfetti();
+    celebrationAudio.play();
+    addFloatingEmoji('🎉');
+    addFloatingEmoji('🏆');
+    addFloatingEmoji('💰');
+    
+    setTimeout(() => {
+      setCelebrationMode(false);
+    }, 8000);
+  };
+  
+  // Transición de estado con efecto
+  const transitionToState = (newState) => {
+    setStateTransition('fade-out');
+    setTimeout(() => {
+      setGameStatus(newState);
+      setStateTransition('fade-in');
+      setTimeout(() => setStateTransition(''), 500);
+    }, 500);
+  };
+  
+  // Actualizar contadores por columna
+  const updateColumnCounts = () => {
+    const counts = [0,0,0,0,0,0,0,0,0];
+    ballsDrawn.forEach(ball => {
+      const columnIndex = Math.floor((ball.number - 1) / 10);
+      counts[columnIndex]++;
+    });
+    setColumnCounts(counts);
+  };
 
   // Simular bolillas flotantes en el bolillero
   useEffect(() => {
@@ -201,6 +266,34 @@ celebrationAudio.volume = 0.7;
       return () => clearInterval(drawTimer);
     }
   }, [gameStatus, ballsDrawn]);
+  
+  // Actualizar contadores de columna cuando cambian las bolas
+  useEffect(() => {
+    updateColumnCounts();
+  }, [ballsDrawn]);
+  
+  // Animación de entrada de cartones
+  useEffect(() => {
+    if (selectedPlayerCards.length > 0 && !cardsDealing) {
+      setCardsDealing(true);
+      setTimeout(() => setCardsDealing(false), selectedPlayerCards.length * 100 + 500);
+    }
+  }, [selectedPlayerCards.length]);
+  
+  // Detectar transiciones de estado
+  useEffect(() => {
+    if (previousGameStatus !== gameStatus) {
+      setPreviousGameStatus(gameStatus);
+      
+      if (gameStatus === 'active') {
+        addToast('🎮', 'JUEGO INICIADO', 'El sorteo ha comenzado');
+        audioService.startBolilleroGirando();
+      } else if (gameStatus === 'ended') {
+        addToast('🏁', 'JUEGO FINALIZADO', 'El sorteo ha terminado');
+        audioService.stopBolilleroGirando();
+      }
+    }
+  }, [gameStatus, previousGameStatus]);
 
   // Función para obtener color según el número (estilo arcoíris)
   const getBallColor = (number) => {
@@ -633,6 +726,7 @@ useEffect(() => {
               const start = columnIndex * 10 + 1;
               const end = (columnIndex + 1) * 10;
               const columnLabel = `${start}-${end}`;
+              const columnCount = columnCounts[columnIndex] || 0;
               
               return (
                 <div key={columnIndex} className="grid-column">
@@ -644,6 +738,9 @@ useEffect(() => {
                     }}
                   >
                     {columnLabel}
+                    {columnCount > 0 && (
+                      <div className="column-counter">{columnCount}</div>
+                    )}
                   </div>
                   <div className="column-numbers">
                     {Array.from({ length: 10 }, (_, i) => {
@@ -680,6 +777,7 @@ useEffect(() => {
               const start = columnIndex * 10 + 1;
               const end = (columnIndex + 1) * 10;
               const columnLabel = `${start}-${end}`;
+              const columnCount = columnCounts[columnIndex] || 0;
               
               return (
                 <div key={columnIndex} className="grid-column">
@@ -691,6 +789,9 @@ useEffect(() => {
                     }}
                   >
                     {columnLabel}
+                    {columnCount > 0 && (
+                      <div className="column-counter">{columnCount}</div>
+                    )}
                   </div>
                   <div className="column-numbers">
                     {Array.from({ length: 10 }, (_, i) => {
@@ -727,6 +828,7 @@ useEffect(() => {
               const start = columnIndex * 10 + 1;
               const end = columnIndex === 8 ? 90 : (columnIndex + 1) * 10;
               const columnLabel = `${start}-${end}`;
+              const columnCount = columnCounts[columnIndex] || 0;
               
               return (
                 <div key={columnIndex} className="grid-column">
@@ -738,6 +840,9 @@ useEffect(() => {
                     }}
                   >
                     {columnLabel}
+                    {columnCount > 0 && (
+                      <div className="column-counter">{columnCount}</div>
+                    )}
                   </div>
                   <div className="column-numbers">
                     {Array.from({ length: end - start + 1 }, (_, i) => {
@@ -1115,7 +1220,83 @@ useEffect(() => {
         >
           {gameStatus === 'active' ? '⏸️ Pausar' : '▶️ Iniciar'}
         </button>
+        <button 
+          className="control-btn"
+          onClick={() => activateCelebration(50000)}
+          title="Probar modo celebración"
+          style={{ background: 'linear-gradient(135deg, #ffd700, #ffaa00)' }}
+        >
+          🏆 Ganar
+        </button>
       </div>
+      
+      {/* Sistema de Reacciones */}
+      <div className="reactions-panel">
+        <div className="reactions-title">Reacciones</div>
+        <div className="reactions-buttons">
+          <button className="reaction-btn" onClick={() => addFloatingEmoji('👍')} title="Me gusta">👍</button>
+          <button className="reaction-btn" onClick={() => addFloatingEmoji('😮')} title="Sorprendido">😮</button>
+          <button className="reaction-btn" onClick={() => addFloatingEmoji('🎉')} title="Celebrar">🎉</button>
+          <button className="reaction-btn" onClick={() => addFloatingEmoji('😢')} title="Triste">😢</button>
+          <button className="reaction-btn" onClick={() => addFloatingEmoji('🔥')} title="Fuego">🔥</button>
+          <button className="reaction-btn" onClick={() => addFloatingEmoji('💎')} title="Diamante">💎</button>
+        </div>
+      </div>
+      
+      {/* Emojis Flotantes */}
+      {floatingEmojis.map(emoji => (
+        <div 
+          key={emoji.id} 
+          className="floating-emoji"
+          style={{ left: `${emoji.x}px` }}
+        >
+          {emoji.emoji}
+        </div>
+      ))}
+      
+      {/* Modo Celebración Full Screen */}
+      {celebrationMode && (
+        <div className="celebration-overlay">
+          <div className="celebration-content">
+            <div className="celebration-trophy">🏆</div>
+            <div className="celebration-text">¡FELICITACIONES!</div>
+            <div className="celebration-subtitle">Has ganado</div>
+            <div className="celebration-amount">${winAmount.toLocaleString()}</div>
+            <div className="celebration-stars">
+              {'⭐'.repeat(5)}
+            </div>
+          </div>
+          <div className="celebration-confetti">
+            {Array.from({ length: 100 }).map((_, i) => (
+              <div 
+                key={i} 
+                className="celebration-confetti-piece"
+                style={{
+                  left: `${Math.random() * 100}%`,
+                  animationDelay: `${Math.random() * 3}s`,
+                  backgroundColor: getBallColor(Math.floor(Math.random() * 90) + 1)
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {/* Números Marcados con Efecto */}
+      {markedNumbers.map(mark => (
+        <div 
+          key={`mark-${mark.number}-${mark.timestamp}`} 
+          className="marked-number-effect"
+        >
+          <div className="marked-stamp">✓</div>
+          <div className="marked-number">{mark.number}</div>
+          <div className="marked-particles">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="marked-particle" />
+            ))}
+          </div>
+        </div>
+      ))}
         </>
       )}
     </div>
