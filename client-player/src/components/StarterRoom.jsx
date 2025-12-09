@@ -698,8 +698,24 @@ useEffect(() => {
               </div>
             )}
 
-            {/* Estado de espera */}
-            {gameStatus === 'waiting' && (
+            {/* Estado de espera - Botón de Selección de Cartones */}
+            {gameStatus === 'waiting' && cardsRemaining > 0 && (
+              <div className="card-selection-sphere">
+                <button 
+                  className="select-cards-sphere-btn"
+                  onClick={() => setShowCardSelection(true)}
+                  title={`Seleccionar cartones (${cardsRemaining} restantes)`}
+                >
+                  <div className="sphere-btn-icon">🎫</div>
+                  <div className="sphere-btn-text">Seleccionar</div>
+                  <div className="sphere-btn-text-large">Cartones</div>
+                  <div className="sphere-btn-count">{cardsRemaining} disponibles</div>
+                </button>
+              </div>
+            )}
+
+            {/* Mensaje de espera cuando no hay cartones disponibles */}
+            {gameStatus === 'waiting' && cardsRemaining === 0 && (
               <div className="waiting-message">
                 <div className="waiting-icon">⏳</div>
                 <div className="waiting-text">Esperando inicio...</div>
@@ -882,7 +898,7 @@ useEffect(() => {
 
       {/* Botón de control (solo para testing) */}
       <div className="test-controls">
-        {cardsRemaining > 0 && (
+        {cardsRemaining > 0 && gameStatus !== 'waiting' && (
           <button 
             className="control-btn cards-btn"
             onClick={() => setShowCardSelection(true)}
