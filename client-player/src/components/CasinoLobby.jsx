@@ -12,17 +12,34 @@ import goldIcon from '../assets/gold_icon.png';
 import lobbyBackground from '../assets/lobby-background.jpg';
 import audioService from '../services/audioService';
 
-// Precargar todas las imágenes al inicio
+// Precargar todas las imágenes al inicio y mantenerlas en cache
+const imageCache = {};
 const preloadImages = () => {
-  const images = [logo, giftIcon, bronzeIcon, silverIcon, goldIcon, lobbyBackground];
-  images.forEach(src => {
-    const img = new Image();
-    img.src = src;
+  const images = [
+    { key: 'logo', src: logo },
+    { key: 'gift', src: giftIcon },
+    { key: 'bronze', src: bronzeIcon },
+    { key: 'silver', src: silverIcon },
+    { key: 'gold', src: goldIcon },
+    { key: 'background', src: lobbyBackground }
+  ];
+  
+  images.forEach(({ key, src }) => {
+    if (!imageCache[key]) {
+      const img = new Image();
+      img.src = src;
+      img.onload = () => {
+        imageCache[key] = img;
+        console.log(`✅ Imagen precargada: ${key}`);
+      };
+    }
   });
 };
 
 // Ejecutar precarga inmediatamente
-preloadImages();
+if (typeof window !== 'undefined') {
+  preloadImages();
+}
 
 const getTargetTime = (hour) => {
   const target = new Date();
@@ -160,10 +177,8 @@ const RoomCard = ({ room }) => {
             className="room-icon-img"
             loading="eager"
             decoding="async"
-            onError={(e) => {
-              e.target.style.opacity = '0.5';
-              e.target.style.filter = 'blur(2px)';
-            }}
+            fetchpriority="high"
+            style={{ imageRendering: 'crisp-edges' }}
           />
         </div>
         <h3 className="room-name">{room.name}</h3>
@@ -363,10 +378,8 @@ const CasinoLobby = () => {
             className="logo-image"
             loading="eager"
             decoding="async"
-            onError={(e) => {
-              e.target.alt = 'BINGO 24K';
-              e.target.style.display = 'none';
-            }}
+            fetchpriority="high"
+            style={{ imageRendering: 'crisp-edges' }}
           />
           <div className="logo-tagline">El Bingo Virtual de Alta Gama</div>
         </div>
