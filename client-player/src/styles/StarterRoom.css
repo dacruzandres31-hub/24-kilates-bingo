@@ -1441,7 +1441,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 20px;
+  gap: 15px;
+  padding: 20px;
   animation: sphere-pulse 2s ease-in-out infinite;
 }
 
@@ -1463,27 +1464,32 @@
   padding: 0;
   transition: all 0.3s ease;
   filter: drop-shadow(0 0 30px rgba(0, 212, 255, 0.6));
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .select-cards-sphere-btn:hover {
-  transform: scale(1.1);
+  transform: scale(1.08);
   filter: drop-shadow(0 0 50px rgba(255, 0, 255, 0.8));
 }
 
 .select-cards-sphere-btn:active {
-  transform: scale(1.05);
+  transform: scale(1.03);
 }
 
 .sphere-btn-image {
-  width: 280px;
+  width: 220px;
   height: auto;
+  max-width: 100%;
   display: block;
   animation: btn-float 3s ease-in-out infinite;
 }
 
 @keyframes btn-float {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-15px); }
+  50% { transform: translateY(-10px); }
 }
 
 /* Contador de Cartones Disponibles */
@@ -1491,12 +1497,12 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  margin-top: 10px;
+  gap: 6px;
+  margin-top: 5px;
 }
 
 .counter-line {
-  width: 120px;
+  width: 100px;
   height: 2px;
   background: linear-gradient(90deg, 
     transparent 0%, 
@@ -1525,7 +1531,7 @@
 }
 
 .counter-number {
-  font-size: 3rem;
+  font-size: 2.5rem;
   font-weight: 900;
   color: #00d4ff;
   text-shadow: 
@@ -1535,6 +1541,7 @@
   animation: number-pulse 1.5s ease-in-out infinite;
   font-family: 'Arial Black', sans-serif;
   letter-spacing: 2px;
+  line-height: 1;
 }
 
 @keyframes number-pulse {
@@ -1543,19 +1550,19 @@
     filter: brightness(1);
   }
   50% { 
-    transform: scale(1.1);
+    transform: scale(1.08);
     filter: brightness(1.3);
   }
 }
 
 .counter-label {
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   font-weight: 600;
   color: #ff00ff;
   text-shadow: 0 0 10px rgba(255, 0, 255, 0.8);
   text-transform: uppercase;
-  letter-spacing: 2px;
-  margin-top: 5px;
+  letter-spacing: 1.5px;
+  margin-top: 3px;
 }
 
 /* Base de la Máquina */
