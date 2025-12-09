@@ -432,10 +432,10 @@ useEffect(() => {
 
   // Anunciar número cantado
   useEffect(() => {
-    if (ballsDrawn.length > 0 && gameStatus === 'active') {
+    if (ballsDrawn.length > 0) {
       const lastDrawnBall = ballsDrawn[ballsDrawn.length - 1];
       
-      // Reproducir sonido de bola cayendo
+      // Reproducir sonido de bola cayendo inmediatamente
       audioService.playBolaCayendo();
       
       // Anunciar el número con voz
@@ -457,7 +457,7 @@ useEffect(() => {
         addToast('✨', '¡Acierto!', `Número ${lastDrawnBall.number}`);
       }
     }
-  }, [ballsDrawn.length, gameStatus]);
+  }, [ballsDrawn.length]);
 
   return (
     <div className="starter-room">

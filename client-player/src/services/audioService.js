@@ -152,11 +152,21 @@ class AudioService {
     if (!this.efectosEnabled || !this.bolaAudio) return;
     
     try {
-      this.bolaAudio.currentTime = 0;
-      this.bolaAudio.play().catch(err => {
-        console.warn('⚠️ No se pudo reproducir bola cayendo:', err.message);
-      });
-      console.log('🎱 Bola cayendo reproducida');
+      // Si el audio ya está reproduciéndose, clonarlo para permitir solapamiento
+      if (!this.bolaAudio.paused) {
+        const clonedAudio = this.bolaAudio.cloneNode();
+        clonedAudio.volume = this.bolaAudio.volume;
+        clonedAudio.play().catch(err => {
+          console.warn('⚠️ No se pudo reproducir bola cayendo (clonada):', err.message);
+        });
+        console.log('🎱 Bola cayendo reproducida (clonada)');
+      } else {
+        this.bolaAudio.currentTime = 0;
+        this.bolaAudio.play().catch(err => {
+          console.warn('⚠️ No se pudo reproducir bola cayendo:', err.message);
+        });
+        console.log('🎱 Bola cayendo reproducida');
+      }
     } catch (error) {
       console.error('❌ Error reproduciendo bola cayendo:', error.message);
     }
