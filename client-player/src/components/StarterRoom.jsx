@@ -99,10 +99,14 @@ celebrationAudio.volume = 0.7;
 
     // Inicializar audio y música
     const initAudio = async () => {
-      await audioService.initialize('starter'); // Especificar sala STARTER
-      await audioService.startBackgroundMusic();
-      setAudioInitialized(true);
-      console.log('🎵 Sistema de audio inicializado para Sala Starter');
+      try {
+        await audioService.initialize('starter'); // Especificar sala STARTER
+        await audioService.startBackgroundMusic();
+        setAudioInitialized(true);
+        console.log('🎵 Sistema de audio inicializado para Sala Starter');
+      } catch (error) {
+        console.error('❌ Error inicializando audio en StarterRoom:', error);
+      }
     };
     
     // Iniciar audio con interacción del usuario (click en cualquier parte)
@@ -122,10 +126,12 @@ celebrationAudio.volume = 0.7;
       setCurrentVoice(voiceService.getCurrentVoice());
     }, 500);
     
-    // Cleanup
+    // Cleanup - NO detener audio para permitir transición suave al lobby
     return () => {
       document.removeEventListener('click', handleFirstInteraction);
-      audioService.stopAll();
+      // NO llamar audioService.stopAll() aquí - dejar que el lobby maneje la transición
+      audioService.stopBolilleroGirando(); // Solo detener efectos de sonido
+      console.log('🔄 Saliendo de StarterRoom, manteniendo sistema de audio activo');
     };
   }, []);
 

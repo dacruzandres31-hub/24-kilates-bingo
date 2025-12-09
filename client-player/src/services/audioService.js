@@ -32,10 +32,15 @@ class AudioService {
       return;
     }
 
-    // Si cambia de sala, detener música actual
-    if (this.initialized && this.currentRoom !== roomType) {
+    // Si cambia de sala, detener música actual ANTES de crear nuevo objeto Audio
+    if (this.initialized && this.currentRoom !== roomType && this.backgroundMusic) {
       console.log(`🔄 Cambiando audio de ${this.currentRoom} a ${roomType}`);
-      this.stopBackgroundMusic();
+      
+      // Detener y limpiar completamente el audio anterior
+      this.backgroundMusic.pause();
+      this.backgroundMusic.currentTime = 0;
+      this.backgroundMusic.src = ''; // Limpiar source
+      this.backgroundMusic = null; // Liberar referencia
     }
 
     try {
@@ -63,6 +68,7 @@ class AudioService {
       
       this.backgroundMusic.addEventListener('error', (e) => {
         console.error('❌ Error cargando audio:', e.target.error);
+        console.error('   Ruta intentada:', musicPath);
       });
 
       // Sonido bolillero girando - COMPARTIDO entre todas las salas
@@ -123,12 +129,24 @@ class AudioService {
   }
 
   /**
-   * Detiene la música de fondo
+   * Detiene la música de fondo (con fade out suave)
    */
   stopBackgroundMusic() {
     if (this.backgroundMusic) {
-      this.backgroundMusic.pause();
-      this.backgroundMusic.currentTime = 0;
+      console.log('🔇 Deteniendo música de fondo:', this.currentRoom);
+      
+      // Fade out suave
+      const fadeOut = setInterval(() => {
+        if (this.backgroundMusic.volume > 0.05) {
+          this.backgroundMusic.volume -= 0.05;
+        } else {
+          clearInterval(fadeOut);
+          this.backgroundMusic.pause();
+          this.backgroundMusic.currentTime = 0;
+          this.backgroundMusic.volume = this.backgroundMusicVolume; // Restaurar volumen original
+          console.log('✅ Música detenida');
+        }
+      }, 50); // 50ms entre cada paso del fade
     }
   }
 

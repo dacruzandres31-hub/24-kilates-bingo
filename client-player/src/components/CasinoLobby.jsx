@@ -252,31 +252,37 @@ const CasinoLobby = () => {
   useEffect(() => {
     const initLobbyAudio = async () => {
       try {
+        console.log('🎵 Inicializando audio del lobby...');
         await audioService.initialize('lobby');
         await audioService.startBackgroundMusic();
         setAudioInitialized(true);
         setShowAudioPrompt(false);
-        console.log('🎵 Audio del lobby inicializado automáticamente');
+        console.log('✅ Audio del lobby inicializado automáticamente');
       } catch (error) {
         console.warn('⚠️ No se pudo iniciar audio automáticamente:', error.message);
         // Mantener showAudioPrompt=true para que el usuario lo active manualmente
       }
     };
     
-    // Intentar iniciar con primer click
-    const handleFirstClick = () => {
-      if (!audioInitialized) {
-        initLobbyAudio();
-      }
-      document.removeEventListener('click', handleFirstClick);
-    };
-    
-    document.addEventListener('click', handleFirstClick);
-    
-    return () => {
-      document.removeEventListener('click', handleFirstClick);
-      // No detener el audio aquí para permitir transición suave a salas
-    };
+    // Si volvemos de una sala, el audio ya puede estar inicializado
+    if (audioService.initialized) {
+      console.log('🔄 Audio ya inicializado, cambiando a música del lobby');
+      initLobbyAudio();
+    } else {
+      // Primera vez - intentar iniciar con primer click
+      const handleFirstClick = () => {
+        if (!audioInitialized) {
+          initLobbyAudio();
+        }
+        document.removeEventListener('click', handleFirstClick);
+      };
+      
+      document.addEventListener('click', handleFirstClick);
+      
+      return () => {
+        document.removeEventListener('click', handleFirstClick);
+      };
+    }
   }, [audioInitialized]);
 
   return (
