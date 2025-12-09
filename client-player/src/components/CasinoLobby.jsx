@@ -234,34 +234,19 @@ const CasinoLobby = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Función para activar audio manualmente
-  const handleActivateAudio = async () => {
-    try {
-      await audioService.initialize('lobby');
-      await audioService.startBackgroundMusic();
-      setAudioInitialized(true);
-      setShowAudioPrompt(false);
-    } catch (error) {
-      console.error('❌ Error activando audio:', error);
-    }
+  // Activar audio manualmente
+  const handleActivateAudio = () => {
+    audioService.playForRoom('lobby');
+    setAudioInitialized(true);
+    setShowAudioPrompt(false);
   };
 
-  // Inicializar audio del lobby
+  // Inicializar audio al entrar al lobby
   useEffect(() => {
-    const initAudio = async () => {
-      try {
-        await audioService.initialize('lobby');
-        await audioService.startBackgroundMusic();
-        setAudioInitialized(true);
-        setShowAudioPrompt(false);
-      } catch (error) {
-        console.warn('⚠️ Audio requiere interacción del usuario');
-      }
-    };
-
-    // Intentar iniciar con primer click
     const handleClick = () => {
-      if (!audioInitialized) initAudio();
+      audioService.playForRoom('lobby');
+      setAudioInitialized(true);
+      setShowAudioPrompt(false);
       document.removeEventListener('click', handleClick);
     };
 
@@ -270,7 +255,7 @@ const CasinoLobby = () => {
     return () => {
       document.removeEventListener('click', handleClick);
     };
-  }, [audioInitialized]);
+  }, []);
 
   return (
     <div className="casino-lobby" style={{ '--lobby-bg-image': `url(${lobbyBackground})` }}>

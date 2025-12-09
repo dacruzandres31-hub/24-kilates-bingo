@@ -97,27 +97,14 @@ celebrationAudio.volume = 0.7;
     }));
     setFloatingBalls(balls);
 
-    // Inicializar audio y música
-    const initAudio = async () => {
-      try {
-        await audioService.initialize('starter'); // Especificar sala STARTER
-        await audioService.startBackgroundMusic();
-        setAudioInitialized(true);
-        console.log('🎵 Sistema de audio inicializado para Sala Starter');
-      } catch (error) {
-        console.error('❌ Error inicializando audio en StarterRoom:', error);
-      }
+    // Inicializar audio para Starter
+    const handleClick = () => {
+      audioService.playForRoom('starter');
+      setAudioInitialized(true);
+      document.removeEventListener('click', handleClick);
     };
     
-    // Iniciar audio con interacción del usuario (click en cualquier parte)
-    const handleFirstInteraction = () => {
-      if (!audioInitialized) {
-        initAudio();
-      }
-      document.removeEventListener('click', handleFirstInteraction);
-    };
-    
-    document.addEventListener('click', handleFirstInteraction);
+    document.addEventListener('click', handleClick);
 
     // Cargar voces disponibles
     setTimeout(() => {
@@ -126,12 +113,10 @@ celebrationAudio.volume = 0.7;
       setCurrentVoice(voiceService.getCurrentVoice());
     }, 500);
     
-    // Cleanup - NO detener audio para permitir transición suave al lobby
+    // Cleanup - detener efectos al salir
     return () => {
-      document.removeEventListener('click', handleFirstInteraction);
-      // NO llamar audioService.stopAll() aquí - dejar que el lobby maneje la transición
-      audioService.stopBolilleroGirando(); // Solo detener efectos de sonido
-      console.log('🔄 Saliendo de StarterRoom, manteniendo sistema de audio activo');
+      document.removeEventListener('click', handleClick);
+      audioService.stopBolilleroGirando();
     };
   }, []);
 
