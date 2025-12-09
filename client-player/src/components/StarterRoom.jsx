@@ -1080,15 +1080,6 @@ useEffect(() => {
 
       {/* Botón de control (solo para testing) */}
       <div className="test-controls">
-        {cardsRemaining > 0 && gameStatus !== 'waiting' && (
-          <button 
-            className="control-btn cards-btn"
-            onClick={() => setShowCardSelection(true)}
-            title={`Seleccionar cartones (${cardsRemaining} restantes)`}
-          >
-            🎫 Elegir Cartones ({cardsRemaining})
-          </button>
-        )}
         <button 
           className="control-btn voice-btn"
           onClick={() => setShowVoiceSelector(true)}
