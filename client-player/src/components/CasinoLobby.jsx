@@ -226,6 +226,7 @@ const CasinoLobby = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showBalance, setShowBalance] = useState(false);
   const [audioInitialized, setAudioInitialized] = useState(false);
+  const [showAudioPrompt, setShowAudioPrompt] = useState(true); // Mostrar prompt de audio
 
   // Actualizar reloj
   useEffect(() => {
@@ -233,16 +234,36 @@ const CasinoLobby = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Inicializar audio del lobby al montar
-  useEffect(() => {
-    const initLobbyAudio = async () => {
+  // Función para activar audio manualmente
+  const handleActivateAudio = async () => {
+    try {
+      console.log('🎵 Activando audio del lobby...');
       await audioService.initialize('lobby');
       await audioService.startBackgroundMusic();
       setAudioInitialized(true);
-      console.log('🎵 Audio del lobby inicializado');
+      setShowAudioPrompt(false);
+      console.log('✅ Audio del lobby activado');
+    } catch (error) {
+      console.error('❌ Error activando audio:', error);
+    }
+  };
+
+  // Inicializar audio del lobby al montar
+  useEffect(() => {
+    const initLobbyAudio = async () => {
+      try {
+        await audioService.initialize('lobby');
+        await audioService.startBackgroundMusic();
+        setAudioInitialized(true);
+        setShowAudioPrompt(false);
+        console.log('🎵 Audio del lobby inicializado automáticamente');
+      } catch (error) {
+        console.warn('⚠️ No se pudo iniciar audio automáticamente:', error.message);
+        // Mantener showAudioPrompt=true para que el usuario lo active manualmente
+      }
     };
     
-    // Iniciar audio con interacción del usuario
+    // Intentar iniciar con primer click
     const handleFirstClick = () => {
       if (!audioInitialized) {
         initLobbyAudio();
@@ -260,6 +281,33 @@ const CasinoLobby = () => {
 
   return (
     <div className="casino-lobby" style={{ '--lobby-bg-image': `url(${lobbyBackground})` }}>
+      {/* Prompt de Audio Flotante */}
+      {showAudioPrompt && !audioInitialized && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: '20px',
+            right: '20px',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            color: 'white',
+            padding: '15px 25px',
+            borderRadius: '12px',
+            boxShadow: '0 8px 20px rgba(0,0,0,0.3)',
+            cursor: 'pointer',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            animation: 'pulse 2s infinite',
+            fontWeight: 'bold'
+          }}
+          onClick={handleActivateAudio}
+        >
+          <span style={{ fontSize: '24px' }}>🔊</span>
+          <span>Haz click para activar el audio</span>
+        </div>
+      )}
+      
       {/* Barra de Información del Jugador */}
       <div className="player-info-bar">
         <div className="player-info-content">

@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vista Simple Cartones - Bingo 24K</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: white;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            color: #ffd700;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+        
+        .status {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .card {
+            background: rgba(255,255,255,0.05);
+            border: 2px solid #ffd700;
+            border-radius: 15px;
+            padding: 15px;
+            transition: transform 0.3s;
+        }
+        
+        .card:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(255,215,0,0.5);
+        }
+        
+        .card-header {
+            text-align: center;
+            margin-bottom: 10px;
+            font-weight: bold;
+            color: #ffd700;
+        }
+        
+        .bingo-grid {
+            display: grid;
+            grid-template-columns: repeat(9, 1fr);
+            gap: 2px;
+            background: #222;
+            padding: 5px;
+            border-radius: 8px;
+        }
+        
+        .bingo-cell {
+            background: rgba(255,255,255,0.1);
+            padding: 8px;
+            text-align: center;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 4px;
+        }
+        
+        .bingo-cell.empty {
+            background: rgba(0,0,0,0.3);
+        }
+        
+        .loading {
+            text-align: center;
+            font-size: 1.5rem;
+            padding: 50px;
+        }
+        
+        .error {
+            background: rgba(255,0,0,0.2);
+            border: 2px solid #ff4444;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            max-width: 600px;
+            margin: 50px auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎰 BINGO 24K - Vista de Cartones</h1>
+        <p>Visualización directa desde la base de datos</p>
+    </div>
+    
+    <div class="status" id="status">
+        <p>⏳ Cargando cartones...</p>
+    </div>
+    
+    <div class="cards-grid" id="cardsGrid"></div>
+
+    <script>
+        async function loadCards() {
+            const statusDiv = document.getElementById('status');
+            const cardsGrid = document.getElementById('cardsGrid');
+            
+            try {
+                // Hacer petición directa al backend
+                const response = await fetch('http://localhost:3001/api/game/starter/available-cards/starter_default');
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                const cards = data.cards || [];
+                
+                statusDiv.innerHTML = `
+                    <p>✅ ${cards.length} cartones cargados exitosamente</p>
+                    <p>Sesión: starter_default</p>
+                `;
+                
+                if (cards.length === 0) {
+                    cardsGrid.innerHTML = '<div class="error">⚠️ No hay cartones disponibles</div>';
+                    return;
+                }
+                
+                // Mostrar solo los primeros 20 cartones
+                cards.slice(0, 20).forEach((card, index) => {
+                    const cardDiv = document.createElement('div');
+                    cardDiv.className = 'card';
+                    
+                    const numbers = typeof card.numbers === 'string' 
+                        ? JSON.parse(card.numbers) 
+                        : card.numbers;
+                    
+                    let gridHTML = '<div class="bingo-grid">';
+                    numbers.forEach(row => {
+                        row.forEach(num => {
+                            const cellClass = num === null ? 'bingo-cell empty' : 'bingo-cell';
+                            const cellContent = num === null ? '' : num;
+                            gridHTML += `<div class="${cellClass}">${cellContent}</div>`;
+                        });
+                    });
+                    gridHTML += '</div>';
+                    
+                    cardDiv.innerHTML = `
+                        <div class="card-header">
+                            Serial: ${card.serial || 'N/A'}
+                        </div>
+                        ${gridHTML}
+                    `;
+                    
+                    cardsGrid.appendChild(cardDiv);
+                });
+                
+                if (cards.length > 20) {
+                    const moreDiv = document.createElement('div');
+                    moreDiv.style.gridColumn = '1 / -1';
+                    moreDiv.style.textAlign = 'center';
+                    moreDiv.style.padding = '20px';
+                    moreDiv.style.color = '#ffd700';
+                    moreDiv.innerHTML = `<p>... y ${cards.length - 20} cartones más</p>`;
+                    cardsGrid.appendChild(moreDiv);
+                }
+                
+            } catch (error) {
+                statusDiv.innerHTML = `<p style="color: #ff4444;">❌ Error cargando cartones</p>`;
+                cardsGrid.innerHTML = `
+                    <div class="error">
+                        <h2>❌ Error de Conexión</h2>
+                        <p>${error.message}</p>
+                        <p style="margin-top: 15px; font-size: 0.9rem;">
+                            Asegúrate de que el backend esté corriendo en: 
+                            <strong>http://localhost:3001</strong>
+                        </p>
+                    </div>
+                `;
+                console.error('Error:', error);
+            }
+        }
+        
+        // Cargar cartones al abrir la página
+        loadCards();
+    </script>
+</body>
+</html>

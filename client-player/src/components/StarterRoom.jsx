@@ -5,6 +5,7 @@ import GiftIcon from '../assets/Gift_icon.png';
 import voiceService from '../services/voiceService';
 import audioService from '../services/audioService';
 import PlayerSidebar from './PlayerSidebar';
+import CardSelectionLobby from './CardSelectionLobby';
 
 export default function StarterRoom() {
   const { sessionId } = useParams();
@@ -28,10 +29,52 @@ const [lineCelebrated, setLineCelebrated] = useState(false); // ¿Ya se festejó
 const [pauseTimeout, setPauseTimeout] = useState(null); // Controlar pausa automática
 const [highlightedLine, setHighlightedLine] = useState(null); // Línea a resaltar
 const [sidebarOpen, setSidebarOpen] = useState(false); // Estado del sidebar
+const [showCardSelection, setShowCardSelection] = useState(false); // Mostrar lobby de selección de cartones
+const [selectedPlayerCards, setSelectedPlayerCards] = useState([]); // Cartones seleccionados por el jugador
+const [cardsRemaining, setCardsRemaining] = useState(20); // Cartones que faltan por seleccionar
 
 // Efectos de festejo (fuera del componente o arriba)
 const celebrationAudio = new Audio('/audio/celebration.mp3');
 celebrationAudio.volume = 0.7;
+
+  // Verificar cartones existentes del jugador al montar
+  useEffect(() => {
+    const checkExistingCards = async () => {
+      try {
+        const response = await fetch(`/api/game/starter/my-cards/${sessionId || 'starter_default'}`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          const currentCards = data.cards || [];
+          
+          console.log('🔍 DEBUG - Cartones cargados desde /my-cards:', currentCards.map(c => ({
+            id: c.id,
+            serial: c.serial,
+            hasSerial: !!c.serial,
+            hasNumbers: !!c.numbers
+          })));
+          
+          setSelectedPlayerCards(currentCards);
+          const remaining = 20 - currentCards.length;
+          setCardsRemaining(remaining);
+          
+          // Si tiene menos de 20, mostrar botón para seleccionar más
+          if (remaining > 0) {
+            console.log(`📋 Tiene ${currentCards.length} cartones, faltan ${remaining}`);
+          } else {
+            console.log('✅ Ya tiene 20 cartones completos');
+          }
+        }
+      } catch (error) {
+        console.log('Sin cartones previos');
+        setCardsRemaining(20);
+      }
+    };
+    
+    checkExistingCards();
+  }, [sessionId]);
 
   // Generar número de serie del cartón: DDMMYY-S0001
   const generateCardSerial = (cardIndex, roomLetter = 'S') => {
@@ -136,42 +179,41 @@ celebrationAudio.volume = 0.7;
     organizedBalls[i] = ballsDrawn.filter(b => b.number >= start && b.number <= (i === 8 ? 90 : end));
   }
 
-  // Cartones de ejemplo BINGO 90 (reemplazar con datos reales)
-  // Formato: 3 filas x 9 columnas, 5 números por fila, nulls para espacios vacíos
-  const [playerCards] = useState([
-    {
-      id: 1,
-      numbers: [
-        [3, null, 15, null, 34, 50, null, 72, 85],
-        [null, 12, null, 28, null, 51, 63, null, 88],
-        [5, null, 22, null, 39, null, 68, 77, null]
-      ]
-    },
-    {
-      id: 2,
-      numbers: [
-        [null, 11, 20, null, 35, null, 60, 75, null],
-        [6, null, null, 29, null, 54, null, 79, 89],
-        [null, 18, 27, null, 42, null, 66, null, 90]
-      ]
-    },
-    {
-      id: 3,
-      numbers: [
-        [8, null, null, 31, null, 55, 64, null, 86],
-        [null, 14, 24, null, 40, null, null, 78, 87],
-        [2, null, 26, null, 48, 59, 70, null, null]
-      ]
-    },
-    {
-      id: 4,
-      numbers: [
-        [null, 13, 23, null, 37, null, 62, 74, null],
-        [7, null, null, 32, null, 56, null, 76, 84],
-        [null, 19, 25, null, 45, null, 67, null, 90]
-      ]
+  // Usar cartones seleccionados por el jugador (si hay)
+  const playerCards = selectedPlayerCards.length > 0 ? selectedPlayerCards : [];
+
+  // Handlers para selección de cartones
+  const handleCardsSelected = (reservedCards) => {
+    console.log('🔍 DEBUG - Cartones recibidos del backend:', reservedCards.map(c => ({
+      id: c.id,
+      serial: c.serial,
+      hasSerial: !!c.serial
+    })));
+    
+    // Combinar cartones existentes con nuevos
+    const allCards = [...selectedPlayerCards, ...reservedCards];
+    setSelectedPlayerCards(allCards);
+    
+    console.log('🔍 DEBUG - Todos los cartones después de combinar:', allCards.map(c => ({
+      id: c.id,
+      serial: c.serial,
+      hasSerial: !!c.serial
+    })));
+    
+    const remaining = 20 - allCards.length;
+    setCardsRemaining(remaining);
+    setShowCardSelection(false);
+    console.log(`✅ Total de cartones: ${allCards.length}, faltan: ${remaining}`);
+  };
+
+  const handleCancelSelection = () => {
+    // Volver al lobby si no tiene cartones
+    if (selectedPlayerCards.length === 0) {
+      navigate('/lobby');
+    } else {
+      setShowCardSelection(false);
     }
-  ]);
+  };
 
   const isNumberCalled = (number) => {
     return ballsDrawn.some(ball => ball.number === number);
@@ -268,7 +310,7 @@ celebrationAudio.volume = 0.7;
     if (completedLines.length > 0) {
       cardsWithWinningLines.push({
         cardId: card.id,
-        cardSerial: generateCardSerial(playerCards.indexOf(card)),
+        cardSerial: card.serial || generateCardSerial(playerCards.indexOf(card)),
         lineCount: completedLines.length,
         lines: completedLines,
         card // importante para renderizado
@@ -355,14 +397,29 @@ useEffect(() => {
 
   return (
     <div className="starter-room">
-      {/* Sidebar con información del jugador */}
-      <PlayerSidebar 
-        isOpen={sidebarOpen} 
-        onToggle={() => setSidebarOpen(!sidebarOpen)} 
-      />
+      {/* Lobby de selección de cartones (overlay sobre la sala) */}
+      {showCardSelection && (
+        <CardSelectionLobby
+          sessionId={sessionId || 'starter_default'}
+          onCardsSelected={handleCardsSelected}
+          onCancel={handleCancelSelection}
+          maxCards={cardsRemaining}
+          currentCards={selectedPlayerCards.length}
+          timeWindow="open"
+        />
+      )}
 
-      {/* CELEBRACIÓN DE LÍNEA GANADORA */}
-      {winnerCards.length > 0 && (
+      {/* Sala de juego (solo visible después de seleccionar cartones) */}
+      {!showCardSelection && (
+        <>
+          {/* Sidebar con información del jugador */}
+          <PlayerSidebar 
+            isOpen={sidebarOpen} 
+            onToggle={() => setSidebarOpen(!sidebarOpen)} 
+          />
+
+          {/* CELEBRACIÓN DE LÍNEA GANADORA */}
+          {winnerCards.length > 0 && (
   <div className="winner-celebration-overlay">
     <div className="celebration-content">
       <div className="celebration-title">🎉 ¡LÍNEA! 🎉</div>
@@ -719,7 +776,13 @@ useEffect(() => {
           {/* Grid compacto 5x4 */}
           <div className="cards-compact-grid">
             {playerCards.map((card, index) => {
-              const cardSerial = generateCardSerial(index);
+              const cardSerial = card.serial || generateCardSerial(index);
+              
+              // DEBUG: Log solo la primera vez o cuando cambia
+              if (index === 0 && card.serial) {
+                console.log(`🔍 RENDER - Cartón ${index}: serial=${card.serial}, usando=${cardSerial}`);
+              }
+              
               const progress = getCardProgress(card);
               const isExpanded = expandedCard === card.id;
               
@@ -760,7 +823,7 @@ useEffect(() => {
               {playerCards
                 .filter(card => card.id === expandedCard)
                 .map(card => {
-                  const cardSerial = generateCardSerial(playerCards.indexOf(card));
+                  const cardSerial = card.serial || generateCardSerial(playerCards.indexOf(card));
                   
                   return (
                     <div key={card.id} className="bingo-card-expanded bingo-card-starter-90">
@@ -843,6 +906,15 @@ useEffect(() => {
 
       {/* Botón de control (solo para testing) */}
       <div className="test-controls">
+        {cardsRemaining > 0 && (
+          <button 
+            className="control-btn cards-btn"
+            onClick={() => setShowCardSelection(true)}
+            title={`Seleccionar cartones (${cardsRemaining} restantes)`}
+          >
+            🎫 Elegir Cartones ({cardsRemaining})
+          </button>
+        )}
         <button 
           className="control-btn voice-btn"
           onClick={() => setShowVoiceSelector(true)}
@@ -879,6 +951,8 @@ useEffect(() => {
           {gameStatus === 'active' ? '⏸️ Pausar' : '▶️ Iniciar'}
         </button>
       </div>
+        </>
+      )}
     </div>
   );
 }

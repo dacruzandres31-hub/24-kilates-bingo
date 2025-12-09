@@ -27,10 +27,14 @@ class AudioService {
    */
   async initialize(roomType = 'starter') {
     // Si ya está inicializado y es la misma sala, no hacer nada
-    if (this.initialized && this.currentRoom === roomType) return;
+    if (this.initialized && this.currentRoom === roomType) {
+      console.log(`✅ Audio ya inicializado para ${roomType}`);
+      return;
+    }
 
     // Si cambia de sala, detener música actual
     if (this.initialized && this.currentRoom !== roomType) {
+      console.log(`🔄 Cambiando audio de ${this.currentRoom} a ${roomType}`);
       this.stopBackgroundMusic();
     }
 
@@ -44,10 +48,22 @@ class AudioService {
         gold: '/audio/music_gold.mp3'
       };
 
-      this.backgroundMusic = new Audio(musicFiles[roomType] || musicFiles.starter);
+      const musicPath = musicFiles[roomType] || musicFiles.starter;
+      console.log(`🎵 Cargando música: ${musicPath}`);
+      
+      this.backgroundMusic = new Audio(musicPath);
       this.backgroundMusic.loop = true;
       this.backgroundMusic.volume = this.backgroundMusicVolume;
       this.currentRoom = roomType;
+
+      // Escuchar eventos de audio para debug
+      this.backgroundMusic.addEventListener('canplay', () => {
+        console.log('✅ Audio cargado y listo para reproducir');
+      });
+      
+      this.backgroundMusic.addEventListener('error', (e) => {
+        console.error('❌ Error cargando audio:', e.target.error);
+      });
 
       // Sonido bolillero girando - COMPARTIDO entre todas las salas
       if (!this.bolilleroGirando) {
@@ -65,7 +81,8 @@ class AudioService {
       this.initialized = true;
       console.log(`🔊 AudioService inicializado para sala: ${roomType.toUpperCase()}`);
     } catch (error) {
-      console.error('Error al inicializar AudioService:', error);
+      console.error('❌ Error al inicializar AudioService:', error);
+      throw error;
     }
   }
 
@@ -73,14 +90,34 @@ class AudioService {
    * Inicia la música de fondo
    */
   async startBackgroundMusic() {
-    if (!this.initialized) await this.initialize();
+    if (!this.initialized) {
+      console.warn('⚠️ AudioService no inicializado, inicializando...');
+      await this.initialize();
+    }
     
     if (this.backgroundMusic && this.musicEnabled) {
       try {
-        await this.backgroundMusic.play();
-        console.log('🎵 Música de fondo iniciada');
+        // Intentar reproducir
+        const playPromise = this.backgroundMusic.play();
+        
+        if (playPromise !== undefined) {
+          await playPromise;
+          console.log('🎵 Música de fondo iniciada:', this.currentRoom);
+        }
       } catch (error) {
-        console.warn('No se pudo reproducir música de fondo:', error.message);
+        if (error.name === 'NotAllowedError') {
+          console.warn('⚠️ Navegador bloqueó audio automático. Requiere interacción del usuario.');
+          console.warn('   Haz click en cualquier parte de la página para activar el audio.');
+        } else {
+          console.error('❌ Error al reproducir música:', error.message);
+        }
+      }
+    } else {
+      if (!this.backgroundMusic) {
+        console.error('❌ backgroundMusic no existe. ¿Se llamó a initialize()?');
+      }
+      if (!this.musicEnabled) {
+        console.log('🔇 Música desactivada por el usuario');
       }
     }
   }

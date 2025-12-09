@@ -20,6 +20,7 @@ const withdrawalRoutes = require('./routes/withdrawalRoutes');
 const winnersPaymentRoutes = require('./routes/winnersPaymentRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const gameAdminRoutes = require('./routes/gameAdminRoutes');
+const starterRoomRoutes = require('./routes/starterRoom');
 const gameAdminController = require('./controllers/gameAdminController');
 
 // CONFIGURACIÓN INICIAL
@@ -118,6 +119,7 @@ io.on('connection', (socket) => {
 // RUTAS API
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/game/starter', starterRoomRoutes); // DEBE IR ANTES de /api/game
 app.use('/api/game', gameRoutes);
 app.use('/api/finance', financeRoutes);
 app.use('/api/gamification', gamificationRoutes);
@@ -179,34 +181,68 @@ const startServer = async () => {
   }
 };
 
-// GRACEFUL SHUTDOWN
-process.on('SIGTERM', () => {
-  console.log('📛 SIGTERM recibido, apagando servidor...');
-  scheduler.stop();
-  server.close(() => {
-    console.log('✅ Servidor apagado correctamente');
-    process.exit(0);
-  });
+// GRACEFUL SHUTDOWN - Solo para Ctrl+C manual del usuario
+let isShuttingDown = false;
+
+process.on('SIGTERM', async () => {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  
+  console.log('\n📛 SIGTERM recibido, apagando servidor...');
+  
+  try {
+    await scheduler.stop();
+    server.close(() => {
+      console.log('✅ Servidor apagado correctamente');
+      process.exit(0);
+    });
+    
+    // Forzar salida después de 10 segundos
+    setTimeout(() => {
+      console.log('⏱️ Tiempo agotado, forzando salida...');
+      process.exit(0);
+    }, 10000);
+  } catch (error) {
+    console.error('❌ Error en shutdown:', error);
+    process.exit(1);
+  }
 });
 
-process.on('SIGINT', () => {
-  console.log('📛 SIGINT recibido, apagando servidor...');
-  scheduler.stop();
-  server.close(() => {
-    console.log('✅ Servidor apagado correctamente');
-    process.exit(0);
-  });
+process.on('SIGINT', async () => {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  
+  console.log('\n📛 SIGINT recibido (Ctrl+C), apagando servidor...');
+  
+  try {
+    await scheduler.stop();
+    server.close(() => {
+      console.log('✅ Servidor apagado correctamente');
+      process.exit(0);
+    });
+    
+    // Forzar salida después de 10 segundos
+    setTimeout(() => {
+      console.log('⏱️ Tiempo agotado, forzando salida...');
+      process.exit(0);
+    }, 10000);
+  } catch (error) {
+    console.error('❌ Error en shutdown:', error);
+    process.exit(1);
+  }
 });
 
-// UNCAUGHT EXCEPTIONS
+// UNCAUGHT EXCEPTIONS - Solo loguear, NO cerrar servidor
 process.on('uncaughtException', (error) => {
   console.error('❌ Excepción no capturada:', error);
-  process.exit(1);
+  console.error('   Stack:', error.stack);
+  // NO llamar process.exit() - dejar que el servidor continúe
 });
 
 process.on('unhandledRejection', (reason, promise) => {
   console.error('❌ Promesa rechazada no manejada:', reason);
-  process.exit(1);
+  console.error('   Promise:', promise);
+  // NO llamar process.exit() - dejar que el servidor continúe
 });
 
 // Iniciar

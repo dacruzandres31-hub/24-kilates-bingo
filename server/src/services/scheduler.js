@@ -376,17 +376,7 @@ function generateBingoGrid() {
 // Crear instancia global
 const scheduler = new Scheduler();
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('[Scheduler] Recibido SIGTERM, apagando gracefully...');
-  scheduler.stop();
-  process.exit(0);
-});
-
-process.on('SIGINT', () => {
-  console.log('[Scheduler] Recibido SIGINT, apagando gracefully...');
-  scheduler.stop();
-  process.exit(0);
-});
+// 🔧 NOTA: Los manejadores SIGTERM/SIGINT están en src/index.js
+// No se definen aquí para evitar conflictos y cierres prematuros
 
 module.exports = scheduler;
