@@ -237,52 +237,39 @@ const CasinoLobby = () => {
   // Función para activar audio manualmente
   const handleActivateAudio = async () => {
     try {
-      console.log('🎵 Activando audio del lobby...');
       await audioService.initialize('lobby');
       await audioService.startBackgroundMusic();
       setAudioInitialized(true);
       setShowAudioPrompt(false);
-      console.log('✅ Audio del lobby activado');
     } catch (error) {
       console.error('❌ Error activando audio:', error);
     }
   };
 
-  // Inicializar audio del lobby al montar
+  // Inicializar audio del lobby
   useEffect(() => {
-    const initLobbyAudio = async () => {
+    const initAudio = async () => {
       try {
-        console.log('🎵 Inicializando audio del lobby...');
         await audioService.initialize('lobby');
         await audioService.startBackgroundMusic();
         setAudioInitialized(true);
         setShowAudioPrompt(false);
-        console.log('✅ Audio del lobby inicializado automáticamente');
       } catch (error) {
-        console.warn('⚠️ No se pudo iniciar audio automáticamente:', error.message);
-        // Mantener showAudioPrompt=true para que el usuario lo active manualmente
+        console.warn('⚠️ Audio requiere interacción del usuario');
       }
     };
+
+    // Intentar iniciar con primer click
+    const handleClick = () => {
+      if (!audioInitialized) initAudio();
+      document.removeEventListener('click', handleClick);
+    };
+
+    document.addEventListener('click', handleClick);
     
-    // Si volvemos de una sala, el audio ya puede estar inicializado
-    if (audioService.initialized) {
-      console.log('🔄 Audio ya inicializado, cambiando a música del lobby');
-      initLobbyAudio();
-    } else {
-      // Primera vez - intentar iniciar con primer click
-      const handleFirstClick = () => {
-        if (!audioInitialized) {
-          initLobbyAudio();
-        }
-        document.removeEventListener('click', handleFirstClick);
-      };
-      
-      document.addEventListener('click', handleFirstClick);
-      
-      return () => {
-        document.removeEventListener('click', handleFirstClick);
-      };
-    }
+    return () => {
+      document.removeEventListener('click', handleClick);
+    };
   }, [audioInitialized]);
 
   return (

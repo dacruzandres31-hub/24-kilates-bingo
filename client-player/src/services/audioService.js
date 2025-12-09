@@ -26,21 +26,23 @@ class AudioService {
    * @param {string} roomType - Tipo de sala: 'lobby', 'starter', 'bronze', 'silver', 'gold'
    */
   async initialize(roomType = 'starter') {
-    // Si ya está inicializado y es la misma sala, no hacer nada
+    // Si ya está inicializado y es la misma sala, solo asegurarse de que esté sonando
     if (this.initialized && this.currentRoom === roomType) {
       console.log(`✅ Audio ya inicializado para ${roomType}`);
       return;
     }
 
-    // Si cambia de sala, detener música actual ANTES de crear nuevo objeto Audio
-    if (this.initialized && this.currentRoom !== roomType && this.backgroundMusic) {
-      console.log(`🔄 Cambiando audio de ${this.currentRoom} a ${roomType}`);
-      
-      // Detener y limpiar completamente el audio anterior
-      this.backgroundMusic.pause();
-      this.backgroundMusic.currentTime = 0;
-      this.backgroundMusic.src = ''; // Limpiar source
-      this.backgroundMusic = null; // Liberar referencia
+    // Si cambia de sala, limpiar audio anterior INMEDIATAMENTE sin fade
+    if (this.backgroundMusic) {
+      try {
+        console.log(`🔄 Limpiando audio anterior: ${this.currentRoom}`);
+        this.backgroundMusic.pause();
+        this.backgroundMusic.src = '';
+        this.backgroundMusic.load(); // Forzar limpieza
+        this.backgroundMusic = null;
+      } catch (error) {
+        console.warn('⚠️ Error limpiando audio anterior:', error);
+      }
     }
 
     try {
@@ -54,41 +56,40 @@ class AudioService {
       };
 
       const musicPath = musicFiles[roomType] || musicFiles.starter;
-      console.log(`🎵 Cargando música: ${musicPath}`);
+      console.log(`🎵 Cargando música nueva: ${musicPath}`);
       
       this.backgroundMusic = new Audio(musicPath);
       this.backgroundMusic.loop = true;
       this.backgroundMusic.volume = this.backgroundMusicVolume;
+      this.backgroundMusic.preload = 'auto';
       this.currentRoom = roomType;
 
-      // Escuchar eventos de audio para debug
-      this.backgroundMusic.addEventListener('canplay', () => {
-        console.log('✅ Audio cargado y listo para reproducir');
-      });
+      // Eventos para debug (sin acumular listeners)
+      this.backgroundMusic.oncanplay = () => {
+        console.log('✅ Audio listo:', roomType);
+      };
       
-      this.backgroundMusic.addEventListener('error', (e) => {
-        console.error('❌ Error cargando audio:', e.target.error);
-        console.error('   Ruta intentada:', musicPath);
-      });
+      this.backgroundMusic.onerror = (e) => {
+        console.error('❌ Error cargando audio:', musicPath, e);
+      };
 
-      // Sonido bolillero girando - COMPARTIDO entre todas las salas
+      // Sonidos de efectos - COMPARTIDOS
       if (!this.bolilleroGirando) {
         this.bolilleroGirando = new Audio('/audio/bolillero_girando.mp3');
         this.bolilleroGirando.loop = true;
         this.bolilleroGirando.volume = this.efectosVolume;
       }
 
-      // Sonido bola cayendo - COMPARTIDO entre todas las salas
       if (!this.bolaCayendo) {
         this.bolaCayendo = new Audio('/audio/bola_cayendo.mp3');
         this.bolaCayendo.volume = this.efectosVolume;
       }
 
       this.initialized = true;
-      console.log(`🔊 AudioService inicializado para sala: ${roomType.toUpperCase()}`);
+      console.log(`🔊 AudioService listo para: ${roomType.toUpperCase()}`);
     } catch (error) {
-      console.error('❌ Error al inicializar AudioService:', error);
-      throw error;
+      console.error('❌ Error fatal inicializando AudioService:', error);
+      this.initialized = false;
     }
   }
 
@@ -97,56 +98,40 @@ class AudioService {
    */
   async startBackgroundMusic() {
     if (!this.initialized) {
-      console.warn('⚠️ AudioService no inicializado, inicializando...');
-      await this.initialize();
+      console.warn('⚠️ AudioService no inicializado');
+      return;
     }
     
     if (this.backgroundMusic && this.musicEnabled) {
       try {
-        // Intentar reproducir
         const playPromise = this.backgroundMusic.play();
         
         if (playPromise !== undefined) {
           await playPromise;
-          console.log('🎵 Música de fondo iniciada:', this.currentRoom);
+          console.log('🎵 Reproduciendo:', this.currentRoom);
         }
       } catch (error) {
         if (error.name === 'NotAllowedError') {
-          console.warn('⚠️ Navegador bloqueó audio automático. Requiere interacción del usuario.');
-          console.warn('   Haz click en cualquier parte de la página para activar el audio.');
+          console.warn('⚠️ Navegador bloqueó audio. Haz click para activar.');
         } else {
-          console.error('❌ Error al reproducir música:', error.message);
+          console.error('❌ Error reproduciendo:', error.message);
         }
-      }
-    } else {
-      if (!this.backgroundMusic) {
-        console.error('❌ backgroundMusic no existe. ¿Se llamó a initialize()?');
-      }
-      if (!this.musicEnabled) {
-        console.log('🔇 Música desactivada por el usuario');
       }
     }
   }
 
   /**
-   * Detiene la música de fondo (con fade out suave)
+   * Detiene la música de fondo (sin fade, inmediato)
    */
   stopBackgroundMusic() {
     if (this.backgroundMusic) {
-      console.log('🔇 Deteniendo música de fondo:', this.currentRoom);
-      
-      // Fade out suave
-      const fadeOut = setInterval(() => {
-        if (this.backgroundMusic.volume > 0.05) {
-          this.backgroundMusic.volume -= 0.05;
-        } else {
-          clearInterval(fadeOut);
-          this.backgroundMusic.pause();
-          this.backgroundMusic.currentTime = 0;
-          this.backgroundMusic.volume = this.backgroundMusicVolume; // Restaurar volumen original
-          console.log('✅ Música detenida');
-        }
-      }, 50); // 50ms entre cada paso del fade
+      try {
+        this.backgroundMusic.pause();
+        this.backgroundMusic.currentTime = 0;
+        console.log('🔇 Música detenida');
+      } catch (error) {
+        console.warn('⚠️ Error deteniendo música:', error);
+      }
     }
   }
 
