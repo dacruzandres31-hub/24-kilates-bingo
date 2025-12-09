@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { FaUser, FaWallet, FaTicketAlt, FaHeadset, FaTimes, FaBars, FaEye, FaEyeSlash, FaHome } from 'react-icons/fa';
+import { FaUser, FaWallet, FaTicketAlt, FaHeadset, FaTimes, FaBars, FaEye, FaEyeSlash, FaHome, FaMusic, FaVolumeUp, FaVolumeMute } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import '../styles/PlayerSidebar.css';
 import bronzeIcon from '../assets/bronze_icon.png';
+import audioService from '../services/audioService';
 
 const PlayerSidebar = ({ isOpen, onToggle }) => {
   const navigate = useNavigate();
   const [showBalance, setShowBalance] = useState(false);
+  const [audioStatus, setAudioStatus] = useState({ musicEnabled: true, efectosEnabled: true });
   const [userData, setUserData] = useState({
     username: 'JugadorPro24',
     balance: 12500,
@@ -20,6 +22,9 @@ const PlayerSidebar = ({ isOpen, onToggle }) => {
 
   // TODO: Cargar datos reales del usuario desde API
   useEffect(() => {
+    // Actualizar estado inicial del audio
+    setAudioStatus(audioService.getStatus());
+    
     // Aquí iría la llamada a la API para obtener datos del usuario
     // const fetchUserData = async () => {
     //   const response = await fetch('/api/user/profile');
@@ -28,6 +33,18 @@ const PlayerSidebar = ({ isOpen, onToggle }) => {
     // };
     // fetchUserData();
   }, []);
+  
+  const toggleMusic = () => {
+    const newState = audioService.toggleMusic();
+    setAudioStatus(audioService.getStatus());
+    console.log(`🎵 Música ${newState ? 'activada' : 'desactivada'}`);
+  };
+  
+  const toggleEfectos = () => {
+    const newState = audioService.toggleEfectos();
+    setAudioStatus(audioService.getStatus());
+    console.log(`🔊 Efectos ${newState ? 'activados' : 'desactivados'}`);
+  };
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('es-AR', {
@@ -142,6 +159,30 @@ const PlayerSidebar = ({ isOpen, onToggle }) => {
             <FaHeadset className="action-icon" />
             <span>Soporte Técnico</span>
           </button>
+        </div>
+        
+        {/* Controles de Audio */}
+        <div className="sidebar-section audio-controls-section">
+          <h4 className="section-title">Audio</h4>
+          <div className="audio-controls">
+            <button 
+              className={`audio-control-btn ${audioStatus.musicEnabled ? 'active' : ''}`}
+              onClick={toggleMusic}
+              title={audioStatus.musicEnabled ? 'Desactivar música' : 'Activar música'}
+            >
+              {audioStatus.musicEnabled ? <FaMusic /> : <FaVolumeMute />}
+              <span>{audioStatus.musicEnabled ? 'Música ON' : 'Música OFF'}</span>
+            </button>
+            
+            <button 
+              className={`audio-control-btn ${audioStatus.efectosEnabled ? 'active' : ''}`}
+              onClick={toggleEfectos}
+              title={audioStatus.efectosEnabled ? 'Desactivar efectos' : 'Activar efectos'}
+            >
+              {audioStatus.efectosEnabled ? <FaVolumeUp /> : <FaVolumeMute />}
+              <span>{audioStatus.efectosEnabled ? 'Efectos ON' : 'Efectos OFF'}</span>
+            </button>
+          </div>
         </div>
 
         {/* Footer */}

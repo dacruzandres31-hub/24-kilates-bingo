@@ -377,12 +377,72 @@
   transform: translateY(-2px);
 }
 
+/* Controles de Audio */
+.audio-controls-section {
+  margin-top: auto;
+  padding-top: 15px;
+  border-top: 1px solid rgba(0, 212, 255, 0.2);
+}
+
+.audio-controls-section .section-title {
+  font-size: 0.9rem;
+  color: #00d4ff;
+  margin-bottom: 10px;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.audio-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 20px;
+}
+
+.audio-control-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 15px;
+  background: rgba(20, 20, 20, 0.6);
+  border: 2px solid rgba(100, 100, 100, 0.4);
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(5px);
+}
+
+.audio-control-btn svg {
+  font-size: 1.2rem;
+}
+
+.audio-control-btn:hover {
+  border-color: rgba(0, 212, 255, 0.6);
+  background: rgba(0, 212, 255, 0.1);
+  transform: translateX(5px);
+}
+
+.audio-control-btn.active {
+  border-color: #00d4ff;
+  background: linear-gradient(135deg, rgba(0, 212, 255, 0.2), rgba(0, 100, 255, 0.2));
+  color: #00d4ff;
+  box-shadow: 0 0 15px rgba(0, 212, 255, 0.3);
+}
+
+.audio-control-btn.active:hover {
+  box-shadow: 0 0 25px rgba(0, 212, 255, 0.5);
+}
+
 /* Footer del sidebar */
 .sidebar-footer {
   padding: 15px 20px;
   text-align: center;
   border-top: 1px solid rgba(0, 212, 255, 0.2);
-  margin-top: auto;
+  margin-top: 10px;
 }
 
 .sidebar-version {

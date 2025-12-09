@@ -1050,7 +1050,7 @@ useEffect(() => {
         </div>
 
         <div className="cards-grid-container">
-          {/* Grid compacto 5x4 */}
+          {/* Grid compacto 6x5 = 30 cartones */}
           <div className="cards-compact-grid">
             {playerCards.map((card, index) => {
               const cardSerial = card.serial || generateCardSerial(index);
@@ -1191,28 +1191,6 @@ useEffect(() => {
           title="Cambiar voz del anunciador"
         >
           🎤 Voz
-        </button>
-        <button 
-          className="control-btn audio-btn"
-          onClick={() => {
-            const newState = audioService.toggleMusic();
-            setAudioStatus(audioService.getStatus());
-            console.log(`🎵 Música ${newState ? 'activada' : 'desactivada'}`);
-          }}
-          title="Activar/Desactivar música de fondo"
-        >
-          {audioStatus.musicEnabled ? '🎵 Música' : '🔇 Música'}
-        </button>
-        <button 
-          className="control-btn audio-btn"
-          onClick={() => {
-            const newState = audioService.toggleEfectos();
-            setAudioStatus(audioService.getStatus());
-            console.log(`🔊 Efectos ${newState ? 'activados' : 'desactivados'}`);
-          }}
-          title="Activar/Desactivar efectos de sonido"
-        >
-          {audioStatus.efectosEnabled ? '🔊 Efectos' : '🔇 Efectos'}
         </button>
         <button 
           className="control-btn"
