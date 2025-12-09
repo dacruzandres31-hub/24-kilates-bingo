@@ -1438,8 +1438,10 @@
   width: 100%;
   height: 100%;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 20px;
   animation: sphere-pulse 2s ease-in-out infinite;
 }
 
@@ -1449,116 +1451,110 @@
     filter: brightness(1);
   }
   50% { 
-    transform: scale(1.05);
-    filter: brightness(1.2);
+    transform: scale(1.02);
+    filter: brightness(1.15);
   }
 }
 
 .select-cards-sphere-btn {
-  width: 280px;
-  height: 280px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, 
-    rgba(0, 212, 255, 0.3) 0%, 
-    rgba(138, 43, 226, 0.3) 50%,
-    rgba(255, 0, 255, 0.3) 100%
-  );
-  border: 4px solid #00d4ff;
-  box-shadow: 
-    0 0 40px rgba(0, 212, 255, 0.6),
-    inset 0 0 40px rgba(0, 212, 255, 0.2),
-    0 0 80px rgba(138, 43, 226, 0.4);
+  background: transparent;
+  border: none;
   cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
+  padding: 0;
   transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
-}
-
-.select-cards-sphere-btn::before {
-  content: '';
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: linear-gradient(
-    45deg,
-    transparent 30%,
-    rgba(255, 255, 255, 0.3) 50%,
-    transparent 70%
-  );
-  animation: shine-rotate 3s linear infinite;
-}
-
-@keyframes shine-rotate {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  filter: drop-shadow(0 0 30px rgba(0, 212, 255, 0.6));
 }
 
 .select-cards-sphere-btn:hover {
   transform: scale(1.1);
-  border-color: #ff00ff;
-  box-shadow: 
-    0 0 60px rgba(255, 0, 255, 0.8),
-    inset 0 0 60px rgba(255, 0, 255, 0.3),
-    0 0 100px rgba(0, 212, 255, 0.6);
-  background: linear-gradient(135deg, 
-    rgba(255, 0, 255, 0.4) 0%, 
-    rgba(138, 43, 226, 0.4) 50%,
-    rgba(0, 212, 255, 0.4) 100%
-  );
+  filter: drop-shadow(0 0 50px rgba(255, 0, 255, 0.8));
 }
 
 .select-cards-sphere-btn:active {
   transform: scale(1.05);
 }
 
-.sphere-btn-icon {
-  font-size: 4rem;
-  animation: icon-float 2s ease-in-out infinite;
-  filter: drop-shadow(0 0 10px rgba(0, 212, 255, 0.8));
+.sphere-btn-image {
+  width: 280px;
+  height: auto;
+  display: block;
+  animation: btn-float 3s ease-in-out infinite;
 }
 
-@keyframes icon-float {
+@keyframes btn-float {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
+  50% { transform: translateY(-15px); }
 }
 
-.sphere-btn-text {
-  font-size: 1.2rem;
-  font-weight: 600;
-  color: #00d4ff;
-  text-shadow: 0 0 10px rgba(0, 212, 255, 0.8);
-  letter-spacing: 1px;
-  text-transform: uppercase;
+/* Contador de Cartones Disponibles */
+.sphere-btn-counter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
 }
 
-.sphere-btn-text-large {
-  font-size: 2rem;
+.counter-line {
+  width: 120px;
+  height: 2px;
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    rgba(0, 212, 255, 0.8) 20%, 
+    rgba(0, 212, 255, 1) 50%, 
+    rgba(0, 212, 255, 0.8) 80%, 
+    transparent 100%
+  );
+  box-shadow: 0 0 10px rgba(0, 212, 255, 0.6);
+  animation: line-glow 2s ease-in-out infinite;
+}
+
+.counter-line.bottom-line {
+  animation-delay: 0.5s;
+}
+
+@keyframes line-glow {
+  0%, 100% { 
+    opacity: 0.6;
+    box-shadow: 0 0 10px rgba(0, 212, 255, 0.6);
+  }
+  50% { 
+    opacity: 1;
+    box-shadow: 0 0 20px rgba(0, 212, 255, 1);
+  }
+}
+
+.counter-number {
+  font-size: 3rem;
   font-weight: 900;
-  color: #ffffff;
+  color: #00d4ff;
   text-shadow: 
     0 0 20px rgba(0, 212, 255, 1),
-    0 0 40px rgba(255, 0, 255, 0.8);
+    0 0 40px rgba(0, 212, 255, 0.8),
+    0 0 60px rgba(255, 0, 255, 0.6);
+  animation: number-pulse 1.5s ease-in-out infinite;
+  font-family: 'Arial Black', sans-serif;
   letter-spacing: 2px;
-  text-transform: uppercase;
-  margin-top: -5px;
 }
 
-.sphere-btn-count {
-  font-size: 0.95rem;
-  font-weight: 500;
+@keyframes number-pulse {
+  0%, 100% { 
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  50% { 
+    transform: scale(1.1);
+    filter: brightness(1.3);
+  }
+}
+
+.counter-label {
+  font-size: 0.9rem;
+  font-weight: 600;
   color: #ff00ff;
   text-shadow: 0 0 10px rgba(255, 0, 255, 0.8);
-  background: rgba(0, 0, 0, 0.5);
-  padding: 5px 15px;
-  border-radius: 20px;
-  border: 1px solid rgba(255, 0, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 2px;
   margin-top: 5px;
 }
 

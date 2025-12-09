@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import '../styles/StarterRoom.css';
 import GiftIcon from '../assets/Gift_icon.png';
+import selectCardsButton from '../assets/select_cards_button.png';
 import voiceService from '../services/voiceService';
 import audioService from '../services/audioService';
 import PlayerSidebar from './PlayerSidebar';
@@ -706,11 +707,18 @@ useEffect(() => {
                   onClick={() => setShowCardSelection(true)}
                   title={`Seleccionar cartones (${cardsRemaining} restantes)`}
                 >
-                  <div className="sphere-btn-icon">🎫</div>
-                  <div className="sphere-btn-text">Seleccionar</div>
-                  <div className="sphere-btn-text-large">Cartones</div>
-                  <div className="sphere-btn-count">{cardsRemaining} disponibles</div>
+                  <img 
+                    src={selectCardsButton} 
+                    alt="Seleccionar Cartones" 
+                    className="sphere-btn-image"
+                  />
                 </button>
+                <div className="sphere-btn-counter">
+                  <div className="counter-line top-line"></div>
+                  <div className="counter-number">{cardsRemaining}</div>
+                  <div className="counter-line bottom-line"></div>
+                  <div className="counter-label">Cartones Disponibles</div>
+                </div>
               </div>
             )}
 
