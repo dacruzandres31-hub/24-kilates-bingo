@@ -168,6 +168,8 @@ celebrationAudio.volume = 0.7;
     
     return () => {
       document.removeEventListener('click', handleClick);
+      // Detener efectos de sonido al desmontar
+      audioService.stopBolilleroGirando();
     };
   }, []);
 
@@ -409,15 +411,21 @@ useEffect(() => {
   useEffect(() => {
     if (gameStatus === 'active' && previousGameStatus === 'waiting') {
       voiceService.announceSorteoIniciado();
+      // Iniciar sonido de bolillero
+      audioService.startBolilleroGirando();
       // Mostrar transición
       setShowTransition(true);
       setTimeout(() => setShowTransition(false), 1500);
       addToast('🎲', '¡Sorteo iniciado!', 'Buena suerte');
     } else if (gameStatus === 'waiting' && previousGameStatus === 'active') {
       voiceService.announceSorteoPausado();
+      // Detener sonido de bolillero
+      audioService.stopBolilleroGirando();
       addToast('⏸️', 'Sorteo pausado', 'Esperando...');
     } else if (gameStatus === 'active' && previousGameStatus === 'paused') {
       voiceService.announceSorteoReiniciado();
+      // Reiniciar sonido de bolillero
+      audioService.startBolilleroGirando();
     }
     setPreviousGameStatus(gameStatus);
   }, [gameStatus]);
@@ -426,6 +434,9 @@ useEffect(() => {
   useEffect(() => {
     if (ballsDrawn.length > 0 && gameStatus === 'active') {
       const lastDrawnBall = ballsDrawn[ballsDrawn.length - 1];
+      
+      // Reproducir sonido de bola cayendo
+      audioService.playBolaCayendo();
       
       // Anunciar el número con voz
       setTimeout(() => {

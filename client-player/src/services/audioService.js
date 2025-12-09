@@ -11,6 +11,11 @@ class AudioService {
     this.enabled = true;
     this.audioCache = {}; // Cache de audios precargados
     
+    // Efectos de sonido
+    this.efectosEnabled = true;
+    this.bolillerAudio = null;
+    this.bolaAudio = null;
+    
     // Precargar audios en el constructor
     this.preloadAudios();
   }
@@ -35,6 +40,18 @@ class AudioService {
       this.audioCache[room] = audio;
       console.log(`🔄 Precargando: ${room}`);
     });
+    
+    // Precargar efectos de sonido
+    this.bolillerAudio = new Audio('/audio/bolillero_girando.mp3');
+    this.bolillerAudio.loop = true;
+    this.bolillerAudio.volume = 0.3;
+    this.bolillerAudio.preload = 'auto';
+    
+    this.bolaAudio = new Audio('/audio/bola_cayendo.mp3');
+    this.bolaAudio.volume = 0.5;
+    this.bolaAudio.preload = 'auto';
+    
+    console.log('🔊 Efectos de sonido precargados');
   }
 
   /**
@@ -106,15 +123,43 @@ class AudioService {
   }
 
   startBolilleroGirando() {
-    // Deshabilitado temporalmente
+    if (!this.efectosEnabled || !this.bolillerAudio) return;
+    
+    try {
+      this.bolillerAudio.currentTime = 0;
+      this.bolillerAudio.play().catch(err => {
+        console.warn('⚠️ No se pudo reproducir bolillero:', err.message);
+      });
+      console.log('🎰 Bolillero girando iniciado');
+    } catch (error) {
+      console.error('❌ Error iniciando bolillero:', error.message);
+    }
   }
 
   stopBolilleroGirando() {
-    // Deshabilitado temporalmente
+    if (!this.bolillerAudio) return;
+    
+    try {
+      this.bolillerAudio.pause();
+      this.bolillerAudio.currentTime = 0;
+      console.log('🛑 Bolillero girando detenido');
+    } catch (error) {
+      console.error('❌ Error deteniendo bolillero:', error.message);
+    }
   }
 
   playBolaCayendo() {
-    // Deshabilitado temporalmente
+    if (!this.efectosEnabled || !this.bolaAudio) return;
+    
+    try {
+      this.bolaAudio.currentTime = 0;
+      this.bolaAudio.play().catch(err => {
+        console.warn('⚠️ No se pudo reproducir bola cayendo:', err.message);
+      });
+      console.log('🎱 Bola cayendo reproducida');
+    } catch (error) {
+      console.error('❌ Error reproduciendo bola cayendo:', error.message);
+    }
   }
 
   toggleMusica() {
@@ -126,7 +171,12 @@ class AudioService {
   }
 
   toggleEfectos() {
-    return true;
+    this.efectosEnabled = !this.efectosEnabled;
+    if (!this.efectosEnabled) {
+      this.stopBolilleroGirando();
+    }
+    console.log(`🔊 Efectos: ${this.efectosEnabled ? 'ON' : 'OFF'}`);
+    return this.efectosEnabled;
   }
 
   getStatus() {
@@ -134,7 +184,9 @@ class AudioService {
       initialized: true,
       currentRoom: this.currentRoom,
       musicEnabled: this.enabled,
-      musicPlaying: this.currentAudio && !this.currentAudio.paused
+      musicPlaying: this.currentAudio && !this.currentAudio.paused,
+      efectosEnabled: this.efectosEnabled,
+      bolilleroPlaying: this.bolillerAudio && !this.bolillerAudio.paused
     };
   }
 }
