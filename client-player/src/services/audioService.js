@@ -1,6 +1,6 @@
 /**
  * AudioService - Servicio singleton SIMPLIFICADO
- * Solo maneja música de fondo por sala
+ * Solo maneja música de fondo por sala con precarga
  */
 
 class AudioService {
@@ -9,6 +9,32 @@ class AudioService {
     this.currentRoom = null;
     this.volume = 0.15;
     this.enabled = true;
+    this.audioCache = {}; // Cache de audios precargados
+    
+    // Precargar audios en el constructor
+    this.preloadAudios();
+  }
+
+  /**
+   * Precarga todos los archivos de audio
+   */
+  preloadAudios() {
+    const musicPaths = {
+      lobby: '/audio/music_lobby.mp3',
+      starter: '/audio/music_starter.mp3',
+      bronze: '/audio/music_bronze.mp3',
+      silver: '/audio/music_silver.mp3',
+      gold: '/audio/music_gold.mp3'
+    };
+
+    Object.entries(musicPaths).forEach(([room, path]) => {
+      const audio = new Audio(path);
+      audio.loop = true;
+      audio.volume = this.volume;
+      audio.preload = 'auto';
+      this.audioCache[room] = audio;
+      console.log(`🔄 Precargando: ${room}`);
+    });
   }
 
   /**
@@ -27,31 +53,21 @@ class AudioService {
     if (this.currentAudio) {
       console.log(`🔇 Deteniendo: ${this.currentRoom}`);
       this.currentAudio.pause();
-      this.currentAudio = null;
+      this.currentAudio.currentTime = 0;
     }
 
-    // Cargar y reproducir nueva música
-    const musicPaths = {
-      lobby: '/audio/music_lobby.mp3',
-      starter: '/audio/music_starter.mp3',
-      bronze: '/audio/music_bronze.mp3',
-      silver: '/audio/music_silver.mp3',
-      gold: '/audio/music_gold.mp3'
-    };
-
-    const path = musicPaths[roomType];
-    if (!path) {
+    // Obtener audio del cache
+    const audio = this.audioCache[roomType];
+    if (!audio) {
       console.error(`❌ No existe música para: ${roomType}`);
       return;
     }
 
     try {
-      console.log(`📂 Cargando: ${path}`);
-      this.currentAudio = new Audio(path);
-      this.currentAudio.loop = true;
-      this.currentAudio.volume = this.volume;
+      this.currentAudio = audio;
       this.currentRoom = roomType;
-
+      this.currentAudio.currentTime = 0; // Reiniciar desde el inicio
+      
       await this.currentAudio.play();
       console.log(`🎶 Reproduciendo: ${roomType}`);
     } catch (error) {
