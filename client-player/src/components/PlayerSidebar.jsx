@@ -5,7 +5,7 @@ import '../styles/PlayerSidebar.css';
 import bronzeIcon from '../assets/bronze_icon.png';
 import audioService from '../services/audioService';
 
-const PlayerSidebar = ({ isOpen, onToggle }) => {
+const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor = '#ff00ff' }) => {
   const navigate = useNavigate();
   const [showBalance, setShowBalance] = useState(false);
   const [audioStatus, setAudioStatus] = useState({ musicEnabled: true, efectosEnabled: true });
@@ -72,8 +72,9 @@ const PlayerSidebar = ({ isOpen, onToggle }) => {
         className={`sidebar-toggle-btn ${isOpen ? 'hidden' : ''}`}
         onClick={onToggle}
         title="Abrir menú"
+        style={{ backgroundColor: themeColor, borderColor: themeColor }}
       >
-        <FaBars />
+        <FaBars style={{ color: '#1a1310' }} />
       </button>
 
       {/* Overlay */}
@@ -82,34 +83,44 @@ const PlayerSidebar = ({ isOpen, onToggle }) => {
       )}
 
       {/* Sidebar */}
-      <aside className={`player-sidebar ${isOpen ? 'open' : ''}`}>
+      <aside className={`player-sidebar ${isOpen ? 'open' : ''}`} style={{
+        '--theme-color': themeColor,
+        '--accent-color': accentColor,
+        borderLeft: `3px solid ${themeColor}`,
+        boxShadow: `-5px 0 20px ${themeColor}40`
+      }}>
         {/* Header */}
-        <div className="sidebar-header">
-          <h3 className="sidebar-title">Mi Perfil</h3>
-          <button className="sidebar-close-btn" onClick={onToggle}>
+        <div className="sidebar-header" style={{
+          borderBottom: `2px solid ${themeColor}`
+        }}>
+          <h3 className="sidebar-title" style={{ color: themeColor }}>Mi Perfil</h3>
+          <button className="sidebar-close-btn" onClick={onToggle} style={{
+            color: themeColor,
+            borderColor: themeColor
+          }}>
             <FaTimes />
           </button>
         </div>
 
         {/* Usuario */}
-        <div className="sidebar-section">
+        <div className="sidebar-section" style={{ borderBottom: `1px solid ${themeColor}30` }}>
           <div className="sidebar-item user-info">
-            <FaUser className="sidebar-icon user-icon" />
+            <FaUser className="sidebar-icon user-icon" style={{ color: themeColor }} />
             <div className="sidebar-item-content">
               <span className="sidebar-label">Usuario</span>
-              <span className="sidebar-value username">{userData.username}</span>
+              <span className="sidebar-value username" style={{ color: accentColor }}>{userData.username}</span>
             </div>
           </div>
         </div>
 
         {/* Saldo */}
-        <div className="sidebar-section">
+        <div className="sidebar-section" style={{ borderBottom: `1px solid ${themeColor}30` }}>
           <div className="sidebar-item balance-info" onClick={() => setShowBalance(!showBalance)}>
-            <img src={bronzeIcon} alt="Saldo" className="sidebar-balance-icon" />
+            <img src={bronzeIcon} alt="Saldo" className="sidebar-balance-icon" style={{ filter: 'sepia(1) saturate(3) hue-rotate(10deg) brightness(0.9)' }} />
             <div className="sidebar-item-content">
               <span className="sidebar-label">Saldo</span>
               {showBalance ? (
-                <span className="sidebar-value balance">{formatCurrency(userData.balance)}</span>
+                <span className="sidebar-value balance" style={{ color: accentColor }}>{formatCurrency(userData.balance)}</span>
               ) : (
                 <span className="sidebar-value balance hidden">•••••••</span>
               )}
@@ -117,6 +128,7 @@ const PlayerSidebar = ({ isOpen, onToggle }) => {
             <button 
               className="balance-toggle-btn" 
               onClick={(e) => { e.stopPropagation(); setShowBalance(!showBalance); }}
+              style={{ color: themeColor, borderColor: themeColor }}
             >
               {showBalance ? <FaEye /> : <FaEyeSlash />}
             </button>
@@ -124,14 +136,14 @@ const PlayerSidebar = ({ isOpen, onToggle }) => {
         </div>
 
         {/* Mis Cartones - Colapsable */}
-        <div className="sidebar-section">
+        <div className="sidebar-section" style={{ borderBottom: `1px solid ${themeColor}30` }}>
           <div 
             className="sidebar-section-header collapsible" 
             onClick={() => setTicketsExpanded(!ticketsExpanded)}
           >
-            <FaTicketAlt className="section-icon" />
-            <h4 className="section-title">Mis Cartones</h4>
-            <span className={`expand-icon ${ticketsExpanded ? 'expanded' : ''}`}>▼</span>
+            <FaTicketAlt className="section-icon" style={{ color: themeColor }} />
+            <h4 className="section-title" style={{ color: accentColor }}>Mis Cartones</h4>
+            <span className={`expand-icon ${ticketsExpanded ? 'expanded' : ''}`} style={{ color: themeColor }}>▼</span>
           </div>
           
           {ticketsExpanded && (
@@ -158,25 +170,25 @@ const PlayerSidebar = ({ isOpen, onToggle }) => {
 
         {/* Botones de Acción */}
         <div className="sidebar-actions">
-          <button className="sidebar-action-btn lobby-btn" onClick={handleGoToLobby}>
-            <FaHome className="action-icon" />
+          <button className="sidebar-action-btn lobby-btn" onClick={handleGoToLobby} style={{ borderColor: themeColor }}>
+            <FaHome className="action-icon" style={{ color: themeColor }} />
             <span>Volver al Lobby</span>
           </button>
           
-          <button className="sidebar-action-btn support-btn" onClick={handleSupport}>
-            <FaHeadset className="action-icon" />
+          <button className="sidebar-action-btn support-btn" onClick={handleSupport} style={{ borderColor: themeColor }}>
+            <FaHeadset className="action-icon" style={{ color: themeColor }} />
             <span>Soporte Técnico</span>
           </button>
         </div>
         
         {/* Controles de Audio - Colapsable */}
-        <div className="sidebar-section audio-controls-section">
+        <div className="sidebar-section audio-controls-section" style={{ borderBottom: `1px solid ${themeColor}30` }}>
           <div 
             className="sidebar-section-header collapsible"
             onClick={() => setAudioExpanded(!audioExpanded)}
           >
-            <h4 className="section-title">Audio</h4>
-            <span className={`expand-icon ${audioExpanded ? 'expanded' : ''}`}>▼</span>
+            <h4 className="section-title" style={{ color: accentColor }}>Audio</h4>
+            <span className={`expand-icon ${audioExpanded ? 'expanded' : ''}`} style={{ color: themeColor }}>▼</span>
           </div>
           
           {audioExpanded && (
@@ -185,8 +197,9 @@ const PlayerSidebar = ({ isOpen, onToggle }) => {
                 className={`audio-control-btn ${audioStatus.musicEnabled ? 'active' : ''}`}
                 onClick={toggleMusic}
                 title={audioStatus.musicEnabled ? 'Desactivar música' : 'Activar música'}
+                style={audioStatus.musicEnabled ? { backgroundColor: `${themeColor}30`, borderColor: themeColor, color: accentColor } : { borderColor: `${themeColor}50` }}
               >
-                {audioStatus.musicEnabled ? <FaMusic /> : <FaVolumeMute />}
+                {audioStatus.musicEnabled ? <FaMusic style={{ color: themeColor }} /> : <FaVolumeMute />}
                 <span>{audioStatus.musicEnabled ? 'Música ON' : 'Música OFF'}</span>
               </button>
               
@@ -194,8 +207,9 @@ const PlayerSidebar = ({ isOpen, onToggle }) => {
                 className={`audio-control-btn ${audioStatus.efectosEnabled ? 'active' : ''}`}
                 onClick={toggleEfectos}
                 title={audioStatus.efectosEnabled ? 'Desactivar efectos' : 'Activar efectos'}
+                style={audioStatus.efectosEnabled ? { backgroundColor: `${themeColor}30`, borderColor: themeColor, color: accentColor } : { borderColor: `${themeColor}50` }}
               >
-                {audioStatus.efectosEnabled ? <FaVolumeUp /> : <FaVolumeMute />}
+                {audioStatus.efectosEnabled ? <FaVolumeUp style={{ color: themeColor }} /> : <FaVolumeMute />}
                 <span>{audioStatus.efectosEnabled ? 'Efectos ON' : 'Efectos OFF'}</span>
               </button>
             </div>

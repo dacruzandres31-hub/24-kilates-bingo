@@ -1,8 +1,8 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import '../styles/BronzeRoom.css';
-import GiftIcon from '../assets/Gift_icon.png';
-import selectCardsButton from '../assets/select_cards_button.png';
+import '../styles/BronzeRoomIndustrial.css?v=2';
+import GiftIcon from '../assets/bronze_icon.png';
+import selectCardsButton from '../assets/comprar_boton_bronce.png';
 import voiceService from '../services/voiceService';
 import audioService from '../services/audioService';
 import PlayerSidebar from './PlayerSidebar';
@@ -297,15 +297,16 @@ celebrationAudio.volume = 0.7;
 
   // Función para obtener color según el número (estilo arcoíris)
   const getBallColor = (number) => {
-    if (number >= 1 && number <= 10) return '#ff0000'; // Rojo
-    if (number >= 11 && number <= 20) return '#ff7700'; // Naranja
-    if (number >= 21 && number <= 30) return '#ffdd00'; // Amarillo
-    if (number >= 31 && number <= 40) return '#00ff00'; // Verde
-    if (number >= 41 && number <= 50) return '#00ddff'; // Cian
-    if (number >= 51 && number <= 60) return '#0077ff'; // Azul
-    if (number >= 61 && number <= 70) return '#7700ff'; // Púrpura
-    if (number >= 71 && number <= 80) return '#ff00ff'; // Magenta
-    return '#ff0099'; // Rosa (81-90)
+    // Tonos marrones claros para sala Bronce (similar a números cantados)
+    if (number >= 1 && number <= 10) return '#c9a876'; // Marrón arena claro
+    if (number >= 11 && number <= 20) return '#d4a574'; // Beige dorado
+    if (number >= 21 && number <= 30) return '#c99456'; // Caramelo
+    if (number >= 31 && number <= 40) return '#b87333'; // Cobre
+    if (number >= 41 && number <= 50) return '#cd9564'; // Bronce claro
+    if (number >= 51 && number <= 60) return '#d2a679'; // Arena dorada
+    if (number >= 61 && number <= 70) return '#c8a36f'; // Marrón miel
+    if (number >= 71 && number <= 80) return '#bc9362'; // Bronce oscuro
+    return '#d4a574'; // Beige metalizado (81-90)
   };
 
   // Organizar bolillas por decenas para el grid
@@ -553,7 +554,12 @@ useEffect(() => {
   }, [ballsDrawn.length]);
 
   return (
-    <div className="starter-room">
+    <div className="bronze-room" style={{
+      minHeight: '100vh',
+      background: '#1a1310',
+      color: '#d4a574',
+      fontFamily: "'Roboto Condensed', 'Arial Narrow', sans-serif"
+    }}>
       {/* Sistema de toasts */}
       <div className="toast-container">
         {toasts.map(toast => (
@@ -651,7 +657,9 @@ useEffect(() => {
           {/* Sidebar con información del jugador */}
           <PlayerSidebar 
             isOpen={sidebarOpen} 
-            onToggle={() => setSidebarOpen(!sidebarOpen)} 
+            onToggle={() => setSidebarOpen(!sidebarOpen)}
+            themeColor="#b87333"
+            accentColor="#d4a574"
           />
 
           {/* CELEBRACIÓN DE LÍNEA GANADORA */}
@@ -716,7 +724,20 @@ useEffect(() => {
         {/* Cuadrícula Digital - IZQUIERDA COMPLETA - 3 FILAS */}
         <div className="digital-grid-full">
           <div className="grid-header">
-            <div className="grid-title">NÚMEROS CANTADOS</div>
+            <div className="grid-title" style={{
+              fontSize: '1rem',
+              fontWeight: 900,
+              letterSpacing: '2px',
+              color: '#b87333',
+              textShadow: '0 0 8px rgba(184, 115, 51, 0.5)',
+              background: 'linear-gradient(180deg, rgba(62, 39, 35, 0.9), rgba(42, 24, 16, 0.9))',
+              borderRadius: '6px',
+              border: '2px solid #5a2d0c',
+              fontFamily: "'Roboto Condensed', 'Arial Narrow', sans-serif",
+              padding: '8px 16px',
+              textAlign: 'center',
+              textTransform: 'uppercase'
+            }}>NÚMEROS CANTADOS</div>
             <div className="grid-glow"></div>
           </div>
           
@@ -733,8 +754,17 @@ useEffect(() => {
                   <div 
                     className="column-letter" 
                     style={{ 
-                      color: getBallColor(start),
-                      textShadow: `0 0 20px ${getBallColor(start)}`
+                      color: '#b87333',
+                      textShadow: '0 0 8px rgba(184, 115, 51, 0.5)',
+                      background: 'linear-gradient(180deg, rgba(62, 39, 35, 0.9), rgba(42, 24, 16, 0.9))',
+                      borderRadius: '6px',
+                      border: '2px solid #5a2d0c',
+                      fontFamily: "'Roboto Condensed', 'Arial Narrow', sans-serif",
+                      padding: '4px 0',
+                      fontWeight: 900,
+                      textAlign: 'center',
+                      fontSize: '1rem',
+                      letterSpacing: '2px'
                     }}
                   >
                     {columnLabel}
@@ -754,13 +784,33 @@ useEffect(() => {
                           key={number} 
                           className={`grid-number ${isCalled ? 'called' : ''} ${isRecent ? 'recent' : ''}`}
                           style={isCalled ? {
-                            backgroundColor: getBallColor(number),
-                            boxShadow: `0 0 20px ${getBallColor(number)}`
-                          } : {}}
+                            background: 'linear-gradient(135deg, #b87333, #d4a574)',
+                            color: '#1a1310',
+                            fontWeight: 900,
+                            border: '2px solid #8b4513',
+                            boxShadow: '0 0 15px rgba(184, 115, 51, 0.8), inset 0 0 10px rgba(255, 255, 255, 0.2)',
+                            fontFamily: "'Roboto Condensed', 'Arial Narrow', sans-serif",
+                            borderRadius: '4px',
+                            padding: '6px 3px',
+                            textAlign: 'center',
+                            fontSize: '1.2rem',
+                            textShadow: '1px 1px 2px rgba(255, 255, 255, 0.3), -1px -1px 2px rgba(0, 0, 0, 0.5)'
+                          } : {
+                            background: 'rgba(26, 19, 16, 0.7)',
+                            border: '1px solid rgba(90, 45, 12, 0.3)',
+                            borderRadius: '4px',
+                            color: '#6b4423',
+                            fontFamily: "'Roboto Condensed', 'Arial Narrow', sans-serif",
+                            padding: '6px 3px',
+                            textAlign: 'center',
+                            fontSize: '1.2rem',
+                            fontWeight: 600,
+                            textShadow: '1px 1px 2px rgba(212, 165, 116, 0.2)'
+                          }}
                         >
                           {number}
                           {isCalled && (
-                            <div className="number-glow-ring" style={{ borderColor: getBallColor(number) }}></div>
+                            <div className="number-glow-ring" style={{ borderColor: '#b87333' }}></div>
                           )}
                         </div>
                       );
@@ -784,8 +834,17 @@ useEffect(() => {
                   <div 
                     className="column-letter" 
                     style={{ 
-                      color: getBallColor(start),
-                      textShadow: `0 0 20px ${getBallColor(start)}`
+                      color: '#b87333',
+                      textShadow: '0 0 8px rgba(184, 115, 51, 0.5)',
+                      background: 'linear-gradient(180deg, rgba(62, 39, 35, 0.9), rgba(42, 24, 16, 0.9))',
+                      borderRadius: '6px',
+                      border: '2px solid #5a2d0c',
+                      fontFamily: "'Roboto Condensed', 'Arial Narrow', sans-serif",
+                      padding: '4px 0',
+                      fontWeight: 900,
+                      textAlign: 'center',
+                      fontSize: '1rem',
+                      letterSpacing: '2px'
                     }}
                   >
                     {columnLabel}
@@ -805,13 +864,33 @@ useEffect(() => {
                           key={number} 
                           className={`grid-number ${isCalled ? 'called' : ''} ${isRecent ? 'recent' : ''}`}
                           style={isCalled ? {
-                            backgroundColor: getBallColor(number),
-                            boxShadow: `0 0 20px ${getBallColor(number)}`
-                          } : {}}
+                            background: 'linear-gradient(135deg, #b87333, #d4a574)',
+                            color: '#1a1310',
+                            fontWeight: 900,
+                            border: '2px solid #8b4513',
+                            boxShadow: '0 0 15px rgba(184, 115, 51, 0.8), inset 0 0 10px rgba(255, 255, 255, 0.2)',
+                            fontFamily: "'Roboto Condensed', 'Arial Narrow', sans-serif",
+                            borderRadius: '4px',
+                            padding: '6px 3px',
+                            textAlign: 'center',
+                            fontSize: '1.2rem',
+                            textShadow: '1px 1px 2px rgba(255, 255, 255, 0.3), -1px -1px 2px rgba(0, 0, 0, 0.5)'
+                          } : {
+                            background: 'rgba(26, 19, 16, 0.7)',
+                            border: '1px solid rgba(90, 45, 12, 0.3)',
+                            borderRadius: '4px',
+                            color: '#6b4423',
+                            fontFamily: "'Roboto Condensed', 'Arial Narrow', sans-serif",
+                            padding: '6px 3px',
+                            textAlign: 'center',
+                            fontSize: '1.2rem',
+                            fontWeight: 600,
+                            textShadow: '1px 1px 2px rgba(212, 165, 116, 0.2)'
+                          }}
                         >
                           {number}
                           {isCalled && (
-                            <div className="number-glow-ring" style={{ borderColor: getBallColor(number) }}></div>
+                            <div className="number-glow-ring" style={{ borderColor: '#b87333' }}></div>
                           )}
                         </div>
                       );
@@ -822,7 +901,7 @@ useEffect(() => {
             })}
           </div>
 
-          {/* FILA 3: 61-70, 71-80, 81-90 */}
+          {/* FILA 3: 61-70, 71-80, 81-90 */}}
           <div className="grid-row">
             {[6, 7, 8].map(columnIndex => {
               const start = columnIndex * 10 + 1;
@@ -835,8 +914,17 @@ useEffect(() => {
                   <div 
                     className="column-letter" 
                     style={{ 
-                      color: getBallColor(start),
-                      textShadow: `0 0 20px ${getBallColor(start)}`
+                      color: '#b87333',
+                      textShadow: '0 0 8px rgba(184, 115, 51, 0.5)',
+                      background: 'linear-gradient(180deg, rgba(62, 39, 35, 0.9), rgba(42, 24, 16, 0.9))',
+                      borderRadius: '6px',
+                      border: '2px solid #5a2d0c',
+                      fontFamily: "'Roboto Condensed', 'Arial Narrow', sans-serif",
+                      padding: '4px 0',
+                      fontWeight: 900,
+                      textAlign: 'center',
+                      fontSize: '1rem',
+                      letterSpacing: '2px'
                     }}
                   >
                     {columnLabel}
@@ -856,13 +944,33 @@ useEffect(() => {
                           key={number} 
                           className={`grid-number ${isCalled ? 'called' : ''} ${isRecent ? 'recent' : ''}`}
                           style={isCalled ? {
-                            backgroundColor: getBallColor(number),
-                            boxShadow: `0 0 20px ${getBallColor(number)}`
-                          } : {}}
+                            background: 'linear-gradient(135deg, #b87333, #d4a574)',
+                            color: '#1a1310',
+                            fontWeight: 900,
+                            border: '2px solid #8b4513',
+                            boxShadow: '0 0 15px rgba(184, 115, 51, 0.8), inset 0 0 10px rgba(255, 255, 255, 0.2)',
+                            fontFamily: "'Roboto Condensed', 'Arial Narrow', sans-serif",
+                            borderRadius: '4px',
+                            padding: '6px 3px',
+                            textAlign: 'center',
+                            fontSize: '1.2rem',
+                            textShadow: '1px 1px 2px rgba(255, 255, 255, 0.3), -1px -1px 2px rgba(0, 0, 0, 0.5)'
+                          } : {
+                            background: 'rgba(26, 19, 16, 0.7)',
+                            border: '1px solid rgba(90, 45, 12, 0.3)',
+                            borderRadius: '4px',
+                            color: '#6b4423',
+                            fontFamily: "'Roboto Condensed', 'Arial Narrow', sans-serif",
+                            padding: '6px 3px',
+                            textAlign: 'center',
+                            fontSize: '1.2rem',
+                            fontWeight: 600,
+                            textShadow: '1px 1px 2px rgba(212, 165, 116, 0.2)'
+                          }}
                         >
                           {number}
                           {isCalled && (
-                            <div className="number-glow-ring" style={{ borderColor: getBallColor(number) }}></div>
+                            <div className="number-glow-ring" style={{ borderColor: '#b87333' }}></div>
                           )}
                         </div>
                       );
@@ -881,11 +989,10 @@ useEffect(() => {
             <div className="room-title">
               <img src={GiftIcon} alt="Gift" className="title-icon" />
               <span className="title-text" style={{ 
-                color: '#00d4ff',
-                textShadow: '0 0 20px rgba(0, 212, 255, 1), 0 0 40px rgba(0, 212, 255, 0.8)',
-                WebkitTextFillColor: '#00d4ff'
+                color: '#b87333',
+                textShadow: '0 0 10px rgba(184, 115, 51, 0.6), 0 0 20px rgba(139, 69, 19, 0.4)',
+                WebkitTextFillColor: '#b87333'
               }}>SALA BRONCE</span>
-              <span className="title-tag">GRATIS</span>
               <button 
                 className="lobby-btn"
                 onClick={() => navigate('/')}
@@ -1002,7 +1109,10 @@ useEffect(() => {
           {gameStatus === 'waiting' && cardsRemaining > 0 && (
             <div className="external-counter">
               <div className="counter-line top-line"></div>
-              <div className="counter-number">{cardsRemaining}</div>
+              <div className="counter-number" style={{
+                color: '#b87333',
+                textShadow: '0 0 15px rgba(184, 115, 51, 0.8), 2px 2px 4px rgba(0, 0, 0, 0.8)'
+              }}>{cardsRemaining}</div>
               <div className="counter-line bottom-line"></div>
               <div className="counter-label">Cartones Disponibles</div>
             </div>
@@ -1042,7 +1152,23 @@ useEffect(() => {
       {/* MITAD INFERIOR - LOS CARTONES */}
       <div className="player-cards-section">
         <div className="cards-header">
-          <div className="cards-title">
+          <div className="cards-title" style={{
+            fontSize: '1rem',
+            fontWeight: 900,
+            letterSpacing: '2px',
+            color: '#b87333',
+            textShadow: '0 0 8px rgba(184, 115, 51, 0.5)',
+            background: 'linear-gradient(180deg, rgba(62, 39, 35, 0.9), rgba(42, 24, 16, 0.9))',
+            borderRadius: '6px',
+            border: '2px solid #5a2d0c',
+            fontFamily: "'Roboto Condensed', 'Arial Narrow', sans-serif",
+            padding: '8px 16px',
+            textAlign: 'center',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px'
+          }}>
             <span className="cards-icon">🎴</span>
             <span>MIS CARTONES</span>
           </div>
@@ -1209,7 +1335,9 @@ useEffect(() => {
       </div>
       
       {/* Sistema de Reacciones */}
-      <div className="reactions-panel">
+      <div className="reactions-panel" style={{
+        boxShadow: '0 0 30px rgba(184, 115, 51, 0.6), inset 0 0 20px rgba(139, 69, 19, 0.2)'
+      }}>
         <div className="reactions-title">Reacciones</div>
         <div className="reactions-buttons">
           <button className="reaction-btn" onClick={() => addFloatingEmoji('👍')} title="Me gusta">👍</button>
