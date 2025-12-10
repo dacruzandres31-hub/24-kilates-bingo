@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaTicketAlt, FaLock, FaCheck, FaTimes, FaClock, FaUsers } from 'react-icons/fa';
+import { FaTicketAlt, FaLock, FaCheck, FaTimes, FaClock, FaUsers, FaArrowLeft } from 'react-icons/fa';
 import '../styles/CardSelectionLobby.css';
 
 const CardSelectionLobby = ({ 
@@ -8,7 +8,8 @@ const CardSelectionLobby = ({
   onCancel,
   maxCards = 20,
   currentCards = 0, // Cartones ya seleccionados
-  timeWindow = 'open' // 'open', 'closed', 'drawing'
+  timeWindow = 'open', // 'open', 'closed', 'drawing'
+  roomTheme = 'starter' // 'starter', 'bronze', 'silver', 'gold'
 }) => {
   const [availableCards, setAvailableCards] = useState([]);
   const [selectedCards, setSelectedCards] = useState([]);
@@ -117,7 +118,7 @@ const CardSelectionLobby = ({
 
   if (timeWindow === 'closed') {
     return (
-      <div className="card-selection-lobby closed">
+      <div className={`card-selection-lobby closed theme-${roomTheme}`}>
         <div className="closed-message">
           <FaLock className="closed-icon" />
           <h2>Selección Cerrada</h2>
@@ -125,8 +126,8 @@ const CardSelectionLobby = ({
           <p className="closed-info">
             Podrás elegir cartones 5 minutos antes del próximo sorteo.
           </p>
-          <button className="btn-cancel" onClick={onCancel}>
-            <FaTimes /> Volver
+          <button className="btn-back" onClick={onCancel}>
+            <FaArrowLeft /> Regresar a la Sala
           </button>
         </div>
       </div>
@@ -135,7 +136,7 @@ const CardSelectionLobby = ({
 
   if (loading) {
     return (
-      <div className="card-selection-lobby loading">
+      <div className={`card-selection-lobby loading theme-${roomTheme}`}>
         <div className="spinner"></div>
         <p>Cargando cartones disponibles...</p>
       </div>
@@ -143,14 +144,14 @@ const CardSelectionLobby = ({
   }
 
   return (
-    <div className="card-selection-lobby">
+    <div className={`card-selection-lobby theme-${roomTheme}`}>
       {/* Header */}
       <div className="selection-header">
         <div className="header-content">
           <div className="header-left">
             <FaTicketAlt className="header-icon" />
             <div className="header-info">
-              <h2 className="header-title">Lobby de Selección de Cartones</h2>
+              <h2 className="header-title">Sala de Selección de Cartones</h2>
               <p className="header-subtitle">
                 {currentCards > 0 
                   ? `Tienes ${currentCards} cartones. Selecciona hasta ${maxCards} más (Total: ${currentCards + maxCards} / 20)`
@@ -251,17 +252,18 @@ const CardSelectionLobby = ({
       {/* Footer con acciones */}
       <div className="selection-footer">
         <button 
-          className="btn-cancel" 
+          className="btn-back" 
           onClick={onCancel}
+          title="Regresar a la sala sin seleccionar cartones"
         >
-          <FaTimes /> Cancelar
+          <FaArrowLeft /> Regresar a la Sala
         </button>
         
         <div className="selection-info">
           <span className="info-text">
             {selectedCards.length > 0 
               ? `${selectedCards.length} cartón${selectedCards.length > 1 ? 'es' : ''} seleccionado${selectedCards.length > 1 ? 's' : ''}`
-              : 'Selecciona al menos 1 cartón'}
+              : 'Selecciona cartones o regresa a la sala'}
           </span>
         </div>
         
@@ -270,7 +272,7 @@ const CardSelectionLobby = ({
           onClick={handleConfirmSelection}
           disabled={selectedCards.length === 0}
         >
-          <FaCheck /> Confirmar ({selectedCards.length})
+          <FaCheck /> Confirmar Selección ({selectedCards.length})
         </button>
       </div>
     </div>

@@ -8,8 +8,11 @@ class AudioService {
     this.currentAudio = null;
     this.currentRoom = null;
     this.volume = 0.15;
+    this.normalVolume = 0.15; // Volumen normal
+    this.lowerVolume = 0.105; // 30% menos (0.15 * 0.7 = 0.105)
     this.enabled = true;
     this.audioCache = {}; // Cache de audios precargados
+    this.isDrawing = false; // Estado del sorteo
     
     // Efectos de sonido
     this.efectosEnabled = true;
@@ -92,10 +95,20 @@ class AudioService {
       this.currentRoom = roomType;
       this.currentAudio.currentTime = 0; // Reiniciar desde el inicio
       
+      // Aplicar el volumen correcto según el estado
+      if (this.isDrawing) {
+        this.currentAudio.volume = this.lowerVolume;
+        console.log(`🔉 Aplicando volumen reducido: ${this.lowerVolume}`);
+      } else {
+        this.currentAudio.volume = this.normalVolume;
+        console.log(`🔊 Aplicando volumen normal: ${this.normalVolume}`);
+      }
+      
       await this.currentAudio.play();
-      console.log(`🎶 Reproduciendo: ${roomType}`);
+      console.log(`🎶 Reproduciendo: ${roomType} (volumen: ${this.currentAudio.volume})`);
     } catch (error) {
       console.error(`❌ Error reproduciendo ${roomType}:`, error.message);
+      throw error; // Re-lanzar para que el caller pueda manejar
     }
   }
 
@@ -130,14 +143,27 @@ class AudioService {
   }
 
   startBolilleroGirando() {
-    if (!this.efectosEnabled || !this.bolillerAudio) return;
+    if (!this.efectosEnabled || !this.bolillerAudio) {
+      console.warn('⚠️ Bolillero no disponible o efectos desactivados');
+      return;
+    }
     
     try {
+      // Reiniciar inmediatamente sin esperar
       this.bolillerAudio.currentTime = 0;
-      this.bolillerAudio.play().catch(err => {
-        console.warn('⚠️ No se pudo reproducir bolillero:', err.message);
-      });
-      console.log('🎰 Bolillero girando iniciado');
+      
+      // Intentar reproducir sin await para ejecución inmediata
+      const playPromise = this.bolillerAudio.play();
+      
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log('🎰 Bolillero girando iniciado exitosamente');
+          })
+          .catch(err => {
+            console.warn('⚠️ No se pudo reproducir bolillero:', err.message);
+          });
+      }
     } catch (error) {
       console.error('❌ Error iniciando bolillero:', error.message);
     }
@@ -156,23 +182,27 @@ class AudioService {
   }
 
   playBolaCayendo() {
-    if (!this.efectosEnabled || !this.bolaAudio) return;
+    if (!this.efectosEnabled || !this.bolaAudio) {
+      console.warn('⚠️ Efecto bola no disponible o efectos desactivados');
+      return;
+    }
     
     try {
-      // Si el audio ya está reproduciéndose, clonarlo para permitir solapamiento
-      if (!this.bolaAudio.paused) {
-        const clonedAudio = this.bolaAudio.cloneNode();
-        clonedAudio.volume = this.bolaAudio.volume;
-        clonedAudio.play().catch(err => {
-          console.warn('⚠️ No se pudo reproducir bola cayendo (clonada):', err.message);
-        });
-        console.log('🎱 Bola cayendo reproducida (clonada)');
-      } else {
-        this.bolaAudio.currentTime = 0;
-        this.bolaAudio.play().catch(err => {
-          console.warn('⚠️ No se pudo reproducir bola cayendo:', err.message);
-        });
-        console.log('🎱 Bola cayendo reproducida');
+      // Reiniciar desde el inicio para reproducción inmediata
+      // No clonar - es más rápido reiniciar el mismo audio
+      this.bolaAudio.currentTime = 0;
+      
+      // Reproducir inmediatamente sin await
+      const playPromise = this.bolaAudio.play();
+      
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            // Silencioso en éxito para no saturar logs
+          })
+          .catch(err => {
+            console.warn('⚠️ No se pudo reproducir bola cayendo:', err.message);
+          });
       }
     } catch (error) {
       console.error('❌ Error reproduciendo bola cayendo:', error.message);
@@ -202,6 +232,38 @@ class AudioService {
     return this.efectosEnabled;
   }
 
+  /**
+   * Baja el volumen de la música al 70% cuando comienza el sorteo
+   */
+  lowerMusicVolume() {
+    console.log(`🔉 [lowerMusicVolume] Llamado - currentAudio existe: ${!!this.currentAudio}, está reproduciendo: ${this.currentAudio && !this.currentAudio.paused}`);
+    
+    if (this.currentAudio) {
+      this.isDrawing = true;
+      const oldVolume = this.currentAudio.volume;
+      this.currentAudio.volume = this.lowerVolume;
+      console.log(`🔉 Volumen de música bajado de ${oldVolume} a ${this.currentAudio.volume} (70% del normal: ${this.normalVolume})`);
+    } else {
+      console.warn('⚠️ No se puede bajar volumen: no hay audio reproduciéndose');
+    }
+  }
+
+  /**
+   * Restaura el volumen de la música al 100% cuando termina el sorteo
+   */
+  restoreMusicVolume() {
+    console.log(`🔊 [restoreMusicVolume] Llamado - currentAudio existe: ${!!this.currentAudio}, está reproduciendo: ${this.currentAudio && !this.currentAudio.paused}`);
+    
+    if (this.currentAudio) {
+      this.isDrawing = false;
+      const oldVolume = this.currentAudio.volume;
+      this.currentAudio.volume = this.normalVolume;
+      console.log(`🔊 Volumen de música restaurado de ${oldVolume} a ${this.currentAudio.volume} (100% normal: ${this.normalVolume})`);
+    } else {
+      console.warn('⚠️ No se puede restaurar volumen: no hay audio reproduciéndose');
+    }
+  }
+
   getStatus() {
     return {
       initialized: true,
@@ -209,7 +271,9 @@ class AudioService {
       musicEnabled: this.enabled,
       musicPlaying: this.currentAudio && !this.currentAudio.paused,
       efectosEnabled: this.efectosEnabled,
-      bolilleroPlaying: this.bolillerAudio && !this.bolillerAudio.paused
+      bolilleroPlaying: this.bolillerAudio && !this.bolillerAudio.paused,
+      isDrawing: this.isDrawing,
+      currentVolume: this.currentAudio ? this.currentAudio.volume : 0
     };
   }
 }

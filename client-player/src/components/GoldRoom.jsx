@@ -35,7 +35,6 @@ const [highlightedLine, setHighlightedLine] = useState(null); // Línea a resalt
   
   // Estados para mejoras visuales
   const [toasts, setToasts] = useState([]); // Notificaciones toast
-  const [showTransition, setShowTransition] = useState(false); // Cortinilla de transición
   const [showConfetti, setShowConfetti] = useState(false); // Confeti digital
   const [luckMeter, setLuckMeter] = useState(0); // Medidor de suerte (0-100)
   const [comboCount, setComboCount] = useState(0); // Contador de combo
@@ -503,22 +502,26 @@ useEffect(() => {
   // Detectar cambios en el estado del juego y anunciar
   useEffect(() => {
     if (gameStatus === 'active' && previousGameStatus === 'waiting') {
-      voiceService.announceSorteoIniciado();
-      // Iniciar sonido de bolillero
+      // PRIMERO: Iniciar sonido de bolillero inmediatamente (sin retardo)
       audioService.startBolilleroGirando();
-      // Mostrar transición
-      setShowTransition(true);
-      setTimeout(() => setShowTransition(false), 1500);
+      // SEGUNDO: Bajar volumen de música de fondo al 70%
+      audioService.lowerMusicVolume();
+      // TERCERO: Anuncios y efectos visuales
+      voiceService.announceSorteoIniciado();
       addToast('🎲', '¡Sorteo iniciado!', 'Buena suerte');
     } else if (gameStatus === 'waiting' && previousGameStatus === 'active') {
       voiceService.announceSorteoPausado();
       // Detener sonido de bolillero
       audioService.stopBolilleroGirando();
+      // Restaurar volumen de música al 100%
+      audioService.restoreMusicVolume();
       addToast('⏸️', 'Sorteo pausado', 'Esperando...');
     } else if (gameStatus === 'active' && previousGameStatus === 'paused') {
       voiceService.announceSorteoReiniciado();
       // Reiniciar sonido de bolillero
       audioService.startBolilleroGirando();
+      // Bajar volumen de música de fondo al 70%
+      audioService.lowerMusicVolume();
     }
     setPreviousGameStatus(gameStatus);
   }, [gameStatus]);
@@ -566,15 +569,6 @@ useEffect(() => {
           </div>
         ))}
       </div>
-
-      {/* Contador de bolas restantes */}
-      {gameStatus === 'active' && (
-        <div className="balls-counter">
-          <div className="counter-icon">🎱</div>
-          <div className="counter-value">{90 - ballsDrawn.length}</div>
-          <div className="counter-label">Bolas restantes</div>
-        </div>
-      )}
 
       {/* Panel de gamificación */}
       {playerCards.length > 0 && (
@@ -626,10 +620,12 @@ useEffect(() => {
         </div>
       )}
 
-      {/* Cortinilla de transición */}
-      {showTransition && (
-        <div className="transition-curtain">
-          <div className="curtain-text">¡COMIENZA!</div>
+      {/* Contador Pre-40 (Posibilidad de Pozo) */}
+      {gameStatus === 'active' && ballsDrawn.length < 40 && (
+        <div className={`pre40-counter ${ballsDrawn.length >= 39 ? 'spin-exit' : ''}`}>
+          <div className="pre40-title">🎰 Posibilidad de Pozo Pre-40</div>
+          <div className="pre40-value">{40 - ballsDrawn.length}</div>
+          <div className="pre40-label">Bolas restantes</div>
         </div>
       )}
 
@@ -893,9 +889,8 @@ useEffect(() => {
               >
                 LOBBY
               </button>
-              <div className="info-badge">
-                <span className="badge-label">Bolas:</span>
-                <span className="badge-value">{ballsDrawn.length}/90</span>
+              <div className="ball-counter-display">
+                🎱 Bola {ballsDrawn.length} de 90
               </div>
               <div className={`status-badge ${gameStatus}`}>
                 {gameStatus === 'waiting' && '⏸️ ESPERA'}

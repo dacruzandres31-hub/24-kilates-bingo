@@ -35,7 +35,6 @@ const [highlightedLine, setHighlightedLine] = useState(null); // Línea a resalt
   
   // Estados para mejoras visuales
   const [toasts, setToasts] = useState([]); // Notificaciones toast
-  const [showTransition, setShowTransition] = useState(false); // Cortinilla de transición
   const [showConfetti, setShowConfetti] = useState(false); // Confeti digital
   const [luckMeter, setLuckMeter] = useState(0); // Medidor de suerte (0-100)
   const [comboCount, setComboCount] = useState(0); // Contador de combo
@@ -200,29 +199,61 @@ celebrationAudio.volume = 0.7;
     setColumnCounts(counts);
   };
 
-  // Simular bolillas flotantes en el bolillero
+  // Simular bolillas flotantes en el bolillero e INICIAR MÚSICA
   useEffect(() => {
-    const colors = ['#ff00ff', '#00ff00', '#00ffff', '#ffff00', '#ff0099'];
-    const balls = Array.from({ length: 15 }, (_, i) => ({
-      id: i,
-      number: Math.floor(Math.random() * 90) + 1,
-      color: colors[Math.floor(Math.random() * colors.length)],
-      delay: Math.random() * 3,
-      duration: 3 + Math.random() * 2
-    }));
+    const colors = ['#8B4513', '#A0522D', '#CD853F', '#D2691E', '#B8860B', '#DEB887', '#D2B48C', '#BC8F8F', '#A0826D'];
+    const balls = Array.from({ length: 15 }, (_, i) => {
+      const randomNumber = Math.floor(Math.random() * 90) + 1;
+      return {
+        id: i,
+        number: randomNumber,
+        color: getBallColor(randomNumber),
+        delay: Math.random() * 3,
+        duration: 3 + Math.random() * 2
+      };
+    });
     setFloatingBalls(balls);
 
-    // Activar audio en primer click
-    let activated = false;
-    const handleClick = () => {
-      if (!activated) {
-        activated = true;
-        audioService.playForRoom('bronce');
-        document.removeEventListener('click', handleClick);
+    // ACTIVACIÓN DE AUDIO - Estrategia múltiple
+    let musicStarted = false;
+    
+    const startMusic = async () => {
+      if (musicStarted) return;
+      
+      try {
+        console.log('🎵 [BronzeRoom] Intentando iniciar música...');
+        await audioService.playForRoom('bronze');
+        musicStarted = true;
+        console.log('✅ [BronzeRoom] Música iniciada correctamente');
+      } catch (err) {
+        console.warn('⚠️ [BronzeRoom] No se pudo iniciar música:', err.message);
       }
     };
+
+    // Intento 1: Inmediato (probablemente fallará por política del navegador)
+    startMusic();
+
+    // Intento 2: Listeners para CUALQUIER tipo de interacción
+    const handleUserInteraction = (event) => {
+      console.log(`🎵 [BronzeRoom] Interacción detectada (${event.type}), iniciando música...`);
+      startMusic().then(() => {
+        // Remover listeners después de éxito
+        if (musicStarted) {
+          document.removeEventListener('click', handleUserInteraction);
+          document.removeEventListener('touchstart', handleUserInteraction);
+          document.removeEventListener('keydown', handleUserInteraction);
+          document.removeEventListener('mousemove', handleUserInteraction);
+          console.log('🎵 [BronzeRoom] Listeners de audio removidos');
+        }
+      });
+    };
     
-    document.addEventListener('click', handleClick);
+    // Agregar múltiples listeners
+    document.addEventListener('click', handleUserInteraction, { once: false });
+    document.addEventListener('touchstart', handleUserInteraction, { once: false });
+    document.addEventListener('keydown', handleUserInteraction, { once: false });
+    // Mousemove como último recurso
+    document.addEventListener('mousemove', handleUserInteraction, { once: true });
 
     // Cargar voces disponibles
     setTimeout(() => {
@@ -232,7 +263,10 @@ celebrationAudio.volume = 0.7;
     }, 500);
     
     return () => {
-      document.removeEventListener('click', handleClick);
+      document.removeEventListener('click', handleUserInteraction);
+      document.removeEventListener('touchstart', handleUserInteraction);
+      document.removeEventListener('keydown', handleUserInteraction);
+      document.removeEventListener('mousemove', handleUserInteraction);
       // Detener efectos de sonido al desmontar
       audioService.stopBolilleroGirando();
     };
@@ -295,18 +329,18 @@ celebrationAudio.volume = 0.7;
     }
   }, [gameStatus, previousGameStatus]);
 
-  // Función para obtener color según el número (estilo arcoíris)
+  // Función para obtener color según el número (paleta marrón bronce)
   const getBallColor = (number) => {
-    // Tonos marrones claros para sala Bronce (similar a números cantados)
-    if (number >= 1 && number <= 10) return '#c9a876'; // Marrón arena claro
-    if (number >= 11 && number <= 20) return '#d4a574'; // Beige dorado
-    if (number >= 21 && number <= 30) return '#c99456'; // Caramelo
-    if (number >= 31 && number <= 40) return '#b87333'; // Cobre
-    if (number >= 41 && number <= 50) return '#cd9564'; // Bronce claro
-    if (number >= 51 && number <= 60) return '#d2a679'; // Arena dorada
-    if (number >= 61 && number <= 70) return '#c8a36f'; // Marrón miel
-    if (number >= 71 && number <= 80) return '#bc9362'; // Bronce oscuro
-    return '#d4a574'; // Beige metalizado (81-90)
+    // Tonos marrones variados para sala Bronce - paleta completa marrón
+    if (number >= 1 && number <= 10) return '#8B4513'; // Marrón silla de montar
+    if (number >= 11 && number <= 20) return '#A0522D'; // Siena
+    if (number >= 21 && number <= 30) return '#CD853F'; // Marrón Perú
+    if (number >= 31 && number <= 40) return '#D2691E'; // Chocolate
+    if (number >= 41 && number <= 50) return '#B8860B'; // Dorado oscuro
+    if (number >= 51 && number <= 60) return '#DEB887'; // Madera clara
+    if (number >= 61 && number <= 70) return '#D2B48C'; // Bronceado
+    if (number >= 71 && number <= 80) return '#BC8F8F'; // Rosa marrón
+    return '#A0826D'; // Marrón topo (81-90)
   };
 
   // Organizar bolillas por decenas para el grid
@@ -345,12 +379,8 @@ celebrationAudio.volume = 0.7;
   };
 
   const handleCancelSelection = () => {
-    // Volver al lobby si no tiene cartones
-    if (selectedPlayerCards.length === 0) {
-      navigate('/lobby');
-    } else {
-      setShowCardSelection(false);
-    }
+    // Solo cerrar el overlay de selección, permitir que el usuario vea la sala
+    setShowCardSelection(false);
   };
 
   const isNumberCalled = (number) => {
@@ -504,22 +534,26 @@ useEffect(() => {
   // Detectar cambios en el estado del juego y anunciar
   useEffect(() => {
     if (gameStatus === 'active' && previousGameStatus === 'waiting') {
-      voiceService.announceSorteoIniciado();
-      // Iniciar sonido de bolillero
+      // PRIMERO: Iniciar sonido de bolillero inmediatamente (sin retardo)
       audioService.startBolilleroGirando();
-      // Mostrar transición
-      setShowTransition(true);
-      setTimeout(() => setShowTransition(false), 1500);
+      // SEGUNDO: Bajar volumen de música de fondo al 70%
+      audioService.lowerMusicVolume();
+      // TERCERO: Anuncios y efectos visuales
+      voiceService.announceSorteoIniciado();
       addToast('🎲', '¡Sorteo iniciado!', 'Buena suerte');
     } else if (gameStatus === 'waiting' && previousGameStatus === 'active') {
       voiceService.announceSorteoPausado();
       // Detener sonido de bolillero
       audioService.stopBolilleroGirando();
+      // Restaurar volumen de música al 100%
+      audioService.restoreMusicVolume();
       addToast('⏸️', 'Sorteo pausado', 'Esperando...');
     } else if (gameStatus === 'active' && previousGameStatus === 'paused') {
       voiceService.announceSorteoReiniciado();
       // Reiniciar sonido de bolillero
       audioService.startBolilleroGirando();
+      // Bajar volumen de música de fondo al 70%
+      audioService.lowerMusicVolume();
     }
     setPreviousGameStatus(gameStatus);
   }, [gameStatus]);
@@ -529,13 +563,13 @@ useEffect(() => {
     if (ballsDrawn.length > 0) {
       const lastDrawnBall = ballsDrawn[ballsDrawn.length - 1];
       
-      // Reproducir sonido de bola cayendo inmediatamente
+      // Reproducir sonido de bola cayendo inmediatamente (sin delay)
       audioService.playBolaCayendo();
       
-      // Anunciar el número con voz
+      // Anunciar el número con voz (delay mínimo de 200ms para que suene natural)
       setTimeout(() => {
         voiceService.announceNumber(lastDrawnBall.number);
-      }, 500);
+      }, 200);
       
       // Actualizar combo y suerte
       updateCombo();
@@ -572,15 +606,6 @@ useEffect(() => {
           </div>
         ))}
       </div>
-
-      {/* Contador de bolas restantes */}
-      {gameStatus === 'active' && (
-        <div className="balls-counter">
-          <div className="counter-icon">🎱</div>
-          <div className="counter-value">{90 - ballsDrawn.length}</div>
-          <div className="counter-label">Bolas restantes</div>
-        </div>
-      )}
 
       {/* Panel de gamificación */}
       {playerCards.length > 0 && (
@@ -632,14 +657,16 @@ useEffect(() => {
         </div>
       )}
 
-      {/* Cortinilla de transición */}
-      {showTransition && (
-        <div className="transition-curtain">
-          <div className="curtain-text">¡COMIENZA!</div>
+      {/* Contador Pre-40 (Posibilidad de Pozo) */}
+      {gameStatus === 'active' && ballsDrawn.length < 40 && (
+        <div className={`pre40-counter ${ballsDrawn.length >= 39 ? 'spin-exit' : ''}`}>
+          <div className="pre40-title">🎰 Posibilidad de Pozo Pre-40</div>
+          <div className="pre40-value">{40 - ballsDrawn.length}</div>
+          <div className="pre40-label">Bolas restantes</div>
         </div>
       )}
 
-      {/* Lobby de selección de cartones (overlay sobre la sala) */}
+      {/* Sala de selección de cartones (overlay sobre la sala) */}
       {showCardSelection && (
         <CardSelectionLobby
           sessionId={sessionId || 'starter_default'}
@@ -648,6 +675,7 @@ useEffect(() => {
           maxCards={cardsRemaining}
           currentCards={selectedPlayerCards.length}
           timeWindow="open"
+          roomTheme="bronze"
         />
       )}
 
@@ -1000,9 +1028,8 @@ useEffect(() => {
               >
                 LOBBY
               </button>
-              <div className="info-badge">
-                <span className="badge-label">Bolas:</span>
-                <span className="badge-value">{ballsDrawn.length}/90</span>
+              <div className="ball-counter-display">
+                🎱 Bola {ballsDrawn.length} de 90
               </div>
               <div className={`status-badge ${gameStatus}`}>
                 {gameStatus === 'waiting' && '⏸️ ESPERA'}

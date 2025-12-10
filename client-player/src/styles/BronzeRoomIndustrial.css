@@ -1,6 +1,6 @@
-﻿/* ============================================
-   SALA STARTER - NEÃ“N, ENERGÃA, ARCADE MODERNO
-   Paleta: Cian ElÃ©ctrico, Violeta NeÃ³n, Negro Profundo
+/* ============================================
+   SALA STARTER - NEÓN, ENERGÍA, ARCADE MODERNO
+   Paleta: Cian Eléctrico, Violeta Neón, Negro Profundo
    ============================================ */
 
 .bronze-room {
@@ -33,7 +33,7 @@
   }
 }
 
-/* Cortinilla de transiciÃ³n waiting â†’ active */
+/* Cortinilla de transición waiting → active */
 .transition-curtain {
   position: fixed;
   inset: 0;
@@ -101,7 +101,7 @@
 }
 
 /* ============================================
-   CELEBRACIÃ“N DE LÃNEA GANADORA
+   CELEBRACIÓN DE LÍNEA GANADORA
    ============================================ */
 
 .winner-celebration-overlay {
@@ -265,7 +265,7 @@
   }
 }
 
-/* Estilos para el cartÃ³n en el modal de celebraciÃ³n */
+/* Estilos para el cartón en el modal de celebración */
 .celebration-card-expanded {
   margin: 30px auto;
   max-width: 700px;
@@ -324,7 +324,7 @@
   text-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
 }
 
-/* LÃ­nea resaltada en dorado */
+/* Línea resaltada en dorado */
 .celebration-card-expanded .card-cell.highlighted-line {
   background: linear-gradient(135deg, #ff6600 0%, #ff6600 100%);
   border: 3px solid #ff6600;
@@ -352,11 +352,11 @@
 }
 
 /* ============================================
-   ALERTA DE CASI LÃNEA
+   ALERTA DE CASI LÍNEA
    ============================================ */
 
 /* ============================================
-   ALERTA DE CASI LÃNEA - COMPACTA
+   ALERTA DE CASI LÍNEA - COMPACTA
    ============================================ */
 
 .compact-line-alert {
@@ -740,6 +740,40 @@
   }
 }
 
+/* Contador de bolas sorteadas - Bronze theme */
+.ball-counter-display {
+  font-size: 0.85rem;
+  background: linear-gradient(135deg, rgba(205, 127, 50, 0.3), rgba(139, 69, 19, 0.3));
+  color: #cd7f32;
+  padding: 6px 14px;
+  border: 2px solid rgba(205, 127, 50, 0.8);
+  border-radius: 15px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  box-shadow: 
+    0 0 15px rgba(205, 127, 50, 0.6),
+    inset 0 0 10px rgba(205, 127, 50, 0.2);
+  animation: ball-counter-glow 2s ease-in-out infinite;
+  text-shadow: 0 0 10px rgba(205, 127, 50, 0.8);
+  white-space: nowrap;
+}
+
+@keyframes ball-counter-glow {
+  0%, 100% {
+    box-shadow: 
+      0 0 15px rgba(205, 127, 50, 0.6),
+      inset 0 0 10px rgba(205, 127, 50, 0.2);
+    text-shadow: 0 0 10px rgba(205, 127, 50, 0.8);
+  }
+  50% {
+    box-shadow: 
+      0 0 25px rgba(205, 127, 50, 0.9),
+      0 0 35px rgba(205, 127, 50, 0.7),
+      inset 0 0 15px rgba(205, 127, 50, 0.3);
+    text-shadow: 0 0 15px rgba(205, 127, 50, 1);
+  }
+}
+
 .game-info {
   display: flex;
   gap: 15px;
@@ -823,7 +857,7 @@
 }
 
 /* ============================================
-   CUADRÃCULA DIGITAL (IZQUIERDA) - 3x3 LAYOUT
+   CUADRÍCULA DIGITAL (IZQUIERDA) - 3x3 LAYOUT
    ============================================ */
 
 .digital-grid-full {
@@ -938,7 +972,24 @@
 }
 
 .grid-row .grid-number.recent {
-  animation: recentPulse 1s ease-in-out, ripple-wave 0.8s ease-out;
+  animation: recentPulse-subtle 2s ease-in-out;
+}
+
+@keyframes recentPulse-subtle {
+  0%, 100% {
+    transform: scale(1.05);
+    box-shadow: 
+      0 4px 8px rgba(139, 69, 19, 0.6),
+      inset 0 1px 0 rgba(255, 255, 255, 0.3),
+      inset 0 -1px 2px rgba(0, 0, 0, 0.4);
+  }
+  50% {
+    transform: scale(1.08);
+    box-shadow: 
+      0 6px 12px rgba(139, 69, 19, 0.8),
+      inset 0 1px 0 rgba(255, 255, 255, 0.4),
+      inset 0 -1px 2px rgba(0, 0, 0, 0.4);
+  }
 }
 
 @keyframes ripple-wave {
@@ -950,30 +1001,7 @@
   }
 }
 
-/* PartÃ­culas doradas flotantes */
-.grid-row .grid-number.recent::after {
-  content: 'âœ¨';
-  position: absolute;
-  top: -20px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 1rem;
-  animation: particle-float-up 1.5s ease-out forwards;
-  pointer-events: none;
-}
-
-@keyframes particle-float-up {
-  0% {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
-  100% {
-    opacity: 0;
-    transform: translateX(-50%) translateY(-50px);
-  }
-}
-
-/* Barra de Ãºltimas bolas */
+/* Barra de últimas bolas */
 .recent-balls-bar {
   margin-top: 12px;
   padding: 10px;
@@ -1024,7 +1052,7 @@
 }
 
 /* ============================================
-   CUADRÃCULA DIGITAL ANTIGUA (BACKUP)
+   CUADRÍCULA DIGITAL ANTIGUA (BACKUP)
    ============================================ */
 
 .digital-grid {
@@ -1127,34 +1155,36 @@
   box-shadow: 
     0 0 15px rgba(184, 115, 51, 0.8),
     inset 0 0 10px rgba(255, 255, 255, 0.2);
-  animation: number-called 0.6s ease-out;
+  animation: number-called-smooth 0.4s ease-out;
   z-index: 1;
 }
 
-@keyframes number-called {
+@keyframes number-called-smooth {
   0% {
-    transform: scale(0.5) rotate(0deg);
-    opacity: 0;
+    transform: scale(0.8);
+    opacity: 0.5;
   }
   50% {
-    transform: scale(1.3) rotate(180deg);
+    transform: scale(1.1);
   }
   100% {
-    transform: scale(1) rotate(360deg);
+    transform: scale(1);
     opacity: 1;
   }
 }
 
 .grid-number.recent {
-  animation: recent-pulse 1.5s ease-in-out infinite;
+  animation: recent-pulse-subtle 2s ease-in-out;
 }
 
-@keyframes recent-pulse {
+@keyframes recent-pulse-subtle {
   0%, 100% {
     transform: scale(1);
+    box-shadow: 0 0 15px rgba(184, 115, 51, 0.8);
   }
   50% {
-    transform: scale(1.15);
+    transform: scale(1.05);
+    box-shadow: 0 0 20px rgba(184, 115, 51, 1);
   }
 }
 
@@ -1181,7 +1211,7 @@
   }
 }
 
-/* Barra de Ãºltimas bolas */
+/* Barra de últimas bolas */
 .recent-balls-bar {
   margin-top: 4px;
   padding: 6px 10px;
@@ -1241,7 +1271,7 @@
 }
 
 /* ============================================
-   SECCIÃ“N DERECHA - TÃTULO + INFO + BOLILLERO
+   SECCIÓN DERECHA - TÍTULO + INFO + BOLILLERO
    ============================================ */
 
 .right-section {
@@ -1391,7 +1421,7 @@
   50% { opacity: 1; }
 }
 
-/* Esfera de AcrÃ­lico Transparente */
+/* Esfera de Acrílico Transparente */
 .acrylic-sphere {
   width: 240px;
   height: 240px;
@@ -1552,7 +1582,7 @@
   }
 }
 
-/* PartÃ­culas de explosiÃ³n al aparecer bola */
+/* Partículas de explosión al aparecer bola */
 @keyframes particle-burst {
   0% {
     transform: translate(0, 0) scale(1);
@@ -1642,7 +1672,7 @@
   letter-spacing: 2px;
 }
 
-/* BotÃ³n de SelecciÃ³n de Cartones en el Bolillero */
+/* Botón de Selección de Cartones en el Bolillero */
 .card-selection-sphere {
   width: 100%;
   height: 100%;
@@ -1716,7 +1746,7 @@
   50% { transform: translateY(-5px); }
 }
 
-/* Contador VIEJO dentro del cÃ­rculo - mantener por compatibilidad */
+/* Contador VIEJO dentro del círculo - mantener por compatibilidad */
 .sphere-btn-counter {
   display: flex;
   flex-direction: column;
@@ -1789,7 +1819,7 @@
   margin-top: 3px;
 }
 
-/* Base de la MÃ¡quina */
+/* Base de la Máquina */
 .machine-base {
   width: 80%;
   display: flex;
@@ -1827,7 +1857,7 @@
 }
 
 /* ============================================
-   SISTEMA DE TOASTS Y ALERTAS CINEMATOGRÃFICAS
+   SISTEMA DE TOASTS Y ALERTAS CINEMATOGRÁFICAS
    ============================================ */
 
 .toast-container {
@@ -1897,7 +1927,7 @@
   color: #4a2800;
 }
 
-/* Alerta de lÃ­nea tipo marquesina */
+/* Alerta de línea tipo marquesina */
 .marquee-alert {
   position: fixed;
   top: 50%;
@@ -1988,8 +2018,73 @@
   letter-spacing: 1px;
 }
 
+/* Contador Pre-40 (Posibilidad de Pozo) */
+.pre40-counter {
+  position: fixed;
+  top: 110px;
+  right: 450px;
+  z-index: 500;
+  background: linear-gradient(135deg, rgba(139, 69, 19, 0.2), rgba(205, 133, 63, 0.2));
+  border: 2px solid rgba(205, 133, 63, 0.8);
+  border-radius: 20px;
+  padding: 12px 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 
+    0 8px 30px rgba(0, 0, 0, 0.8),
+    0 0 30px rgba(205, 133, 63, 0.6),
+    inset 0 0 15px rgba(139, 69, 19, 0.3);
+  backdrop-filter: blur(15px);
+  animation: pre40-pulse-bronze 2s ease-in-out infinite;
+}
+
+@keyframes pre40-pulse-bronze {
+  0%, 100% { transform: translateX(-50%) scale(1); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8), 0 0 40px rgba(205, 133, 63, 0.6); }
+  50% { transform: translateX(-50%) scale(1.05); box-shadow: 0 15px 50px rgba(0, 0, 0, 0.9), 0 0 60px rgba(205, 133, 63, 0.9); }
+}
+
+.pre40-counter.spin-exit {
+  animation: spin-and-exit 1s ease-out forwards;
+}
+
+@keyframes spin-and-exit {
+  0% { transform: translateX(-50%) scale(1) rotate(0deg); opacity: 1; }
+  50% { transform: translateX(-50%) scale(1.2) rotate(360deg); opacity: 0.8; }
+  100% { transform: translateX(-50%) scale(0) rotate(720deg); opacity: 0; }
+}
+
+.pre40-title {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #cd853f;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  text-shadow: 0 0 12px rgba(205, 133, 63, 0.8);
+}
+
+.pre40-value {
+  font-size: 2.5rem;
+  font-weight: 900;
+  color: #ffffff;
+  text-shadow: 
+    0 0 25px rgba(205, 133, 63, 1),
+    0 0 45px rgba(139, 69, 19, 0.8),
+    2px 2px 8px rgba(0, 0, 0, 0.8);
+  line-height: 1;
+}
+
+.pre40-label {
+  font-size: 0.7rem;
+  color: #d2b48c;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  text-shadow: 0 0 8px rgba(210, 180, 140, 0.6);
+}
+
 /* ============================================
-   DIVIDER NEÃ“N
+   DIVIDER NEÓN
    ============================================ */
 
 .neon-divider {
@@ -2043,7 +2138,7 @@
    ============================================ */
 
 /* ============================================
-   ELEMENTOS DE GAMIFICACIÃ“N
+   ELEMENTOS DE GAMIFICACIÓN
    ============================================ */
 
 .gamification-panel {
@@ -2240,7 +2335,7 @@
   border: 1px solid rgba(255, 0, 0, 0.3);
 }
 
-/* Scroll Container - Con superposiciÃ³n vertical */
+/* Scroll Container - Con superposición vertical */
 .cards-scroll-container {
   flex: 1;
   position: relative;
@@ -2300,7 +2395,7 @@
   z-index: 10;
 }
 
-/* CartÃ³n a 1 de lÃ­nea - borde dorado pulsante intenso */
+/* Cartón a 1 de línea - borde dorado pulsante intenso */
 .compact-card.almost-line {
   border-color: #ff6600;
   animation: cyan-pulse-intense 0.8s ease-in-out infinite;
@@ -2326,7 +2421,7 @@
   }
 }
 
-/* Barra de progreso circular alrededor del cartÃ³n */
+/* Barra de progreso circular alrededor del cartón */
 .compact-card::before {
   content: '';
   position: absolute;
@@ -2438,7 +2533,7 @@
 }
 
 /* ============================================
-   CARTÃ“N EXPANDIDO - OVERLAY CENTRAL
+   CARTÓN EXPANDIDO - OVERLAY CENTRAL
    ============================================ */
 
 .expanded-card-overlay {
@@ -2523,7 +2618,7 @@
 }
 
 /* ============================================
-   CARTÃ“N DE BINGO - ESTILO CARTAS SUPERPUESTAS VERTICAL (BACKUP)
+   CARTÓN DE BINGO - ESTILO CARTAS SUPERPUESTAS VERTICAL (BACKUP)
    ============================================ */
 
 .bingo-card-starter {
@@ -2546,41 +2641,41 @@
   margin-bottom: -210px;
 }
 
-/* Primer cartÃ³n - totalmente visible con mayor z-index */
+/* Primer cartón - totalmente visible con mayor z-index */
 .bingo-card-starter:first-child {
   margin-top: 0;
   z-index: 10;
 }
 
-/* Segundo cartÃ³n - desplazado 50px hacia abajo */
+/* Segundo cartón - desplazado 50px hacia abajo */
 .bingo-card-starter:nth-child(2) {
   margin-top: 50px;
   z-index: 9;
 }
 
-/* Tercer cartÃ³n - desplazado 100px hacia abajo */
+/* Tercer cartón - desplazado 100px hacia abajo */
 .bingo-card-starter:nth-child(3) {
   margin-top: 100px;
   z-index: 8;
 }
 
-/* Cuarto cartÃ³n - desplazado 150px hacia abajo */
+/* Cuarto cartón - desplazado 150px hacia abajo */
 .bingo-card-starter:nth-child(4) {
   margin-top: 150px;
   z-index: 7;
 }
 
-/* Quinto cartÃ³n y siguientes */
+/* Quinto cartón y siguientes */
 .bingo-card-starter:nth-child(n+5) {
   z-index: 6;
 }
 
-/* Ãšltimo cartÃ³n - debe tener margen normal para no cortar */
+/* Último cartón - debe tener margen normal para no cortar */
 .bingo-card-starter:last-child {
   margin-bottom: 0;
 }
 
-/* Hover - expandir cartÃ³n */
+/* Hover - expandir cartón */
 .bingo-card-starter:hover {
   transform: scale(1.03);
   z-index: 20 !important;
@@ -2870,13 +2965,13 @@
     font-size: 1rem;
   }
 
-  /* Cartones en stack vertical en mÃ³vil */
+  /* Cartones en stack vertical en móvil */
   .cards-compact-grid {
     grid-template-columns: repeat(2, 1fr);
     grid-template-rows: repeat(15, 1fr);
   }
 
-  /* BotÃ³n de selecciÃ³n mÃ¡s grande en touch */
+  /* Botón de selección más grande en touch */
   .select-cards-sphere-btn {
     transform: scale(1.2);
   }
@@ -2885,7 +2980,7 @@
     width: 180px;
   }
 
-  /* Toasts mÃ¡s pequeÃ±os */
+  /* Toasts más pequeños */
   .toast-notification {
     padding: 15px 20px;
   }
@@ -2898,7 +2993,7 @@
     font-size: 0.9rem;
   }
 
-  /* Medidores de gamificaciÃ³n mÃ¡s compactos */
+  /* Medidores de gamificación más compactos */
   .gamification-panel {
     bottom: 10px;
     left: 10px;
@@ -2914,7 +3009,7 @@
 /* ===== BINGO 90 STYLES (3x9 Grid) ===== */
 
 .bingo-card-starter-90 {
-  max-width: 400px; /* MÃ¡s ancho para acomodar 9 columnas */
+  max-width: 400px; /* Más ancho para acomodar 9 columnas */
 }
 
 .card-grid-90 {
@@ -3255,7 +3350,7 @@
   }
 }
 
-/* Modo CelebraciÃ³n Full Screen */
+/* Modo Celebración Full Screen */
 .celebration-overlay {
   position: fixed;
   inset: 0;
@@ -3364,7 +3459,7 @@
   }
 }
 
-/* Confetti para CelebraciÃ³n */
+/* Confetti para Celebración */
 .celebration-confetti {
   position: absolute;
   inset: 0;
@@ -3391,7 +3486,7 @@
   }
 }
 
-/* NÃºmeros Marcados con Efecto */
+/* Números Marcados con Efecto */
 .marked-number-effect {
   position: fixed;
   top: 50%;
@@ -3486,7 +3581,7 @@
 .marked-particle:nth-child(7) { --i: 0; --j: -1; }
 .marked-particle:nth-child(8) { --i: 1; --j: -1; }
 
-/* AnimaciÃ³n de Entrada de Cartones (Deal) */
+/* Animación de Entrada de Cartones (Deal) */
 .compact-card {
   animation: card-deal 0.5s ease-out backwards;
 }
@@ -3517,28 +3612,7 @@
   }
 }
 
-/* Efecto 3D en nÃºmeros del grid cuando son cantados */
-.grid-number.called {
-  animation: number-3d-pop 0.6s ease-out;
-}
 
-@keyframes number-3d-pop {
-  0% {
-    transform: scale(1) rotateY(0deg);
-  }
-  25% {
-    transform: scale(1.3) rotateY(180deg);
-  }
-  50% {
-    transform: scale(1.5) rotateY(360deg);
-  }
-  75% {
-    transform: scale(1.3) rotateY(540deg);
-  }
-  100% {
-    transform: scale(1) rotateY(720deg);
-  }
-}
 
 /* Transiciones de Estado Mejoradas */
 .bronze-room.fade-out {
@@ -3590,24 +3664,53 @@
   box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
 }
 
-/* Ripple Effect Mejorado en Grid */
-.grid-number.called::after {
+/* Ripple Effect Suave en Grid - solo para números llamados que NO son recientes */
+.grid-number.called:not(.recent)::after {
   content: '';
   position: absolute;
-  inset: -10px;
-  border: 3px solid currentColor;
-  border-radius: 50%;
-  animation: ripple-strong 1s ease-out;
+  inset: -5px;
+  border: 2px solid rgba(184, 115, 51, 0.6);
+  border-radius: 4px;
+  animation: ripple-subtle 0.6s ease-out;
   opacity: 0;
+  pointer-events: none;
 }
 
-@keyframes ripple-strong {
+/* Efecto especial para el número más reciente - estrellitas brillantes */
+.grid-number.recent::after {
+  content: '✨';
+  position: absolute;
+  top: -25px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 1.2rem;
+  animation: sparkle-float 1.5s ease-out forwards;
+  pointer-events: none;
+  z-index: 10;
+  filter: drop-shadow(0 0 3px rgba(255, 215, 0, 0.8));
+}
+
+@keyframes sparkle-float {
   0% {
-    transform: scale(0);
     opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+  50% {
+    transform: translateX(-50%) translateY(-15px) scale(1.2);
   }
   100% {
-    transform: scale(2);
+    opacity: 0;
+    transform: translateX(-50%) translateY(-40px) scale(0.8);
+  }
+}
+
+@keyframes ripple-subtle {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.3);
     opacity: 0;
   }
 }

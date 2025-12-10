@@ -1,6 +1,6 @@
-﻿/* ============================================
-   SALA STARTER - NEÃ“N, ENERGÃA, ARCADE MODERNO
-   Paleta: Cian ElÃ©ctrico, Violeta NeÃ³n, Negro Profundo
+/* ============================================
+   SALA STARTER - NEÓN, ENERGÍA, ARCADE MODERNO
+   Paleta: Cian Eléctrico, Violeta Neón, Negro Profundo
    ============================================ */
 
 .starter-room {
@@ -30,7 +30,7 @@
   }
 }
 
-/* Cortinilla de transiciÃ³n waiting â†’ active */
+/* Cortinilla de transición waiting → active */
 .transition-curtain {
   position: fixed;
   inset: 0;
@@ -95,7 +95,7 @@
 }
 
 /* ============================================
-   CELEBRACIÃ“N DE LÃNEA GANADORA
+   CELEBRACIÓN DE LÍNEA GANADORA
    ============================================ */
 
 .winner-celebration-overlay {
@@ -259,7 +259,7 @@
   }
 }
 
-/* Estilos para el cartÃ³n en el modal de celebraciÃ³n */
+/* Estilos para el cartón en el modal de celebración */
 .celebration-card-expanded {
   margin: 30px auto;
   max-width: 700px;
@@ -318,7 +318,7 @@
   text-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
 }
 
-/* LÃ­nea resaltada en dorado */
+/* Línea resaltada en dorado */
 .celebration-card-expanded .card-cell.highlighted-line {
   background: linear-gradient(135deg, #00ffff 0%, #00ffff 100%);
   border: 3px solid #00ffff;
@@ -346,11 +346,11 @@
 }
 
 /* ============================================
-   ALERTA DE CASI LÃNEA
+   ALERTA DE CASI LÍNEA
    ============================================ */
 
 /* ============================================
-   ALERTA DE CASI LÃNEA - COMPACTA
+   ALERTA DE CASI LÍNEA - COMPACTA
    ============================================ */
 
 .compact-line-alert {
@@ -728,6 +728,40 @@
   }
 }
 
+/* Contador de bolas sorteadas */
+.ball-counter-display {
+  font-size: 0.85rem;
+  background: linear-gradient(135deg, rgba(0, 255, 255, 0.2), rgba(255, 215, 0, 0.2));
+  color: #ffd700;
+  padding: 6px 14px;
+  border: 2px solid rgba(255, 215, 0, 0.6);
+  border-radius: 15px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  box-shadow: 
+    0 0 15px rgba(255, 215, 0, 0.5),
+    inset 0 0 10px rgba(255, 215, 0, 0.2);
+  animation: ball-counter-glow 2s ease-in-out infinite;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.8);
+  white-space: nowrap;
+}
+
+@keyframes ball-counter-glow {
+  0%, 100% {
+    box-shadow: 
+      0 0 15px rgba(255, 215, 0, 0.5),
+      inset 0 0 10px rgba(255, 215, 0, 0.2);
+    text-shadow: 0 0 10px rgba(255, 215, 0, 0.8);
+  }
+  50% {
+    box-shadow: 
+      0 0 25px rgba(255, 215, 0, 0.8),
+      0 0 35px rgba(255, 215, 0, 0.6),
+      inset 0 0 15px rgba(255, 215, 0, 0.3);
+    text-shadow: 0 0 15px rgba(255, 215, 0, 1);
+  }
+}
+
 .game-info {
   display: flex;
   gap: 15px;
@@ -811,7 +845,7 @@
 }
 
 /* ============================================
-   CUADRÃCULA DIGITAL (IZQUIERDA) - 3x3 LAYOUT
+   CUADRÍCULA DIGITAL (IZQUIERDA) - 3x3 LAYOUT
    ============================================ */
 
 .digital-grid-full {
@@ -895,7 +929,6 @@
   font-size: 1.36rem;
   font-weight: 600;
   border-radius: 5px;
-  background: rgba(0, 0, 0, 0.6);
   border: 1px solid rgba(0, 255, 255, 0.4);
   color: rgba(255, 255, 255, 0.5);
   transition: all 0.3s ease;
@@ -903,12 +936,29 @@
   box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
 }
 
+/* Fondo oscuro solo para números NO llamados */
+.grid-row .grid-number:not(.called) {
+  background: rgba(0, 0, 0, 0.6);
+}
+
 .grid-row .grid-number.called {
-  color: #000;
+  color: #fff !important;
   font-weight: 700;
   transform: scale(1.05);
-  border: 2px solid rgba(255, 0, 255, 0.8);
+  border: 2px solid rgba(255, 255, 255, 0.5) !important;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8) !important;
 }
+
+/* Colores de fondo por rango de números */
+.grid-number.called[data-range="1-10"] { background: #ff0000 !important; }
+.grid-number.called[data-range="11-20"] { background: #ff7700 !important; }
+.grid-number.called[data-range="21-30"] { background: #ffdd00 !important; }
+.grid-number.called[data-range="31-40"] { background: #00ff00 !important; }
+.grid-number.called[data-range="41-50"] { background: #00ddff !important; }
+.grid-number.called[data-range="51-60"] { background: #0077ff !important; }
+.grid-number.called[data-range="61-70"] { background: #7700ff !important; }
+.grid-number.called[data-range="71-80"] { background: #ff00ff !important; }
+.grid-number.called[data-range="81-90"] { background: #ff0099 !important; }
 
 .grid-row .grid-number.recent {
   animation: recentPulse 1s ease-in-out, ripple-wave 0.8s ease-out;
@@ -923,31 +973,7 @@
   }
 }
 
-/* PartÃ­culas doradas flotantes */
-.grid-row .grid-number.recent::after {
-  content: 'âœ¨';
-  position: absolute;
-  top: -20px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 1rem;
-  animation: particle-float-up 1.5s ease-out forwards;
-  pointer-events: none;
-}
-
-@keyframes particle-float-up {
-  0% {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
-  100% {
-    opacity: 0;
-    transform: translateX(-50%) translateY(-50px);
-  }
-}
-
-/* Barra de Ãºltimas bolas */
-.recent-balls-bar {
+/* Partículas doradas flotantes */
   margin-top: 12px;
   padding: 10px;
   background: rgba(0, 0, 0, 0.4);
@@ -997,7 +1023,7 @@
 }
 
 /* ============================================
-   CUADRÃCULA DIGITAL ANTIGUA (BACKUP)
+   CUADRÍCULA DIGITAL ANTIGUA (BACKUP)
    ============================================ */
 
 .digital-grid {
@@ -1073,7 +1099,6 @@
 }
 
 .grid-number {
-  background: rgba(0, 0, 0, 0.6);
   border: 1px solid rgba(0, 255, 255, 0.1);
   border-radius: 4px;
   padding: 3px 2px;
@@ -1086,12 +1111,18 @@
   transition: all 0.3s ease;
 }
 
+/* Fondo oscuro solo para números NO llamados */
+.grid-number:not(.called) {
+  background: rgba(0, 0, 0, 0.6);
+}
+
 .grid-number.called {
-  color: #000;
+  color: #fff !important;
   font-weight: 900;
-  border: none;
+  border: 2px solid rgba(255, 255, 255, 0.5) !important;
   animation: number-called 0.6s ease-out;
   z-index: 1;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8) !important;
 }
 
 @keyframes number-called {
@@ -1144,7 +1175,7 @@
   }
 }
 
-/* Barra de Ãºltimas bolas */
+/* Barra de últimas bolas */
 .recent-balls-bar {
   margin-top: 4px;
   padding: 6px 10px;
@@ -1204,7 +1235,7 @@
 }
 
 /* ============================================
-   SECCIÃ“N DERECHA - TÃTULO + INFO + BOLILLERO
+   SECCIÓN DERECHA - TÍTULO + INFO + BOLILLERO
    ============================================ */
 
 .right-section {
@@ -1354,7 +1385,7 @@
   50% { opacity: 1; }
 }
 
-/* Esfera de AcrÃ­lico Transparente */
+/* Esfera de Acrílico Transparente */
 .acrylic-sphere {
   width: 240px;
   height: 240px;
@@ -1515,7 +1546,7 @@
   }
 }
 
-/* PartÃ­culas de explosiÃ³n al aparecer bola */
+/* Partículas de explosión al aparecer bola */
 @keyframes particle-burst {
   0% {
     transform: translate(0, 0) scale(1);
@@ -1605,7 +1636,7 @@
   letter-spacing: 2px;
 }
 
-/* BotÃ³n de SelecciÃ³n de Cartones en el Bolillero */
+/* Botón de Selección de Cartones en el Bolillero */
 .card-selection-sphere {
   width: 100%;
   height: 100%;
@@ -1679,7 +1710,7 @@
   50% { transform: translateY(-5px); }
 }
 
-/* Contador VIEJO dentro del cÃ­rculo - mantener por compatibilidad */
+/* Contador VIEJO dentro del círculo - mantener por compatibilidad */
 .sphere-btn-counter {
   display: flex;
   flex-direction: column;
@@ -1752,7 +1783,7 @@
   margin-top: 3px;
 }
 
-/* Base de la MÃ¡quina */
+/* Base de la Máquina */
 .machine-base {
   width: 80%;
   display: flex;
@@ -1790,7 +1821,7 @@
 }
 
 /* ============================================
-   SISTEMA DE TOASTS Y ALERTAS CINEMATOGRÃFICAS
+   SISTEMA DE TOASTS Y ALERTAS CINEMATOGRÁFICAS
    ============================================ */
 
 .toast-container {
@@ -1860,7 +1891,7 @@
   color: #4a2800;
 }
 
-/* Alerta de lÃ­nea tipo marquesina */
+/* Alerta de línea tipo marquesina */
 .marquee-alert {
   position: fixed;
   top: 50%;
@@ -1951,8 +1982,73 @@
   letter-spacing: 1px;
 }
 
+/* Contador Pre-40 (Posibilidad de Pozo) */
+.pre40-counter {
+  position: fixed;
+  top: 110px;
+  right: 450px;
+  z-index: 500;
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.15), rgba(255, 140, 0, 0.15));
+  border: 2px solid rgba(255, 215, 0, 0.8);
+  border-radius: 20px;
+  padding: 12px 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 
+    0 8px 30px rgba(0, 0, 0, 0.8),
+    0 0 30px rgba(255, 215, 0, 0.6),
+    inset 0 0 15px rgba(255, 215, 0, 0.2);
+  backdrop-filter: blur(15px);
+  animation: pre40-pulse 2s ease-in-out infinite;
+}
+
+@keyframes pre40-pulse {
+  0%, 100% { transform: translateX(-50%) scale(1); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8), 0 0 40px rgba(255, 215, 0, 0.6); }
+  50% { transform: translateX(-50%) scale(1.05); box-shadow: 0 15px 50px rgba(0, 0, 0, 0.9), 0 0 60px rgba(255, 215, 0, 0.9); }
+}
+
+.pre40-counter.spin-exit {
+  animation: spin-and-exit 1s ease-out forwards;
+}
+
+@keyframes spin-and-exit {
+  0% { transform: translateX(-50%) scale(1) rotate(0deg); opacity: 1; }
+  50% { transform: translateX(-50%) scale(1.2) rotate(360deg); opacity: 0.8; }
+  100% { transform: translateX(-50%) scale(0) rotate(720deg); opacity: 0; }
+}
+
+.pre40-title {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #ffd700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  text-shadow: 0 0 12px rgba(255, 215, 0, 0.8);
+}
+
+.pre40-value {
+  font-size: 2.5rem;
+  font-weight: 900;
+  color: #ffffff;
+  text-shadow: 
+    0 0 25px rgba(255, 215, 0, 1),
+    0 0 45px rgba(255, 140, 0, 0.8),
+    2px 2px 8px rgba(0, 0, 0, 0.8);
+  line-height: 1;
+}
+
+.pre40-label {
+  font-size: 0.7rem;
+  color: #ffb84d;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  text-shadow: 0 0 8px rgba(255, 184, 77, 0.6);
+}
+
 /* ============================================
-   DIVIDER NEÃ“N
+   DIVIDER NEÓN
    ============================================ */
 
 .neon-divider {
@@ -2006,7 +2102,7 @@
    ============================================ */
 
 /* ============================================
-   ELEMENTOS DE GAMIFICACIÃ“N
+   ELEMENTOS DE GAMIFICACIÓN
    ============================================ */
 
 .gamification-panel {
@@ -2203,7 +2299,7 @@
   border: 1px solid rgba(255, 0, 255, 0.3);
 }
 
-/* Scroll Container - Con superposiciÃ³n vertical */
+/* Scroll Container - Con superposición vertical */
 .cards-scroll-container {
   flex: 1;
   position: relative;
@@ -2263,7 +2359,7 @@
   z-index: 10;
 }
 
-/* CartÃ³n a 1 de lÃ­nea - borde dorado pulsante intenso */
+/* Cartón a 1 de línea - borde dorado pulsante intenso */
 .compact-card.almost-line {
   border-color: #00ffff;
   animation: cyan-pulse-intense 0.8s ease-in-out infinite;
@@ -2289,7 +2385,7 @@
   }
 }
 
-/* Barra de progreso circular alrededor del cartÃ³n */
+/* Barra de progreso circular alrededor del cartón */
 .compact-card::before {
   content: '';
   position: absolute;
@@ -2401,7 +2497,7 @@
 }
 
 /* ============================================
-   CARTÃ“N EXPANDIDO - OVERLAY CENTRAL
+   CARTÓN EXPANDIDO - OVERLAY CENTRAL
    ============================================ */
 
 .expanded-card-overlay {
@@ -2486,7 +2582,7 @@
 }
 
 /* ============================================
-   CARTÃ“N DE BINGO - ESTILO CARTAS SUPERPUESTAS VERTICAL (BACKUP)
+   CARTÓN DE BINGO - ESTILO CARTAS SUPERPUESTAS VERTICAL (BACKUP)
    ============================================ */
 
 .bingo-card-starter {
@@ -2509,41 +2605,41 @@
   margin-bottom: -210px;
 }
 
-/* Primer cartÃ³n - totalmente visible con mayor z-index */
+/* Primer cartón - totalmente visible con mayor z-index */
 .bingo-card-starter:first-child {
   margin-top: 0;
   z-index: 10;
 }
 
-/* Segundo cartÃ³n - desplazado 50px hacia abajo */
+/* Segundo cartón - desplazado 50px hacia abajo */
 .bingo-card-starter:nth-child(2) {
   margin-top: 50px;
   z-index: 9;
 }
 
-/* Tercer cartÃ³n - desplazado 100px hacia abajo */
+/* Tercer cartón - desplazado 100px hacia abajo */
 .bingo-card-starter:nth-child(3) {
   margin-top: 100px;
   z-index: 8;
 }
 
-/* Cuarto cartÃ³n - desplazado 150px hacia abajo */
+/* Cuarto cartón - desplazado 150px hacia abajo */
 .bingo-card-starter:nth-child(4) {
   margin-top: 150px;
   z-index: 7;
 }
 
-/* Quinto cartÃ³n y siguientes */
+/* Quinto cartón y siguientes */
 .bingo-card-starter:nth-child(n+5) {
   z-index: 6;
 }
 
-/* Ãšltimo cartÃ³n - debe tener margen normal para no cortar */
+/* Último cartón - debe tener margen normal para no cortar */
 .bingo-card-starter:last-child {
   margin-bottom: 0;
 }
 
-/* Hover - expandir cartÃ³n */
+/* Hover - expandir cartón */
 .bingo-card-starter:hover {
   transform: scale(1.03);
   z-index: 20 !important;
@@ -2833,13 +2929,13 @@
     font-size: 1rem;
   }
 
-  /* Cartones en stack vertical en mÃ³vil */
+  /* Cartones en stack vertical en móvil */
   .cards-compact-grid {
     grid-template-columns: repeat(2, 1fr);
     grid-template-rows: repeat(15, 1fr);
   }
 
-  /* BotÃ³n de selecciÃ³n mÃ¡s grande en touch */
+  /* Botón de selección más grande en touch */
   .select-cards-sphere-btn {
     transform: scale(1.2);
   }
@@ -2848,7 +2944,7 @@
     width: 180px;
   }
 
-  /* Toasts mÃ¡s pequeÃ±os */
+  /* Toasts más pequeños */
   .toast-notification {
     padding: 15px 20px;
   }
@@ -2861,7 +2957,7 @@
     font-size: 0.9rem;
   }
 
-  /* Medidores de gamificaciÃ³n mÃ¡s compactos */
+  /* Medidores de gamificación más compactos */
   .gamification-panel {
     bottom: 10px;
     left: 10px;
@@ -2877,7 +2973,7 @@
 /* ===== BINGO 90 STYLES (3x9 Grid) ===== */
 
 .bingo-card-starter-90 {
-  max-width: 400px; /* MÃ¡s ancho para acomodar 9 columnas */
+  max-width: 400px; /* Más ancho para acomodar 9 columnas */
 }
 
 .card-grid-90 {
@@ -3218,7 +3314,7 @@
   }
 }
 
-/* Modo CelebraciÃ³n Full Screen */
+/* Modo Celebración Full Screen */
 .celebration-overlay {
   position: fixed;
   inset: 0;
@@ -3327,7 +3423,7 @@
   }
 }
 
-/* Confetti para CelebraciÃ³n */
+/* Confetti para Celebración */
 .celebration-confetti {
   position: absolute;
   inset: 0;
@@ -3354,7 +3450,7 @@
   }
 }
 
-/* NÃºmeros Marcados con Efecto */
+/* Números Marcados con Efecto */
 .marked-number-effect {
   position: fixed;
   top: 50%;
@@ -3449,7 +3545,7 @@
 .marked-particle:nth-child(7) { --i: 0; --j: -1; }
 .marked-particle:nth-child(8) { --i: 1; --j: -1; }
 
-/* AnimaciÃ³n de Entrada de Cartones (Deal) */
+/* Animación de Entrada de Cartones (Deal) */
 .compact-card {
   animation: card-deal 0.5s ease-out backwards;
 }
@@ -3480,7 +3576,7 @@
   }
 }
 
-/* Efecto 3D en nÃºmeros del grid cuando son cantados */
+/* Efecto 3D en números del grid cuando son cantados */
 .grid-number.called {
   animation: number-3d-pop 0.6s ease-out;
 }
@@ -3553,8 +3649,8 @@
   box-shadow: 0 0 10px rgba(255, 0, 255, 0.5);
 }
 
-/* Ripple Effect Mejorado en Grid */
-.grid-number.called::after {
+/* Ripple Effect - solo para n�meros llamados que NO son recientes */
+.grid-number.called:not(.recent)::after {
   content: '';
   position: absolute;
   inset: -10px;
@@ -3562,6 +3658,39 @@
   border-radius: 50%;
   animation: ripple-strong 1s ease-out;
   opacity: 0;
+  pointer-events: none;
+}
+
+/* Efecto especial para el n�mero m�s reciente - fuegos artificiales festivos */
+.grid-number.recent::after {
+  content: '??';
+  position: absolute;
+  top: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 1.5rem;
+  animation: firework-burst 1.2s ease-out forwards;
+  pointer-events: none;
+  z-index: 10;
+  filter: drop-shadow(0 0 5px rgba(255, 255, 0, 0.8));
+}
+
+@keyframes firework-burst {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px) scale(0.5) rotate(0deg);
+  }
+  30% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-10px) scale(1.3) rotate(180deg);
+  }
+  60% {
+    transform: translateX(-50%) translateY(-20px) scale(1.1) rotate(360deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-45px) scale(0.7) rotate(540deg);
+  }
 }
 
 @keyframes ripple-strong {
