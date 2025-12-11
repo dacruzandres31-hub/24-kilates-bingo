@@ -64,14 +64,14 @@ export default function Login({ onLogin }) {
 
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
-                Usuario
+                Nombre de Usuario
               </label>
               <input
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-gold-500 focus:border-transparent transition-all"
-                placeholder="admin"
+                placeholder="Nombre de Usuario"
                 required
                 autoComplete="username"
               />

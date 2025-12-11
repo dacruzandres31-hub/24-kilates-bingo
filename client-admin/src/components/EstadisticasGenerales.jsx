@@ -71,18 +71,18 @@ export default function EstadisticasGenerales({ financialData }) {
       {/* Primera fila: Carga Rápida, Ganancia Neta, Netwin Mensual */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Carga Rápida */}
-        <div className="bg-white rounded-lg shadow-lg p-6">
-          <div className="bg-blue-500 text-white text-center py-3 rounded-t-lg -mx-6 -mt-6 mb-6">
+        <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50 shadow-lg">
+          <div className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white text-center py-3 rounded-xl mb-6">
             <h3 className="text-xl font-bold">Carga rápida</h3>
           </div>
 
           <div className="space-y-4">
-            <button className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors">
+            <button className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] shadow-lg">
               <span>👤</span>
               <span>NUEVO JUGADOR</span>
             </button>
 
-            <button className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors">
+            <button className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] shadow-lg">
               <span>🏢</span>
               <span>NUEVO AGENTE</span>
             </button>
@@ -93,18 +93,18 @@ export default function EstadisticasGenerales({ financialData }) {
                   type="text"
                   value={newUserName}
                   onChange={(e) => setNewUserName(e.target.value)}
-                  placeholder="Nombre de usuario"
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Nombre de Usuario"
+                  className="flex-1 px-4 py-2 bg-gray-900/50 border border-gray-700 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 />
                 <button
                   type="button"
-                  className="w-10 h-10 bg-cyan-400 hover:bg-cyan-500 text-white rounded-lg flex items-center justify-center text-2xl transition-colors"
+                  className="w-10 h-10 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-xl flex items-center justify-center text-2xl transition-all transform hover:scale-110 shadow-lg"
                 >
                   +
                 </button>
                 <button
                   type="button"
-                  className="w-10 h-10 bg-cyan-400 hover:bg-cyan-500 text-white rounded-lg flex items-center justify-center text-2xl transition-colors"
+                  className="w-10 h-10 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white rounded-xl flex items-center justify-center text-2xl transition-all transform hover:scale-110 shadow-lg"
                 >
                   -
                 </button>
@@ -114,29 +114,31 @@ export default function EstadisticasGenerales({ financialData }) {
         </div>
 
         {/* Ganancia Neta */}
-        <div className="bg-white rounded-lg shadow-lg p-6">
-          <div className="bg-blue-500 text-white text-center py-3 rounded-t-lg -mx-6 -mt-6 mb-6">
+        <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50 shadow-lg">
+          <div className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white text-center py-3 rounded-xl mb-6">
             <h3 className="text-xl font-bold">Ganancia neta</h3>
           </div>
 
           <div className="space-y-4">
             <div>
-              <p className="text-gray-600 text-sm mb-1">Mes actual:</p>
-              <p className="text-2xl font-bold">{formatCurrency(gananciaActual)}</p>
+              <p className="text-gray-400 text-sm mb-1">Mes actual:</p>
+              <p className="text-2xl font-bold text-white">{formatCurrency(gananciaActual)}</p>
             </div>
 
             <div>
-              <p className="text-gray-600 text-sm mb-1">Mes anterior:</p>
-              <p className="text-xl text-gray-700">{formatCurrency(gananciaAnterior)}</p>
+              <p className="text-gray-400 text-sm mb-1">Mes anterior:</p>
+              <p className="text-xl text-gray-300">{formatCurrency(gananciaAnterior)}</p>
             </div>
 
             <div className="flex items-center gap-3">
-              <span className={`text-2xl font-bold px-4 py-2 rounded ${
-                parseFloat(porcentajeCambio) < 0 ? 'bg-red-500 text-white' : 'bg-green-500 text-white'
+              <span className={`text-2xl font-bold px-4 py-2 rounded-xl shadow-lg ${
+                parseFloat(porcentajeCambio) < 0 
+                  ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white' 
+                  : 'bg-gradient-to-r from-green-600 to-emerald-600 text-white'
               }`}>
                 {porcentajeCambio}%
               </span>
-              <button className="text-gray-400 hover:text-gray-600 text-2xl">
+              <button className="text-gray-400 hover:text-indigo-400 text-2xl transition-colors">
                 👁️‍🗨️
               </button>
             </div>
@@ -144,8 +146,8 @@ export default function EstadisticasGenerales({ financialData }) {
         </div>
 
         {/* Netwin Mensual */}
-        <div className="bg-white rounded-lg shadow-lg p-6">
-          <div className="bg-blue-500 text-white text-center py-3 rounded-t-lg -mx-6 -mt-6 mb-6">
+        <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50 shadow-lg">
+          <div className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white text-center py-3 rounded-xl mb-6">
             <h3 className="text-xl font-bold">Netwin Mensual</h3>
           </div>
 
@@ -175,8 +177,8 @@ export default function EstadisticasGenerales({ financialData }) {
       {/* Segunda fila: Netwin Diario y Top Agentes */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Netwin Diario */}
-        <div className="bg-white rounded-lg shadow-lg p-6">
-          <div className="bg-blue-500 text-white text-center py-3 rounded-t-lg -mx-6 -mt-6 mb-6">
+        <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50 shadow-lg">
+          <div className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white text-center py-3 rounded-xl mb-6">
             <h3 className="text-xl font-bold">Netwin Diario</h3>
           </div>
 
@@ -203,8 +205,8 @@ export default function EstadisticasGenerales({ financialData }) {
         </div>
 
         {/* Top Agentes del Mes */}
-        <div className="bg-white rounded-lg shadow-lg p-6">
-          <div className="bg-blue-500 text-white text-center py-3 rounded-t-lg -mx-6 -mt-6 mb-6">
+        <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50 shadow-lg">
+          <div className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white text-center py-3 rounded-xl mb-6">
             <h3 className="text-xl font-bold">Top Agentes del mes</h3>
           </div>
 
@@ -232,15 +234,15 @@ export default function EstadisticasGenerales({ financialData }) {
           {/* Leyenda personalizada */}
           <div className="mt-4 space-y-2">
             {dataTopAgentes.map((agente, index) => (
-              <div key={index} className="flex items-center justify-between">
+              <div key={index} className="flex items-center justify-between p-2 bg-gray-900/30 rounded-lg hover:bg-gray-900/50 transition-colors">
                 <div className="flex items-center gap-2">
                   <div 
-                    className="w-4 h-4 rounded"
+                    className="w-4 h-4 rounded shadow-lg"
                     style={{ backgroundColor: agente.color }}
                   ></div>
-                  <span className="text-sm text-gray-700">{agente.name}</span>
+                  <span className="text-sm text-gray-300">{agente.name}</span>
                 </div>
-                <span className="text-sm font-semibold text-gray-900">{agente.value}%</span>
+                <span className="text-sm font-semibold text-white">{agente.value}%</span>
               </div>
             ))}
           </div>

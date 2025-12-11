@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import axios from 'axios';
 import MetricCard from '../components/MetricCard';
 import PotStatus from '../components/PotStatus';
@@ -6,6 +7,9 @@ import AlertsList from '../components/AlertsList';
 import Sidebar from '../components/Sidebar';
 import EstadisticasGenerales from '../components/EstadisticasGenerales';
 import GestionUsuarios from '../components/GestionUsuarios';
+import CardInventoryPanel from '../components/CardInventoryPanel';
+import AdminCardInventory from '../components/AdminCardInventory';
+import { SuperAdminOnly } from '../components/ProtectedContent';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 
 export default function Dashboard() {
@@ -19,9 +23,13 @@ export default function Dashboard() {
   });
   const [showCartonesDropdown, setShowCartonesDropdown] = useState(false);
   const [showPerfilDropdown, setShowPerfilDropdown] = useState(false);
+  const stockButtonRef = useRef(null);
+  const perfilButtonRef = useRef(null);
+  const [dropdownPositions, setDropdownPositions] = useState({ stock: {}, perfil: {} });
   const [activeSections, setActiveSections] = useState({
     'estadisticas-generales': true,
     'usuarios': false,
+    'card-inventory': false,
     'finanzas-hoy': false,
     'movimientos': false,
     'movimientos-recientes': false,
@@ -35,6 +43,28 @@ export default function Dashboard() {
     const interval = setInterval(fetchDashboardData, 10000); // Actualizar cada 10s
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (stockButtonRef.current && !stockButtonRef.current.contains(event.target)) {
+        const stockDropdown = document.querySelector('[data-dropdown="stock"]');
+        if (stockDropdown && !stockDropdown.contains(event.target)) {
+          setShowCartonesDropdown(false);
+        }
+      }
+      if (perfilButtonRef.current && !perfilButtonRef.current.contains(event.target)) {
+        const perfilDropdown = document.querySelector('[data-dropdown="perfil"]');
+        if (perfilDropdown && !perfilDropdown.contains(event.target)) {
+          setShowPerfilDropdown(false);
+        }
+      }
+    };
+
+    if (showCartonesDropdown || showPerfilDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showCartonesDropdown, showPerfilDropdown]);
 
   const fetchDashboardData = async () => {
     try {
@@ -95,6 +125,37 @@ export default function Dashboard() {
     });
   };
 
+  const calculateDropdownPosition = (buttonRef) => {
+    if (!buttonRef.current) return {};
+    const rect = buttonRef.current.getBoundingClientRect();
+    return {
+      top: rect.bottom + 8,
+      right: window.innerWidth - rect.right
+    };
+  };
+
+  const handleStockDropdown = () => {
+    setShowPerfilDropdown(false); // Cerrar perfil si está abierto
+    if (!showCartonesDropdown) {
+      setDropdownPositions(prev => ({
+        ...prev,
+        stock: calculateDropdownPosition(stockButtonRef)
+      }));
+    }
+    setShowCartonesDropdown(!showCartonesDropdown);
+  };
+
+  const handlePerfilDropdown = () => {
+    setShowCartonesDropdown(false); // Cerrar stock si está abierto
+    if (!showPerfilDropdown) {
+      setDropdownPositions(prev => ({
+        ...prev,
+        perfil: calculateDropdownPosition(perfilButtonRef)
+      }));
+    }
+    setShowPerfilDropdown(!showPerfilDropdown);
+  };
+
   const formatMoney = (amount) => {
     return new Intl.NumberFormat('es-CO', {
       style: 'currency',
@@ -122,26 +183,26 @@ export default function Dashboard() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <header className="bg-gray-800/50 backdrop-blur-sm border-b border-gray-700 px-4 sm:px-6 lg:px-8 py-4">
+        <header className="bg-gradient-to-r from-gray-800/80 to-gray-900/80 backdrop-blur-md border-b border-gray-700/50 px-4 sm:px-6 lg:px-8 py-5 shadow-xl">
           <div className="flex items-center justify-between">
             {/* Logo - Izquierda */}
             <div className="flex items-center space-x-4">
-              <img src="/logo.png" alt="Bingo 24K" className="h-12" />
+              <img src="/logo.png" alt="Bingo 24K" className="h-14 drop-shadow-lg" />
             </div>
 
             {/* Nombre del Usuario - Centro */}
             <div className="absolute left-1/2 transform -translate-x-1/2">
-              <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-600">
+              <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-indigo-400 to-blue-400">
                 {userData?.username || 'Admin'}
               </h2>
             </div>
 
             {/* Controles - Derecha */}
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3">
               {/* Botón Refrescar */}
               <button
                 onClick={handleRefresh}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-lg transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
               >
                 🔄
               </button>
@@ -149,89 +210,33 @@ export default function Dashboard() {
               {/* Stock de Cartones */}
               <div className="relative">
                 <button
-                  onClick={() => setShowCartonesDropdown(!showCartonesDropdown)}
-                  className="flex items-center space-x-2 px-4 py-2 bg-gray-700/50 hover:bg-gray-700 border border-gray-600 rounded-lg transition-colors"
+                  ref={stockButtonRef}
+                  onClick={handleStockDropdown}
+                  className="flex items-center space-x-2 px-4 py-2 bg-gray-800/80 hover:bg-gray-700/80 border border-gray-600/50 rounded-lg transition-all shadow-md hover:shadow-lg"
                 >
-                  <span className="text-white font-semibold">📦 Stock</span>
+                  <span className="text-white font-semibold text-sm">📦 Stock</span>
                   {showCartonesDropdown ? (
                     <ChevronDown className="w-4 h-4 text-gray-400" />
                   ) : (
                     <ChevronRight className="w-4 h-4 text-gray-400" />
                   )}
                 </button>
-
-                {/* Dropdown Stock */}
-                {showCartonesDropdown && (
-                  <div className="absolute top-full mt-2 right-0 bg-gray-800 border border-gray-600 rounded-lg shadow-xl p-4 min-w-[280px] z-[9999]">
-                    <div className="space-y-3">
-                      {/* Bronce */}
-                      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-orange-900/30 to-orange-800/20 border border-orange-700/50 rounded-lg">
-                        <div className="flex items-center space-x-2">
-                          <div className="w-3 h-3 bg-gradient-to-br from-orange-500 to-orange-700 rounded-full"></div>
-                          <span className="text-orange-300 font-semibold">BRONCE:</span>
-                        </div>
-                        <span className="text-white font-bold text-lg">{cartonesStock.bronce}</span>
-                      </div>
-
-                      {/* Plata */}
-                      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-gray-700/30 to-gray-600/20 border border-gray-500/50 rounded-lg">
-                        <div className="flex items-center space-x-2">
-                          <div className="w-3 h-3 bg-gradient-to-br from-gray-300 to-gray-500 rounded-full"></div>
-                          <span className="text-gray-300 font-semibold">PLATA:</span>
-                        </div>
-                        <span className="text-white font-bold text-lg">{cartonesStock.plata}</span>
-                      </div>
-
-                      {/* Oro */}
-                      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-yellow-900/30 to-yellow-800/20 border border-yellow-600/50 rounded-lg">
-                        <div className="flex items-center space-x-2">
-                          <div className="w-3 h-3 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full"></div>
-                          <span className="text-yellow-300 font-semibold">ORO:</span>
-                        </div>
-                        <span className="text-white font-bold text-lg">{cartonesStock.oro}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
 
               {/* Perfil */}
               <div className="relative">
                 <button
-                  onClick={() => setShowPerfilDropdown(!showPerfilDropdown)}
-                  className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white rounded-lg transition-colors"
+                  ref={perfilButtonRef}
+                  onClick={handlePerfilDropdown}
+                  className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
                 >
-                  <span className="font-semibold">👤 Perfil</span>
+                  <span className="font-semibold text-sm">👤 Perfil</span>
                   {showPerfilDropdown ? (
                     <ChevronDown className="w-4 h-4" />
                   ) : (
                     <ChevronRight className="w-4 h-4" />
                   )}
                 </button>
-
-                {/* Dropdown Perfil */}
-                {showPerfilDropdown && (
-                  <div className="absolute top-full mt-2 right-0 bg-gray-800 border border-gray-600 rounded-lg shadow-xl min-w-[220px] z-[9999] overflow-hidden">
-                    <button
-                      className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-700 transition-colors flex items-center space-x-2"
-                      onClick={() => {
-                        // TODO: Implementar cambio de contraseña
-                        alert('Funcionalidad de cambio de contraseña próximamente');
-                        setShowPerfilDropdown(false);
-                      }}
-                    >
-                      <span>🔑</span>
-                      <span>Cambiar Contraseña</span>
-                    </button>
-                    <button
-                      className="w-full px-4 py-3 text-left text-red-400 hover:bg-red-900/20 transition-colors flex items-center space-x-2 border-t border-gray-700"
-                      onClick={handleLogout}
-                    >
-                      <span>🚪</span>
-                      <span>Cerrar Sesión</span>
-                    </button>
-                  </div>
-                )}
               </div>
             </div>
           </div>
@@ -250,6 +255,15 @@ export default function Dashboard() {
           {activeSections['usuarios'] && (
             <section className="mb-8">
               <GestionUsuarios />
+            </section>
+          )}
+
+          {/* Inventario de Cartones */}
+          {activeSections['card-inventory'] && (
+            <section className="mb-8">
+              <SuperAdminOnly fallback={<AdminCardInventory />}>
+                <CardInventoryPanel />
+              </SuperAdminOnly>
             </section>
           )}
 
@@ -360,6 +374,81 @@ export default function Dashboard() {
           )}
         </main>
       </div>
+
+      {/* Dropdowns renderizados usando Portals fuera del stacking context del header */}
+      {showCartonesDropdown && createPortal(
+        <div 
+          data-dropdown="stock"
+          className="fixed bg-gray-800/95 backdrop-blur-lg border border-gray-700/50 rounded-xl shadow-2xl p-4 min-w-[280px]"
+          style={{
+            top: `${dropdownPositions.stock.top}px`,
+            right: `${dropdownPositions.stock.right}px`,
+            zIndex: 2147483647
+          }}
+        >
+          <div className="space-y-3">
+            {/* Bronce */}
+            <div className="flex items-center justify-between p-3 bg-gradient-to-r from-orange-900/30 to-orange-800/20 border border-orange-700/50 rounded-lg">
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-gradient-to-br from-orange-500 to-orange-700 rounded-full"></div>
+                <span className="text-orange-300 font-semibold">BRONCE:</span>
+              </div>
+              <span className="text-white font-bold text-lg">{cartonesStock.bronce}</span>
+            </div>
+
+            {/* Plata */}
+            <div className="flex items-center justify-between p-3 bg-gradient-to-r from-gray-700/30 to-gray-600/20 border border-gray-500/50 rounded-lg">
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-gradient-to-br from-gray-300 to-gray-500 rounded-full"></div>
+                <span className="text-gray-300 font-semibold">PLATA:</span>
+              </div>
+              <span className="text-white font-bold text-lg">{cartonesStock.plata}</span>
+            </div>
+
+            {/* Oro */}
+            <div className="flex items-center justify-between p-3 bg-gradient-to-r from-yellow-900/30 to-yellow-800/20 border border-yellow-600/50 rounded-lg">
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full"></div>
+                <span className="text-yellow-300 font-semibold">ORO:</span>
+              </div>
+              <span className="text-white font-bold text-lg">{cartonesStock.oro}</span>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {showPerfilDropdown && createPortal(
+        <div 
+          data-dropdown="perfil"
+          className="fixed bg-gray-800/95 backdrop-blur-lg border border-gray-700/50 rounded-xl shadow-2xl min-w-[220px] overflow-hidden"
+          style={{
+            top: `${dropdownPositions.perfil.top}px`,
+            right: `${dropdownPositions.perfil.right}px`,
+            zIndex: 2147483647
+          }}
+        >
+          <button
+            className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-700/50 transition-all flex items-center space-x-2 text-sm"
+            onClick={() => {
+              // TODO: Implementar cambio de contraseña
+              alert('Funcionalidad de cambio de contraseña próximamente');
+              setShowPerfilDropdown(false);
+            }}
+          >
+            <span>🔑</span>
+            <span>Cambiar Contraseña</span>
+          </button>
+          <button
+            className="w-full px-4 py-3 text-left text-red-400 hover:bg-red-900/20 transition-colors flex items-center space-x-2 border-t border-gray-700"
+            onClick={handleLogout}
+          >
+            <span>🚪</span>
+            <span>Cerrar Sesión</span>
+          </button>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

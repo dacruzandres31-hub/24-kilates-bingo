@@ -43,6 +43,12 @@ export default function Sidebar({ activeSections, onToggleSection }) {
       sections: []
     },
     {
+      id: 'card-inventory',
+      title: '📦 Inventario de Cartones',
+      icon: '📦',
+      sections: []
+    },
+    {
       id: 'sesiones',
       title: '🎲 Sesiones y Pozos',
       icon: '🎲',

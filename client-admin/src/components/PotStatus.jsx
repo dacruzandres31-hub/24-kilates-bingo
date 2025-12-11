@@ -22,7 +22,7 @@ const getRoomColor = (room) => {
 export default function PotStatus({ pozos, loading = false }) {
   if (loading) {
     return (
-      <div className="bg-slate-800 rounded-xl border border-slate-700 p-6">
+      <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-sm rounded-xl border border-gray-700/50 p-6 shadow-lg">
         <div className="loading-skeleton h-6 w-40 mb-6"></div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {[1, 2, 3].map(i => (
@@ -34,21 +34,21 @@ export default function PotStatus({ pozos, loading = false }) {
   }
 
   return (
-    <div className="bg-slate-800 rounded-xl border border-slate-700 p-6">
-      <h2 className="section-title">
+    <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-sm rounded-xl border border-gray-700/50 p-6 shadow-lg">
+      <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
         <span>💰</span>
         <span>Estado de Pozos</span>
       </h2>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Total General */}
-        <div className="col-span-full bg-gradient-to-br from-gold-500/20 to-gold-600/20 border border-gold-500/50 rounded-xl p-6">
+        <div className="col-span-full bg-gradient-to-br from-yellow-500/20 to-amber-600/20 border border-yellow-500/50 rounded-xl p-6 shadow-lg">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gold-300 uppercase tracking-wide mb-2">
+              <p className="text-sm font-medium text-yellow-300 uppercase tracking-wide mb-2">
                 💎 Total en Pozos
               </p>
-              <p className="text-4xl font-bold text-gold-400">
+              <p className="text-4xl font-bold text-yellow-400">
                 {formatMoney(pozos?.suma_total || 0)}
               </p>
             </div>
@@ -57,7 +57,7 @@ export default function PotStatus({ pozos, loading = false }) {
         </div>
 
         {/* Pozos LÍNEA */}
-        <div className="bg-slate-900/50 rounded-xl p-4 border border-blue-500/30">
+        <div className="bg-gray-900/50 rounded-xl p-4 border border-blue-500/30 shadow-lg hover:shadow-xl transition-shadow">
           <div className="flex items-center gap-2 mb-3">
             <span className="text-2xl">📏</span>
             <h3 className="text-lg font-semibold text-blue-400">Pozos LÍNEA</h3>
@@ -68,7 +68,7 @@ export default function PotStatus({ pozos, loading = false }) {
         </div>
 
         {/* Pozos BINGO */}
-        <div className="bg-slate-900/50 rounded-xl p-4 border border-green-500/30">
+        <div className="bg-gray-900/50 rounded-xl p-4 border border-green-500/30 shadow-lg hover:shadow-xl transition-shadow">
           <div className="flex items-center gap-2 mb-3">
             <span className="text-2xl">🎯</span>
             <h3 className="text-lg font-semibold text-green-400">Pozos BINGO</h3>
@@ -79,7 +79,7 @@ export default function PotStatus({ pozos, loading = false }) {
         </div>
 
         {/* Pozos Acumulativos */}
-        <div className="bg-slate-900/50 rounded-xl p-4 border border-purple-500/30">
+        <div className="bg-gray-900/50 rounded-xl p-4 border border-purple-500/30 shadow-lg hover:shadow-xl transition-shadow">
           <div className="flex items-center gap-2 mb-3">
             <span className="text-2xl">🔥</span>
             <h3 className="text-lg font-semibold text-purple-400">Acumulativos</h3>

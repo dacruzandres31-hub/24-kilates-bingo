@@ -28,41 +28,47 @@ export default function MetricCard({ title, value, subtitle, icon, type = 'neutr
 
   if (loading) {
     return (
-      <div className="metric-card">
+      <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50 shadow-lg">
         <div className="flex items-center justify-between mb-4">
-          <div className="loading-skeleton h-5 w-32"></div>
-          <div className="loading-skeleton h-10 w-10 rounded-full"></div>
+          <div className="h-4 w-32 bg-gray-700 rounded animate-pulse"></div>
+          <div className="h-10 w-10 bg-gray-700 rounded-lg animate-pulse"></div>
         </div>
-        <div className="loading-skeleton h-9 w-40 mb-2"></div>
-        <div className="loading-skeleton h-4 w-24"></div>
+        <div className="h-9 w-40 bg-gray-700 rounded animate-pulse mb-2"></div>
+        <div className="h-4 w-24 bg-gray-700 rounded animate-pulse"></div>
       </div>
     );
   }
 
   return (
-    <div className="metric-card">
+    <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50 shadow-lg hover:shadow-xl transition-all hover:border-gray-600/50">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wide">
+        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
           {title}
         </h3>
         {icon && (
-          <div className={`p-2 rounded-full ${iconBgClasses[type]}`}>
-            <span className="text-2xl">{icon}</span>
+          <div className={`p-2.5 rounded-lg ${iconBgClasses[type]} backdrop-blur-sm`}>
+            <span className="text-xl">{icon}</span>
           </div>
         )}
       </div>
 
-      <div className={`stat-value ${typeClasses[type]} mb-2`}>
+      <div className={`text-3xl font-bold mb-2 ${
+        type === 'positive' ? 'text-green-400' :
+        type === 'warning' ? 'text-yellow-400' :
+        type === 'danger' ? 'text-red-400' :
+        type === 'info' ? 'text-blue-400' :
+        'text-white'
+      }`}>
         {typeof value === 'number' ? formatMoney(value) : value}
       </div>
 
       {subtitle && (
-        <p className="text-sm text-slate-400">{subtitle}</p>
+        <p className="text-sm text-gray-400 font-medium">{subtitle}</p>
       )}
 
       {trend && (
-        <div className={`flex items-center gap-2 mt-2 text-sm ${trend.type === 'up' ? 'text-green-400' : 'text-red-400'}`}>
-          <span>{trend.type === 'up' ? '↗' : '↘'}</span>
+        <div className={`flex items-center gap-2 mt-3 text-sm font-semibold ${trend.type === 'up' ? 'text-green-400' : 'text-red-400'}`}>
+          <span className="text-lg">{trend.type === 'up' ? '↗' : '↘'}</span>
           <span>{trend.value}</span>
         </div>
       )}

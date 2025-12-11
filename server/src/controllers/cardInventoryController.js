@@ -11,14 +11,37 @@ const cardInventoryService = require('../services/cardInventoryService');
  */
 exports.creditCards = async (req, res) => {
   try {
-    const { user_id, room, quantity, is_gift, purchase_price, reason } = req.body;
+    const { user_id, username, room, quantity, is_gift, purchase_price, reason } = req.body;
 
     // Validaciones
-    if (!user_id || !room || !quantity) {
+    if (!user_id && !username) {
       return res.status(400).json({
         success: false,
-        message: 'Faltan campos requeridos: user_id, room, quantity'
+        message: 'Debe proporcionar user_id o username'
       });
+    }
+
+    if (!room || !quantity) {
+      return res.status(400).json({
+        success: false,
+        message: 'Faltan campos requeridos: room, quantity'
+      });
+    }
+
+    // Si se proporciona username, buscar el user_id
+    let targetUserId = user_id;
+    if (username && !user_id) {
+      const db = require('../config/database');
+      const [users] = await db.query('SELECT id FROM users WHERE username = ?', [username]);
+      
+      if (users.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: `Usuario "${username}" no encontrado`
+        });
+      }
+      
+      targetUserId = users[0].id;
     }
 
     if (!['bronce', 'plata', 'oro'].includes(room)) {
@@ -36,7 +59,7 @@ exports.creditCards = async (req, res) => {
     }
 
     const result = await cardInventoryService.creditCards(
-      user_id,
+      targetUserId,
       room,
       quantity,
       is_gift || false,
@@ -67,18 +90,37 @@ exports.getUserInventory = async (req, res) => {
     if (!userId) {
       return res.status(400).json({
         success: false,
-        message: 'user_id es requerido'
+        message: 'user_id o username es requerido'
       });
     }
 
+    // Determinar si es username o ID
+    const db = require('../config/database');
+    let targetUserId;
+
+    // Si es solo números, es un ID
+    if (/^\d+$/.test(userId)) {
+      targetUserId = parseInt(userId);
+    } else {
+      // Es un username, buscarlo
+      const [users] = await db.query('SELECT id FROM users WHERE username = ?', [userId]);
+      if (users.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: `Usuario "${userId}" no encontrado`
+        });
+      }
+      targetUserId = users[0].id;
+    }
+
     const inventory = await cardInventoryService.getInventory(
-      parseInt(userId),
+      targetUserId,
       true  // isSuperAdmin = true (ve regalo/normal separados)
     );
 
     res.json({
       success: true,
-      user_id: parseInt(userId),
+      user_id: targetUserId,
       inventory: inventory
     });
 
@@ -103,18 +145,37 @@ exports.getMovementsLog = async (req, res) => {
     if (!userId) {
       return res.status(400).json({
         success: false,
-        message: 'user_id es requerido'
+        message: 'user_id o username es requerido'
       });
     }
 
+    // Determinar si es username o ID
+    const db = require('../config/database');
+    let targetUserId;
+
+    // Si es solo números, es un ID
+    if (/^\d+$/.test(userId)) {
+      targetUserId = parseInt(userId);
+    } else {
+      // Es un username, buscarlo
+      const [users] = await db.query('SELECT id FROM users WHERE username = ?', [userId]);
+      if (users.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: `Usuario "${userId}" no encontrado`
+        });
+      }
+      targetUserId = users[0].id;
+    }
+
     const movements = await cardInventoryService.getMovementsLog(
-      parseInt(userId),
+      targetUserId,
       limit
     );
 
     res.json({
       success: true,
-      user_id: parseInt(userId),
+      user_id: targetUserId,
       total: movements.length,
       movements: movements
     });
@@ -134,14 +195,48 @@ exports.getMovementsLog = async (req, res) => {
  */
 exports.transferCards = async (req, res) => {
   try {
-    const { from_user_id, to_user_id, room, quantity } = req.body;
+    const { from_user_id, from_username, to_user_id, to_username, room, quantity } = req.body;
 
     // Validaciones
-    if (!from_user_id || !to_user_id || !room || !quantity) {
+    if ((!from_user_id && !from_username) || (!to_user_id && !to_username)) {
       return res.status(400).json({
         success: false,
-        message: 'Faltan campos requeridos: from_user_id, to_user_id, room, quantity'
+        message: 'Debe proporcionar from_user_id/from_username y to_user_id/to_username'
       });
+    }
+
+    if (!room || !quantity) {
+      return res.status(400).json({
+        success: false,
+        message: 'Faltan campos requeridos: room, quantity'
+      });
+    }
+
+    // Resolver usernames a IDs si es necesario
+    const db = require('../config/database');
+    let fromUserId = from_user_id;
+    let toUserId = to_user_id;
+
+    if (from_username && !from_user_id) {
+      const [users] = await db.query('SELECT id FROM users WHERE username = ?', [from_username]);
+      if (users.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: `Usuario origen "${from_username}" no encontrado`
+        });
+      }
+      fromUserId = users[0].id;
+    }
+
+    if (to_username && !to_user_id) {
+      const [users] = await db.query('SELECT id FROM users WHERE username = ?', [to_username]);
+      if (users.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: `Usuario destino "${to_username}" no encontrado`
+        });
+      }
+      toUserId = users[0].id;
     }
 
     if (!['bronce', 'plata', 'oro'].includes(room)) {
@@ -158,7 +253,7 @@ exports.transferCards = async (req, res) => {
       });
     }
 
-    if (from_user_id === to_user_id) {
+    if (fromUserId === toUserId) {
       return res.status(400).json({
         success: false,
         message: 'No puede transferir cartones a sí mismo'
@@ -166,8 +261,8 @@ exports.transferCards = async (req, res) => {
     }
 
     const result = await cardInventoryService.transferCards(
-      from_user_id,
-      to_user_id,
+      fromUserId,
+      toUserId,
       room,
       quantity,
       req.user.id  // SuperAdmin que ejecuta
