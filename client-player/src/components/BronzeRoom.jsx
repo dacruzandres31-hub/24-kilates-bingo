@@ -1026,10 +1026,10 @@ useEffect(() => {
                 textShadow: '0 0 10px rgba(184, 115, 51, 0.6), 0 0 20px rgba(139, 69, 19, 0.4)',
                 WebkitTextFillColor: '#b87333'
               }}>SALA BRONCE</span>
-              <span className="card-price-tag">
+              <div className="card-price-tag">
                 <span className="price-label">Valor Cartón</span>
                 <span className="price-amount">$500</span>
-              </span>
+              </div>
               <button 
                 className="lobby-btn"
                 onClick={() => navigate('/')}

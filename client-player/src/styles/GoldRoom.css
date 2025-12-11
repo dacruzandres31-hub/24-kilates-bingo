@@ -3701,7 +3701,7 @@
 .gold-room .price-label {
   font-size: 0.75rem;
   font-weight: 600;
-  color: #FFD700;
+  color: #FFD700 !important;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   text-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
@@ -3714,8 +3714,10 @@
   background: linear-gradient(135deg, #FFD700 0%, #FFC107 100%);
   padding: 4px 12px;
   border-radius: 8px;
+  border: 2px solid #DAA520;
   text-shadow: none;
   letter-spacing: 1px;
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.6), inset 0 1px 2px rgba(255, 255, 255, 0.3);
 }
 
 /* Grid de Números - Fondo Dorado Elegante */
@@ -3916,6 +3918,96 @@
     0 5px 15px rgba(0, 0, 0, 0.5),
     inset 0 -5px 10px rgba(0, 0, 0, 0.3),
     inset 0 5px 10px rgba(255, 255, 255, 0.3) !important;
+}
+
+/* ============================================
+   SIDEBAR DORADO - SALA ORO
+   ============================================ */
+
+/* Botón toggle del sidebar */
+.gold-room .sidebar-toggle-btn {
+  background: rgba(255, 215, 0, 0.2) !important;
+  border: 2px solid rgba(255, 215, 0, 0.6) !important;
+  color: #FFD700 !important;
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.4) !important;
+}
+
+.gold-room .sidebar-toggle-btn:hover {
+  background: rgba(255, 215, 0, 0.3) !important;
+  border-color: rgba(255, 215, 0, 1) !important;
+  box-shadow: 0 0 30px rgba(255, 215, 0, 0.8) !important;
+}
+
+/* Sidebar principal */
+.gold-room .player-sidebar {
+  border-right: 3px solid rgba(255, 215, 0, 0.5) !important;
+  box-shadow: 5px 0 30px rgba(255, 215, 0, 0.3) !important;
+}
+
+/* Scrollbar dorado */
+.gold-room .player-sidebar::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #FFD700, #FFA000) !important;
+}
+
+/* Header del sidebar */
+.gold-room .sidebar-header {
+  border-bottom: 2px solid rgba(255, 215, 0, 0.3) !important;
+}
+
+.gold-room .sidebar-title {
+  color: #FFD700 !important;
+  text-shadow: 0 0 15px rgba(255, 215, 0, 0.6) !important;
+}
+
+.gold-room .sidebar-close-btn {
+  color: #FFD700 !important;
+  border: 2px solid rgba(255, 215, 0, 0.3) !important;
+}
+
+.gold-room .sidebar-close-btn:hover {
+  background: rgba(255, 215, 0, 0.2) !important;
+  border-color: rgba(255, 215, 0, 0.6) !important;
+  color: #ffffff !important;
+}
+
+/* Secciones del sidebar */
+.gold-room .sidebar-section-header {
+  color: #FFD700 !important;
+  border-bottom: 2px solid rgba(255, 215, 0, 0.3) !important;
+}
+
+.gold-room .sidebar-item {
+  border: 1px solid rgba(255, 215, 0, 0.2) !important;
+}
+
+.gold-room .sidebar-item:hover {
+  background: rgba(255, 215, 0, 0.1) !important;
+  border-color: rgba(255, 215, 0, 0.4) !important;
+}
+
+.gold-room .sidebar-icon {
+  color: #FFD700 !important;
+}
+
+.gold-room .sidebar-label {
+  color: #FFD700 !important;
+}
+
+.gold-room .sidebar-value {
+  color: #ffffff !important;
+}
+
+/* Botones de acción */
+.gold-room .sidebar-actions button {
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(255, 160, 0, 0.2)) !important;
+  border: 2px solid rgba(255, 215, 0, 0.4) !important;
+  color: #FFD700 !important;
+}
+
+.gold-room .sidebar-actions button:hover {
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.3), rgba(255, 160, 0, 0.3)) !important;
+  border-color: rgba(255, 215, 0, 0.6) !important;
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.5) !important;
 }
 
 /* Sección derecha - Fondo negro con resplandor dorado */

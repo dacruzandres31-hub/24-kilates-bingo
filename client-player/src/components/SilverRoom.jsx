@@ -344,12 +344,8 @@ celebrationAudio.volume = 0.7;
   };
 
   const handleCancelSelection = () => {
-    // Volver al lobby si no tiene cartones
-    if (selectedPlayerCards.length === 0) {
-      navigate('/lobby');
-    } else {
-      setShowCardSelection(false);
-    }
+    // Simplemente cerrar el lobby de selección
+    setShowCardSelection(false);
   };
 
   const isNumberCalled = (number) => {
@@ -639,6 +635,7 @@ useEffect(() => {
           maxCards={cardsRemaining}
           currentCards={selectedPlayerCards.length}
           timeWindow="open"
+          roomTheme="silver"
         />
       )}
 

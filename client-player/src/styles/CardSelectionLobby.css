@@ -786,3 +786,222 @@
 .card-selection-lobby.theme-bronze .closed-info {
   color: #cd853f !important;
 }
+
+/* ============================================
+   TEMA SILVER - SALA PLATA
+   ============================================ */
+
+.card-selection-lobby.theme-silver {
+  background: linear-gradient(180deg, #0a0a0a 0%, #1a1a1a 100%);
+}
+
+.card-selection-lobby.theme-silver .selection-header {
+  border-bottom-color: rgba(192, 192, 192, 0.3);
+  background: rgba(192, 192, 192, 0.05);
+}
+
+.card-selection-lobby.theme-silver .header-icon {
+  color: #c0c0c0;
+}
+
+.card-selection-lobby.theme-silver .header-title {
+  background: linear-gradient(90deg, #c0c0c0, #d3d3d3);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.card-selection-lobby.theme-silver .header-subtitle {
+  color: rgba(192, 192, 192, 0.8);
+}
+
+.card-selection-lobby.theme-silver .stat-icon {
+  color: #c0c0c0;
+}
+
+.card-selection-lobby.theme-silver .stat-value {
+  color: #c0c0c0;
+  text-shadow: 0 0 10px rgba(192, 192, 192, 0.6);
+}
+
+.card-selection-lobby.theme-silver .stat-label {
+  color: rgba(192, 192, 192, 0.7);
+}
+
+.card-selection-lobby.theme-silver .counter-label {
+  color: #c0c0c0;
+}
+
+.card-selection-lobby.theme-silver .counter-value {
+  color: #c0c0c0;
+  text-shadow: 0 0 10px rgba(192, 192, 192, 0.8);
+}
+
+.card-selection-lobby.theme-silver .counter-fill {
+  background: linear-gradient(90deg, #c0c0c0, #d3d3d3);
+  box-shadow: 0 0 15px rgba(192, 192, 192, 0.8);
+}
+
+.card-selection-lobby.theme-silver .card-item {
+  border-color: rgba(192, 192, 192, 0.3);
+}
+
+.card-selection-lobby.theme-silver .card-item:hover {
+  border-color: rgba(192, 192, 192, 0.6);
+  box-shadow: 0 5px 20px rgba(192, 192, 192, 0.3);
+}
+
+.card-selection-lobby.theme-silver .card-item.selected {
+  border-color: #c0c0c0;
+  box-shadow: 0 0 30px rgba(192, 192, 192, 0.6);
+}
+
+.card-selection-lobby.theme-silver .card-serial {
+  color: #c0c0c0;
+}
+
+.card-selection-lobby.theme-silver .btn-back {
+  background: linear-gradient(135deg, rgba(192, 192, 192, 0.2), rgba(169, 169, 169, 0.2));
+  border-color: rgba(192, 192, 192, 0.5);
+  color: #c0c0c0;
+}
+
+.card-selection-lobby.theme-silver .btn-back:hover {
+  background: linear-gradient(135deg, rgba(192, 192, 192, 0.3), rgba(169, 169, 169, 0.3));
+  border-color: #c0c0c0;
+  box-shadow: 0 0 30px rgba(192, 192, 192, 0.6);
+}
+
+.card-selection-lobby.theme-silver .btn-confirm {
+  background: linear-gradient(135deg, rgba(192, 192, 192, 0.3), rgba(211, 211, 211, 0.3));
+  border-color: rgba(192, 192, 192, 0.6);
+  color: #c0c0c0;
+}
+
+.card-selection-lobby.theme-silver .btn-confirm:hover {
+  background: linear-gradient(135deg, rgba(192, 192, 192, 0.5), rgba(211, 211, 211, 0.5));
+  border-color: #c0c0c0;
+  box-shadow: 0 0 30px rgba(192, 192, 192, 0.8);
+}
+
+.card-selection-lobby.theme-silver .closed-message {
+  border-color: rgba(192, 192, 192, 0.5);
+}
+
+.card-selection-lobby.theme-silver .closed-icon {
+  color: #c0c0c0;
+}
+
+.card-selection-lobby.theme-silver .closed-info {
+  color: #c0c0c0 !important;
+}
+
+/* ============================================
+   TEMA GOLD - SALA ORO
+   ============================================ */
+
+.card-selection-lobby.theme-gold {
+  background: linear-gradient(180deg, #0a0a00 0%, #1a1a00 100%);
+}
+
+.card-selection-lobby.theme-gold .selection-header {
+  border-bottom-color: rgba(255, 215, 0, 0.3);
+  background: rgba(255, 215, 0, 0.05);
+}
+
+.card-selection-lobby.theme-gold .header-icon {
+  color: #FFD700;
+}
+
+.card-selection-lobby.theme-gold .header-title {
+  background: linear-gradient(90deg, #FFD700, #FFC107);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.card-selection-lobby.theme-gold .header-subtitle {
+  color: rgba(255, 215, 0, 0.8);
+}
+
+.card-selection-lobby.theme-gold .stat-icon {
+  color: #FFD700;
+}
+
+.card-selection-lobby.theme-gold .stat-value {
+  color: #FFD700;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
+}
+
+.card-selection-lobby.theme-gold .stat-label {
+  color: rgba(255, 215, 0, 0.7);
+}
+
+.card-selection-lobby.theme-gold .counter-label {
+  color: #FFD700;
+}
+
+.card-selection-lobby.theme-gold .counter-value {
+  color: #FFD700;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.8);
+}
+
+.card-selection-lobby.theme-gold .counter-fill {
+  background: linear-gradient(90deg, #FFD700, #FFC107);
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.8);
+}
+
+.card-selection-lobby.theme-gold .card-item {
+  border-color: rgba(255, 215, 0, 0.3);
+}
+
+.card-selection-lobby.theme-gold .card-item:hover {
+  border-color: rgba(255, 215, 0, 0.6);
+  box-shadow: 0 5px 20px rgba(255, 215, 0, 0.3);
+}
+
+.card-selection-lobby.theme-gold .card-item.selected {
+  border-color: #FFD700;
+  box-shadow: 0 0 30px rgba(255, 215, 0, 0.6);
+}
+
+.card-selection-lobby.theme-gold .card-serial {
+  color: #FFD700;
+}
+
+.card-selection-lobby.theme-gold .btn-back {
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(255, 160, 0, 0.2));
+  border-color: rgba(255, 215, 0, 0.5);
+  color: #FFD700;
+}
+
+.card-selection-lobby.theme-gold .btn-back:hover {
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.3), rgba(255, 160, 0, 0.3));
+  border-color: #FFD700;
+  box-shadow: 0 0 30px rgba(255, 215, 0, 0.6);
+}
+
+.card-selection-lobby.theme-gold .btn-confirm {
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.3), rgba(255, 193, 7, 0.3));
+  border-color: rgba(255, 215, 0, 0.6);
+  color: #FFD700;
+}
+
+.card-selection-lobby.theme-gold .btn-confirm:hover {
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.5), rgba(255, 193, 7, 0.5));
+  border-color: #FFD700;
+  box-shadow: 0 0 30px rgba(255, 215, 0, 0.8);
+}
+
+.card-selection-lobby.theme-gold .closed-message {
+  border-color: rgba(255, 215, 0, 0.5);
+}
+
+.card-selection-lobby.theme-gold .closed-icon {
+  color: #FFD700;
+}
+
+.card-selection-lobby.theme-gold .closed-info {
+  color: #FFD700 !important;
+}
+

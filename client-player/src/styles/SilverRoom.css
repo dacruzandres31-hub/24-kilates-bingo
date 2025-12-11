@@ -3701,7 +3701,7 @@
 .silver-room .price-label {
   font-size: 0.75rem;
   font-weight: 600;
-  color: #c0c0c0;
+  color: #c0c0c0 !important;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   text-shadow: 0 0 8px rgba(192, 192, 192, 0.6);
@@ -3714,8 +3714,10 @@
   background: linear-gradient(135deg, #c0c0c0 0%, #d3d3d3 100%);
   padding: 4px 12px;
   border-radius: 8px;
+  border: 2px solid #a8a8a8;
   text-shadow: none;
   letter-spacing: 1px;
+  box-shadow: 0 0 15px rgba(192, 192, 192, 0.6), inset 0 1px 2px rgba(255, 255, 255, 0.3);
 }
 
 /* Grid de Números - Fondo Gris Elegante */
@@ -3896,6 +3898,96 @@
     0 5px 15px rgba(0, 0, 0, 0.5),
     inset 0 -5px 10px rgba(0, 0, 0, 0.3),
     inset 0 5px 10px rgba(255, 255, 255, 0.3) !important;
+}
+
+/* ============================================
+   SIDEBAR PLATEADO - SALA PLATA
+   ============================================ */
+
+/* Botón toggle del sidebar */
+.silver-room .sidebar-toggle-btn {
+  background: rgba(192, 192, 192, 0.2) !important;
+  border: 2px solid rgba(192, 192, 192, 0.6) !important;
+  color: #c0c0c0 !important;
+  box-shadow: 0 0 20px rgba(192, 192, 192, 0.4) !important;
+}
+
+.silver-room .sidebar-toggle-btn:hover {
+  background: rgba(192, 192, 192, 0.3) !important;
+  border-color: rgba(192, 192, 192, 1) !important;
+  box-shadow: 0 0 30px rgba(192, 192, 192, 0.8) !important;
+}
+
+/* Sidebar principal */
+.silver-room .player-sidebar {
+  border-right: 3px solid rgba(192, 192, 192, 0.5) !important;
+  box-shadow: 5px 0 30px rgba(192, 192, 192, 0.3) !important;
+}
+
+/* Scrollbar plateado */
+.silver-room .player-sidebar::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #c0c0c0, #a9a9a9) !important;
+}
+
+/* Header del sidebar */
+.silver-room .sidebar-header {
+  border-bottom: 2px solid rgba(192, 192, 192, 0.3) !important;
+}
+
+.silver-room .sidebar-title {
+  color: #c0c0c0 !important;
+  text-shadow: 0 0 15px rgba(192, 192, 192, 0.6) !important;
+}
+
+.silver-room .sidebar-close-btn {
+  color: #c0c0c0 !important;
+  border: 2px solid rgba(192, 192, 192, 0.3) !important;
+}
+
+.silver-room .sidebar-close-btn:hover {
+  background: rgba(192, 192, 192, 0.2) !important;
+  border-color: rgba(192, 192, 192, 0.6) !important;
+  color: #ffffff !important;
+}
+
+/* Secciones del sidebar */
+.silver-room .sidebar-section-header {
+  color: #c0c0c0 !important;
+  border-bottom: 2px solid rgba(192, 192, 192, 0.3) !important;
+}
+
+.silver-room .sidebar-item {
+  border: 1px solid rgba(192, 192, 192, 0.2) !important;
+}
+
+.silver-room .sidebar-item:hover {
+  background: rgba(192, 192, 192, 0.1) !important;
+  border-color: rgba(192, 192, 192, 0.4) !important;
+}
+
+.silver-room .sidebar-icon {
+  color: #c0c0c0 !important;
+}
+
+.silver-room .sidebar-label {
+  color: #c0c0c0 !important;
+}
+
+.silver-room .sidebar-value {
+  color: #ffffff !important;
+}
+
+/* Botones de acción */
+.silver-room .sidebar-actions button {
+  background: linear-gradient(135deg, rgba(192, 192, 192, 0.2), rgba(169, 169, 169, 0.2)) !important;
+  border: 2px solid rgba(192, 192, 192, 0.4) !important;
+  color: #c0c0c0 !important;
+}
+
+.silver-room .sidebar-actions button:hover {
+  background: linear-gradient(135deg, rgba(192, 192, 192, 0.3), rgba(169, 169, 169, 0.3)) !important;
+  border-color: rgba(192, 192, 192, 0.6) !important;
+  box-shadow: 0 0 20px rgba(192, 192, 192, 0.5) !important;
 }
 
 /* Sección derecha - Fondo negro con resplandor plateado */
