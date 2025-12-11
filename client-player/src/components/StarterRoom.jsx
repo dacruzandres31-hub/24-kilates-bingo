@@ -271,6 +271,14 @@ celebrationAudio.volume = 0.7;
     updateColumnCounts();
   }, [ballsDrawn]);
   
+  // Reproducir sonido cuando la bola CAE (currentBall se establece)
+  useEffect(() => {
+    if (currentBall) {
+      console.log(`🎱 [SONIDO] Bola cayendo: ${currentBall.number}`);
+      audioService.playBolaCayendoConPausa();
+    }
+  }, [currentBall]);
+  
   // Animación de entrada de cartones
   useEffect(() => {
     if (selectedPlayerCards.length > 0 && !cardsDealing) {
@@ -509,28 +517,35 @@ useEffect(() => {
 
   // Detectar cambios en el estado del juego y anunciar
   useEffect(() => {
-    if (gameStatus === 'active' && previousGameStatus === 'waiting') {
-      // PRIMERO: Iniciar sonido de bolillero inmediatamente (sin retardo)
+    console.log(`🎮 [StarterRoom] gameStatus cambió: ${previousGameStatus} → ${gameStatus}`);
+    
+    if (gameStatus === 'active' && previousGameStatus !== 'active') {
+      console.log('🎬 SORTEO ACTIVO - Iniciando bolillero');
+      
+      // Iniciar bolillero cuando arranca el sorteo
       audioService.startBolilleroGirando();
-      // SEGUNDO: Bajar volumen de música de fondo al 70%
+      
+      // Bajar volumen de música de fondo al 70%
       audioService.lowerMusicVolume();
-      // TERCERO: Anuncios y efectos visuales
-      voiceService.announceSorteoIniciado();
-      addToast('🎲', '¡Sorteo iniciado!', 'Buena suerte');
+      
+      // Anuncios según el estado previo
+      if (previousGameStatus === 'waiting') {
+        voiceService.announceSorteoIniciado();
+        addToast('🎲', '¡Sorteo iniciado!', 'Buena suerte');
+      } else if (previousGameStatus === 'paused') {
+        voiceService.announceSorteoReiniciado();
+      }
+      
     } else if (gameStatus === 'waiting' && previousGameStatus === 'active') {
+      console.log('⏸️ PAUSANDO SORTEO - Deteniendo bolillero');
       voiceService.announceSorteoPausado();
       // Detener sonido de bolillero
       audioService.stopBolilleroGirando();
       // Restaurar volumen de música al 100%
       audioService.restoreMusicVolume();
       addToast('⏸️', 'Sorteo pausado', 'Esperando...');
-    } else if (gameStatus === 'active' && previousGameStatus === 'paused') {
-      voiceService.announceSorteoReiniciado();
-      // Reiniciar sonido de bolillero
-      audioService.startBolilleroGirando();
-      // Bajar volumen de música de fondo al 70%
-      audioService.lowerMusicVolume();
     }
+    
     setPreviousGameStatus(gameStatus);
   }, [gameStatus]);
 
@@ -538,11 +553,10 @@ useEffect(() => {
   useEffect(() => {
     if (ballsDrawn.length > 0) {
       const lastDrawnBall = ballsDrawn[ballsDrawn.length - 1];
+      console.log(`📢 [StarterRoom] Anunciando número: ${lastDrawnBall.number}`);
       
-      // Reproducir sonido de bola cayendo inmediatamente
-      audioService.playBolaCayendo();
-      
-      // Anunciar el número con voz
+      // NO reproducir sonido aquí - ya se reprodujo cuando cayó (currentBall)
+      // Solo anunciar con voz
       setTimeout(() => {
         voiceService.announceNumber(lastDrawnBall.number);
       }, 500);

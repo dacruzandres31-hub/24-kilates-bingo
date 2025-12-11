@@ -51,8 +51,13 @@ class AudioService {
     this.bolillerAudio.preload = 'auto';
     
     this.bolaAudio = new Audio('/audio/bola_cayendo.mp3');
-    this.bolaAudio.volume = 0.5;
+    this.bolaAudio.volume = 0.8;
     this.bolaAudio.preload = 'auto';
+    
+    // Detectar duración del audio de bola cuando se cargue
+    this.bolaAudio.addEventListener('loadedmetadata', () => {
+      console.log(`🎱 Duración de bola_cayendo.mp3: ${this.bolaAudio.duration} segundos`);
+    });
     
     console.log('🔊 Efectos de sonido precargados');
   }
@@ -143,29 +148,66 @@ class AudioService {
   }
 
   startBolilleroGirando() {
-    if (!this.efectosEnabled || !this.bolillerAudio) {
-      console.warn('⚠️ Bolillero no disponible o efectos desactivados');
+    console.log(`🎰 [startBolilleroGirando] Llamado - efectosEnabled: ${this.efectosEnabled}, bolillerAudio existe: ${!!this.bolillerAudio}`);
+    
+    if (!this.efectosEnabled) {
+      console.warn('⚠️ Efectos desactivados, no se inicia bolillero');
       return;
     }
     
+    if (!this.bolillerAudio) {
+      console.error('❌ bolillerAudio no existe! Intentando recrear...');
+      this.bolillerAudio = new Audio('/audio/bolillero_girando.mp3');
+      this.bolillerAudio.loop = true;
+      this.bolillerAudio.volume = 0.3;
+      this.bolillerAudio.preload = 'auto';
+    }
+    
     try {
-      // Reiniciar inmediatamente sin esperar
+      // Si ya está reproduciendo, no hacer nada
+      if (!this.bolillerAudio.paused) {
+        console.log('🎰 Bolillero ya está girando, ignorando llamada duplicada');
+        return;
+      }
+      
+      console.log('🎰 Iniciando reproducción de bolillero...');
+      console.log(`   Estado: readyState=${this.bolillerAudio.readyState}, networkState=${this.bolillerAudio.networkState}`);
+      
+      // Reiniciar desde el inicio
       this.bolillerAudio.currentTime = 0;
+      this.bolillerAudio.volume = 0.3;
       
-      // Intentar reproducir sin await para ejecución inmediata
       const playPromise = this.bolillerAudio.play();
-      
       if (playPromise !== undefined) {
         playPromise
           .then(() => {
-            console.log('🎰 Bolillero girando iniciado exitosamente');
+            console.log('✅ Bolillero girando iniciado exitosamente');
+            console.log(`   - Volume: ${this.bolillerAudio.volume}`);
+            console.log(`   - Loop: ${this.bolillerAudio.loop}`);
+            console.log(`   - Paused: ${this.bolillerAudio.paused}`);
           })
           .catch(err => {
-            console.warn('⚠️ No se pudo reproducir bolillero:', err.message);
+            console.error('❌ No se pudo reproducir bolillero:', err.message);
+            console.error('   Error completo:', err);
+            console.error('   ReadyState:', this.bolillerAudio.readyState);
+            console.error('   NetworkState:', this.bolillerAudio.networkState);
+            console.error('   Src:', this.bolillerAudio.src);
+            
+            // Si el error es por source, intentar recargar
+            if (err.message.includes('sources') || err.message.includes('HAVE_NOTHING')) {
+              console.log('🔄 Intentando recargar audio...');
+              this.bolillerAudio.load();
+              setTimeout(() => {
+                this.bolillerAudio.play()
+                  .then(() => console.log('✅ Bolillero arrancado después de reload'))
+                  .catch(err2 => console.error('❌ Falló después de reload:', err2.message));
+              }, 100);
+            }
           });
       }
     } catch (error) {
       console.error('❌ Error iniciando bolillero:', error.message);
+      console.error('   Stack:', error.stack);
     }
   }
 
@@ -178,6 +220,79 @@ class AudioService {
       console.log('🛑 Bolillero girando detenido');
     } catch (error) {
       console.error('❌ Error deteniendo bolillero:', error.message);
+    }
+  }
+
+  /**
+   * Pausa temporalmente el bolillero (sin reiniciar posición)
+   */
+  pauseBolillero() {
+    if (!this.bolillerAudio || this.bolillerAudio.paused) return;
+    
+    try {
+      this.bolillerAudio.pause();
+      console.log('⏸️ Bolillero pausado temporalmente');
+    } catch (error) {
+      console.error('❌ Error pausando bolillero:', error.message);
+    }
+  }
+
+  /**
+   * Reanuda el bolillero desde donde se pausó
+   */
+  resumeBolillero() {
+    if (!this.bolillerAudio || !this.efectosEnabled) return;
+    
+    try {
+      if (this.bolillerAudio.paused) {
+        this.bolillerAudio.play()
+          .then(() => console.log('▶️ Bolillero reanudado'))
+          .catch(err => console.warn('⚠️ No se pudo reanudar bolillero:', err.message));
+      }
+    } catch (error) {
+      console.error('❌ Error reanudando bolillero:', error.message);
+    }
+  }
+
+  /**
+   * Reproduce bola cayendo INMEDIATAMENTE sin tocar el bolillero
+   * Simple y directo
+   */
+  playBolaCayendoConPausa() {
+    const timestamp = new Date().toLocaleTimeString('es-AR', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 });
+    console.log(`🔔 [${timestamp}] playBolaCayendoConPausa LLAMADO`);
+    
+    if (!this.efectosEnabled) {
+      console.log('🔇 Efectos desactivados, no se reproduce bola');
+      return;
+    }
+    
+    if (!this.bolaAudio) {
+      console.error('❌ bolaAudio no está inicializado');
+      return;
+    }
+    
+    try {
+      console.log(`   Estado previo: paused=${this.bolaAudio.paused}, currentTime=${this.bolaAudio.currentTime.toFixed(3)}`);
+      
+      // FORZAR reinicio incluso si está reproduciéndose
+      this.bolaAudio.pause();
+      this.bolaAudio.currentTime = 0;
+      this.bolaAudio.volume = 0.8;
+      
+      const playPromise = this.bolaAudio.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log(`✅ [${timestamp}] Bola cayendo reproducida correctamente`);
+          })
+          .catch(err => {
+            console.error(`❌ [${timestamp}] Error reproduciendo bola:`, err.message);
+            console.error('   Causa probable: autoplay bloqueado por navegador');
+          });
+      }
+    } catch (error) {
+      console.error('❌ Error al reproducir bola:', error);
     }
   }
 

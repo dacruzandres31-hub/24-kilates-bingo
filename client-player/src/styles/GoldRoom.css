@@ -3676,3 +3676,280 @@
   }
 }
 
+/* ============================================
+   SALA ORO - ESTILOS EXCLUSIVOS (NO AFECTAN STARTER, BRONCE NI PLATA)
+   Tema Elegante: Dorado con Tipografía Georgia
+   ============================================ */
+
+/* Etiqueta de Precio Cartón $2.000 */
+.gold-room .card-price-tag {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.25) 0%, rgba(255, 193, 7, 0.15) 100%);
+  border: 2px solid #FFD700;
+  border-radius: 12px;
+  box-shadow: 
+    0 4px 15px rgba(255, 215, 0, 0.4),
+    inset 0 2px 8px rgba(255, 255, 255, 0.2);
+  gap: 2px;
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+.gold-room .price-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #FFD700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
+}
+
+.gold-room .price-amount {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #000000;
+  background: linear-gradient(135deg, #FFD700 0%, #FFC107 100%);
+  padding: 4px 12px;
+  border-radius: 8px;
+  text-shadow: none;
+  letter-spacing: 1px;
+}
+
+/* Grid de Números - Fondo Dorado Elegante */
+.gold-room .grid-number {
+  background: linear-gradient(135deg, #FFEB3B 0%, #FFC107 100%) !important;
+  color: #1a1a00 !important;
+  font-family: Georgia, 'Times New Roman', serif !important;
+  font-weight: 600 !important;
+  border: 1px solid rgba(255, 215, 0, 0.5) !important;
+  box-shadow: 
+    0 2px 8px rgba(0, 0, 0, 0.15),
+    inset 0 1px 3px rgba(255, 255, 255, 0.4) !important;
+}
+
+.gold-room .grid-number.called {
+  background: linear-gradient(135deg, #FFB300 0%, #FF8F00 100%) !important;
+  color: #000000 !important;
+  border-color: #FFD700 !important;
+  border-width: 3px !important;
+  box-shadow: 
+    0 0 25px rgba(255, 179, 0, 1),
+    0 0 40px rgba(255, 215, 0, 0.8),
+    0 4px 12px rgba(0, 0, 0, 0.3),
+    inset 0 2px 8px rgba(255, 255, 255, 0.5) !important;
+  font-weight: 900 !important;
+}
+
+/* Letras de Columna (1-10, 11-20, etc) */
+.gold-room .column-letter {
+  background: linear-gradient(135deg, #FFC107 0%, #FFD700 100%) !important;
+  color: #1a1a00 !important;
+  font-family: Georgia, 'Times New Roman', serif !important;
+  font-weight: 700 !important;
+  border: 2px solid rgba(255, 215, 0, 0.7) !important;
+  box-shadow: 
+    0 3px 10px rgba(0, 0, 0, 0.2),
+    inset 0 2px 5px rgba(255, 255, 255, 0.5) !important;
+}
+
+/* Título del Grid */
+.gold-room .grid-title {
+  color: #FFD700 !important;
+  text-shadow: 
+    0 0 15px rgba(255, 215, 0, 0.8),
+    0 0 30px rgba(255, 193, 7, 0.4) !important;
+  font-family: Georgia, 'Times New Roman', serif !important;
+}
+
+/* Glow del Grid */
+.gold-room .grid-glow {
+  background: linear-gradient(135deg, 
+    rgba(255, 215, 0, 0.3) 0%, 
+    rgba(255, 193, 7, 0.2) 50%,
+    rgba(255, 235, 59, 0.3) 100%) !important;
+  box-shadow: 
+    0 0 40px rgba(255, 215, 0, 0.5),
+    inset 0 0 30px rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Anillo de Glow en Números Llamados */
+.gold-room .number-glow-ring {
+  border: 2px solid #FFD700 !important;
+  box-shadow: 
+    0 0 20px rgba(255, 215, 0, 0.8),
+    inset 0 0 15px rgba(255, 255, 255, 0.4) !important;
+}
+
+/* Bordes de columnas del grid - DORADO */
+.gold-room .grid-row .grid-column {
+  border: 2px solid rgba(255, 215, 0, 0.6) !important;
+  box-shadow: 
+    0 0 20px rgba(255, 215, 0, 0.4),
+    inset 0 0 20px rgba(255, 215, 0, 0.1) !important;
+}
+
+/* Título de las columnas (1-10, 11-20, etc) - DORADO */
+.gold-room .grid-row .column-letter {
+  border: 1px solid rgba(255, 215, 0, 0.6) !important;
+  color: #FFD700 !important;
+}
+
+/* Números del grid general */
+.gold-room .grid-row .grid-number {
+  border: 1px solid rgba(255, 215, 0, 0.4) !important;
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.2) !important;
+}
+
+/* Números cantados */
+.gold-room .grid-row .grid-number.called {
+  border: 2px solid rgba(255, 215, 0, 0.8) !important;
+}
+
+/* Efectos de onda - DORADO */
+@keyframes ripple-wave-gold {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.6);
+  }
+  100% {
+    box-shadow: 0 0 0 30px rgba(255, 215, 0, 0);
+  }
+}
+
+.gold-room .grid-row .grid-number.recent {
+  animation: recentPulse 1s ease-in-out, ripple-wave-gold 0.8s ease-out !important;
+}
+
+/* Barra de bolas recientes - DORADO */
+.gold-room .recent-balls-bar {
+  border: 1px solid rgba(255, 215, 0, 0.3) !important;
+}
+
+.gold-room .recent-label {
+  color: #FFD700 !important;
+}
+
+/* Sidebar Tema Oro */
+.gold-room .sidebar-container {
+  background: linear-gradient(180deg, 
+    rgba(255, 215, 0, 0.15) 0%, 
+    rgba(255, 193, 7, 0.1) 100%) !important;
+  border-left: 2px solid rgba(255, 215, 0, 0.4) !important;
+  box-shadow: 
+    -4px 0 20px rgba(0, 0, 0, 0.3),
+    inset 0 0 30px rgba(255, 215, 0, 0.1) !important;
+}
+
+.gold-room .sidebar-title {
+  color: #FFD700 !important;
+  text-shadow: 
+    0 0 12px rgba(255, 215, 0, 0.7),
+    0 0 20px rgba(255, 193, 7, 0.3) !important;
+  font-family: Georgia, 'Times New Roman', serif !important;
+}
+
+/* Sección de cartones - Fondo dorado */
+.gold-room .player-cards-section {
+  background: rgba(20, 15, 0, 0.8) !important;
+  border: 2px solid rgba(255, 215, 0, 0.5) !important;
+  box-shadow: 
+    0 4px 20px rgba(255, 215, 0, 0.3),
+    inset 0 2px 10px rgba(255, 215, 0, 0.1) !important;
+}
+
+.gold-room .cards-title {
+  color: #FFD700 !important;
+  text-shadow: 0 0 15px rgba(255, 215, 0, 0.8) !important;
+}
+
+.gold-room .cards-count {
+  background: rgba(255, 215, 0, 0.15) !important;
+  border: 1px solid rgba(255, 215, 0, 0.4) !important;
+  color: #FFC107 !important;
+}
+
+/* Cartones compactos - Bordes dorados */
+.gold-room .compact-card {
+  background: rgba(15, 12, 0, 0.95) !important;
+  border: 2px solid rgba(255, 215, 0, 0.5) !important;
+}
+
+.gold-room .compact-card:hover {
+  border-color: rgba(255, 215, 0, 0.9) !important;
+  box-shadow: 
+    0 10px 30px rgba(255, 215, 0, 0.6),
+    0 0 40px rgba(255, 215, 0, 0.4) !important;
+}
+
+/* Bolillero - Reflejos dorados */
+.gold-room .acrylic-sphere {
+  background: 
+    radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.3), transparent 50%),
+    radial-gradient(circle at 70% 70%, rgba(255, 215, 0, 0.25), transparent) !important;
+  border: 4px solid rgba(255, 215, 0, 0.6) !important;
+  box-shadow: 
+    0 0 60px rgba(255, 215, 0, 0.7),
+    0 0 100px rgba(255, 215, 0, 0.4),
+    inset 0 0 80px rgba(255, 215, 0, 0.3) !important;
+}
+
+.gold-room .led-ring {
+  background: 
+    linear-gradient(#000000, #000000) padding-box,
+    linear-gradient(45deg, #ffd700, #FFA000, #ffd700) border-box !important;
+}
+
+.gold-room .machine-top-led {
+  background: linear-gradient(to right, 
+    transparent, 
+    rgba(255, 215, 0, 0.9) 50%, 
+    transparent) !important;
+  box-shadow: 0 0 25px rgba(255, 215, 0, 0.8) !important;
+}
+
+.gold-room .floating-ball {
+  border: 3px solid rgba(255, 215, 0, 0.7) !important;
+  box-shadow: 
+    0 0 20px rgba(255, 215, 0, 0.6),
+    0 5px 15px rgba(0, 0, 0, 0.5),
+    inset 0 -5px 10px rgba(0, 0, 0, 0.3),
+    inset 0 5px 10px rgba(255, 255, 255, 0.3) !important;
+}
+
+/* Sección derecha - Fondo negro con resplandor dorado */
+.gold-room .right-section {
+  background: rgba(0, 0, 0, 0.95) !important;
+  border: 2px solid rgba(255, 215, 0, 0.4) !important;
+  border-radius: 15px !important;
+  box-shadow: 
+    0 0 30px rgba(255, 215, 0, 0.4),
+    inset 0 0 40px rgba(255, 215, 0, 0.1) !important;
+}
+
+.gold-room .side-info {
+  background: rgba(0, 0, 0, 0.7) !important;
+  padding: 10px !important;
+  border-radius: 12px !important;
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.3) !important;
+}
+
+.gold-room .modern-bingo-machine {
+  background: rgba(0, 0, 0, 0.8) !important;
+  padding: 15px !important;
+  border-radius: 12px !important;
+  box-shadow: 
+    0 0 25px rgba(255, 215, 0, 0.35),
+    inset 0 0 30px rgba(255, 215, 0, 0.08) !important;
+}
+
+/* Etiquetas de rango (1-10, 11-20, etc) en NEGRO para resaltar */
+.gold-room .grid-row .column-letter {
+  color: #000000 !important;
+  background: linear-gradient(180deg, #FFD700 0%, #FFC107 100%) !important;
+  text-shadow: none !important;
+  font-weight: 900 !important;
+}
+
+

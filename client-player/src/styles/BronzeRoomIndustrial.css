@@ -666,6 +666,46 @@
   50% { box-shadow: 0 0 25px rgba(255, 102, 0, 0.8); }
 }
 
+/* Tag de precio del cartón */
+.card-price-tag {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: rgba(139, 69, 19, 0.15);
+  padding: 6px 12px;
+  border-radius: 12px;
+  border: 2px solid #654321;
+  box-shadow: 
+    0 0 15px rgba(101, 67, 33, 0.5),
+    inset 0 0 10px rgba(139, 69, 19, 0.1);
+}
+
+.price-label {
+  font-size: 0.65rem;
+  color: #d4a574;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.price-amount {
+  font-size: 1.2rem;
+  font-weight: 900;
+  color: #000;
+  background: linear-gradient(135deg, #d4a574, #c19a6b);
+  padding: 4px 12px;
+  border-radius: 8px;
+  border: 2px solid #8b4513;
+  letter-spacing: 1px;
+  box-shadow: 
+    0 0 10px rgba(139, 69, 19, 0.6),
+    inset 0 1px 2px rgba(255, 255, 255, 0.3);
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
+  line-height: 1;
+}
+
 .lobby-btn {
   font-size: 0.8rem;
   font-family: 'Roboto Condensed', sans-serif;

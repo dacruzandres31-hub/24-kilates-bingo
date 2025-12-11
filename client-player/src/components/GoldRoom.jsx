@@ -1,8 +1,8 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import '../styles/GoldRoom.css';
-import GiftIcon from '../assets/Gift_icon.png';
-import selectCardsButton from '../assets/select_cards_button.png';
+import GoldIcon from '../assets/gold_icon.png';
+import comprarBotonOro from '../assets/comprar_boton_oro.png';
 import voiceService from '../services/voiceService';
 import audioService from '../services/audioService';
 import PlayerSidebar from './PlayerSidebar';
@@ -201,7 +201,7 @@ celebrationAudio.volume = 0.7;
 
   // Simular bolillas flotantes en el bolillero
   useEffect(() => {
-    const colors = ['#ff00ff', '#00ff00', '#00ffff', '#ffff00', '#ff0099'];
+    const colors = ['#FFD700', '#FFC107', '#FFAB00', '#FF8F00', '#F57F17', '#FDD835', '#FFEA00', '#FFD600', '#FFCC00'];
     const balls = Array.from({ length: 15 }, (_, i) => ({
       id: i,
       number: Math.floor(Math.random() * 90) + 1,
@@ -216,7 +216,7 @@ celebrationAudio.volume = 0.7;
     const handleClick = () => {
       if (!activated) {
         activated = true;
-        audioService.playForRoom('oro');
+        audioService.playForRoom('gold');
         document.removeEventListener('click', handleClick);
       }
     };
@@ -271,6 +271,14 @@ celebrationAudio.volume = 0.7;
     updateColumnCounts();
   }, [ballsDrawn]);
   
+  // Reproducir sonido cuando la bola CAE (currentBall se establece)
+  useEffect(() => {
+    if (currentBall) {
+      console.log(`🎱 [SONIDO] Bola cayendo AHORA: ${currentBall.number}`);
+      audioService.playBolaCayendoConPausa();
+    }
+  }, [currentBall]);
+  
   // Animación de entrada de cartones
   useEffect(() => {
     if (selectedPlayerCards.length > 0 && !cardsDealing) {
@@ -294,17 +302,18 @@ celebrationAudio.volume = 0.7;
     }
   }, [gameStatus, previousGameStatus]);
 
-  // Función para obtener color según el número (estilo arcoíris)
+  // Función para obtener color según el número - Paleta Dorada
   const getBallColor = (number) => {
-    if (number >= 1 && number <= 10) return '#ff0000'; // Rojo
-    if (number >= 11 && number <= 20) return '#ff7700'; // Naranja
-    if (number >= 21 && number <= 30) return '#ffdd00'; // Amarillo
-    if (number >= 31 && number <= 40) return '#00ff00'; // Verde
-    if (number >= 41 && number <= 50) return '#00ddff'; // Cian
-    if (number >= 51 && number <= 60) return '#0077ff'; // Azul
-    if (number >= 61 && number <= 70) return '#7700ff'; // Púrpura
-    if (number >= 71 && number <= 80) return '#ff00ff'; // Magenta
-    return '#ff0099'; // Rosa (81-90)
+    // Tonos dorados variados para sala Oro - paleta completa dorada
+    if (number >= 1 && number <= 10) return '#FFD700'; // Oro estándar
+    if (number >= 11 && number <= 20) return '#FFC107'; // Ámbar
+    if (number >= 21 && number <= 30) return '#FFAB00'; // Naranja dorado
+    if (number >= 31 && number <= 40) return '#FF8F00'; // Naranja oscuro
+    if (number >= 41 && number <= 50) return '#F57F17'; // Lima oscuro
+    if (number >= 51 && number <= 60) return '#FDD835'; // Amarillo limón
+    if (number >= 61 && number <= 70) return '#FFEA00'; // Amarillo
+    if (number >= 71 && number <= 80) return '#FFD600'; // Amarillo oro
+    return '#FFCC00'; // Ámbar dorado (81-90)
   };
 
   // Organizar bolillas por decenas para el grid
@@ -501,28 +510,26 @@ useEffect(() => {
 
   // Detectar cambios en el estado del juego y anunciar
   useEffect(() => {
-    if (gameStatus === 'active' && previousGameStatus === 'waiting') {
-      // PRIMERO: Iniciar sonido de bolillero inmediatamente (sin retardo)
+    if (gameStatus === 'active' && previousGameStatus !== 'active') {
+      console.log('🎬 INICIANDO SORTEO - Activando bolillero INMEDIATAMENTE');
+      
       audioService.startBolilleroGirando();
-      // SEGUNDO: Bajar volumen de música de fondo al 70%
       audioService.lowerMusicVolume();
-      // TERCERO: Anuncios y efectos visuales
-      voiceService.announceSorteoIniciado();
-      addToast('🎲', '¡Sorteo iniciado!', 'Buena suerte');
+      
+      if (previousGameStatus === 'waiting') {
+        voiceService.announceSorteoIniciado();
+        addToast('🎲', '¡Sorteo iniciado!', 'Buena suerte');
+      } else if (previousGameStatus === 'paused') {
+        voiceService.announceSorteoReiniciado();
+      }
+      
     } else if (gameStatus === 'waiting' && previousGameStatus === 'active') {
       voiceService.announceSorteoPausado();
-      // Detener sonido de bolillero
       audioService.stopBolilleroGirando();
-      // Restaurar volumen de música al 100%
       audioService.restoreMusicVolume();
       addToast('⏸️', 'Sorteo pausado', 'Esperando...');
-    } else if (gameStatus === 'active' && previousGameStatus === 'paused') {
-      voiceService.announceSorteoReiniciado();
-      // Reiniciar sonido de bolillero
-      audioService.startBolilleroGirando();
-      // Bajar volumen de música de fondo al 70%
-      audioService.lowerMusicVolume();
     }
+    
     setPreviousGameStatus(gameStatus);
   }, [gameStatus]);
 
@@ -530,9 +537,6 @@ useEffect(() => {
   useEffect(() => {
     if (ballsDrawn.length > 0) {
       const lastDrawnBall = ballsDrawn[ballsDrawn.length - 1];
-      
-      // Reproducir sonido de bola cayendo inmediatamente
-      audioService.playBolaCayendo();
       
       // Anunciar el número con voz
       setTimeout(() => {
@@ -556,7 +560,7 @@ useEffect(() => {
   }, [ballsDrawn.length]);
 
   return (
-    <div className="starter-room">
+    <div className="gold-room">
       {/* Sistema de toasts */}
       <div className="toast-container">
         {toasts.map(toast => (
@@ -728,9 +732,18 @@ useEffect(() => {
                 <div key={columnIndex} className="grid-column">
                   <div 
                     className="column-letter" 
-                    style={{ 
-                      color: getBallColor(start),
-                      textShadow: `0 0 20px ${getBallColor(start)}`
+                    style={{
+                      color: '#FFD700',
+                      textShadow: '0 0 8px rgba(255, 215, 0, 0.7)',
+                      background: 'linear-gradient(180deg, rgba(255, 215, 0, 0.3), rgba(255, 193, 7, 0.3))',
+                      borderRadius: '6px',
+                      border: '2px solid #FFA000',
+                      fontFamily: "Georgia, 'Times New Roman', serif",
+                      padding: '4px 0',
+                      fontWeight: 700,
+                      textAlign: 'center',
+                      fontSize: '1rem',
+                      letterSpacing: '2px'
                     }}
                   >
                     {columnLabel}
@@ -750,13 +763,32 @@ useEffect(() => {
                           key={number} 
                           className={`grid-number ${isCalled ? 'called' : ''} ${isRecent ? 'recent' : ''}`}
                           style={isCalled ? {
-                            backgroundColor: getBallColor(number),
-                            boxShadow: `0 0 20px ${getBallColor(number)}`
-                          } : {}}
+                            background: 'linear-gradient(135deg, #FFD700, #FFC107)',
+                            color: '#1a1a00',
+                            fontWeight: 900,
+                            border: '2px solid #FFD700',
+                            boxShadow: '0 0 15px rgba(255, 215, 0, 0.9), inset 0 0 10px rgba(255, 255, 255, 0.3)',
+                            fontFamily: "Georgia, 'Times New Roman', serif",
+                            borderRadius: '4px',
+                            padding: '6px 3px',
+                            textAlign: 'center',
+                            fontSize: '1.2rem',
+                            textShadow: '1px 1px 2px rgba(255, 255, 255, 0.5), -1px -1px 2px rgba(0, 0, 0, 0.3)'
+                          } : {
+                            background: 'rgba(40, 35, 0, 0.7)',
+                            border: '1px solid rgba(255, 193, 7, 0.3)',
+                            borderRadius: '4px',
+                            color: '#B8860B',
+                            fontFamily: "Georgia, 'Times New Roman', serif",
+                            padding: '6px 3px',
+                            textAlign: 'center',
+                            fontSize: '1.2rem',
+                            fontWeight: 600
+                          }}
                         >
                           {number}
                           {isCalled && (
-                            <div className="number-glow-ring" style={{ borderColor: getBallColor(number) }}></div>
+                            <div className="number-glow-ring" style={{ borderColor: '#FFD700' }}></div>
                           )}
                         </div>
                       );
@@ -779,9 +811,18 @@ useEffect(() => {
                 <div key={columnIndex} className="grid-column">
                   <div 
                     className="column-letter" 
-                    style={{ 
-                      color: getBallColor(start),
-                      textShadow: `0 0 20px ${getBallColor(start)}`
+                    style={{
+                      color: '#FFD700',
+                      textShadow: '0 0 8px rgba(255, 215, 0, 0.7)',
+                      background: 'linear-gradient(180deg, rgba(255, 215, 0, 0.3), rgba(255, 193, 7, 0.3))',
+                      borderRadius: '6px',
+                      border: '2px solid #FFA000',
+                      fontFamily: "Georgia, 'Times New Roman', serif",
+                      padding: '4px 0',
+                      fontWeight: 700,
+                      textAlign: 'center',
+                      fontSize: '1rem',
+                      letterSpacing: '2px'
                     }}
                   >
                     {columnLabel}
@@ -801,13 +842,32 @@ useEffect(() => {
                           key={number} 
                           className={`grid-number ${isCalled ? 'called' : ''} ${isRecent ? 'recent' : ''}`}
                           style={isCalled ? {
-                            backgroundColor: getBallColor(number),
-                            boxShadow: `0 0 20px ${getBallColor(number)}`
-                          } : {}}
+                            background: 'linear-gradient(135deg, #FFD700, #FFC107)',
+                            color: '#1a1a00',
+                            fontWeight: 900,
+                            border: '2px solid #FFD700',
+                            boxShadow: '0 0 15px rgba(255, 215, 0, 0.9), inset 0 0 10px rgba(255, 255, 255, 0.3)',
+                            fontFamily: "Georgia, 'Times New Roman', serif",
+                            borderRadius: '4px',
+                            padding: '6px 3px',
+                            textAlign: 'center',
+                            fontSize: '1.2rem',
+                            textShadow: '1px 1px 2px rgba(255, 255, 255, 0.5), -1px -1px 2px rgba(0, 0, 0, 0.3)'
+                          } : {
+                            background: 'rgba(40, 35, 0, 0.7)',
+                            border: '1px solid rgba(255, 193, 7, 0.3)',
+                            borderRadius: '4px',
+                            color: '#B8860B',
+                            fontFamily: "Georgia, 'Times New Roman', serif",
+                            padding: '6px 3px',
+                            textAlign: 'center',
+                            fontSize: '1.2rem',
+                            fontWeight: 600
+                          }}
                         >
                           {number}
                           {isCalled && (
-                            <div className="number-glow-ring" style={{ borderColor: getBallColor(number) }}></div>
+                            <div className="number-glow-ring" style={{ borderColor: '#FFD700' }}></div>
                           )}
                         </div>
                       );
@@ -830,9 +890,18 @@ useEffect(() => {
                 <div key={columnIndex} className="grid-column">
                   <div 
                     className="column-letter" 
-                    style={{ 
-                      color: getBallColor(start),
-                      textShadow: `0 0 20px ${getBallColor(start)}`
+                    style={{
+                      color: '#FFD700',
+                      textShadow: '0 0 8px rgba(255, 215, 0, 0.7)',
+                      background: 'linear-gradient(180deg, rgba(255, 215, 0, 0.3), rgba(255, 193, 7, 0.3))',
+                      borderRadius: '6px',
+                      border: '2px solid #FFA000',
+                      fontFamily: "Georgia, 'Times New Roman', serif",
+                      padding: '4px 0',
+                      fontWeight: 700,
+                      textAlign: 'center',
+                      fontSize: '1rem',
+                      letterSpacing: '2px'
                     }}
                   >
                     {columnLabel}
@@ -852,13 +921,32 @@ useEffect(() => {
                           key={number} 
                           className={`grid-number ${isCalled ? 'called' : ''} ${isRecent ? 'recent' : ''}`}
                           style={isCalled ? {
-                            backgroundColor: getBallColor(number),
-                            boxShadow: `0 0 20px ${getBallColor(number)}`
-                          } : {}}
+                            background: 'linear-gradient(135deg, #FFD700, #FFC107)',
+                            color: '#1a1a00',
+                            fontWeight: 900,
+                            border: '2px solid #FFD700',
+                            boxShadow: '0 0 15px rgba(255, 215, 0, 0.9), inset 0 0 10px rgba(255, 255, 255, 0.3)',
+                            fontFamily: "Georgia, 'Times New Roman', serif",
+                            borderRadius: '4px',
+                            padding: '6px 3px',
+                            textAlign: 'center',
+                            fontSize: '1.2rem',
+                            textShadow: '1px 1px 2px rgba(255, 255, 255, 0.5), -1px -1px 2px rgba(0, 0, 0, 0.3)'
+                          } : {
+                            background: 'rgba(40, 35, 0, 0.7)',
+                            border: '1px solid rgba(255, 193, 7, 0.3)',
+                            borderRadius: '4px',
+                            color: '#B8860B',
+                            fontFamily: "Georgia, 'Times New Roman', serif",
+                            padding: '6px 3px',
+                            textAlign: 'center',
+                            fontSize: '1.2rem',
+                            fontWeight: 600
+                          }}
                         >
                           {number}
                           {isCalled && (
-                            <div className="number-glow-ring" style={{ borderColor: getBallColor(number) }}></div>
+                            <div className="number-glow-ring" style={{ borderColor: '#FFD700' }}></div>
                           )}
                         </div>
                       );
@@ -875,13 +963,17 @@ useEffect(() => {
           {/* Info superior */}
           <div className="side-info">
             <div className="room-title">
-              <img src={GiftIcon} alt="Gift" className="title-icon" />
+              <img src={GoldIcon} alt="Gold" className="title-icon" />
               <span className="title-text" style={{ 
-                color: '#00d4ff',
-                textShadow: '0 0 20px rgba(0, 212, 255, 1), 0 0 40px rgba(0, 212, 255, 0.8)',
-                WebkitTextFillColor: '#00d4ff'
+                color: '#FFD700',
+                textShadow: '0 0 20px rgba(255, 215, 0, 0.9), 0 0 40px rgba(255, 193, 7, 0.6)',
+                WebkitTextFillColor: '#FFD700',
+                fontFamily: "Georgia, 'Times New Roman', serif"
               }}>SALA ORO</span>
-              <span className="title-tag">GRATIS</span>
+              <div className="card-price-tag">
+                <div className="price-label">Valor Cartón</div>
+                <div className="price-amount">$2.000</div>
+              </div>
               <button 
                 className="lobby-btn"
                 onClick={() => navigate('/')}
@@ -973,11 +1065,11 @@ useEffect(() => {
                 <button 
                   className="select-cards-sphere-btn"
                   onClick={() => setShowCardSelection(true)}
-                  title={`Seleccionar cartones (${cardsRemaining} restantes)`}
+                  title={`Comprar cartones (${cardsRemaining} restantes)`}
                 >
                   <img 
-                    src={selectCardsButton} 
-                    alt="Seleccionar Cartones" 
+                    src={comprarBotonOro} 
+                    alt="Comprar Cartones" 
                     className="sphere-btn-image"
                   />
                 </button>

@@ -1412,7 +1412,7 @@
   overflow: hidden;
 }
 
-/* Borde LED Azul */
+/* Borde LED Plateado */
 .led-ring {
   position: absolute;
   top: -5px;
@@ -1423,7 +1423,7 @@
   border: 3px solid transparent;
   background: 
     linear-gradient(#000000, #000000) padding-box,
-    linear-gradient(45deg, #87ceeb, #0066ff, #87ceeb) border-box;
+    linear-gradient(45deg, #c0c0c0, #d3d3d3, #a9a9a9, #c0c0c0) border-box;
   animation: led-rotate 3s linear infinite;
 }
 
@@ -3675,4 +3675,261 @@
     opacity: 0;
   }
 }
+
+/* ============================================
+   SALA PLATA - ESTILOS EXCLUSIVOS (NO AFECTAN STARTER NI BRONCE)
+   Tema Elegante: Gris Platino con Tipografía Georgia
+   ============================================ */
+
+/* Etiqueta de Precio Cartón $1.000 */
+.silver-room .card-price-tag {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, rgba(192, 192, 192, 0.25) 0%, rgba(208, 208, 208, 0.15) 100%);
+  border: 2px solid #c0c0c0;
+  border-radius: 12px;
+  box-shadow: 
+    0 4px 15px rgba(192, 192, 192, 0.4),
+    inset 0 2px 8px rgba(255, 255, 255, 0.2);
+  gap: 2px;
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+.silver-room .price-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #c0c0c0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-shadow: 0 0 8px rgba(192, 192, 192, 0.6);
+}
+
+.silver-room .price-amount {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #000000;
+  background: linear-gradient(135deg, #c0c0c0 0%, #d3d3d3 100%);
+  padding: 4px 12px;
+  border-radius: 8px;
+  text-shadow: none;
+  letter-spacing: 1px;
+}
+
+/* Grid de Números - Fondo Gris Elegante */
+.silver-room .grid-number {
+  background: linear-gradient(135deg, #e8e8e8 0%, #d0d0d0 100%) !important;
+  color: #1a1a1a !important;
+  font-family: Georgia, 'Times New Roman', serif !important;
+  font-weight: 600 !important;
+  border: 1px solid rgba(192, 192, 192, 0.5) !important;
+  box-shadow: 
+    0 2px 8px rgba(0, 0, 0, 0.15),
+    inset 0 1px 3px rgba(255, 255, 255, 0.4) !important;
+}
+
+.silver-room .grid-number.called {
+  background: linear-gradient(135deg, #c0c0c0 0%, #a8a8a8 100%) !important;
+  color: #000000 !important;
+  border-color: #ffffff !important;
+  box-shadow: 
+    0 0 20px rgba(192, 192, 192, 0.8),
+    0 4px 12px rgba(0, 0, 0, 0.3),
+    inset 0 2px 6px rgba(255, 255, 255, 0.5) !important;
+}
+
+/* Letras de Columna (B-I-N-G-O) */
+.silver-room .column-letter {
+  background: linear-gradient(135deg, #d0d0d0 0%, #c0c0c0 100%) !important;
+  color: #1a1a1a !important;
+  font-family: Georgia, 'Times New Roman', serif !important;
+  font-weight: 700 !important;
+  border: 2px solid rgba(192, 192, 192, 0.7) !important;
+  box-shadow: 
+    0 3px 10px rgba(0, 0, 0, 0.2),
+    inset 0 2px 5px rgba(255, 255, 255, 0.5) !important;
+}
+
+/* Título del Grid */
+.silver-room .grid-title {
+  color: #c0c0c0 !important;
+  text-shadow: 
+    0 0 15px rgba(192, 192, 192, 0.8),
+    0 0 30px rgba(255, 255, 255, 0.4) !important;
+  font-family: Georgia, 'Times New Roman', serif !important;
+}
+
+/* Glow del Grid */
+.silver-room .grid-glow {
+  background: linear-gradient(135deg, 
+    rgba(192, 192, 192, 0.3) 0%, 
+    rgba(208, 208, 208, 0.2) 50%,
+    rgba(224, 224, 224, 0.3) 100%) !important;
+  box-shadow: 
+    0 0 40px rgba(192, 192, 192, 0.5),
+    inset 0 0 30px rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Anillo de Glow en Números Llamados */
+.silver-room .number-glow-ring {
+  border: 2px solid #c0c0c0 !important;
+  box-shadow: 
+    0 0 20px rgba(192, 192, 192, 0.8),
+    inset 0 0 15px rgba(255, 255, 255, 0.4) !important;
+}
+
+/* Sidebar Tema Plata */
+.silver-room .sidebar-container {
+  background: linear-gradient(180deg, 
+    rgba(192, 192, 192, 0.15) 0%, 
+    rgba(160, 160, 160, 0.1) 100%) !important;
+  border-left: 2px solid rgba(192, 192, 192, 0.4) !important;
+  box-shadow: 
+    -4px 0 20px rgba(0, 0, 0, 0.3),
+    inset 0 0 30px rgba(192, 192, 192, 0.1) !important;
+}
+
+.silver-room .sidebar-title {
+  color: #c0c0c0 !important;
+  text-shadow: 
+    0 0 12px rgba(192, 192, 192, 0.7),
+    0 0 20px rgba(255, 255, 255, 0.3) !important;
+  font-family: Georgia, 'Times New Roman', serif !important;
+}
+
+/* Bordes de columnas del grid - PLATEADO */
+.silver-room .grid-row .grid-column {
+  border: 2px solid rgba(192, 192, 192, 0.6) !important;
+  box-shadow: 
+    0 0 20px rgba(192, 192, 192, 0.4),
+    inset 0 0 20px rgba(192, 192, 192, 0.1) !important;
+}
+
+/* Título de las columnas (1-10, 11-20, etc) - PLATEADO */
+.silver-room .grid-row .column-letter {
+  border: 1px solid rgba(192, 192, 192, 0.6) !important;
+  color: #c0c0c0 !important;
+}
+
+/* Números del grid general */
+.silver-room .grid-row .grid-number {
+  border: 1px solid rgba(192, 192, 192, 0.4) !important;
+  box-shadow: 0 0 10px rgba(192, 192, 192, 0.2) !important;
+}
+
+/* Números cantados - Gris oscuro intenso */
+.silver-room .grid-row .grid-number.called {
+  background: linear-gradient(135deg, #a8a8a8 0%, #808080 100%) !important;
+  color: #000000 !important;
+  border: 3px solid #c0c0c0 !important;
+  box-shadow: 
+    0 0 25px rgba(192, 192, 192, 1),
+    0 0 40px rgba(192, 192, 192, 0.7),
+    0 4px 12px rgba(0, 0, 0, 0.3),
+    inset 0 2px 8px rgba(255, 255, 255, 0.5) !important;
+  font-weight: 900 !important;
+}
+
+/* Efectos de onda - PLATEADO */
+@keyframes ripple-wave-silver {
+  0% {
+    box-shadow: 0 0 0 0 rgba(192, 192, 192, 0.6);
+  }
+  100% {
+    box-shadow: 0 0 0 30px rgba(192, 192, 192, 0);
+  }
+}
+
+.silver-room .grid-row .grid-number.recent {
+  animation: recentPulse 1s ease-in-out, ripple-wave-silver 0.8s ease-out !important;
+}
+
+/* Barra de bolas recientes - PLATEADO */
+.silver-room .recent-balls-bar {
+  border: 1px solid rgba(192, 192, 192, 0.3) !important;
+}
+
+.silver-room .recent-label {
+  color: #c0c0c0 !important;
+}
+
+/* Contador de cartones disponibles - Plateado */
+.silver-room .counter-number {
+  color: #c0c0c0 !important;
+  text-shadow: 
+    0 0 20px rgba(192, 192, 192, 1),
+    0 0 40px rgba(192, 192, 192, 0.8),
+    0 0 60px rgba(192, 192, 192, 0.6) !important;
+}
+
+/* MIS CARTONES - Texto plateado */
+.silver-room .cards-title {
+  color: #c0c0c0 !important;
+  text-shadow: 0 0 15px rgba(192, 192, 192, 0.6) !important;
+}
+
+/* BOLILLERO - Resplandor plateado exclusivo */
+.silver-room .acrylic-sphere {
+  background: 
+    radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.3), transparent 50%),
+    radial-gradient(circle at 70% 70%, rgba(192, 192, 192, 0.15), transparent) !important;
+  border: 4px solid rgba(192, 192, 192, 0.5) !important;
+  box-shadow: 
+    0 0 60px rgba(192, 192, 192, 0.6),
+    0 0 100px rgba(192, 192, 192, 0.3),
+    inset 0 0 80px rgba(192, 192, 192, 0.2) !important;
+}
+
+.silver-room .led-ring {
+  background: 
+    linear-gradient(#000000, #000000) padding-box,
+    linear-gradient(45deg, #c0c0c0, #d3d3d3, #a9a9a9, #c0c0c0) border-box !important;
+}
+
+/* Bolillas flotantes - Bordes plateados mejorados */
+.silver-room .floating-ball {
+  border: 3px solid rgba(192, 192, 192, 0.7) !important;
+  box-shadow: 
+    0 0 20px rgba(192, 192, 192, 0.6),
+    0 5px 15px rgba(0, 0, 0, 0.5),
+    inset 0 -5px 10px rgba(0, 0, 0, 0.3),
+    inset 0 5px 10px rgba(255, 255, 255, 0.3) !important;
+}
+
+/* Sección derecha - Fondo negro con resplandor plateado */
+.silver-room .right-section {
+  background: rgba(0, 0, 0, 0.95) !important;
+  border: 2px solid rgba(192, 192, 192, 0.4) !important;
+  border-radius: 15px !important;
+  box-shadow: 
+    0 0 30px rgba(192, 192, 192, 0.4),
+    inset 0 0 40px rgba(192, 192, 192, 0.1) !important;
+}
+
+.silver-room .side-info {
+  background: rgba(0, 0, 0, 0.7) !important;
+  padding: 10px !important;
+  border-radius: 12px !important;
+  box-shadow: 0 0 20px rgba(192, 192, 192, 0.3) !important;
+}
+
+.silver-room .modern-bingo-machine {
+  background: rgba(0, 0, 0, 0.8) !important;
+  padding: 15px !important;
+  border-radius: 12px !important;
+  box-shadow: 
+    0 0 25px rgba(192, 192, 192, 0.35),
+    inset 0 0 30px rgba(192, 192, 192, 0.08) !important;
+}
+
+/* Etiquetas de rango (1-10, 11-20, etc) en NEGRO para resaltar */
+.silver-room .grid-row .column-letter {
+  color: #000000 !important;
+  background: linear-gradient(180deg, #d0d0d0 0%, #c0c0c0 100%) !important;
+  text-shadow: none !important;
+  font-weight: 900 !important;
+}
+
 
