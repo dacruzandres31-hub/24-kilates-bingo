@@ -19,6 +19,7 @@ const chipsRoutes = require('./routes/chipsRoutes');
 const withdrawalRoutes = require('./routes/withdrawalRoutes');
 const winnersPaymentRoutes = require('./routes/winnersPaymentRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const superAdminRoutes = require('./routes/superAdminRoutes');
 const gameAdminRoutes = require('./routes/gameAdminRoutes');
 const starterRoomRoutes = require('./routes/starterRoom');
 const gameAdminController = require('./controllers/gameAdminController');
@@ -131,6 +132,7 @@ app.use('/api/chips', chipsRoutes);
 app.use('/api/withdrawals', withdrawalRoutes);
 app.use('/api/winners-payment', winnersPaymentRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/superadmin', superAdminRoutes);
 app.use('/api/game-admin', gameAdminRoutes);
 
 // HEALTH CHECK

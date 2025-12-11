@@ -1,5 +1,6 @@
 const pool = require('../db');
 const MoneyMath = require('../utils/moneyMath');
+const bcrypt = require('bcryptjs');
 
 /**
  * MÓDULO 7: API del Dashboard Administrativo
@@ -14,6 +15,73 @@ const MoneyMath = require('../utils/moneyMath');
  * ⚡ Optimizado con consultas paralelas (Promise.all)
  * 💰 Usa MoneyMath para cálculos precisos
  */
+
+/**
+ * GET /api/admin/profile
+ * Obtiene información del usuario administrador actual
+ */
+async function getAdminProfile(req, res) {
+  try {
+    const { userId } = req.user;
+
+    const [users] = await pool.query(
+      'SELECT id, username, role, balance FROM users WHERE id = ?',
+      [userId]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    res.json(users[0]);
+
+  } catch (error) {
+    console.error('❌ Error obteniendo perfil:', error);
+    res.status(500).json({ error: 'Error obteniendo perfil' });
+  }
+}
+
+/**
+ * GET /api/admin/financial-summary
+ * Retorna resumen financiero para el dashboard
+ */
+async function getFinancialSummary(req, res) {
+  try {
+    const [todayStats] = await pool.query(`
+      SELECT 
+        COALESCE(SUM(CASE WHEN movement_type = 'purchase' THEN amount ELSE 0 END), 0) as sales,
+        COALESCE(SUM(CASE WHEN movement_type = 'prize' THEN amount ELSE 0 END), 0) as prizesDistributed,
+        COUNT(DISTINCT user_id) as activeUsers
+      FROM chips_movements 
+      WHERE DATE(created_at) = CURDATE()
+    `);
+
+    const stats = todayStats[0] || {};
+    const netBalance = (stats.sales || 0) - (stats.prizesDistributed || 0);
+
+    res.json({
+      success: true,
+      today: {
+        sales: stats.sales || 0,
+        prizesDistributed: stats.prizesDistributed || 0,
+        netBalance: netBalance,
+        activeUsers: stats.activeUsers || 0
+      },
+      pots: {
+        linea: 0,
+        bingo: 0,
+        acumulado: 0
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error obteniendo resumen financiero:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Error obteniendo resumen financiero' 
+    });
+  }
+}
 
 /**
  * GET /api/admin/dashboard/stats
@@ -520,10 +588,368 @@ async function getRevenueBreakdown(req, res) {
   }
 }
 
+/**
+ * GET /api/admin/stock-summary
+ * Retorna el stock disponible de cartones por sala
+ */
+async function getStockSummary(req, res) {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    
+    const [stockResults] = await pool.query(`
+      SELECT 
+        room,
+        COUNT(*) as total,
+        SUM(CASE WHEN status = 'available' THEN 1 ELSE 0 END) as disponibles,
+        SUM(CASE WHEN status = 'sold' THEN 1 ELSE 0 END) as vendidos
+      FROM daily_stock_cards
+      WHERE play_date = ?
+      GROUP BY room
+    `, [today]);
+
+    const stockByRoom = {
+      bronce: 0,
+      plata: 0,
+      oro: 0
+    };
+
+    stockResults.forEach(row => {
+      const room = row.room.toLowerCase();
+      if (stockByRoom.hasOwnProperty(room)) {
+        stockByRoom[room] = row.disponibles || 0;
+      }
+    });
+
+    res.json({
+      success: true,
+      bronce: stockByRoom.bronce,
+      plata: stockByRoom.plata,
+      oro: stockByRoom.oro,
+      fecha: today
+    });
+
+  } catch (error) {
+    console.error('❌ Error obteniendo stock de cartones:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Error obteniendo stock de cartones',
+      details: error.message 
+    });
+  }
+}
+
+/**
+ * GET /api/admin/users/hierarchy
+ * Obtiene la jerarquía completa de usuarios en formato árbol
+ * Excluye al usuario actual del listado (solo muestra su red descendente)
+ */
+async function getUsersHierarchy(req, res) {
+  try {
+    const currentUserId = req.user.id; // ID del usuario que hace la petición
+
+    const [users] = await pool.query(`
+      SELECT id, username, role, parent_id, balance,
+             (SELECT COUNT(*) FROM user_cards WHERE user_id = users.id AND room = 'bronce') as cards_bronce,
+             (SELECT COUNT(*) FROM user_cards WHERE user_id = users.id AND room = 'plata') as cards_plata,
+             (SELECT COUNT(*) FROM user_cards WHERE user_id = users.id AND room = 'oro') as cards_oro
+      FROM users
+      WHERE id != ?
+      ORDER BY id
+    `, [currentUserId]);
+
+    // Construir árbol jerárquico
+    const buildTree = (parentId = null) => {
+      return users
+        .filter(u => u.parent_id === parentId)
+        .map(user => ({
+          ...user,
+          children: buildTree(user.id)
+        }));
+    };
+
+    // Construir el árbol desde el usuario actual hacia abajo
+    const tree = buildTree(currentUserId);
+
+    res.json({
+      success: true,
+      tree,
+      all: users
+    });
+
+  } catch (error) {
+    console.error('❌ Error obteniendo jerarquía:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Error obteniendo jerarquía de usuarios',
+      details: error.message 
+    });
+  }
+}
+
+/**
+ * POST /api/admin/users/create
+ * Crea un nuevo usuario (jugador o agente)
+ */
+async function createUser(req, res) {
+  try {
+    const { username, password, role, parent_id, nombre_completo, documento, email, telefono } = req.body;
+
+    if (!username || !password || !role) {
+      return res.status(400).json({
+        success: false,
+        error: 'Faltan campos requeridos'
+      });
+    }
+
+    // Verificar si el usuario ya existe
+    const [existingUser] = await pool.query(
+      'SELECT id, username FROM users WHERE username = ?',
+      [username]
+    );
+
+    if (existingUser.length > 0) {
+      return res.status(409).json({
+        success: false,
+        error: `El usuario "${username}" ya existe. Por favor elige otro nombre.`
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Preparar datos opcionales
+    const userData = {
+      username,
+      password: hashedPassword,
+      role,
+      parent_id: parent_id || null,
+      balance: 0,
+      nombre_completo: nombre_completo || null,
+      documento: documento || null,
+      email: email || null,
+      telefono: telefono || null
+    };
+
+    const [result] = await pool.query(
+      `INSERT INTO users (username, password_hash, role, parent_id, balance, nombre_completo, documento, email, telefono)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [userData.username, userData.password, userData.role, userData.parent_id, userData.balance, 
+       userData.nombre_completo, userData.documento, userData.email, userData.telefono]
+    );
+
+    res.json({
+      success: true,
+      userId: result.insertId,
+      message: `Usuario ${username} creado exitosamente`
+    });
+
+  } catch (error) {
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({
+        success: false,
+        error: 'El nombre de usuario ya existe'
+      });
+    }
+
+    console.error('❌ Error creando usuario:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Error creando usuario',
+      details: error.message 
+    });
+  }
+}
+
+/**
+ * POST /api/admin/users/add-cards
+ * Agrega o quita cartones a un usuario
+ */
+async function addCardsToUser(req, res) {
+  try {
+    const { userId, room, quantity } = req.body;
+
+    if (!userId || !room || quantity === undefined) {
+      return res.status(400).json({
+        success: false,
+        error: 'Faltan campos requeridos'
+      });
+    }
+
+    // Validar que la sala sea válida
+    const validRooms = ['bronce', 'plata', 'oro'];
+    if (!validRooms.includes(room)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Sala inválida. Debe ser: bronce, plata u oro'
+      });
+    }
+
+    // Si se van a quitar cartones, verificar que el usuario tenga suficientes
+    if (quantity < 0) {
+      const [cards] = await pool.query(
+        `SELECT COUNT(*) as total FROM user_cards 
+         WHERE user_id = ? AND room = ?`,
+        [userId, room]
+      );
+
+      const cartonesActuales = cards[0].total;
+      const cartonesAQuitar = Math.abs(quantity);
+
+      if (cartonesActuales === 0) {
+        return res.status(400).json({
+          success: false,
+          error: `El usuario no tiene cartones de ${room} para descargar`
+        });
+      }
+
+      if (cartonesActuales < cartonesAQuitar) {
+        return res.status(400).json({
+          success: false,
+          error: `El usuario solo tiene ${cartonesActuales} cartón(es) de ${room}, no se pueden descargar ${cartonesAQuitar}`
+        });
+      }
+    }
+
+    if (quantity > 0) {
+      // Agregar cartones
+      for (let i = 0; i < quantity; i++) {
+        await pool.query(
+          `INSERT INTO user_cards (user_id, room, created_at)
+           VALUES (?, ?, NOW())`,
+          [userId, room]
+        );
+      }
+    } else if (quantity < 0) {
+      // Quitar cartones (ya validamos que tiene suficientes)
+      await pool.query(
+        `DELETE FROM user_cards 
+         WHERE user_id = ? AND room = ? 
+         LIMIT ?`,
+        [userId, room, Math.abs(quantity)]
+      );
+    }
+
+    res.json({
+      success: true,
+      message: `${Math.abs(quantity)} cartón(es) de ${room} ${quantity > 0 ? 'agregado(s)' : 'descargado(s)'} exitosamente`
+    });
+
+  } catch (error) {
+    console.error('❌ Error gestionando cartones:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Error gestionando cartones',
+      details: error.message 
+    });
+  }
+}
+
+/**
+ * POST /api/admin/users/add-balance
+ * Agrega o quita saldo a un usuario
+ */
+async function addBalanceToUser(req, res) {
+  try {
+    const { userId, amount } = req.body;
+
+    if (!userId || amount === undefined) {
+      return res.status(400).json({
+        success: false,
+        error: 'Faltan campos requeridos (userId, amount)'
+      });
+    }
+
+    // Validar que amount sea un número válido
+    if (isNaN(amount)) {
+      return res.status(400).json({
+        success: false,
+        error: 'El monto debe ser un número válido'
+      });
+    }
+
+    const amountDecimal = MoneyMath.decimal(amount);
+
+    // Obtener balance actual y username
+    const [users] = await pool.query(
+      'SELECT username, balance FROM users WHERE id = ?',
+      [userId]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Usuario no encontrado'
+      });
+    }
+
+    const currentBalance = MoneyMath.decimal(users[0].balance);
+    const username = users[0].username;
+    const newBalance = currentBalance.plus(amountDecimal);
+
+    // Validaciones específicas para descarga de saldo
+    if (amount < 0) {
+      // Verificar que tenga saldo disponible
+      if (currentBalance.lessThanOrEqualTo(0)) {
+        return res.status(400).json({
+          success: false,
+          error: `El usuario ${username} no tiene saldo disponible para descargar`
+        });
+      }
+
+      // Verificar que no se descargue más de lo que tiene
+      if (newBalance.lessThan(0)) {
+        return res.status(400).json({
+          success: false,
+          error: `El usuario solo tiene $${MoneyMath.toNumber(currentBalance).toLocaleString('es-CO')}, no se pueden descargar $${Math.abs(amount).toLocaleString('es-CO')}`
+        });
+      }
+    }
+
+    // Actualizar balance
+    await pool.query(
+      'UPDATE users SET balance = ? WHERE id = ?',
+      [MoneyMath.toNumber(newBalance), userId]
+    );
+
+    // Registrar movimiento
+    const movementType = amount > 0 ? 'deposit' : 'withdrawal';
+    const description = amount > 0 
+      ? `Carga manual desde panel admin` 
+      : `Descarga manual desde panel admin`;
+
+    await pool.query(
+      `INSERT INTO chips_movements 
+       (user_id, movement_type, amount, balance_after, description, created_at)
+       VALUES (?, ?, ?, ?, ?, NOW())`,
+      [userId, movementType, Math.abs(amount), MoneyMath.toNumber(newBalance), description]
+    );
+
+    res.json({
+      success: true,
+      message: `${amount > 0 ? 'Cargado' : 'Descargado'} $${Math.abs(amount).toLocaleString('es-CO')} ${amount > 0 ? 'a' : 'de'} ${username}`,
+      newBalance: MoneyMath.toNumber(newBalance)
+    });
+
+  } catch (error) {
+    console.error('❌ Error gestionando balance:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Error gestionando balance',
+      details: error.message 
+    });
+  }
+}
+
 module.exports = {
+  getAdminProfile,
+  getFinancialSummary,
   getDashboardStats,
   sendGlobalMessage,
   getSessionStats,
   getUserStats,
-  getRevenueBreakdown
+  getRevenueBreakdown,
+  getStockSummary,
+  getUsersHierarchy,
+  createUser,
+  addCardsToUser,
+  addBalanceToUser
 };

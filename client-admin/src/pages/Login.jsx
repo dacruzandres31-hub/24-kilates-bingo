@@ -28,6 +28,8 @@ export default function Login({ onLogin }) {
         return;
       }
 
+      // Guardar información del usuario
+      localStorage.setItem('adminUser', JSON.stringify(user));
       onLogin(token);
     } catch (err) {
       setError(err.response?.data?.message || 'Error de autenticación');

@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 
 export default function Sidebar({ activeSections, onToggleSection }) {
   const [expandedMenus, setExpandedMenus] = useState({
+    estadisticas: true,
     finanzas: true,
     usuarios: true,
     sesiones: true,
@@ -18,6 +19,14 @@ export default function Sidebar({ activeSections, onToggleSection }) {
 
   const menuItems = [
     {
+      id: 'estadisticas',
+      title: '📊 Estadísticas',
+      icon: '📊',
+      sections: [
+        { id: 'estadisticas-generales', name: 'Dashboard General' }
+      ]
+    },
+    {
       id: 'finanzas',
       title: '💰 Finanzas',
       icon: '💰',
@@ -31,9 +40,7 @@ export default function Sidebar({ activeSections, onToggleSection }) {
       id: 'usuarios',
       title: '👥 Usuarios',
       icon: '👥',
-      sections: [
-        { id: 'usuarios-stats', name: 'Estadísticas de Usuarios' }
-      ]
+      sections: []
     },
     {
       id: 'sesiones',
@@ -64,22 +71,31 @@ export default function Sidebar({ activeSections, onToggleSection }) {
             <div key={menu.id}>
               {/* Menu Header */}
               <button
-                onClick={() => toggleMenu(menu.id)}
+                onClick={() => {
+                  if (menu.sections.length === 0) {
+                    // Si no tiene secciones, activar directamente
+                    onToggleSection(menu.id);
+                  } else {
+                    toggleMenu(menu.id);
+                  }
+                }}
                 className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-slate-700 transition-colors text-left"
               >
                 <span className="flex items-center gap-2 text-slate-200 font-medium">
                   <span>{menu.icon}</span>
                   <span className="text-sm">{menu.title}</span>
                 </span>
-                {expandedMenus[menu.id] ? (
-                  <ChevronDown className="w-4 h-4 text-slate-400" />
-                ) : (
-                  <ChevronRight className="w-4 h-4 text-slate-400" />
+                {menu.sections.length > 0 && (
+                  expandedMenus[menu.id] ? (
+                    <ChevronDown className="w-4 h-4 text-slate-400" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4 text-slate-400" />
+                  )
                 )}
               </button>
 
               {/* Submenu Items */}
-              {expandedMenus[menu.id] && (
+              {menu.sections.length > 0 && expandedMenus[menu.id] && (
                 <div className="ml-6 mt-1 space-y-1">
                   {menu.sections.map((section) => (
                     <button
