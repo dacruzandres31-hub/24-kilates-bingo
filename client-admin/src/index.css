@@ -1,0 +1,79 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-900 text-white;
+  }
+}
+
+@layer components {
+  .metric-card {
+    @apply bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl border border-slate-700 p-6 shadow-xl hover:shadow-2xl transition-all duration-300;
+  }
+
+  .metric-card:hover {
+    @apply border-slate-600 transform scale-[1.02];
+  }
+
+  .stat-value {
+    @apply text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r;
+  }
+
+  .stat-positive {
+    @apply from-green-400 to-emerald-600;
+  }
+
+  .stat-warning {
+    @apply from-yellow-400 to-orange-600;
+  }
+
+  .stat-danger {
+    @apply from-red-400 to-rose-600;
+  }
+
+  .stat-info {
+    @apply from-blue-400 to-cyan-600;
+  }
+
+  .stat-neutral {
+    @apply from-slate-300 to-slate-500;
+  }
+
+  .loading-skeleton {
+    @apply animate-pulse bg-slate-700 rounded;
+  }
+
+  .alert-badge {
+    @apply px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide;
+  }
+
+  .alert-warning {
+    @apply bg-yellow-500/20 text-yellow-300 border border-yellow-500/50;
+  }
+
+  .alert-error {
+    @apply bg-red-500/20 text-red-300 border border-red-500/50;
+  }
+
+  .alert-info {
+    @apply bg-blue-500/20 text-blue-300 border border-blue-500/50;
+  }
+
+  .btn-primary {
+    @apply px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-semibold rounded-lg shadow-lg transition-all duration-200 transform hover:scale-105;
+  }
+
+  .btn-danger {
+    @apply px-6 py-3 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-semibold rounded-lg shadow-lg transition-all duration-200 transform hover:scale-105;
+  }
+
+  .section-title {
+    @apply text-2xl font-bold mb-6 flex items-center gap-3;
+  }
+
+  .divider {
+    @apply border-t border-slate-700 my-8;
+  }
+}
