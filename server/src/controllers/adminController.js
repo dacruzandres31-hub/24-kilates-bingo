@@ -646,17 +646,60 @@ async function getStockSummary(req, res) {
  */
 async function getUsersHierarchy(req, res) {
   try {
-    const currentUserId = req.user.id; // ID del usuario que hace la petición
+    const currentUserId = req.user.id;
+    const currentUserRole = req.user.role;
 
-    const [users] = await pool.query(`
-      SELECT id, username, role, parent_id, balance,
-             (SELECT COUNT(*) FROM user_cards WHERE user_id = users.id AND room = 'bronce') as cards_bronce,
-             (SELECT COUNT(*) FROM user_cards WHERE user_id = users.id AND room = 'plata') as cards_plata,
-             (SELECT COUNT(*) FROM user_cards WHERE user_id = users.id AND room = 'oro') as cards_oro
-      FROM users
-      WHERE id != ?
-      ORDER BY id
-    `, [currentUserId]);
+    let users;
+
+    // SuperAdmin ve TODOS los usuarios
+    if (currentUserRole === 'superadmin') {
+      [users] = await pool.query(`
+        SELECT id, username, role, parent_id, balance,
+               (SELECT COUNT(*) FROM user_cards WHERE user_id = users.id AND room = 'bronce') as cards_bronce,
+               (SELECT COUNT(*) FROM user_cards WHERE user_id = users.id AND room = 'plata') as cards_plata,
+               (SELECT COUNT(*) FROM user_cards WHERE user_id = users.id AND room = 'oro') as cards_oro
+        FROM users
+        WHERE id != ?
+        ORDER BY id
+      `, [currentUserId]);
+    } 
+    // Agentes solo ven su RED (hijos directos y todos los descendientes)
+    else if (currentUserRole === 'agente') {
+      // Usar CTE recursivo para obtener toda la red del agente
+      [users] = await pool.query(`
+        WITH RECURSIVE network AS (
+          -- Caso base: hijos directos del agente actual
+          SELECT id, username, role, parent_id, balance
+          FROM users 
+          WHERE parent_id = ?
+          
+          UNION ALL
+          
+          -- Caso recursivo: hijos de los hijos
+          SELECT u.id, u.username, u.role, u.parent_id, u.balance
+          FROM users u
+          INNER JOIN network n ON u.parent_id = n.id
+        )
+        SELECT 
+          n.id, 
+          n.username, 
+          n.role, 
+          n.parent_id, 
+          n.balance,
+          (SELECT COUNT(*) FROM user_cards WHERE user_id = n.id AND room = 'bronce') as cards_bronce,
+          (SELECT COUNT(*) FROM user_cards WHERE user_id = n.id AND room = 'plata') as cards_plata,
+          (SELECT COUNT(*) FROM user_cards WHERE user_id = n.id AND room = 'oro') as cards_oro
+        FROM network n
+        ORDER BY n.id
+      `, [currentUserId]);
+    }
+    // Jugadores no tienen acceso a este endpoint (pero por si acaso)
+    else {
+      return res.status(403).json({
+        success: false,
+        error: 'No tienes permisos para ver usuarios'
+      });
+    }
 
     // Construir árbol jerárquico
     const buildTree = (parentId = null) => {
@@ -668,13 +711,18 @@ async function getUsersHierarchy(req, res) {
         }));
     };
 
-    // Construir el árbol desde el usuario actual hacia abajo
-    const tree = buildTree(currentUserId);
+    // SuperAdmin: árbol desde null (raíz), Agente: árbol desde su ID
+    const rootParentId = currentUserRole === 'superadmin' ? null : currentUserId;
+    const tree = buildTree(rootParentId);
 
     res.json({
       success: true,
       tree,
-      all: users
+      all: users,
+      currentUser: {
+        id: currentUserId,
+        role: currentUserRole
+      }
     });
 
   } catch (error) {
@@ -690,15 +738,55 @@ async function getUsersHierarchy(req, res) {
 /**
  * POST /api/admin/users/create
  * Crea un nuevo usuario (jugador o agente)
+ * 
+ * Jerarquía:
+ * - SuperAdmin: Puede crear agentes sin parent (raíz) o especificar parent_id
+ * - Agente: Crea usuarios bajo su propia red (parent_id = req.user.id automático)
  */
 async function createUser(req, res) {
   try {
     const { username, password, role, parent_id, nombre_completo, documento, email, telefono } = req.body;
+    const currentUserId = req.user.id;
+    const currentUserRole = req.user.role;
 
     if (!username || !password || !role) {
       return res.status(400).json({
         success: false,
-        error: 'Faltan campos requeridos'
+        error: 'Faltan campos requeridos: username, password, role'
+      });
+    }
+
+    // Validar que el role sea válido
+    const validRoles = ['superadmin', 'agente', 'jugador'];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Rol inválido. Debe ser: superadmin, agente o jugador'
+      });
+    }
+
+    // Determinar el parent_id según la lógica jerárquica
+    let finalParentId;
+
+    if (currentUserRole === 'superadmin') {
+      // SuperAdmin puede especificar parent_id o dejarlo null (raíz)
+      finalParentId = parent_id || null;
+    } else if (currentUserRole === 'agente') {
+      // Agentes siempre crean usuarios bajo su red
+      finalParentId = currentUserId;
+
+      // Agentes NO pueden crear SuperAdmins
+      if (role === 'superadmin') {
+        return res.status(403).json({
+          success: false,
+          error: 'No tienes permisos para crear SuperAdmins'
+        });
+      }
+    } else {
+      // Jugadores no pueden crear usuarios
+      return res.status(403).json({
+        success: false,
+        error: 'No tienes permisos para crear usuarios'
       });
     }
 
@@ -722,7 +810,7 @@ async function createUser(req, res) {
       username,
       password: hashedPassword,
       role,
-      parent_id: parent_id || null,
+      parent_id: finalParentId,
       balance: 0,
       nombre_completo: nombre_completo || null,
       documento: documento || null,
@@ -740,7 +828,8 @@ async function createUser(req, res) {
     res.json({
       success: true,
       userId: result.insertId,
-      message: `Usuario ${username} creado exitosamente`
+      message: `${role.toUpperCase()} "${username}" creado exitosamente bajo ${currentUserRole === 'agente' ? 'tu red' : 'la jerarquía especificada'}`,
+      parent_id: finalParentId
     });
 
   } catch (error) {
@@ -761,17 +850,62 @@ async function createUser(req, res) {
 }
 
 /**
+ * Helper: Verificar si un usuario pertenece a la red de un agente
+ * Usa CTE recursivo para verificar toda la jerarquía descendente
+ */
+async function canModifyUser(currentUserId, currentUserRole, targetUserId) {
+  // SuperAdmin puede modificar a todos
+  if (currentUserRole === 'superadmin') {
+    return true;
+  }
+
+  // Agentes solo pueden modificar usuarios de su red
+  if (currentUserRole === 'agente') {
+    const [result] = await pool.query(`
+      WITH RECURSIVE network AS (
+        -- Caso base: hijos directos
+        SELECT id FROM users WHERE parent_id = ?
+        
+        UNION ALL
+        
+        -- Caso recursivo: descendientes
+        SELECT u.id FROM users u
+        INNER JOIN network n ON u.parent_id = n.id
+      )
+      SELECT COUNT(*) as count FROM network WHERE id = ?
+    `, [currentUserId, targetUserId]);
+
+    return result[0].count > 0;
+  }
+
+  // Jugadores no pueden modificar a nadie
+  return false;
+}
+
+/**
  * POST /api/admin/users/add-cards
  * Agrega o quita cartones a un usuario
+ * Validación jerárquica: Agentes solo pueden modificar su red
  */
 async function addCardsToUser(req, res) {
   try {
     const { userId, room, quantity } = req.body;
+    const currentUserId = req.user.id;
+    const currentUserRole = req.user.role;
 
     if (!userId || !room || quantity === undefined) {
       return res.status(400).json({
         success: false,
         error: 'Faltan campos requeridos'
+      });
+    }
+
+    // VALIDACIÓN JERÁRQUICA: Verificar permisos
+    const hasPermission = await canModifyUser(currentUserId, currentUserRole, userId);
+    if (!hasPermission) {
+      return res.status(403).json({
+        success: false,
+        error: 'No tienes permisos para modificar a este usuario (fuera de tu red)'
       });
     }
 
@@ -851,11 +985,22 @@ async function addCardsToUser(req, res) {
 async function addBalanceToUser(req, res) {
   try {
     const { userId, amount } = req.body;
+    const currentUserId = req.user.id;
+    const currentUserRole = req.user.role;
 
     if (!userId || amount === undefined) {
       return res.status(400).json({
         success: false,
         error: 'Faltan campos requeridos (userId, amount)'
+      });
+    }
+
+    // VALIDACIÓN JERÁRQUICA: Verificar permisos
+    const hasPermission = await canModifyUser(currentUserId, currentUserRole, userId);
+    if (!hasPermission) {
+      return res.status(403).json({
+        success: false,
+        error: 'No tienes permisos para modificar a este usuario (fuera de tu red)'
       });
     }
 

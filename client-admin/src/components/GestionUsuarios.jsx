@@ -4,6 +4,7 @@ import axios from 'axios';
 export default function GestionUsuarios() {
   const [usuarios, setUsuarios] = useState([]);
   const [arbolJerarquico, setArbolJerarquico] = useState([]);
+  const [currentUser, setCurrentUser] = useState({ id: null, role: '' }); // Usuario actual del backend
   const [nuevoUsuario, setNuevoUsuario] = useState({
     username: '',
     password: '',
@@ -58,6 +59,11 @@ export default function GestionUsuarios() {
       });
       setArbolJerarquico(response.data.tree || []);
       setUsuarios(response.data.all || []);
+      
+      // Guardar información del usuario actual (para validaciones de rol)
+      if (response.data.currentUser) {
+        setCurrentUser(response.data.currentUser);
+      }
     } catch (error) {
       console.error('Error cargando usuarios:', error);
     }
@@ -97,7 +103,7 @@ export default function GestionUsuarios() {
         username: datosIngreso.username,
         password: datosIngreso.password,
         role: tipoUsuario,
-        parent_id: null,
+        // NO enviar parent_id - el backend lo asigna automáticamente según jerarquía
         // Datos personales opcionales
         ...(datosPersonales.nombre_completo && { nombre_completo: datosPersonales.nombre_completo }),
         ...(datosPersonales.documento && { documento: datosPersonales.documento }),
@@ -105,11 +111,11 @@ export default function GestionUsuarios() {
         ...(datosPersonales.telefono && { telefono: datosPersonales.telefono })
       };
 
-      await axios.post('/api/admin/users/create', userData, {
+      const response = await axios.post('/api/admin/users/create', userData, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      alert(`✅ ${tipoUsuario.toUpperCase()} "${datosIngreso.username}" creado exitosamente`);
+      alert(`✅ ${response.data.message || `${tipoUsuario.toUpperCase()} "${datosIngreso.username}" creado exitosamente`}`);
       
       // Cerrar modal y recargar
       setModalCrearUsuario({ ...modalCrearUsuario, isOpen: false });
@@ -312,13 +318,16 @@ export default function GestionUsuarios() {
                 <span>NUEVO JUGADOR</span>
               </button>
 
-              <button
-                onClick={() => abrirModalCrearUsuario('agente')}
-                className="bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] shadow-lg"
-              >
-                <span>🏢</span>
-                <span>NUEVO AGENTE</span>
-              </button>
+              {/* Solo SuperAdmin y Agentes pueden crear agentes */}
+              {(currentUser.role === 'superadmin' || currentUser.role === 'agente') && (
+                <button
+                  onClick={() => abrirModalCrearUsuario('agente')}
+                  className="bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] shadow-lg"
+                >
+                  <span>🏢</span>
+                  <span>NUEVO AGENTE</span>
+                </button>
+              )}
             </div>
 
             {/* Carga rápida de saldo/cartones */}
