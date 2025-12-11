@@ -805,25 +805,48 @@ async function createUser(req, res) {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Preparar datos opcionales
-    const userData = {
-      username,
-      password: hashedPassword,
-      role,
-      parent_id: finalParentId,
-      balance: 0,
-      nombre_completo: nombre_completo || null,
-      documento: documento || null,
-      email: email || null,
-      telefono: telefono || null
-    };
-
+    // Insertar usuario con campos básicos primero
     const [result] = await pool.query(
-      `INSERT INTO users (username, password_hash, role, parent_id, balance, nombre_completo, documento, email, telefono)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [userData.username, userData.password, userData.role, userData.parent_id, userData.balance, 
-       userData.nombre_completo, userData.documento, userData.email, userData.telefono]
+      `INSERT INTO users (username, password_hash, role, parent_id, balance)
+       VALUES (?, ?, ?, ?, ?)`,
+      [username, hashedPassword, role, finalParentId, 0]
     );
+
+    // Intentar actualizar campos opcionales si existen
+    if (nombre_completo || documento || email || telefono) {
+      try {
+        const updates = [];
+        const values = [];
+        
+        if (nombre_completo) {
+          updates.push('nombre_completo = ?');
+          values.push(nombre_completo);
+        }
+        if (documento) {
+          updates.push('documento = ?');
+          values.push(documento);
+        }
+        if (email) {
+          updates.push('email = ?');
+          values.push(email);
+        }
+        if (telefono) {
+          updates.push('telefono = ?');
+          values.push(telefono);
+        }
+
+        if (updates.length > 0) {
+          values.push(result.insertId);
+          await pool.query(
+            `UPDATE users SET ${updates.join(', ')} WHERE id = ?`,
+            values
+          );
+        }
+      } catch (updateError) {
+        // Ignorar errores de campos opcionales que no existen en la tabla
+        console.log('⚠️  Campos opcionales no disponibles en la tabla:', updateError.message);
+      }
+    }
 
     res.json({
       success: true,
