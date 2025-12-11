@@ -50,4 +50,12 @@ router.post('/claim-bingo', gameController.claimBingo);
 // NUEVO: Análisis y ordenamiento inteligente de cartones
 router.get('/my-cards-analysis/:gameSessionId', gameController.getMyCardsAnalysis);
 
+// ========================================
+// 🎴 INVENTARIO DE CARTONES (v1.4.0)
+// Jugadores - Validar y consultar cartones
+// ========================================
+router.post('/validate-cards', gameController.validateCardsForSession);
+router.get('/my-validated-cards/:sessionId', gameController.getMyValidatedCards);
+router.get('/my-inventory', gameController.getMyCardInventory);
+
 module.exports = router;

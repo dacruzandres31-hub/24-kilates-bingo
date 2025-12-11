@@ -1,6 +1,7 @@
 const pool = require('../db');
 const MoneyMath = require('../utils/moneyMath');
 const bcrypt = require('bcryptjs');
+const cardInventoryService = require('../services/cardInventoryService');
 
 /**
  * MÓDULO 7: API del Dashboard Administrativo
@@ -939,6 +940,135 @@ async function addBalanceToUser(req, res) {
   }
 }
 
+/**
+ * GET /api/admin/cards/inventory
+ * Obtiene inventario de cartones del admin actual (vista filtrada - solo totales)
+ */
+async function getMyCardInventory(req, res) {
+  try {
+    const inventory = await cardInventoryService.getInventory(
+      req.user.userId,
+      false  // isSuperAdmin = false (solo ve totales, NO regalo/normal)
+    );
+
+    res.json({
+      success: true,
+      user_id: req.user.userId,
+      username: req.user.username,
+      inventory: inventory
+    });
+
+  } catch (error) {
+    console.error('❌ Error obteniendo inventario de cartones:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error obteniendo inventario de cartones',
+      details: error.message
+    });
+  }
+}
+
+/**
+ * POST /api/admin/cards/transfer
+ * Transfiere cartones a usuarios de su red (cajeros/jugadores)
+ */
+async function transferCardsToUser(req, res) {
+  try {
+    const { to_user_id, room, quantity } = req.body;
+
+    // Validaciones
+    if (!to_user_id || !room || !quantity) {
+      return res.status(400).json({
+        success: false,
+        message: 'Faltan campos requeridos: to_user_id, room, quantity'
+      });
+    }
+
+    if (!['bronce', 'plata', 'oro'].includes(room)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Sala inválida. Debe ser: bronce, plata u oro'
+      });
+    }
+
+    if (quantity <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'La cantidad debe ser mayor a 0'
+      });
+    }
+
+    // Verificar que el destinatario esté en su red (jerárquicamente bajo él)
+    const [targetUser] = await pool.query(
+      `WITH RECURSIVE network AS (
+         SELECT id, username, parent_id, 1 as level 
+         FROM users WHERE id = ?
+         UNION ALL
+         SELECT u.id, u.username, u.parent_id, n.level + 1
+         FROM users u 
+         JOIN network n ON u.parent_id = n.id
+       )
+       SELECT id, username FROM network WHERE id = ?`,
+      [req.user.userId, to_user_id]
+    );
+
+    if (targetUser.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: 'Solo puede transferir cartones a usuarios de su red'
+      });
+    }
+
+    const result = await cardInventoryService.transferCards(
+      req.user.userId,
+      to_user_id,
+      room,
+      quantity,
+      req.user.userId
+    );
+
+    res.json(result);
+
+  } catch (error) {
+    console.error('❌ Error transfiriendo cartones:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error transfiriendo cartones',
+      details: error.message
+    });
+  }
+}
+
+/**
+ * GET /api/admin/cards/movements
+ * Obtiene historial de movimientos de cartones del admin actual
+ */
+async function getMyCardMovements(req, res) {
+  try {
+    const limit = parseInt(req.query.limit) || 50;
+
+    const movements = await cardInventoryService.getMovementsLog(
+      req.user.userId,
+      limit
+    );
+
+    res.json({
+      success: true,
+      user_id: req.user.userId,
+      total: movements.length,
+      movements: movements
+    });
+
+  } catch (error) {
+    console.error('❌ Error obteniendo movimientos:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error obteniendo movimientos de cartones',
+      details: error.message
+    });
+  }
+}
+
 module.exports = {
   getAdminProfile,
   getFinancialSummary,
@@ -951,5 +1081,9 @@ module.exports = {
   getUsersHierarchy,
   createUser,
   addCardsToUser,
-  addBalanceToUser
+  addBalanceToUser,
+  // Card Inventory (Admin/Cajero)
+  getMyCardInventory,
+  transferCardsToUser,
+  getMyCardMovements
 };

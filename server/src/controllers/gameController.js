@@ -7,6 +7,7 @@ const rankingEngine = require('../services/ranking_engine');
 const notificationService = require('../services/notificationService');
 const inventoryService = require('../services/inventoryService');
 const CardAnalyzer = require('../services/cardAnalyzer');
+const cardInventoryService = require('../services/cardInventoryService');
 
 // COMPRAR CARTÓN - Agregar a session del usuario
 exports.buyCard = async (req, res) => {
@@ -1282,4 +1283,150 @@ exports.getMyCardsAnalysis = async (req, res) => {
     });
   }
 };
+
+/**
+ * POST /api/game/validate-cards
+ * Valida cartones del inventario para una sesión de juego específica
+ * - Genera número de serie único por cartón
+ * - Verifica límite del 10% de cartones de regalo
+ * - Distribuye a jackpots si es cartón pago (15% línea, 50% bingo, 5% pre-40)
+ */
+exports.validateCardsForSession = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { game_session_id, room, quantity } = req.body;
+
+    // Validaciones
+    if (!game_session_id || !room || !quantity) {
+      return res.status(400).json({
+        success: false,
+        message: 'Faltan campos requeridos: game_session_id, room, quantity'
+      });
+    }
+
+    if (!['bronce', 'plata', 'oro'].includes(room)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Sala inválida. Debe ser: bronce, plata u oro'
+      });
+    }
+
+    if (quantity <= 0 || quantity > 20) {
+      return res.status(400).json({
+        success: false,
+        message: 'La cantidad debe ser entre 1 y 20 cartones'
+      });
+    }
+
+    // Verificar que la sesión existe y está pendiente
+    const [session] = await pool.query(
+      `SELECT id, status, room, play_date FROM game_sessions WHERE id = ?`,
+      [game_session_id]
+    );
+
+    if (session.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Sesión de juego no encontrada'
+      });
+    }
+
+    if (session[0].status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        message: `La sesión está en estado: ${session[0].status}. Solo se pueden validar cartones en sesiones pendientes`
+      });
+    }
+
+    if (session[0].room !== room) {
+      return res.status(400).json({
+        success: false,
+        message: `La sesión es de sala ${session[0].room}, no ${room}`
+      });
+    }
+
+    // Validar cartones usando el servicio
+    const result = await cardInventoryService.validateCards(
+      userId,
+      game_session_id,
+      room,
+      quantity
+    );
+
+    res.json(result);
+
+  } catch (error) {
+    console.error('[GameController] Error validando cartones:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Error validando cartones'
+    });
+  }
+};
+
+/**
+ * GET /api/game/my-validated-cards/:sessionId
+ * Obtiene los cartones validados del jugador para una sesión específica
+ */
+exports.getMyValidatedCards = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { sessionId } = req.params;
+
+    if (!sessionId) {
+      return res.status(400).json({
+        success: false,
+        message: 'session_id es requerido'
+      });
+    }
+
+    const cards = await cardInventoryService.getValidatedCards(
+      userId,
+      parseInt(sessionId)
+    );
+
+    res.json({
+      success: true,
+      game_session_id: parseInt(sessionId),
+      total_cards: cards.length,
+      cards: cards
+    });
+
+  } catch (error) {
+    console.error('[GameController] Error obteniendo cartones validados:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Error obteniendo cartones validados'
+    });
+  }
+};
+
+/**
+ * GET /api/game/my-inventory
+ * Obtiene el inventario de cartones del jugador (vista jugador - solo totales)
+ */
+exports.getMyCardInventory = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const inventory = await cardInventoryService.getInventory(
+      userId,
+      false  // isSuperAdmin = false
+    );
+
+    res.json({
+      success: true,
+      user_id: userId,
+      inventory: inventory
+    });
+
+  } catch (error) {
+    console.error('[GameController] Error obteniendo inventario:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Error obteniendo inventario'
+    });
+  }
+};
+
 

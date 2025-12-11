@@ -16,7 +16,10 @@ const {
   getUsersHierarchy,
   createUser,
   addCardsToUser,
-  addBalanceToUser
+  addBalanceToUser,
+  getMyCardInventory,
+  transferCardsToUser,
+  getMyCardMovements
 } = require('../controllers/adminController');
 
 /**
@@ -56,5 +59,13 @@ router.get('/users/hierarchy', authenticateToken, isAdmin, getUsersHierarchy);
 router.post('/users/create', authenticateToken, isAdmin, createUser);
 router.post('/users/add-cards', authenticateToken, isAdmin, addCardsToUser);
 router.post('/users/add-balance', authenticateToken, isAdmin, addBalanceToUser);
+
+// ========================================
+// 🎴 INVENTARIO DE CARTONES (v1.4.0)
+// Admin/Cajero - Vista filtrada (solo totales)
+// ========================================
+router.get('/cards/inventory', authenticateToken, isAdmin, getMyCardInventory);
+router.post('/cards/transfer', authenticateToken, isAdmin, transferCardsToUser);
+router.get('/cards/movements', authenticateToken, isAdmin, getMyCardMovements);
 
 module.exports = router;
