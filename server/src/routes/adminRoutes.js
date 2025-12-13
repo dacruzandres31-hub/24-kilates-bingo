@@ -19,7 +19,8 @@ const {
   addBalanceToUser,
   getMyCardInventory,
   transferCardsToUser,
-  getMyCardMovements
+  getMyCardMovements,
+  changePassword
 } = require('../controllers/adminController');
 
 /**
@@ -32,6 +33,7 @@ const {
 
 // 👤 Perfil del admin
 router.get('/profile', authenticateToken, isAdmin, getAdminProfile);
+router.post('/change-password', authenticateToken, isAdmin, changePassword);
 
 // 💰 Resumen financiero
 router.get('/financial-summary', authenticateToken, isAdmin, getFinancialSummary);

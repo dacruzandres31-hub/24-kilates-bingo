@@ -1,9 +1,25 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import axios from 'axios';
 import { LineChart, Line, AreaChart, Area, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 export default function EstadisticasGenerales({ financialData }) {
-  const [newUserName, setNewUserName] = useState('');
+  const [quickSearchUsername, setQuickSearchUsername] = useState('');
+  const [quickSearchResult, setQuickSearchResult] = useState(null);
+  const [searchResults, setSearchResults] = useState([]);
   const [newUserType, setNewUserType] = useState('jugador');
+
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') {
+        setQuickSearchUsername('');
+        setQuickSearchResult(null);
+        setSearchResults([]);
+      }
+    };
+    
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, []);
 
   // Datos para gráfica mensual (simulados - deberían venir del backend)
   const dataNetwinMensual = [
@@ -53,13 +69,51 @@ export default function EstadisticasGenerales({ financialData }) {
     }).format(value);
   };
 
-  const handleCreateUser = (e) => {
-    e.preventDefault();
-    if (!newUserName.trim()) return;
-    
-    // TODO: Implementar creación de usuario
-    alert(`Crear usuario: ${newUserName} como ${newUserType}`);
-    setNewUserName('');
+  const handleQuickSearchRealtime = async (searchTerm) => {
+    if (!searchTerm || searchTerm.length < 2) {
+      setSearchResults([]);
+      setQuickSearchResult(null);
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('adminToken');
+      // Buscar en toda la red de usuarios
+      const response = await axios.get('/api/admin/users/hierarchy', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (response.data && response.data.all) {
+        // Filtrar usuarios que coincidan con el término de búsqueda
+        const filtered = response.data.all.filter(u => 
+          u.username.toLowerCase().includes(searchTerm.toLowerCase())
+        ).slice(0, 5); // Mostrar máximo 5 resultados
+        
+        setSearchResults(filtered);
+        
+        // Si hay coincidencia exacta, seleccionarla
+        const exactMatch = filtered.find(u => 
+          u.username.toLowerCase() === searchTerm.toLowerCase()
+        );
+        if (exactMatch) {
+          setQuickSearchResult(exactMatch);
+        } else {
+          setQuickSearchResult(null);
+        }
+      }
+    } catch (error) {
+      console.error('Error en búsqueda:', error);
+      setSearchResults([]);
+      setQuickSearchResult(null);
+    }
+  };
+
+  const handleOpenUserModal = (role) => {
+    console.log('🔵 Disparando evento openCreateUserModal con role:', role);
+    // Disparar evento directamente - GestionUsuarios está siempre montado
+    window.dispatchEvent(new CustomEvent('openCreateUserModal', { 
+      detail: { role } 
+    }));
   };
 
   const gananciaActual = financialData?.today?.sales || 4331434.85;
@@ -77,39 +131,121 @@ export default function EstadisticasGenerales({ financialData }) {
           </div>
 
           <div className="space-y-4">
-            <button className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] shadow-lg">
+            <button 
+              onClick={() => handleOpenUserModal('jugador')}
+              className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] shadow-lg">
               <span>👤</span>
               <span>NUEVO JUGADOR</span>
             </button>
 
-            <button className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] shadow-lg">
+            <button 
+              onClick={() => handleOpenUserModal('agente')}
+              className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] shadow-lg">
               <span>🏢</span>
               <span>NUEVO AGENTE</span>
             </button>
 
-            <form onSubmit={handleCreateUser} className="space-y-3">
+            <div className="space-y-3">
+              <label className="block text-gray-400 text-sm">Nombre de Usuario</label>
               <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={newUserName}
-                  onChange={(e) => setNewUserName(e.target.value)}
-                  placeholder="Nombre de Usuario"
-                  className="flex-1 px-4 py-2 bg-gray-900/50 border border-gray-700 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                />
-                <button
-                  type="button"
-                  className="w-10 h-10 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-xl flex items-center justify-center text-2xl transition-all transform hover:scale-110 shadow-lg"
-                >
-                  +
-                </button>
-                <button
-                  type="button"
-                  className="w-10 h-10 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white rounded-xl flex items-center justify-center text-2xl transition-all transform hover:scale-110 shadow-lg"
-                >
-                  -
-                </button>
+                <div className="flex-1 relative">
+                  <input
+                    type="text"
+                    value={quickSearchUsername}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setQuickSearchUsername(value);
+                      handleQuickSearchRealtime(value);
+                    }}
+                    placeholder="🔍 Buscar usuario..."
+                    className="w-full px-4 py-2 bg-gray-900/50 border border-gray-700 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                  
+                  {/* Lista de resultados mientras escribe - HACIA ARRIBA */}
+                  {searchResults.length > 0 && quickSearchUsername.length >= 2 && (
+                    <div className="absolute bottom-full left-0 right-0 mb-2 bg-gray-900 border border-indigo-500/50 rounded-lg shadow-2xl max-h-80 overflow-y-auto z-[100]">
+                      {searchResults.map((user) => (
+                        <button
+                          key={user.id}
+                          onClick={() => {
+                            // Disparar evento para abrir modal de gestión con este usuario
+                            window.dispatchEvent(new CustomEvent('openUserManagementModal', {
+                              detail: { user }
+                            }));
+                            // Limpiar búsqueda
+                            setQuickSearchUsername('');
+                            setSearchResults([]);
+                            setQuickSearchResult(null);
+                          }}
+                          className="w-full px-3 py-3 text-left hover:bg-indigo-600/30 transition-colors border-b border-gray-700 last:border-b-0 flex items-center gap-3"
+                        >
+                          <span className="text-xl">
+                            {user.role === 'superadmin' ? '👑' : user.role === 'agente' ? '🏢' : '👤'}
+                          </span>
+                          <div className="flex-1">
+                            <p className="text-white font-semibold">{user.username}</p>
+                            <p className="text-gray-400 text-xs">
+                              {user.role === 'superadmin' ? 'Super Admin' : user.role === 'agente' ? 'Agente' : 'Jugador'}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs text-green-400">💰</span>
+                            <span className="text-xs text-green-300 font-semibold">
+                              ${Math.floor(user.balance || 0).toLocaleString('es-CO')}
+                            </span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </form>
+              
+              {/* Resultado seleccionado */}
+              {quickSearchResult && (
+                <div className="mt-3 bg-gray-900/70 border border-indigo-500/50 rounded-xl p-3">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="text-2xl">
+                      {quickSearchResult.role === 'superadmin' ? '👑' : quickSearchResult.role === 'agente' ? '🏢' : '👤'}
+                    </span>
+                    <div>
+                      <p className="text-white font-bold">{quickSearchResult.username}</p>
+                      <p className="text-gray-400 text-xs">
+                        {quickSearchResult.role === 'superadmin' ? 'Super Admin' : quickSearchResult.role === 'agente' ? 'Agente' : 'Jugador'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {/* Balance */}
+                    <div className="flex items-center gap-1 bg-green-900/40 border border-green-600/50 rounded-lg px-2 py-1">
+                      <span className="text-xs text-green-400">💰</span>
+                      <span className="text-xs font-bold text-green-300">
+                        ${Math.floor(quickSearchResult.balance || 0).toLocaleString('es-CO')}
+                      </span>
+                    </div>
+                    {/* Cartones */}
+                    {(quickSearchResult.cards_bronce || 0) > 0 && (
+                      <div className="flex items-center gap-1 bg-orange-900/40 border border-orange-600/50 rounded-lg px-2 py-1">
+                        <div className="w-2 h-2 bg-gradient-to-br from-orange-500 to-orange-700 rounded-full"></div>
+                        <span className="text-xs font-bold text-orange-300">{quickSearchResult.cards_bronce}</span>
+                      </div>
+                    )}
+                    {(quickSearchResult.cards_plata || 0) > 0 && (
+                      <div className="flex items-center gap-1 bg-gray-700/40 border border-gray-500/50 rounded-lg px-2 py-1">
+                        <div className="w-2 h-2 bg-gradient-to-br from-gray-300 to-gray-500 rounded-full"></div>
+                        <span className="text-xs font-bold text-gray-300">{quickSearchResult.cards_plata}</span>
+                      </div>
+                    )}
+                    {(quickSearchResult.cards_oro || 0) > 0 && (
+                      <div className="flex items-center gap-1 bg-yellow-900/40 border border-yellow-600/50 rounded-lg px-2 py-1">
+                        <div className="w-2 h-2 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full"></div>
+                        <span className="text-xs font-bold text-yellow-300">{quickSearchResult.cards_oro}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

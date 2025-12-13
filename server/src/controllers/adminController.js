@@ -649,24 +649,39 @@ async function getUsersHierarchy(req, res) {
     const currentUserId = req.user.id;
     const currentUserRole = req.user.role;
 
-    let users;
+    let allUsers;
+    let currentUserData;
 
-    // SuperAdmin ve TODOS los usuarios
+    // SuperAdmin ve TODOS los usuarios (incluyéndose a sí mismo)
     if (currentUserRole === 'superadmin') {
-      [users] = await pool.query(`
+      [allUsers] = await pool.query(`
         SELECT id, username, role, parent_id, balance,
                (SELECT COUNT(*) FROM user_cards WHERE user_id = users.id AND room = 'bronce') as cards_bronce,
                (SELECT COUNT(*) FROM user_cards WHERE user_id = users.id AND room = 'plata') as cards_plata,
                (SELECT COUNT(*) FROM user_cards WHERE user_id = users.id AND room = 'oro') as cards_oro
         FROM users
-        WHERE id != ?
         ORDER BY id
-      `, [currentUserId]);
+      `);
+      
+      // Obtener datos del usuario actual
+      currentUserData = allUsers.find(u => u.id === currentUserId);
     } 
     // Agentes solo ven su RED (hijos directos y todos los descendientes)
     else if (currentUserRole === 'agente') {
+      // Primero obtener datos del agente actual
+      const [currentUserRow] = await pool.query(`
+        SELECT id, username, role, parent_id, balance,
+               (SELECT COUNT(*) FROM user_cards WHERE user_id = users.id AND room = 'bronce') as cards_bronce,
+               (SELECT COUNT(*) FROM user_cards WHERE user_id = users.id AND room = 'plata') as cards_plata,
+               (SELECT COUNT(*) FROM user_cards WHERE user_id = users.id AND room = 'oro') as cards_oro
+        FROM users
+        WHERE id = ?
+      `, [currentUserId]);
+      
+      currentUserData = currentUserRow[0];
+      
       // Usar CTE recursivo para obtener toda la red del agente
-      [users] = await pool.query(`
+      const [networkUsers] = await pool.query(`
         WITH RECURSIVE network AS (
           -- Caso base: hijos directos del agente actual
           SELECT id, username, role, parent_id, balance
@@ -692,6 +707,9 @@ async function getUsersHierarchy(req, res) {
         FROM network n
         ORDER BY n.id
       `, [currentUserId]);
+      
+      // Combinar: agente actual + su red
+      allUsers = [currentUserData, ...networkUsers];
     }
     // Jugadores no tienen acceso a este endpoint (pero por si acaso)
     else {
@@ -703,7 +721,7 @@ async function getUsersHierarchy(req, res) {
 
     // Construir árbol jerárquico
     const buildTree = (parentId = null) => {
-      return users
+      return allUsers
         .filter(u => u.parent_id === parentId)
         .map(user => ({
           ...user,
@@ -711,17 +729,20 @@ async function getUsersHierarchy(req, res) {
         }));
     };
 
-    // SuperAdmin: árbol desde null (raíz), Agente: árbol desde su ID
-    const rootParentId = currentUserRole === 'superadmin' ? null : currentUserId;
-    const tree = buildTree(rootParentId);
+    // Crear árbol con el usuario actual como raíz
+    const tree = [{
+      ...currentUserData,
+      children: buildTree(currentUserId)
+    }];
 
     res.json({
       success: true,
       tree,
-      all: users,
+      all: allUsers,
       currentUser: {
         id: currentUserId,
-        role: currentUserRole
+        role: currentUserRole,
+        username: currentUserData?.username
       }
     });
 
@@ -745,9 +766,14 @@ async function getUsersHierarchy(req, res) {
  */
 async function createUser(req, res) {
   try {
+    console.log('🔍 [CREATE-USER] req.user =', JSON.stringify(req.user));
+    console.log('🔍 [CREATE-USER] req.body =', JSON.stringify(req.body));
+    
     const { username, password, role, parent_id, nombre_completo, documento, email, telefono } = req.body;
     const currentUserId = req.user.id;
     const currentUserRole = req.user.role;
+
+    console.log('🔍 [CREATE-USER] Parsed - username:', username, 'role:', role, 'parent_id:', parent_id, 'currentUserId:', currentUserId, 'currentUserRole:', currentUserRole);
 
     if (!username || !password || !role) {
       return res.status(400).json({
@@ -804,6 +830,9 @@ async function createUser(req, res) {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+
+    // DEBUG: Log para verificar parent_id
+    console.log(`🔍 [JWT-FIX] Creating user: ${username}, Role: ${role}, CurrentUser: ${currentUserId}, CurrentRole: ${currentUserRole}, FinalParentId: ${finalParentId}, ReqUser:`, JSON.stringify(req.user));
 
     // Insertar usuario con campos básicos primero
     const [result] = await pool.query(
@@ -969,12 +998,24 @@ async function addCardsToUser(req, res) {
 
     if (quantity > 0) {
       // Agregar cartones
-      for (let i = 0; i < quantity; i++) {
+      // Optimización: Para cantidades grandes (>100), usar INSERT múltiple
+      if (quantity > 100) {
+        const values = Array(quantity).fill('(?, ?, NOW())').join(', ');
+        const params = Array(quantity).fill([userId, room]).flat();
+        
         await pool.query(
-          `INSERT INTO user_cards (user_id, room, created_at)
-           VALUES (?, ?, NOW())`,
-          [userId, room]
+          `INSERT INTO user_cards (user_id, room, created_at) VALUES ${values}`,
+          params
         );
+      } else {
+        // Para cantidades pequeñas, insertar uno por uno (más legible en logs)
+        for (let i = 0; i < quantity; i++) {
+          await pool.query(
+            `INSERT INTO user_cards (user_id, room, created_at)
+             VALUES (?, ?, NOW())`,
+            [userId, room]
+          );
+        }
       }
     } else if (quantity < 0) {
       // Quitar cartones (ya validamos que tiene suficientes)
@@ -1115,13 +1156,13 @@ async function addBalanceToUser(req, res) {
 async function getMyCardInventory(req, res) {
   try {
     const inventory = await cardInventoryService.getInventory(
-      req.user.userId,
+      req.user.id,
       false  // isSuperAdmin = false (solo ve totales, NO regalo/normal)
     );
 
     res.json({
       success: true,
-      user_id: req.user.userId,
+      user_id: req.user.id,
       username: req.user.username,
       inventory: inventory
     });
@@ -1177,7 +1218,7 @@ async function transferCardsToUser(req, res) {
          JOIN network n ON u.parent_id = n.id
        )
        SELECT id, username FROM network WHERE id = ?`,
-      [req.user.userId, to_user_id]
+      [req.user.id, to_user_id]
     );
 
     if (targetUser.length === 0) {
@@ -1188,11 +1229,11 @@ async function transferCardsToUser(req, res) {
     }
 
     const result = await cardInventoryService.transferCards(
-      req.user.userId,
+      req.user.id,
       to_user_id,
       room,
       quantity,
-      req.user.userId
+      req.user.id
     );
 
     res.json(result);
@@ -1216,13 +1257,13 @@ async function getMyCardMovements(req, res) {
     const limit = parseInt(req.query.limit) || 50;
 
     const movements = await cardInventoryService.getMovementsLog(
-      req.user.userId,
+      req.user.id,
       limit
     );
 
     res.json({
       success: true,
-      user_id: req.user.userId,
+      user_id: req.user.id,
       total: movements.length,
       movements: movements
     });
@@ -1232,6 +1273,79 @@ async function getMyCardMovements(req, res) {
     res.status(500).json({
       success: false,
       error: 'Error obteniendo movimientos de cartones',
+      details: error.message
+    });
+  }
+}
+
+/**
+ * POST /api/admin/change-password
+ * Cambia la contraseña del usuario actual
+ */
+async function changePassword(req, res) {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const userId = req.user.id;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        error: 'Faltan campos requeridos'
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        error: 'La nueva contraseña debe tener al menos 6 caracteres'
+      });
+    }
+
+    // Obtener usuario actual
+    const [users] = await pool.query(
+      'SELECT id, username, password FROM users WHERE id = ?',
+      [userId]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Usuario no encontrado'
+      });
+    }
+
+    const user = users[0];
+
+    // Verificar contraseña actual
+    const isValidPassword = await bcrypt.compare(currentPassword, user.password);
+    if (!isValidPassword) {
+      return res.status(401).json({
+        success: false,
+        error: 'La contraseña actual es incorrecta'
+      });
+    }
+
+    // Hashear nueva contraseña
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Actualizar contraseña
+    await pool.query(
+      'UPDATE users SET password = ? WHERE id = ?',
+      [hashedPassword, userId]
+    );
+
+    console.log(`✅ Contraseña cambiada para usuario ${user.username} (ID: ${userId})`);
+
+    res.json({
+      success: true,
+      message: 'Contraseña cambiada exitosamente'
+    });
+
+  } catch (error) {
+    console.error('❌ Error cambiando contraseña:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al cambiar la contraseña',
       details: error.message
     });
   }
@@ -1253,5 +1367,6 @@ module.exports = {
   // Card Inventory (Admin/Cajero)
   getMyCardInventory,
   transferCardsToUser,
-  getMyCardMovements
+  getMyCardMovements,
+  changePassword
 };

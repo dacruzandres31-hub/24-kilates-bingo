@@ -38,8 +38,9 @@ Write-Host ""
 # ============================================================
 Write-Host "PASO 2: Crear Agente Nivel 1..." -ForegroundColor Yellow
 
+$timestamp = Get-Date -Format "HHmmss"
 $agente1Data = @{
-    username = "agente_principal"
+    username = "agente_principal_$timestamp"
     password = "agente123"
     role = "agente"
     nombre_completo = "Carlos Agente Principal"
@@ -66,7 +67,7 @@ Write-Host ""
 Write-Host "PASO 3: Login como Agente1..." -ForegroundColor Yellow
 
 $agente1LoginData = @{
-    username = "agente_principal"
+    username = "agente_principal_$timestamp"
     password = "agente123"
 } | ConvertTo-Json
 
@@ -87,7 +88,7 @@ Write-Host ""
 Write-Host "PASO 4: Agente1 crea Sub-Agente (Nivel 2)..." -ForegroundColor Yellow
 
 $agente2Data = @{
-    username = "sub_agente_1"
+    username = "sub_agente_$timestamp"
     password = "subagente123"
     role = "agente"
     nombre_completo = "Maria Sub-Agente"
@@ -112,7 +113,7 @@ Write-Host ""
 Write-Host "PASO 5: Agente1 crea Jugador directo..." -ForegroundColor Yellow
 
 $jugador1Data = @{
-    username = "jugador_carlos"
+    username = "jugador_carlos_$timestamp"
     password = "jugador123"
     role = "jugador"
     nombre_completo = "Juan Jugador"
@@ -137,7 +138,7 @@ Write-Host ""
 Write-Host "PASO 6: Login como Sub-Agente..." -ForegroundColor Yellow
 
 $agente2LoginData = @{
-    username = "sub_agente_1"
+    username = "sub_agente_$timestamp"
     password = "subagente123"
 } | ConvertTo-Json
 
@@ -157,7 +158,7 @@ Write-Host ""
 Write-Host "PASO 7: Sub-Agente crea Jugador (Nivel 3)..." -ForegroundColor Yellow
 
 $jugador2Data = @{
-    username = "jugador_maria"
+    username = "jugador_maria_$timestamp"
     password = "jugador123"
     role = "jugador"
     nombre_completo = "Ana Jugadora"

@@ -23,6 +23,12 @@ export default function Dashboard() {
   });
   const [showCartonesDropdown, setShowCartonesDropdown] = useState(false);
   const [showPerfilDropdown, setShowPerfilDropdown] = useState(false);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
   const stockButtonRef = useRef(null);
   const perfilButtonRef = useRef(null);
   const [dropdownPositions, setDropdownPositions] = useState({ stock: {}, perfil: {} });
@@ -46,24 +52,25 @@ export default function Dashboard() {
 
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (stockButtonRef.current && !stockButtonRef.current.contains(event.target)) {
+      // Cerrar dropdown de recursos si se hace clic fuera
+      if (showCartonesDropdown && stockButtonRef.current) {
         const stockDropdown = document.querySelector('[data-dropdown="stock"]');
-        if (stockDropdown && !stockDropdown.contains(event.target)) {
+        if (stockDropdown && !stockDropdown.contains(event.target) && !stockButtonRef.current.contains(event.target)) {
           setShowCartonesDropdown(false);
         }
       }
-      if (perfilButtonRef.current && !perfilButtonRef.current.contains(event.target)) {
+      
+      // Cerrar dropdown de perfil si se hace clic fuera
+      if (showPerfilDropdown && perfilButtonRef.current) {
         const perfilDropdown = document.querySelector('[data-dropdown="perfil"]');
-        if (perfilDropdown && !perfilDropdown.contains(event.target)) {
+        if (perfilDropdown && !perfilDropdown.contains(event.target) && !perfilButtonRef.current.contains(event.target)) {
           setShowPerfilDropdown(false);
         }
       }
     };
 
-    if (showCartonesDropdown || showPerfilDropdown) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showCartonesDropdown, showPerfilDropdown]);
 
   const fetchDashboardData = async () => {
@@ -134,15 +141,37 @@ export default function Dashboard() {
     };
   };
 
-  const handleStockDropdown = () => {
-    setShowPerfilDropdown(false); // Cerrar perfil si está abierto
-    if (!showCartonesDropdown) {
+  const handleStockDropdown = (e) => {
+    console.log('🔵 handleStockDropdown ejecutado', { 
+      showCartonesDropdown, 
+      hasRef: !!stockButtonRef.current 
+    });
+    
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
+    setShowPerfilDropdown(false);
+    
+    if (stockButtonRef.current) {
+      const rect = stockButtonRef.current.getBoundingClientRect();
+      console.log('📍 Posición del botón:', {
+        top: rect.bottom + 8,
+        right: window.innerWidth - rect.right,
+        willShow: !showCartonesDropdown
+      });
+      
       setDropdownPositions(prev => ({
         ...prev,
-        stock: calculateDropdownPosition(stockButtonRef)
+        stock: {
+          top: rect.bottom + 8,
+          right: window.innerWidth - rect.right
+        }
       }));
     }
-    setShowCartonesDropdown(!showCartonesDropdown);
+    
+    setShowCartonesDropdown(prev => !prev);
   };
 
   const handlePerfilDropdown = () => {
@@ -154,6 +183,36 @@ export default function Dashboard() {
       }));
     }
     setShowPerfilDropdown(!showPerfilDropdown);
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      alert('❌ Las contraseñas no coinciden');
+      return;
+    }
+    
+    if (passwordData.newPassword.length < 6) {
+      alert('❌ La contraseña debe tener al menos 6 caracteres');
+      return;
+    }
+    
+    try {
+      const token = localStorage.getItem('adminToken');
+      await axios.post('/api/admin/change-password', {
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      alert('✅ Contraseña cambiada exitosamente');
+      setShowChangePasswordModal(false);
+      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (error) {
+      alert('❌ ' + (error.response?.data?.error || 'Error al cambiar la contraseña'));
+    }
   };
 
   const formatMoney = (amount) => {
@@ -207,18 +266,19 @@ export default function Dashboard() {
                 🔄
               </button>
 
-              {/* Stock de Cartones */}
+              {/* Recursos Disponibles */}
               <div className="relative">
                 <button
                   ref={stockButtonRef}
                   onClick={handleStockDropdown}
-                  className="flex items-center space-x-2 px-4 py-2 bg-gray-800/80 hover:bg-gray-700/80 border border-gray-600/50 rounded-lg transition-all shadow-md hover:shadow-lg"
+                  className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 border border-purple-500/50 rounded-lg transition-all shadow-lg hover:shadow-xl transform hover:scale-105 cursor-pointer"
+                  style={{ pointerEvents: 'auto' }}
                 >
-                  <span className="text-white font-semibold text-sm">📦 Stock</span>
+                  <span className="text-white font-semibold text-sm">💼 Recursos</span>
                   {showCartonesDropdown ? (
-                    <ChevronDown className="w-4 h-4 text-gray-400" />
+                    <ChevronDown className="w-4 h-4 text-white" />
                   ) : (
-                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                    <ChevronRight className="w-4 h-4 text-white" />
                   )}
                 </button>
               </div>
@@ -251,12 +311,17 @@ export default function Dashboard() {
             </section>
           )}
 
-          {/* Gestión de Usuarios */}
-          {activeSections['usuarios'] && (
-            <section className="mb-8">
-              <GestionUsuarios />
-            </section>
-          )}
+          {/* Gestión de Usuarios - Siempre montado para escuchar eventos */}
+          <section className={activeSections['usuarios'] ? 'mb-8' : 'hidden'}>
+            <GestionUsuarios 
+              sharedUserData={userData}
+              sharedCartonesStock={cartonesStock}
+              onResourcesUpdate={(newUserData, newCartonesStock) => {
+                if (newUserData) setUserData(newUserData);
+                if (newCartonesStock) setCartonesStock(newCartonesStock);
+              }}
+            />
+          </section>
 
           {/* Inventario de Cartones */}
           {activeSections['card-inventory'] && (
@@ -379,19 +444,35 @@ export default function Dashboard() {
       {showCartonesDropdown && createPortal(
         <div 
           data-dropdown="stock"
-          className="fixed bg-gray-800/95 backdrop-blur-lg border border-gray-700/50 rounded-xl shadow-2xl p-4 min-w-[280px]"
+          className="fixed bg-gradient-to-br from-gray-900/98 to-gray-800/98 backdrop-blur-xl border border-purple-500/50 rounded-xl shadow-2xl p-5 min-w-[320px]"
           style={{
-            top: `${dropdownPositions.stock.top}px`,
-            right: `${dropdownPositions.stock.right}px`,
-            zIndex: 2147483647
+            top: dropdownPositions.stock?.top !== undefined ? `${dropdownPositions.stock.top}px` : '80px',
+            right: dropdownPositions.stock?.right !== undefined ? `${dropdownPositions.stock.right}px` : '20px',
+            zIndex: 99999
           }}
         >
+          <div className="mb-4 pb-3 border-b border-gray-700">
+            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              💼 Recursos Disponibles
+            </h3>
+            <p className="text-xs text-gray-400 mt-1">Panel de {userData?.username || 'Administrador'}</p>
+          </div>
+          
           <div className="space-y-3">
+            {/* Balance */}
+            <div className="flex items-center justify-between p-3 bg-gradient-to-r from-green-900/40 to-emerald-900/30 border border-green-600/50 rounded-lg">
+              <div className="flex items-center space-x-2">
+                <span className="text-2xl">💰</span>
+                <span className="text-green-300 font-semibold">Balance:</span>
+              </div>
+              <span className="text-white font-bold text-lg">${Math.floor(userData?.balance || 0).toLocaleString('es-CO')}</span>
+            </div>
+
             {/* Bronce */}
             <div className="flex items-center justify-between p-3 bg-gradient-to-r from-orange-900/30 to-orange-800/20 border border-orange-700/50 rounded-lg">
               <div className="flex items-center space-x-2">
                 <div className="w-3 h-3 bg-gradient-to-br from-orange-500 to-orange-700 rounded-full"></div>
-                <span className="text-orange-300 font-semibold">BRONCE:</span>
+                <span className="text-orange-300 font-semibold">Bronce:</span>
               </div>
               <span className="text-white font-bold text-lg">{cartonesStock.bronce}</span>
             </div>
@@ -400,7 +481,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between p-3 bg-gradient-to-r from-gray-700/30 to-gray-600/20 border border-gray-500/50 rounded-lg">
               <div className="flex items-center space-x-2">
                 <div className="w-3 h-3 bg-gradient-to-br from-gray-300 to-gray-500 rounded-full"></div>
-                <span className="text-gray-300 font-semibold">PLATA:</span>
+                <span className="text-gray-300 font-semibold">Plata:</span>
               </div>
               <span className="text-white font-bold text-lg">{cartonesStock.plata}</span>
             </div>
@@ -409,7 +490,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between p-3 bg-gradient-to-r from-yellow-900/30 to-yellow-800/20 border border-yellow-600/50 rounded-lg">
               <div className="flex items-center space-x-2">
                 <div className="w-3 h-3 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full"></div>
-                <span className="text-yellow-300 font-semibold">ORO:</span>
+                <span className="text-yellow-300 font-semibold">Oro:</span>
               </div>
               <span className="text-white font-bold text-lg">{cartonesStock.oro}</span>
             </div>
@@ -431,8 +512,7 @@ export default function Dashboard() {
           <button
             className="w-full px-4 py-3 text-left text-gray-300 hover:bg-gray-700/50 transition-all flex items-center space-x-2 text-sm"
             onClick={() => {
-              // TODO: Implementar cambio de contraseña
-              alert('Funcionalidad de cambio de contraseña próximamente');
+              setShowChangePasswordModal(true);
               setShowPerfilDropdown(false);
             }}
           >
@@ -446,6 +526,88 @@ export default function Dashboard() {
             <span>🚪</span>
             <span>Cerrar Sesión</span>
           </button>
+        </div>,
+        document.body
+      )}
+
+      {/* Modal de Cambiar Contraseña */}
+      {showChangePasswordModal && createPortal(
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[9999]">
+          <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border-2 border-purple-500/50 rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+            {/* Header */}
+            <div className="p-6 bg-gradient-to-r from-purple-600 to-indigo-600">
+              <h3 className="text-2xl font-bold text-white text-center">
+                🔑 Cambiar Contraseña
+              </h3>
+            </div>
+
+            {/* Body */}
+            <form onSubmit={handleChangePassword} className="p-6 space-y-4">
+              <div>
+                <label className="block text-gray-300 font-semibold mb-2 text-sm">
+                  Contraseña Actual:
+                </label>
+                <input
+                  type="password"
+                  value={passwordData.currentPassword}
+                  onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                  className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500 transition-colors"
+                  placeholder="Ingresa tu contraseña actual"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-300 font-semibold mb-2 text-sm">
+                  Nueva Contraseña:
+                </label>
+                <input
+                  type="password"
+                  value={passwordData.newPassword}
+                  onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                  className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500 transition-colors"
+                  placeholder="Mínimo 6 caracteres"
+                  required
+                  minLength={6}
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-300 font-semibold mb-2 text-sm">
+                  Confirmar Nueva Contraseña:
+                </label>
+                <input
+                  type="password"
+                  value={passwordData.confirmPassword}
+                  onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                  className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500 transition-colors"
+                  placeholder="Repite la nueva contraseña"
+                  required
+                  minLength={6}
+                />
+              </div>
+
+              {/* Footer */}
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowChangePasswordModal(false);
+                    setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+                  }}
+                  className="flex-1 py-3 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-500 hover:to-gray-600 text-white font-bold rounded-xl transition-all"
+                >
+                  CANCELAR
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-xl transition-all"
+                >
+                  ✓ CAMBIAR
+                </button>
+              </div>
+            </form>
+          </div>
         </div>,
         document.body
       )}

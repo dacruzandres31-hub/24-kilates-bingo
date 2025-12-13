@@ -692,7 +692,7 @@ exports.end_free_game = async (req, res) => {
 exports.claimLine = async (req, res) => {
   try {
     const { gameSessionId, cardId, lineType } = req.body;
-    const userId = req.user.userId;
+    const userId = req.user.id;
 
     // Validar parámetros
     if (!gameSessionId || !cardId || !lineType) {
@@ -843,7 +843,7 @@ exports.claimLine = async (req, res) => {
 exports.claimBingo = async (req, res) => {
   try {
     const { gameSessionId, cardId } = req.body;
-    const userId = req.user.userId;
+    const userId = req.user.id;
 
     // Validar parámetros
     if (!gameSessionId || !cardId) {
@@ -1223,7 +1223,7 @@ function convertGridDataToMatrix(gridData) {
 exports.getMyCardsAnalysis = async (req, res) => {
   try {
     const { gameSessionId } = req.params;
-    const userId = req.user.userId;
+    const userId = req.user.id;
 
     // Obtener cartones del usuario en esta sesión
     const [cards] = await pool.query(

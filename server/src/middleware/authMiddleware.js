@@ -17,15 +17,17 @@ const authenticateToken = (req, res, next) => {
   }
 };
 
-// Middleware: Solo administradores
+// Middleware: Solo administradores (admin, superadmin, agente)
 const isAdmin = (req, res, next) => {
   if (!req.user) {
     return res.status(401).json({ error: 'No autenticado' });
   }
 
-  if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+  const allowedRoles = ['admin', 'superadmin', 'agente'];
+  if (!allowedRoles.includes(req.user.role)) {
     return res.status(403).json({ 
-      error: 'Acceso denegado. Se requiere rol de administrador.' 
+      error: 'Acceso denegado. Se requiere rol de administrador o agente.',
+      currentRole: req.user.role
     });
   }
 

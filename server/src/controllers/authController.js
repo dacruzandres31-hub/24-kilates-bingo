@@ -6,7 +6,9 @@ const SECRET = process.env.JWT_SECRET || 'tu_super_secret_key_24k';
 
 // Generar JWT
 const generateToken = (userId, role) => {
-  return jwt.sign({ userId, role }, SECRET, { expiresIn: '7d' });
+  const token = jwt.sign({ id: userId, role }, SECRET, { expiresIn: '7d' });
+  console.log('🔑 [TOKEN-GEN] Generated token payload:', { id: userId, role });
+  return token;
 };
 
 // LOGIN - Validar credenciales y retornar token

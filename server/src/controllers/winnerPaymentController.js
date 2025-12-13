@@ -9,7 +9,7 @@ const pool = require('../db');
 // ============================================
 exports.submitPaymentInfo = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user.id;
     const { 
       gameSessionId, 
       prizeType, 
@@ -109,7 +109,7 @@ exports.submitPaymentInfo = async (req, res) => {
 // ============================================
 exports.getMyPaymentInfo = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user.id;
     const { status, limit, offset } = req.query;
 
     let query = `
@@ -206,7 +206,7 @@ exports.processPayment = async (req, res) => {
   try {
     const { paymentId } = req.params;
     const { paymentReceipt, notes } = req.body;
-    const processorId = req.user.userId;
+    const processorId = req.user.id;
 
     // Verificar que el pago existe y está pendiente
     const [payments] = await pool.query(
@@ -264,7 +264,7 @@ exports.rejectPayment = async (req, res) => {
   try {
     const { paymentId } = req.params;
     const { reason } = req.body;
-    const processorId = req.user.userId;
+    const processorId = req.user.id;
 
     if (!reason) {
       return res.status(400).json({

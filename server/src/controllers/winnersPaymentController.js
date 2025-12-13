@@ -9,7 +9,7 @@ const pool = require('../db');
 // ============================================
 exports.submitPaymentInfo = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user.id;
     const { 
       gameSessionId, 
       prizeType, 
@@ -113,7 +113,7 @@ exports.submitPaymentInfo = async (req, res) => {
 // ============================================
 exports.getMyPendingPayments = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user.id;
 
     const [payments] = await pool.query(
       `SELECT 
@@ -152,7 +152,7 @@ exports.getMyPendingPayments = async (req, res) => {
 // ============================================
 exports.getMyPaymentHistory = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user.id;
     const { limit, offset } = req.query;
 
     const [payments] = await pool.query(
@@ -249,7 +249,7 @@ exports.processWinnerPayment = async (req, res) => {
   try {
     const { paymentInfoId } = req.params;
     const { paymentReceipt } = req.body;
-    const processorId = req.user.userId;
+    const processorId = req.user.id;
 
     if (!paymentReceipt) {
       return res.status(400).json({
@@ -329,7 +329,7 @@ exports.markPaymentAsFailed = async (req, res) => {
   try {
     const { paymentInfoId } = req.params;
     const { reason } = req.body;
-    const processorId = req.user.userId;
+    const processorId = req.user.id;
 
     await pool.query(
       `UPDATE winners_payment_info 
