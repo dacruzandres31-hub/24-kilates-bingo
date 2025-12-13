@@ -60,6 +60,8 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
       telefono: ''
     }
   });
+  const [showPasswordCreate, setShowPasswordCreate] = useState(false);
+  const [passwordStrengthCreate, setPasswordStrengthCreate] = useState({ level: 0, text: '', color: '' });
 
   useEffect(() => {
     cargarUsuarios();
@@ -210,6 +212,21 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         telefono: ''
       }
     });
+  };
+
+  const calculatePasswordStrength = (password) => {
+    if (!password) return { level: 0, text: '', color: '' };
+    
+    let strength = 0;
+    if (password.length >= 6) strength++;
+    if (password.length >= 10) strength++;
+    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
+    if (/[0-9]/.test(password)) strength++;
+    if (/[^a-zA-Z0-9]/.test(password)) strength++;
+    
+    if (strength <= 2) return { level: 1, text: 'Débil', color: 'text-red-500' };
+    if (strength <= 3) return { level: 2, text: 'Media', color: 'text-yellow-500' };
+    return { level: 3, text: 'Fuerte', color: 'text-green-500' };
   };
 
   const handleCrearUsuario = async () => {
@@ -1211,18 +1228,49 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                       className="flex-1 px-4 py-2 bg-gray-900/50 border-b-2 border-gray-700 focus:outline-none focus:border-indigo-500 text-white placeholder-gray-500"
                     />
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-gray-400 text-xl">👁️</span>
-                    <input
-                      type="password"
-                      value={modalCrearUsuario.datosIngreso.password}
-                      onChange={(e) => setModalCrearUsuario({
-                        ...modalCrearUsuario,
-                        datosIngreso: { ...modalCrearUsuario.datosIngreso, password: e.target.value }
-                      })}
-                      placeholder="Contraseña"
-                      className="flex-1 px-4 py-2 bg-gray-900/50 border-b-2 border-gray-700 focus:outline-none focus:border-indigo-500 text-white placeholder-gray-500"
-                    />
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3">
+                      <span className="text-white text-xl">👁️</span>
+                      <div className="flex-1 relative">
+                        <input
+                          type={showPasswordCreate ? "text" : "password"}
+                          value={modalCrearUsuario.datosIngreso.password}
+                          onChange={(e) => {
+                            const pwd = e.target.value;
+                            setModalCrearUsuario({
+                              ...modalCrearUsuario,
+                              datosIngreso: { ...modalCrearUsuario.datosIngreso, password: pwd }
+                            });
+                            setPasswordStrengthCreate(calculatePasswordStrength(pwd));
+                          }}
+                          placeholder="Contraseña"
+                          className="w-full px-4 py-2 pr-10 bg-gray-900/50 border-b-2 border-gray-700 focus:outline-none focus:border-indigo-500 text-white placeholder-gray-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPasswordCreate(!showPasswordCreate)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-white hover:text-indigo-400 transition-colors"
+                        >
+                          {showPasswordCreate ? '👁️' : '👁️‍🗨️'}
+                        </button>
+                      </div>
+                    </div>
+                    {modalCrearUsuario.datosIngreso.password && passwordStrengthCreate.level > 0 && (
+                      <div className="ml-11 flex items-center gap-2">
+                        <div className="flex-1 h-2 bg-gray-700 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full transition-all duration-300 ${
+                              passwordStrengthCreate.level === 1 ? 'bg-red-500 w-1/3' :
+                              passwordStrengthCreate.level === 2 ? 'bg-yellow-500 w-2/3' :
+                              'bg-green-500 w-full'
+                            }`}
+                          ></div>
+                        </div>
+                        <span className={`text-sm font-semibold ${passwordStrengthCreate.color}`}>
+                          {passwordStrengthCreate.text}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

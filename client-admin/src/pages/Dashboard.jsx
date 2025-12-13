@@ -29,6 +29,12 @@ export default function Dashboard() {
     newPassword: '',
     confirmPassword: ''
   });
+  const [showPasswords, setShowPasswords] = useState({
+    current: false,
+    new: false,
+    confirm: false
+  });
+  const [passwordStrength, setPasswordStrength] = useState({ level: 0, text: '', color: '' });
   const stockButtonRef = useRef(null);
   const perfilButtonRef = useRef(null);
   const [dropdownPositions, setDropdownPositions] = useState({ stock: {}, perfil: {} });
@@ -183,6 +189,21 @@ export default function Dashboard() {
       }));
     }
     setShowPerfilDropdown(!showPerfilDropdown);
+  };
+
+  const calculatePasswordStrength = (password) => {
+    if (!password) return { level: 0, text: '', color: '' };
+    
+    let strength = 0;
+    if (password.length >= 6) strength++;
+    if (password.length >= 10) strength++;
+    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
+    if (/[0-9]/.test(password)) strength++;
+    if (/[^a-zA-Z0-9]/.test(password)) strength++;
+    
+    if (strength <= 2) return { level: 1, text: 'Débil', color: 'text-red-500' };
+    if (strength <= 3) return { level: 2, text: 'Media', color: 'text-yellow-500' };
+    return { level: 3, text: 'Fuerte', color: 'text-green-500' };
   };
 
   const handleChangePassword = async (e) => {
@@ -474,7 +495,7 @@ export default function Dashboard() {
                 <div className="w-3 h-3 bg-gradient-to-br from-orange-500 to-orange-700 rounded-full"></div>
                 <span className="text-orange-300 font-semibold">Bronce:</span>
               </div>
-              <span className="text-white font-bold text-lg">{cartonesStock.bronce}</span>
+              <span className="text-white font-bold text-lg">{(cartonesStock.bronce || 0).toLocaleString('es-CO')}</span>
             </div>
 
             {/* Plata */}
@@ -483,7 +504,7 @@ export default function Dashboard() {
                 <div className="w-3 h-3 bg-gradient-to-br from-gray-300 to-gray-500 rounded-full"></div>
                 <span className="text-gray-300 font-semibold">Plata:</span>
               </div>
-              <span className="text-white font-bold text-lg">{cartonesStock.plata}</span>
+              <span className="text-white font-bold text-lg">{(cartonesStock.plata || 0).toLocaleString('es-CO')}</span>
             </div>
 
             {/* Oro */}
@@ -492,7 +513,7 @@ export default function Dashboard() {
                 <div className="w-3 h-3 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full"></div>
                 <span className="text-yellow-300 font-semibold">Oro:</span>
               </div>
-              <span className="text-white font-bold text-lg">{cartonesStock.oro}</span>
+              <span className="text-white font-bold text-lg">{(cartonesStock.oro || 0).toLocaleString('es-CO')}</span>
             </div>
           </div>
         </div>,
@@ -547,44 +568,91 @@ export default function Dashboard() {
                 <label className="block text-gray-300 font-semibold mb-2 text-sm">
                   Contraseña Actual:
                 </label>
-                <input
-                  type="password"
-                  value={passwordData.currentPassword}
-                  onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
-                  className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500 transition-colors"
-                  placeholder="Ingresa tu contraseña actual"
-                  required
-                />
+                <div className="relative">
+                  <input
+                    type={showPasswords.current ? "text" : "password"}
+                    value={passwordData.currentPassword}
+                    onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                    className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-4 py-3 pr-12 text-white focus:outline-none focus:border-purple-500 transition-colors"
+                    placeholder="Ingresa tu contraseña actual"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswords({ ...showPasswords, current: !showPasswords.current })}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-purple-400 transition-colors"
+                  >
+                    {showPasswords.current ? '👁️' : '👁️‍🗨️'}
+                  </button>
+                </div>
               </div>
 
               <div>
                 <label className="block text-gray-300 font-semibold mb-2 text-sm">
                   Nueva Contraseña:
                 </label>
-                <input
-                  type="password"
-                  value={passwordData.newPassword}
-                  onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                  className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500 transition-colors"
-                  placeholder="Mínimo 6 caracteres"
-                  required
-                  minLength={6}
-                />
+                <div className="relative">
+                  <input
+                    type={showPasswords.new ? "text" : "password"}
+                    value={passwordData.newPassword}
+                    onChange={(e) => {
+                      const newPwd = e.target.value;
+                      setPasswordData({ ...passwordData, newPassword: newPwd });
+                      setPasswordStrength(calculatePasswordStrength(newPwd));
+                    }}
+                    className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-4 py-3 pr-12 text-white focus:outline-none focus:border-purple-500 transition-colors"
+                    placeholder="Mínimo 6 caracteres"
+                    required
+                    minLength={6}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswords({ ...showPasswords, new: !showPasswords.new })}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-purple-400 transition-colors"
+                  >
+                    {showPasswords.new ? '👁️' : '👁️‍🗨️'}
+                  </button>
+                </div>
+                {passwordData.newPassword && passwordStrength.level > 0 && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <div className="flex-1 h-2 bg-gray-600 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full transition-all duration-300 ${
+                          passwordStrength.level === 1 ? 'bg-red-500 w-1/3' :
+                          passwordStrength.level === 2 ? 'bg-yellow-500 w-2/3' :
+                          'bg-green-500 w-full'
+                        }`}
+                      ></div>
+                    </div>
+                    <span className={`text-sm font-semibold ${passwordStrength.color}`}>
+                      {passwordStrength.text}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div>
                 <label className="block text-gray-300 font-semibold mb-2 text-sm">
                   Confirmar Nueva Contraseña:
                 </label>
-                <input
-                  type="password"
-                  value={passwordData.confirmPassword}
-                  onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                  className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500 transition-colors"
-                  placeholder="Repite la nueva contraseña"
-                  required
-                  minLength={6}
-                />
+                <div className="relative">
+                  <input
+                    type={showPasswords.confirm ? "text" : "password"}
+                    value={passwordData.confirmPassword}
+                    onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                    className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-4 py-3 pr-12 text-white focus:outline-none focus:border-purple-500 transition-colors"
+                    placeholder="Repite la nueva contraseña"
+                    required
+                    minLength={6}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswords({ ...showPasswords, confirm: !showPasswords.confirm })}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-purple-400 transition-colors"
+                  >
+                    {showPasswords.confirm ? '👁️' : '👁️‍🗨️'}
+                  </button>
+                </div>
               </div>
 
               {/* Footer */}
