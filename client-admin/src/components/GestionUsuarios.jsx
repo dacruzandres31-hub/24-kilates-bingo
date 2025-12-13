@@ -530,20 +530,34 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         }, {
           headers: { Authorization: `Bearer ${token}` }
         });
-
-        // Actualizar usuario en el modal
-        const updatedUser = usuarios.find(u => u.id === userId);
-        if (updatedUser) {
-          const ajuste = tipo === 'dinero-cargar' ? cantidadNum : -cantidadNum;
-          updatedUser.balance = (updatedUser.balance || 0) + ajuste;
-          setModalGestionUsuario(prev => ({ 
-            ...prev, 
-            usuario: { ...updatedUser, balance: updatedUser.balance }
-          }));
-        }
         
         // Recargar usuarios para asegurar consistencia
         await cargarUsuarios();
+        
+        // DESPUÉS de recargar, actualizar el modal con datos frescos de la BD
+        if (modalGestionUsuario.isOpen && modalGestionUsuario.usuario?.id === userId) {
+          try {
+            const response = await axios.get('/api/admin/users-hierarchy', {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+            
+            const usuarioActualizado = response.data.all.find(u => u.id === userId);
+            if (usuarioActualizado) {
+              setModalGestionUsuario({
+                ...modalGestionUsuario,
+                usuario: {
+                  ...modalGestionUsuario.usuario,
+                  balance: parseFloat(usuarioActualizado.balance) || 0,
+                  cards_bronce: parseInt(usuarioActualizado.cards_bronce) || 0,
+                  cards_plata: parseInt(usuarioActualizado.cards_plata) || 0,
+                  cards_oro: parseInt(usuarioActualizado.cards_oro) || 0
+                }
+              });
+            }
+          } catch (error) {
+            console.error('Error actualizando modal de gestión:', error);
+          }
+        }
         
         // DESPUÉS de recargar, actualizar recursos del admin si cargó/descargó a otro usuario
         if (tipo === 'dinero-cargar' && userId !== currentUser.id && onResourcesUpdate) {
@@ -571,34 +585,59 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
           headers: { Authorization: `Bearer ${token}` }
         });
 
-        // Actualizar usuario en el modal
-        const updatedUser = usuarios.find(u => u.id === userId);
-        if (updatedUser) {
-          updatedUser[`cards_${sala}`] = (updatedUser[`cards_${sala}`] || 0) + cantidadFinal;
-          setModalGestionUsuario(prev => ({ 
-            ...prev, 
-            usuario: { ...updatedUser }
-          }));
-          
-          // Si es el usuario actual, actualizar recursos compartidos
-          if (userId === currentUser.id && onResourcesUpdate) {
-            const newCurrentUser = {
-              ...currentUser,
-              cards_bronce: updatedUser.cards_bronce,
-              cards_plata: updatedUser.cards_plata,
-              cards_oro: updatedUser.cards_oro
-            };
-            setCurrentUser(newCurrentUser);
-            onResourcesUpdate(null, {
-              bronce: updatedUser.cards_bronce || 0,
-              plata: updatedUser.cards_plata || 0,
-              oro: updatedUser.cards_oro || 0
+        // Recargar usuarios para asegurar consistencia
+        await cargarUsuarios();
+        
+        // DESPUÉS de recargar, actualizar el modal con datos frescos
+        if (modalGestionUsuario.isOpen && modalGestionUsuario.usuario?.id === userId) {
+          try {
+            const response = await axios.get('/api/admin/users-hierarchy', {
+              headers: { Authorization: `Bearer ${token}` }
             });
+            
+            const usuarioActualizado = response.data.all.find(u => u.id === userId);
+            if (usuarioActualizado) {
+              setModalGestionUsuario({
+                ...modalGestionUsuario,
+                usuario: {
+                  ...modalGestionUsuario.usuario,
+                  balance: parseFloat(usuarioActualizado.balance) || 0,
+                  cards_bronce: parseInt(usuarioActualizado.cards_bronce) || 0,
+                  cards_plata: parseInt(usuarioActualizado.cards_plata) || 0,
+                  cards_oro: parseInt(usuarioActualizado.cards_oro) || 0
+                }
+              });
+            }
+          } catch (error) {
+            console.error('Error actualizando modal de gestión:', error);
           }
         }
         
-        // Recargar usuarios para asegurar consistencia
-        await cargarUsuarios();
+        // Si es el usuario actual, actualizar recursos compartidos con Dashboard
+        if (userId === currentUser.id && onResourcesUpdate) {
+          try {
+            const response = await axios.get('/api/admin/users-hierarchy', {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+            const usuarioActualizado = response.data.all.find(u => u.id === userId);
+            if (usuarioActualizado) {
+              const newCurrentUser = {
+                ...currentUser,
+                cards_bronce: parseInt(usuarioActualizado.cards_bronce) || 0,
+                cards_plata: parseInt(usuarioActualizado.cards_plata) || 0,
+                cards_oro: parseInt(usuarioActualizado.cards_oro) || 0
+              };
+              setCurrentUser(newCurrentUser);
+              onResourcesUpdate(null, {
+                bronce: newCurrentUser.cards_bronce,
+                plata: newCurrentUser.cards_plata,
+                oro: newCurrentUser.cards_oro
+              });
+            }
+          } catch (error) {
+            console.error('Error actualizando recursos:', error);
+          }
+        }
       }
       
       setModalConfirmacion({ isOpen: false, tipo: '', sala: '', cantidad: '', userId: null });
