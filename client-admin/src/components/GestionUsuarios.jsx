@@ -1071,12 +1071,23 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                           : 'bg-gray-700/30 border-gray-600/50 text-gray-200 hover:bg-gray-700/50'
                     }`}
                     onClick={async () => {
-                      const giftCards = await cargarGiftCards(usuario.id);
+                      // Abrir modal inmediatamente
                       setModalGestionUsuario({
                         isOpen: true,
                         usuario: usuario,
-                        giftCards: giftCards
+                        giftCards: { bronce: 0, plata: 0, oro: 0 }
                       });
+                      
+                      // Cargar gift cards en segundo plano
+                      try {
+                        const giftCards = await cargarGiftCards(usuario.id);
+                        setModalGestionUsuario(prev => ({
+                          ...prev,
+                          giftCards: giftCards
+                        }));
+                      } catch (error) {
+                        console.error('Error cargando gift cards:', error);
+                      }
                     }}
                   >
                     <div className="flex items-center gap-3 flex-1">
@@ -1855,7 +1866,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                   </div>
                 </div>
               )}
-            </div>
+            </div> {/* Cierra el contenedor del Body */}
 
             {/* Footer */}
             <div className="border-t border-gray-700 p-4 bg-gray-800/50">
