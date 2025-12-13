@@ -20,17 +20,19 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
   // Estado para el modal de gestión de usuario
   const [modalGestionUsuario, setModalGestionUsuario] = useState({
     isOpen: false,
-    usuario: null
+    usuario: null,
+    giftCards: { bronce: 0, plata: 0, oro: 0 } // Cartones de regalo
   });
   
   // Estado para modal de confirmación de operaciones
   const [modalConfirmacion, setModalConfirmacion] = useState({
     isOpen: false,
-    tipo: '', // 'dinero-cargar', 'dinero-descargar', 'cartones-agregar', 'cartones-quitar'
+    tipo: '', // 'dinero-cargar', 'dinero-descargar', 'cartones-agregar', 'cartones-quitar', 'gift-agregar', 'gift-quitar'
     sala: '', // 'bronce', 'plata', 'oro'
     cantidad: '',
     userId: null,
-    isProcessing: false // Prevenir múltiples clicks
+    isProcessing: false, // Prevenir múltiples clicks
+    isGift: false // Indica si es operación de gift cards
   });
   
   // Estados para el modal de dinero
@@ -194,6 +196,24 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
     });
 
     setUsuariosDelAgente(ordenados);
+  };
+
+  // Cargar cartones de regalo de un usuario
+  const cargarGiftCards = async (userId) => {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const response = await axios.get(`/api/admin/gift-cards/stock/${userId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (response.data.success) {
+        return response.data.giftCards;
+      }
+      return { bronce: 0, plata: 0, oro: 0 };
+    } catch (error) {
+      console.error('Error cargando gift cards:', error);
+      return { bronce: 0, plata: 0, oro: 0 };
+    }
   };
 
   const abrirModalCrearUsuario = (tipo) => {
@@ -477,7 +497,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
           onResourcesUpdate(newUserData, null);
         }
 
-        setModalConfirmacion({ isOpen: false, tipo: '', sala: '', cantidad: '', userId: null, isProcessing: false });
+        setModalConfirmacion({ isOpen: false, tipo: '', sala: '', cantidad: '', userId: null, isProcessing: false, isGift: false });
         setShowSuccessPopup(true);
         setTimeout(() => setShowSuccessPopup(false), 2000);
         await cargarUsuarios();
@@ -510,7 +530,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
           });
         }
 
-        setModalConfirmacion({ isOpen: false, tipo: '', sala: '', cantidad: '', userId: null, isProcessing: false });
+        setModalConfirmacion({ isOpen: false, tipo: '', sala: '', cantidad: '', userId: null, isProcessing: false, isGift: false });
         setShowSuccessPopup(true);
         setTimeout(() => setShowSuccessPopup(false), 2000);
         await cargarUsuarios();
@@ -604,8 +624,42 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
           setCurrentUser(newUserData);
           onResourcesUpdate(newUserData, null);
         }
+      } else if (tipo === 'gift-agregar' || tipo === 'gift-quitar') {
+        // OPERACIONES DE GIFT CARDS
+        const isAdd = tipo === 'gift-agregar';
+        const endpoint = isAdd ? '/api/admin/gift-cards/add' : '/api/admin/gift-cards/remove';
+        
+        // Validar para quitar
+        if (!isAdd) {
+          const giftCardsActuales = modalGestionUsuario.giftCards?.[sala] || 0;
+          if (cantidadNum > giftCardsActuales) {
+            setModalConfirmacion(prev => ({ ...prev, isProcessing: false }));
+            alert(`❌ El usuario solo tiene ${giftCardsActuales} cartón(es) de regalo de ${sala.toUpperCase()}.\nNo se pueden quitar ${cantidadNum}.`);
+            return;
+          }
+        }
+        
+        await axios.post(endpoint, {
+          userId: userId,
+          room: sala,
+          quantity: cantidadNum,
+          isGift: true
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        // Recargar gift cards
+        const giftCards = await cargarGiftCards(userId);
+        
+        // Actualizar modal con nuevos datos
+        if (modalGestionUsuario.isOpen && modalGestionUsuario.usuario?.id === userId) {
+          setModalGestionUsuario({
+            ...modalGestionUsuario,
+            giftCards: giftCards
+          });
+        }
       } else {
-        // Validar cartones para operaciones de quitar
+        // OPERACIONES DE CARTONES NORMALES
         if (tipo === 'cartones-quitar') {
           const usuario = modalGestionUsuario.usuario;
           if (!usuario || usuario.id !== userId) {
@@ -692,7 +746,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
       }
       
       // Cerrar modal y resetear estado
-      setModalConfirmacion({ isOpen: false, tipo: '', sala: '', cantidad: '', userId: null, isProcessing: false });
+      setModalConfirmacion({ isOpen: false, tipo: '', sala: '', cantidad: '', userId: null, isProcessing: false, isGift: false });
       
     } catch (error) {
       console.error('Error en ejecutarOperacion:', error);
@@ -1016,10 +1070,12 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                           ? 'bg-indigo-900/30 border-indigo-600/50 text-indigo-200 hover:bg-indigo-900/50' 
                           : 'bg-gray-700/30 border-gray-600/50 text-gray-200 hover:bg-gray-700/50'
                     }`}
-                    onClick={() => {
+                    onClick={async () => {
+                      const giftCards = await cargarGiftCards(usuario.id);
                       setModalGestionUsuario({
                         isOpen: true,
-                        usuario: usuario
+                        usuario: usuario,
+                        giftCards: giftCards
                       });
                     }}
                   >
@@ -1653,6 +1709,152 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                   </div>
                 </div>
               </div>
+
+              {/* SISTEMA DE GIFT CARDS - Solo visible para Andy (SuperAdmin) */}
+              {currentUser.role === 'superadmin' && currentUser.username?.toLowerCase() === 'andy' && (
+                <div>
+                  <h3 className="text-white font-bold text-lg mb-3 flex items-center gap-2">
+                    🎁 Cartones de Regalo
+                    <span className="text-xs text-purple-300 bg-purple-900/50 px-2 py-1 rounded-full">Solo Andy</span>
+                  </h3>
+                  <div className="space-y-3">
+                    {/* Gift Bronce */}
+                    <div className="bg-gradient-to-r from-orange-900/40 to-orange-800/30 border-2 border-orange-500/70 rounded-xl p-4 relative overflow-hidden">
+                      <div className="absolute top-2 right-2 bg-orange-500/20 px-2 py-1 rounded text-xs text-orange-300 font-bold">
+                        REGALO
+                      </div>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full animate-pulse"></div>
+                          <span className="text-orange-300 font-semibold">Bronce Regalo:</span>
+                        </div>
+                        <span className="text-white font-bold text-xl">
+                          {(modalGestionUsuario.giftCards?.bronce || 0).toLocaleString('es-CO')}
+                        </span>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setModalConfirmacion({
+                            isOpen: true,
+                            tipo: 'gift-agregar',
+                            sala: 'bronce',
+                            cantidad: '',
+                            userId: modalGestionUsuario.usuario.id,
+                            isGift: true
+                          })}
+                          className="flex-1 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-500 hover:to-orange-600 text-white font-bold py-2 px-4 rounded-lg transition-all shadow-lg"
+                        >
+                          🎁 + Agregar
+                        </button>
+                        <button
+                          onClick={() => setModalConfirmacion({
+                            isOpen: true,
+                            tipo: 'gift-quitar',
+                            sala: 'bronce',
+                            cantidad: '',
+                            userId: modalGestionUsuario.usuario.id,
+                            isGift: true
+                          })}
+                          className="flex-1 bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700 text-white font-bold py-2 px-4 rounded-lg transition-all"
+                          disabled={(modalGestionUsuario.giftCards?.bronce || 0) === 0}
+                        >
+                          − Quitar
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Gift Plata */}
+                    <div className="bg-gradient-to-r from-gray-700/40 to-gray-600/30 border-2 border-gray-400/70 rounded-xl p-4 relative overflow-hidden">
+                      <div className="absolute top-2 right-2 bg-gray-400/20 px-2 py-1 rounded text-xs text-gray-300 font-bold">
+                        REGALO
+                      </div>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 bg-gradient-to-br from-gray-200 to-gray-400 rounded-full animate-pulse"></div>
+                          <span className="text-gray-300 font-semibold">Plata Regalo:</span>
+                        </div>
+                        <span className="text-white font-bold text-xl">
+                          {(modalGestionUsuario.giftCards?.plata || 0).toLocaleString('es-CO')}
+                        </span>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setModalConfirmacion({
+                            isOpen: true,
+                            tipo: 'gift-agregar',
+                            sala: 'plata',
+                            cantidad: '',
+                            userId: modalGestionUsuario.usuario.id,
+                            isGift: true
+                          })}
+                          className="flex-1 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-500 hover:to-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-all shadow-lg"
+                        >
+                          🎁 + Agregar
+                        </button>
+                        <button
+                          onClick={() => setModalConfirmacion({
+                            isOpen: true,
+                            tipo: 'gift-quitar',
+                            sala: 'plata',
+                            cantidad: '',
+                            userId: modalGestionUsuario.usuario.id,
+                            isGift: true
+                          })}
+                          className="flex-1 bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700 text-white font-bold py-2 px-4 rounded-lg transition-all"
+                          disabled={(modalGestionUsuario.giftCards?.plata || 0) === 0}
+                        >
+                          − Quitar
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Gift Oro */}
+                    <div className="bg-gradient-to-r from-yellow-900/40 to-yellow-800/30 border-2 border-yellow-500/70 rounded-xl p-4 relative overflow-hidden">
+                      <div className="absolute top-2 right-2 bg-yellow-500/20 px-2 py-1 rounded text-xs text-yellow-300 font-bold">
+                        REGALO
+                      </div>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 bg-gradient-to-br from-yellow-300 to-yellow-500 rounded-full animate-pulse"></div>
+                          <span className="text-yellow-300 font-semibold">Oro Regalo:</span>
+                        </div>
+                        <span className="text-white font-bold text-xl">
+                          {(modalGestionUsuario.giftCards?.oro || 0).toLocaleString('es-CO')}
+                        </span>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setModalConfirmacion({
+                            isOpen: true,
+                            tipo: 'gift-agregar',
+                            sala: 'oro',
+                            cantidad: '',
+                            userId: modalGestionUsuario.usuario.id,
+                            isGift: true
+                          })}
+                          className="flex-1 bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-500 hover:to-yellow-600 text-white font-bold py-2 px-4 rounded-lg transition-all shadow-lg"
+                        >
+                          🎁 + Agregar
+                        </button>
+                        <button
+                          onClick={() => setModalConfirmacion({
+                            isOpen: true,
+                            tipo: 'gift-quitar',
+                            sala: 'oro',
+                            cantidad: '',
+                            userId: modalGestionUsuario.usuario.id,
+                            isGift: true
+                          })}
+                          className="flex-1 bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700 text-white font-bold py-2 px-4 rounded-lg transition-all"
+                          disabled={(modalGestionUsuario.giftCards?.oro || 0) === 0}
+                        >
+                          − Quitar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Footer */}
@@ -1681,6 +1883,8 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
               modalConfirmacion.tipo === 'dinero-cargar' ? 'bg-gradient-to-r from-green-600 to-emerald-600' :
               modalConfirmacion.tipo === 'dinero-descargar' ? 'bg-gradient-to-r from-gray-600 to-gray-700' :
               modalConfirmacion.tipo === 'cartones-agregar' ? 'bg-gradient-to-r from-purple-600 to-indigo-600' :
+              modalConfirmacion.tipo === 'gift-agregar' ? 'bg-gradient-to-r from-pink-600 to-rose-600' :
+              modalConfirmacion.tipo === 'gift-quitar' ? 'bg-gradient-to-r from-gray-600 to-gray-700' :
               'bg-gradient-to-r from-gray-600 to-gray-700'
             }`}>
               <h3 className="text-2xl font-bold text-white text-center">
@@ -1690,6 +1894,8 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                 {modalConfirmacion.tipo === 'dinero-descargar' && '💸 Descargar Dinero'}
                 {modalConfirmacion.tipo === 'cartones-agregar' && `🎫 Agregar Cartones ${modalConfirmacion.sala.toUpperCase()}`}
                 {modalConfirmacion.tipo === 'cartones-quitar' && `🗑️ Quitar Cartones ${modalConfirmacion.sala.toUpperCase()}`}
+                {modalConfirmacion.tipo === 'gift-agregar' && `🎁 Agregar Cartones de Regalo ${modalConfirmacion.sala.toUpperCase()}`}
+                {modalConfirmacion.tipo === 'gift-quitar' && `🗑️ Quitar Cartones de Regalo ${modalConfirmacion.sala.toUpperCase()}`}
               </h3>
             </div>
 
@@ -1699,7 +1905,8 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                 {modalConfirmacion.tipo === 'superadmin-add-balance' && '💎 Cantidad a agregar (sin límite):'}
                 {modalConfirmacion.tipo === 'superadmin-add-cards' && '💎 Cantidad de cartones a agregar (sin límite):'}
                 {modalConfirmacion.tipo.includes('dinero') && !modalConfirmacion.tipo.includes('superadmin') && 'Ingrese el monto (solo pesos enteros):'}
-                {modalConfirmacion.tipo.includes('cartones') && !modalConfirmacion.tipo.includes('superadmin') && 'Ingrese la cantidad de cartones:'}
+                {modalConfirmacion.tipo.includes('cartones') && !modalConfirmacion.tipo.includes('superadmin') && !modalConfirmacion.tipo.includes('gift') && 'Ingrese la cantidad de cartones:'}
+                {modalConfirmacion.tipo.includes('gift') && 'Ingrese la cantidad de cartones de regalo:'}
               </label>
               
               {/* Badge de SuperAdmin */}
@@ -1733,6 +1940,18 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                 );
               })()}
               
+              {/* Mostrar gift cards disponibles para quitar */}
+              {modalConfirmacion.tipo === 'gift-quitar' && (() => {
+                const giftCardsActuales = modalGestionUsuario.giftCards?.[modalConfirmacion.sala] || 0;
+                return (
+                  <div className="mb-3 p-3 bg-pink-900/30 border border-pink-600/50 rounded-lg">
+                    <p className="text-pink-300 text-sm text-center">
+                      🎁 Cartones de regalo disponibles: <span className="font-bold">{giftCardsActuales.toLocaleString('es-CO')}</span>
+                    </p>
+                  </div>
+                );
+              })()}
+              
               <input
                 type="text"
                 value={modalConfirmacion.cantidad ? parseInt(modalConfirmacion.cantidad || '0').toLocaleString('es-CO') : ''}
@@ -1745,7 +1964,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') ejecutarOperacion();
-                  if (e.key === 'Escape') setModalConfirmacion({ isOpen: false, tipo: '', sala: '', cantidad: '', userId: null, isProcessing: false });
+                  if (e.key === 'Escape') setModalConfirmacion({ isOpen: false, tipo: '', sala: '', cantidad: '', userId: null, isProcessing: false, isGift: false });
                   // Bloquear punto y coma
                   if (e.key === '.' || e.key === ',') {
                     e.preventDefault();
@@ -1764,7 +1983,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
             {/* Footer con botones */}
             <div className="p-6 pt-0 flex gap-3">
               <button
-                onClick={() => setModalConfirmacion({ isOpen: false, tipo: '', sala: '', cantidad: '', userId: null, isProcessing: false })}
+                onClick={() => setModalConfirmacion({ isOpen: false, tipo: '', sala: '', cantidad: '', userId: null, isProcessing: false, isGift: false })}
                 className="flex-1 py-3 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-500 hover:to-gray-600 text-white font-bold rounded-xl transition-all"
               >
                 CANCELAR
@@ -1779,6 +1998,8 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                   modalConfirmacion.tipo === 'dinero-cargar' ? 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500' :
                   modalConfirmacion.tipo === 'dinero-descargar' ? 'bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700' :
                   modalConfirmacion.tipo === 'cartones-agregar' ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500' :
+                  modalConfirmacion.tipo === 'gift-agregar' ? 'bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500' :
+                  modalConfirmacion.tipo === 'gift-quitar' ? 'bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700' :
                   'bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700'
                 }`}
               >
