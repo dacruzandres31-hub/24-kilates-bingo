@@ -401,8 +401,31 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
       setShowSuccessPopup(true);
       setTimeout(() => setShowSuccessPopup(false), 2000);
 
-      // Recargar usuarios
-      cargarUsuarios();
+      // Recargar usuarios y actualizar modal si está abierto
+      await cargarUsuarios();
+      
+      // Después de recargar, actualizar el modal de gestión si está abierto
+      if (modalGestionUsuario.isOpen && modalGestionUsuario.usuario?.id === userId) {
+        // Hacer una consulta fresca del usuario
+        try {
+          const response = await axios.get('/api/admin/users-hierarchy', {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          
+          const usuarioActualizado = response.data.all.find(u => u.id === userId);
+          if (usuarioActualizado) {
+            setModalGestionUsuario({
+              ...modalGestionUsuario,
+              usuario: {
+                ...modalGestionUsuario.usuario,
+                balance: parseFloat(usuarioActualizado.balance) || 0
+              }
+            });
+          }
+        } catch (error) {
+          console.error('Error actualizando modal de gestión:', error);
+        }
+      }
     } catch (error) {
       alert('❌ ' + (error.response?.data?.error || error.message));
     }
@@ -1249,9 +1272,9 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                         <button
                           type="button"
                           onClick={() => setShowPasswordCreate(!showPasswordCreate)}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 text-white hover:text-indigo-400 transition-colors"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-white hover:text-indigo-400 transition-colors text-lg"
                         >
-                          {showPasswordCreate ? '👁️' : '👁️‍🗨️'}
+                          {showPasswordCreate ? '👁' : '🔒'}
                         </button>
                       </div>
                     </div>

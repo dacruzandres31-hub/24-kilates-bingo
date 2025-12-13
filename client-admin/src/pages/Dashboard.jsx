@@ -580,9 +580,9 @@ export default function Dashboard() {
                   <button
                     type="button"
                     onClick={() => setShowPasswords({ ...showPasswords, current: !showPasswords.current })}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-purple-400 transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-purple-400 transition-colors text-lg"
                   >
-                    {showPasswords.current ? '👁️' : '👁️‍🗨️'}
+                    {showPasswords.current ? '👁' : '🔒'}
                   </button>
                 </div>
               </div>
@@ -608,9 +608,9 @@ export default function Dashboard() {
                   <button
                     type="button"
                     onClick={() => setShowPasswords({ ...showPasswords, new: !showPasswords.new })}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-purple-400 transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-purple-400 transition-colors text-lg"
                   >
-                    {showPasswords.new ? '👁️' : '👁️‍🗨️'}
+                    {showPasswords.new ? '👁' : '🔒'}
                   </button>
                 </div>
                 {passwordData.newPassword && passwordStrength.level > 0 && (
@@ -648,9 +648,9 @@ export default function Dashboard() {
                   <button
                     type="button"
                     onClick={() => setShowPasswords({ ...showPasswords, confirm: !showPasswords.confirm })}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-purple-400 transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-purple-400 transition-colors text-lg"
                   >
-                    {showPasswords.confirm ? '👁️' : '👁️‍🗨️'}
+                    {showPasswords.confirm ? '👁' : '🔒'}
                   </button>
                 </div>
               </div>
