@@ -22,6 +22,7 @@ const adminRoutes = require('./routes/adminRoutes');
 const superAdminRoutes = require('./routes/superAdminRoutes');
 const gameAdminRoutes = require('./routes/gameAdminRoutes');
 const starterRoomRoutes = require('./routes/starterRoom');
+const giftCardsRoutes = require('./routes/giftCards');
 const gameAdminController = require('./controllers/gameAdminController');
 const cardPoolService = require('./services/cardPoolService');
 const db = require('./db');
@@ -132,6 +133,7 @@ app.use('/api/chips', chipsRoutes);
 app.use('/api/withdrawals', withdrawalRoutes);
 app.use('/api/winners-payment', winnersPaymentRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin/gift-cards', giftCardsRoutes);
 app.use('/api/superadmin', superAdminRoutes);
 app.use('/api/game-admin', gameAdminRoutes);
 

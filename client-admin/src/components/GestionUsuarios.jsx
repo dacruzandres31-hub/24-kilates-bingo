@@ -691,8 +691,11 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         }
       }
       
+      // Cerrar modal y resetear estado
       setModalConfirmacion({ isOpen: false, tipo: '', sala: '', cantidad: '', userId: null, isProcessing: false });
+      
     } catch (error) {
+      console.error('Error en ejecutarOperacion:', error);
       setModalConfirmacion(prev => ({ ...prev, isProcessing: false }));
       alert('❌ ' + (error.response?.data?.error || error.message));
     }
