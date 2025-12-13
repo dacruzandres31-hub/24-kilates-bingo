@@ -934,7 +934,7 @@ useEffect(() => {
             })}
           </div>
 
-          {/* FILA 3: 61-70, 71-80, 81-90 */}}
+          {/* FILA 3: 61-70, 71-80, 81-90 */}
           <div className="grid-row">
             {[6, 7, 8].map(columnIndex => {
               const start = columnIndex * 10 + 1;
