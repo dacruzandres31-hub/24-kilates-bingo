@@ -605,6 +605,26 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
           onResourcesUpdate(newUserData, null);
         }
       } else {
+        // Validar cartones para operaciones de quitar
+        if (tipo === 'cartones-quitar') {
+          const usuario = modalGestionUsuario.usuario;
+          if (!usuario || usuario.id !== userId) {
+            console.error('❌ Usuario no coincide o no encontrado');
+            setModalConfirmacion(prev => ({ ...prev, isProcessing: false }));
+            alert('❌ Usuario no encontrado');
+            return;
+          }
+          
+          const cartonesActuales = parseInt(usuario[`cards_${sala}`]) || 0;
+          console.log('🎫 Validando quitar cartones:', { sala, cartonesActuales, cantidadNum });
+          
+          if (cantidadNum > cartonesActuales) {
+            setModalConfirmacion(prev => ({ ...prev, isProcessing: false }));
+            alert(`❌ El usuario solo tiene ${cartonesActuales} cartón(es) de ${sala.toUpperCase()}.\nNo se pueden quitar ${cantidadNum} cartones.`);
+            return;
+          }
+        }
+        
         // Operación de cartones
         const cantidadFinal = (tipo === 'cartones-agregar' ? 1 : -1) * parseInt(cantidad);
         
@@ -1712,17 +1732,13 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
               
               <input
                 type="text"
-                value={modalConfirmacion.cantidad ? parseInt(modalConfirmacion.cantidad.replace(/\D/g, '') || '0').toLocaleString('es-CO') : ''}
+                value={modalConfirmacion.cantidad ? parseInt(modalConfirmacion.cantidad || '0').toLocaleString('es-CO') : ''}
                 onChange={(e) => {
                   const rawValue = e.target.value.replace(/\D/g, ''); // Eliminar todo excepto dígitos
-                  
-                  // Solo permitir números enteros
-                  if (rawValue === '' || /^[0-9]+$/.test(rawValue)) {
-                    setModalConfirmacion({ 
-                      ...modalConfirmacion, 
-                      cantidad: rawValue // Guardar valor sin formato
-                    });
-                  }
+                  setModalConfirmacion({ 
+                    ...modalConfirmacion, 
+                    cantidad: rawValue // Guardar valor sin formato
+                  });
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') ejecutarOperacion();
