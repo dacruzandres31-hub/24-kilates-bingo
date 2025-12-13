@@ -3,7 +3,7 @@
 # Fecha: 13-DIC-2025
 
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  MIGRACIÓN: Sistema de Cartones de Regalo" -ForegroundColor Cyan
+Write-Host "  MIGRACION: Sistema de Cartones de Regalo" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
