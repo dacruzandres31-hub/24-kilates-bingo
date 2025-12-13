@@ -29,7 +29,8 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
     tipo: '', // 'dinero-cargar', 'dinero-descargar', 'cartones-agregar', 'cartones-quitar'
     sala: '', // 'bronce', 'plata', 'oro'
     cantidad: '',
-    userId: null
+    userId: null,
+    isProcessing: false // Prevenir múltiples clicks
   });
   
   // Estados para el modal de dinero
@@ -433,6 +434,12 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
 
   // Ejecutar operación confirmada
   const ejecutarOperacion = async () => {
+    // Prevenir múltiples ejecuciones
+    if (modalConfirmacion.isProcessing) {
+      console.log('⏳ Operación ya en proceso, ignorando click...');
+      return;
+    }
+    
     const { tipo, sala, cantidad, userId } = modalConfirmacion;
     const cantidadNum = parseInt(cantidad);
 
@@ -442,12 +449,9 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
       alert('❌ Debes ingresar una cantidad válida');
       return;
     }
-
-    // Validar que no tenga decimales
-    if (cantidad.includes('.') || cantidad.includes(',')) {
-      alert('❌ Solo se permiten números enteros (sin decimales)');
-      return;
-    }
+    
+    // Bloquear múltiples ejecuciones
+    setModalConfirmacion(prev => ({ ...prev, isProcessing: true }));
 
     try {
       const token = localStorage.getItem('adminToken');
@@ -473,7 +477,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
           onResourcesUpdate(newUserData, null);
         }
 
-        setModalConfirmacion({ isOpen: false, tipo: '', sala: '', cantidad: '', userId: null });
+        setModalConfirmacion({ isOpen: false, tipo: '', sala: '', cantidad: '', userId: null, isProcessing: false });
         setShowSuccessPopup(true);
         setTimeout(() => setShowSuccessPopup(false), 2000);
         await cargarUsuarios();
@@ -506,7 +510,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
           });
         }
 
-        setModalConfirmacion({ isOpen: false, tipo: '', sala: '', cantidad: '', userId: null });
+        setModalConfirmacion({ isOpen: false, tipo: '', sala: '', cantidad: '', userId: null, isProcessing: false });
         setShowSuccessPopup(true);
         setTimeout(() => setShowSuccessPopup(false), 2000);
         await cargarUsuarios();
@@ -514,11 +518,38 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
       }
 
       if (tipo === 'dinero-cargar' || tipo === 'dinero-descargar') {
-        // Validar recursos disponibles para CARGAR dinero
+        // Validar recursos disponibles para CARGAR dinero (admin tiene suficiente saldo)
         if (tipo === 'dinero-cargar') {
           const recursosDisponibles = sharedUserData?.balance || currentUser.balance || 0;
           if (cantidadNum > recursosDisponibles) {
             alert(`❌ No tienes suficiente saldo disponible.\nRecursos disponibles: $${recursosDisponibles.toLocaleString('es-CO')}\nIntentaste cargar: $${cantidadNum.toLocaleString('es-CO')}`);
+            return;
+          }
+        }
+        
+        // Validar recursos disponibles para DESCARGAR dinero (usuario tiene suficiente saldo)
+        if (tipo === 'dinero-descargar') {
+          // Usar datos del modal de gestión en lugar de buscar en array
+          const usuario = modalGestionUsuario.usuario;
+          console.log('💸 Validando descarga:', { 
+            usuario: usuario ? { id: usuario.id, username: usuario.username, balance: usuario.balance } : null, 
+            userId, 
+            cantidadNum 
+          });
+          
+          if (!usuario || usuario.id !== userId) {
+            console.error('❌ Usuario no coincide o no encontrado');
+            setModalConfirmacion(prev => ({ ...prev, isProcessing: false }));
+            alert('❌ Usuario no encontrado');
+            return;
+          }
+          
+          const saldoUsuario = parseFloat(usuario.balance) || 0;
+          console.log('💰 Saldo del usuario:', saldoUsuario, 'Intentando descargar:', cantidadNum);
+          
+          if (cantidadNum > saldoUsuario) {
+            setModalConfirmacion(prev => ({ ...prev, isProcessing: false }));
+            alert(`❌ El usuario no tiene suficiente saldo para descargar.\nSaldo del usuario: $${Math.floor(saldoUsuario).toLocaleString('es-CO')}\nIntentaste descargar: $${cantidadNum.toLocaleString('es-CO')}`);
             return;
           }
         }
@@ -640,8 +671,9 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         }
       }
       
-      setModalConfirmacion({ isOpen: false, tipo: '', sala: '', cantidad: '', userId: null });
+      setModalConfirmacion({ isOpen: false, tipo: '', sala: '', cantidad: '', userId: null, isProcessing: false });
     } catch (error) {
+      setModalConfirmacion(prev => ({ ...prev, isProcessing: false }));
       alert('❌ ' + (error.response?.data?.error || error.message));
     }
   };
@@ -1660,38 +1692,43 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
               {modalConfirmacion.tipo === 'dinero-cargar' && (
                 <div className="mb-3 p-3 bg-indigo-900/30 border border-indigo-500/50 rounded-lg">
                   <p className="text-indigo-300 text-sm text-center">
-                    💼 Recursos disponibles: <span className="font-bold">${Math.floor((sharedUserData?.balance || currentUser.balance) || 0).toLocaleString('es-CO')}</span>
+                    💼 Tus recursos disponibles: <span className="font-bold">${Math.floor((sharedUserData?.balance || currentUser.balance) || 0).toLocaleString('es-CO')}</span>
                   </p>
                 </div>
               )}
               
+              {/* Mostrar balance del usuario para descargar */}
+              {modalConfirmacion.tipo === 'dinero-descargar' && (() => {
+                const usuario = usuarios.find(u => u.id === modalConfirmacion.userId);
+                const saldoUsuario = usuario ? Math.floor(parseFloat(usuario.balance) || 0) : 0;
+                return (
+                  <div className="mb-3 p-3 bg-gray-700/50 border border-gray-600 rounded-lg">
+                    <p className="text-gray-300 text-sm text-center">
+                      💰 Balance disponible del usuario: <span className="font-bold">${saldoUsuario.toLocaleString('es-CO')}</span>
+                    </p>
+                  </div>
+                );
+              })()}
+              
               <input
-                type="number"
-                min="1"
-                step="1"
-                value={modalConfirmacion.cantidad}
+                type="text"
+                value={modalConfirmacion.cantidad ? parseInt(modalConfirmacion.cantidad.replace(/\D/g, '') || '0').toLocaleString('es-CO') : ''}
                 onChange={(e) => {
-                  const value = e.target.value;
-                  // Solo permitir números enteros para dinero
-                  if (modalConfirmacion.tipo.includes('dinero') || modalConfirmacion.tipo.includes('balance')) {
-                    if (value === '' || /^[0-9]+$/.test(value)) {
-                      setModalConfirmacion({ 
-                        ...modalConfirmacion, 
-                        cantidad: value 
-                      });
-                    }
-                  } else {
+                  const rawValue = e.target.value.replace(/\D/g, ''); // Eliminar todo excepto dígitos
+                  
+                  // Solo permitir números enteros
+                  if (rawValue === '' || /^[0-9]+$/.test(rawValue)) {
                     setModalConfirmacion({ 
                       ...modalConfirmacion, 
-                      cantidad: value 
+                      cantidad: rawValue // Guardar valor sin formato
                     });
                   }
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') ejecutarOperacion();
-                  if (e.key === 'Escape') setModalConfirmacion({ isOpen: false, tipo: '', sala: '', cantidad: '', userId: null });
-                  // Bloquear punto y coma para operaciones de dinero
-                  if (modalConfirmacion.tipo.includes('dinero') && (e.key === '.' || e.key === ',')) {
+                  if (e.key === 'Escape') setModalConfirmacion({ isOpen: false, tipo: '', sala: '', cantidad: '', userId: null, isProcessing: false });
+                  // Bloquear punto y coma
+                  if (e.key === '.' || e.key === ',') {
                     e.preventDefault();
                   }
                 }}
@@ -1708,14 +1745,17 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
             {/* Footer con botones */}
             <div className="p-6 pt-0 flex gap-3">
               <button
-                onClick={() => setModalConfirmacion({ isOpen: false, tipo: '', sala: '', cantidad: '', userId: null })}
+                onClick={() => setModalConfirmacion({ isOpen: false, tipo: '', sala: '', cantidad: '', userId: null, isProcessing: false })}
                 className="flex-1 py-3 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-500 hover:to-gray-600 text-white font-bold rounded-xl transition-all"
               >
                 CANCELAR
               </button>
               <button
                 onClick={ejecutarOperacion}
+                disabled={modalConfirmacion.isProcessing}
                 className={`flex-1 py-3 text-white font-bold rounded-xl transition-all ${
+                  modalConfirmacion.isProcessing ? 'opacity-50 cursor-not-allowed' : ''
+                } ${
                   modalConfirmacion.tipo === 'superadmin-add-balance' || modalConfirmacion.tipo === 'superadmin-add-cards' ? 'bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500' :
                   modalConfirmacion.tipo === 'dinero-cargar' ? 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500' :
                   modalConfirmacion.tipo === 'dinero-descargar' ? 'bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700' :
@@ -1723,7 +1763,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                   'bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700'
                 }`}
               >
-                ✓ ACEPTAR
+                {modalConfirmacion.isProcessing ? '⏳ PROCESANDO...' : '✓ ACEPTAR'}
               </button>
             </div>
           </div>
