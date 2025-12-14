@@ -970,7 +970,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
               <span className="text-xs bg-yellow-500 text-black px-2 py-1 rounded-full font-bold ml-2">SUPERADMIN</span>
             )}
           </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className={`grid gap-4 ${currentUser.role === 'superadmin' ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2 md:grid-cols-4'}`}>
             {/* Balance */}
             <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20 relative">
               <p className="text-sm text-purple-200">Balance</p>
@@ -1229,31 +1229,40 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                           </div>
                           
                           {/* Cartones Bronce */}
-                          {(usuario.cards_bronce || 0) > 0 && (
+                          {((usuario.cards_bronce || 0) > 0 || (currentUser.role === 'superadmin' && (usuario.gift_bronce || 0) > 0)) && (
                             <div className="flex items-center gap-1 bg-orange-900/30 border border-orange-600/40 rounded-lg px-2 py-1">
                               <div className="w-2 h-2 bg-gradient-to-br from-orange-500 to-orange-700 rounded-full"></div>
                               <span className="text-xs font-semibold text-orange-300">
-                                {usuario.cards_bronce.toLocaleString('es-CO')}
+                                {currentUser.role === 'superadmin' && (usuario.gift_bronce || 0) > 0
+                                  ? `${usuario.cards_bronce || 0}+${usuario.gift_bronce}🎁`
+                                  : (usuario.cards_bronce || 0).toLocaleString('es-CO')
+                                }
                               </span>
                             </div>
                           )}
                           
                           {/* Cartones Plata */}
-                          {(usuario.cards_plata || 0) > 0 && (
+                          {((usuario.cards_plata || 0) > 0 || (currentUser.role === 'superadmin' && (usuario.gift_plata || 0) > 0)) && (
                             <div className="flex items-center gap-1 bg-gray-700/30 border border-gray-500/40 rounded-lg px-2 py-1">
                               <div className="w-2 h-2 bg-gradient-to-br from-gray-300 to-gray-500 rounded-full"></div>
                               <span className="text-xs font-semibold text-gray-300">
-                                {usuario.cards_plata.toLocaleString('es-CO')}
+                                {currentUser.role === 'superadmin' && (usuario.gift_plata || 0) > 0
+                                  ? `${usuario.cards_plata || 0}+${usuario.gift_plata}🎁`
+                                  : (usuario.cards_plata || 0).toLocaleString('es-CO')
+                                }
                               </span>
                             </div>
                           )}
                           
                           {/* Cartones Oro */}
-                          {(usuario.cards_oro || 0) > 0 && (
+                          {((usuario.cards_oro || 0) > 0 || (currentUser.role === 'superadmin' && (usuario.gift_oro || 0) > 0)) && (
                             <div className="flex items-center gap-1 bg-yellow-900/30 border border-yellow-600/40 rounded-lg px-2 py-1">
                               <div className="w-2 h-2 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full"></div>
                               <span className="text-xs font-semibold text-yellow-300">
-                                {usuario.cards_oro.toLocaleString('es-CO')}
+                                {currentUser.role === 'superadmin' && (usuario.gift_oro || 0) > 0
+                                  ? `${usuario.cards_oro || 0}+${usuario.gift_oro}🎁`
+                                  : (usuario.cards_oro || 0).toLocaleString('es-CO')
+                                }
                               </span>
                             </div>
                           )}

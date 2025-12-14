@@ -23,8 +23,33 @@ const cardInventoryService = require('../services/cardInventoryService');
  */
 async function getAdminProfile(req, res) {
   try {
-    const { userId } = req.user;
+    const { userId, role } = req.user;
 
+    // SuperAdmin ve cartones normales y regalo separados
+    if (role === 'superadmin') {
+      const [users] = await pool.query(
+        `SELECT u.id, u.username, u.role, u.balance,
+          COALESCE(SUM(CASE WHEN uci.room = 'bronce' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_bronce,
+          COALESCE(SUM(CASE WHEN uci.room = 'plata' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_plata,
+          COALESCE(SUM(CASE WHEN uci.room = 'oro' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_oro,
+          COALESCE(SUM(CASE WHEN uci.room = 'bronce' AND uci.is_gift = TRUE THEN uci.quantity ELSE 0 END), 0) as gift_bronce,
+          COALESCE(SUM(CASE WHEN uci.room = 'plata' AND uci.is_gift = TRUE THEN uci.quantity ELSE 0 END), 0) as gift_plata,
+          COALESCE(SUM(CASE WHEN uci.room = 'oro' AND uci.is_gift = TRUE THEN uci.quantity ELSE 0 END), 0) as gift_oro
+         FROM users u
+         LEFT JOIN user_card_inventory uci ON u.id = uci.user_id
+         WHERE u.id = ?
+         GROUP BY u.id`,
+        [userId]
+      );
+      
+      if (users.length === 0) {
+        return res.status(404).json({ error: 'Usuario no encontrado' });
+      }
+      
+      return res.json(users[0]);
+    }
+    
+    // Agentes y jugadores ven solo el total (normales + regalo sumados)
     const [users] = await pool.query(
       `SELECT u.id, u.username, u.role, u.balance,
         COALESCE(SUM(CASE WHEN uci.room = 'bronce' THEN uci.quantity ELSE 0 END), 0) as cards_bronce,
@@ -659,13 +684,16 @@ async function getUsersHierarchy(req, res) {
     let allUsers;
     let currentUserData;
 
-    // SuperAdmin ve TODOS los usuarios (incluyéndose a sí mismo)
+    // SuperAdmin ve TODOS los usuarios con cartones normales y regalo separados
     if (currentUserRole === 'superadmin') {
       [allUsers] = await pool.query(`
         SELECT u.id, u.username, u.role, u.parent_id, u.balance,
-               COALESCE(SUM(CASE WHEN uci.room = 'bronce' THEN uci.quantity ELSE 0 END), 0) as cards_bronce,
-               COALESCE(SUM(CASE WHEN uci.room = 'plata' THEN uci.quantity ELSE 0 END), 0) as cards_plata,
-               COALESCE(SUM(CASE WHEN uci.room = 'oro' THEN uci.quantity ELSE 0 END), 0) as cards_oro
+               COALESCE(SUM(CASE WHEN uci.room = 'bronce' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_bronce,
+               COALESCE(SUM(CASE WHEN uci.room = 'plata' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_plata,
+               COALESCE(SUM(CASE WHEN uci.room = 'oro' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_oro,
+               COALESCE(SUM(CASE WHEN uci.room = 'bronce' AND uci.is_gift = TRUE THEN uci.quantity ELSE 0 END), 0) as gift_bronce,
+               COALESCE(SUM(CASE WHEN uci.room = 'plata' AND uci.is_gift = TRUE THEN uci.quantity ELSE 0 END), 0) as gift_plata,
+               COALESCE(SUM(CASE WHEN uci.room = 'oro' AND uci.is_gift = TRUE THEN uci.quantity ELSE 0 END), 0) as gift_oro
         FROM users u
         LEFT JOIN user_card_inventory uci ON u.id = uci.user_id
         GROUP BY u.id

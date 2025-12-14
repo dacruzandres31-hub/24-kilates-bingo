@@ -387,25 +387,24 @@ exports.getUserProfile = async (req, res) => {
 
     const user = users[0];
 
-    // Obtener cartones disponibles del inventario
+    // Obtener cartones disponibles del inventario (suma normales + regalo)
     const [inventory] = await pool.query(
       `SELECT 
-        COUNT(CASE WHEN room_type = 'starter' AND status = 'active' THEN 1 END) as starter,
-        COUNT(CASE WHEN room_type = 'bronce' AND status = 'active' THEN 1 END) as bronze,
-        COUNT(CASE WHEN room_type = 'plata' AND status = 'active' THEN 1 END) as silver,
-        COUNT(CASE WHEN room_type = 'oro' AND status = 'active' THEN 1 END) as gold
+        COALESCE(SUM(CASE WHEN room = 'bronce' THEN quantity ELSE 0 END), 0) as bronze,
+        COALESCE(SUM(CASE WHEN room = 'plata' THEN quantity ELSE 0 END), 0) as silver,
+        COALESCE(SUM(CASE WHEN room = 'oro' THEN quantity ELSE 0 END), 0) as gold
        FROM user_card_inventory
        WHERE user_id = ?`,
       [userId]
     );
 
-    const tickets = inventory[0] || { starter: 0, bronze: 0, silver: 0, gold: 0 };
+    const tickets = inventory[0] || { bronze: 0, silver: 0, gold: 0 };
 
     res.json({
       username: user.username,
       balance: user.balance || 0,
       tickets: {
-        starter: parseInt(tickets.starter) || 0,
+        starter: 0, // Starter se maneja aparte
         bronze: parseInt(tickets.bronze) || 0,
         silver: parseInt(tickets.silver) || 0,
         gold: parseInt(tickets.gold) || 0

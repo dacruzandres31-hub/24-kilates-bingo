@@ -54,27 +54,48 @@ async function addGiftCards(req, res) {
       });
     }
 
-    // Los cartones de regalo siempre van a gift_cards_{room}
-    const cardColumn = `gift_cards_${room}`;
-
-    // Actualizar cartones del usuario
-    await pool.query(
-      `UPDATE users SET ${cardColumn} = ${cardColumn} + ? WHERE id = ?`,
-      [quantityNum, userId]
+    // Crear/actualizar registro en user_card_inventory con is_gift = TRUE
+    const [existing] = await pool.query(
+      `SELECT id, quantity FROM user_card_inventory 
+       WHERE user_id = ? AND room = ? AND is_gift = TRUE
+       LIMIT 1`,
+      [userId, room]
     );
 
-    // Registrar movimiento
-    await pool.query(
-      `INSERT INTO gift_cards_movements 
-      (user_id, admin_id, room, quantity, movement_type, notes)
-        VALUES (?, ?, ?, ?, 'add', ?)`,
-        [userId, adminId, room, quantityNum, `Cartones de regalo agregados por admin ${adminId}`]
+    if (existing.length > 0) {
+      // Actualizar existente
+      await pool.query(
+        `UPDATE user_card_inventory 
+         SET quantity = quantity + ?, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [quantityNum, existing[0].id]
       );
+    } else {
+      // Crear nuevo registro
+      await pool.query(
+        `INSERT INTO user_card_inventory 
+         (user_id, room, quantity, is_gift, created_at, updated_at)
+         VALUES (?, ?, ?, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+        [userId, room, quantityNum]
+      );
+    }
+
+    // Registrar movimiento en log
+    await pool.query(
+      `INSERT INTO card_movements_log 
+       (user_id, room, movement_type, quantity, is_gift, reason, executed_by, created_at)
+       VALUES (?, ?, 'credit', ?, TRUE, 'Cartones de regalo agregados por SuperAdmin', ?, CURRENT_TIMESTAMP)`,
+      [userId, room, quantityNum, adminId]
+    );
 
     // Obtener nuevos totales
-    const [user] = await pool.query(
-      `SELECT gift_cards_bronce, gift_cards_plata, gift_cards_oro
-       FROM users WHERE id = ?`,
+    const [totals] = await pool.query(
+      `SELECT 
+        COALESCE(SUM(CASE WHEN room = 'bronce' AND is_gift = TRUE THEN quantity ELSE 0 END), 0) as gift_bronce,
+        COALESCE(SUM(CASE WHEN room = 'plata' AND is_gift = TRUE THEN quantity ELSE 0 END), 0) as gift_plata,
+        COALESCE(SUM(CASE WHEN room = 'oro' AND is_gift = TRUE THEN quantity ELSE 0 END), 0) as gift_oro
+       FROM user_card_inventory
+       WHERE user_id = ?`,
       [userId]
     );
 
@@ -82,9 +103,9 @@ async function addGiftCards(req, res) {
       success: true,
       message: `${quantityNum} cartones de regalo de ${room} agregados`,
       giftCards: {
-        bronce: user[0].gift_cards_bronce,
-        plata: user[0].gift_cards_plata,
-        oro: user[0].gift_cards_oro
+        bronce: parseInt(totals[0].gift_bronce) || 0,
+        plata: parseInt(totals[0].gift_plata) || 0,
+        oro: parseInt(totals[0].gift_oro) || 0
       }
     });
 
@@ -122,15 +143,22 @@ async function removeGiftCards(req, res) {
     }
 
     const quantityNum = parseInt(quantity);
-    const cardColumn = `gift_cards_${room}`;
+    if (isNaN(quantityNum) || quantityNum <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'La cantidad debe ser un número positivo'
+      });
+    }
 
     // Verificar que tenga suficientes cartones de regalo
-    const [user] = await pool.query(
-      `SELECT ${cardColumn} as current_cards FROM users WHERE id = ?`,
-      [userId]
+    const [inventory] = await pool.query(
+      `SELECT COALESCE(SUM(quantity), 0) as total
+       FROM user_card_inventory
+       WHERE user_id = ? AND room = ? AND is_gift = TRUE`,
+      [userId, room]
     );
 
-    const currentCards = user[0]?.current_cards || 0;
+    const currentCards = parseInt(inventory[0]?.total) || 0;
     if (currentCards < quantityNum) {
       return res.status(400).json({
         success: false,
@@ -139,35 +167,59 @@ async function removeGiftCards(req, res) {
     }
 
     // Quitar cartones de regalo
+    let remaining = quantityNum;
+    const [giftRecords] = await pool.query(
+      `SELECT id, quantity FROM user_card_inventory
+       WHERE user_id = ? AND room = ? AND is_gift = TRUE
+       ORDER BY id ASC`,
+      [userId, room]
+    );
+
+    for (const record of giftRecords) {
+      if (remaining <= 0) break;
+      
+      const toRemove = Math.min(record.quantity, remaining);
+      await pool.query(
+        `UPDATE user_card_inventory 
+         SET quantity = quantity - ?, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [toRemove, record.id]
+      );
+      
+      remaining -= toRemove;
+    }
+
+    // Eliminar registros con cantidad 0
     await pool.query(
-      `UPDATE users SET ${cardColumn} = ${cardColumn} - ? WHERE id = ?`,
-      [quantityNum, userId]
+      `DELETE FROM user_card_inventory WHERE quantity = 0`
     );
 
     // Registrar movimiento
     await pool.query(
-      `INSERT INTO gift_cards_movements 
-      (user_id, admin_id, room, quantity, movement_type, notes)
-      VALUES (?, ?, ?, ?, 'remove', ?)`,
-      [userId, adminId, room, quantityNum, `Cartones de regalo removidos por admin ${adminId}`]
+      `INSERT INTO card_movements_log 
+       (user_id, room, movement_type, quantity, is_gift, reason, executed_by, created_at)
+       VALUES (?, ?, 'debit', ?, TRUE, 'Cartones de regalo removidos por SuperAdmin', ?, CURRENT_TIMESTAMP)`,
+      [userId, room, quantityNum, adminId]
     );
 
     // Obtener nuevos totales
-    const [updatedUser] = await pool.query(
-      `SELECT gift_cards_bronce, gift_cards_plata, gift_cards_oro
-       FROM users WHERE id = ?`,
+    const [totals] = await pool.query(
+      `SELECT 
+        COALESCE(SUM(CASE WHEN room = 'bronce' AND is_gift = TRUE THEN quantity ELSE 0 END), 0) as gift_bronce,
+        COALESCE(SUM(CASE WHEN room = 'plata' AND is_gift = TRUE THEN quantity ELSE 0 END), 0) as gift_plata,
+        COALESCE(SUM(CASE WHEN room = 'oro' AND is_gift = TRUE THEN quantity ELSE 0 END), 0) as gift_oro
+       FROM user_card_inventory
+       WHERE user_id = ?`,
       [userId]
     );
 
-    const roomCardKey = `gift_cards_${room}`;
     res.json({
       success: true,
       message: `${quantityNum} cartones de regalo de ${room} removidos`,
-      newStock: updatedUser[0][roomCardKey],
       giftCards: {
-        bronce: updatedUser[0].gift_cards_bronce,
-        plata: updatedUser[0].gift_cards_plata,
-        oro: updatedUser[0].gift_cards_oro
+        bronce: parseInt(totals[0].gift_bronce) || 0,
+        plata: parseInt(totals[0].gift_plata) || 0,
+        oro: parseInt(totals[0].gift_oro) || 0
       }
     });
 
@@ -188,13 +240,17 @@ async function getGiftCardsStock(req, res) {
   try {
     const { userId } = req.params;
 
-    const [user] = await pool.query(
-      `SELECT gift_cards_bronce, gift_cards_plata, gift_cards_oro
-       FROM users WHERE id = ?`,
+    const [totals] = await pool.query(
+      `SELECT 
+        COALESCE(SUM(CASE WHEN room = 'bronce' AND is_gift = TRUE THEN quantity ELSE 0 END), 0) as bronce,
+        COALESCE(SUM(CASE WHEN room = 'plata' AND is_gift = TRUE THEN quantity ELSE 0 END), 0) as plata,
+        COALESCE(SUM(CASE WHEN room = 'oro' AND is_gift = TRUE THEN quantity ELSE 0 END), 0) as oro
+       FROM user_card_inventory
+       WHERE user_id = ?`,
       [userId]
     );
 
-    if (!user[0]) {
+    if (!totals[0]) {
       return res.status(404).json({
         success: false,
         error: 'Usuario no encontrado'
@@ -203,25 +259,15 @@ async function getGiftCardsStock(req, res) {
 
     res.json({
       success: true,
-      stock: {
-        bronce: user[0].gift_cards_bronce || 0,
-        plata: user[0].gift_cards_plata || 0,
-        oro: user[0].gift_cards_oro || 0
-      },
-      normalCards: {
-        bronce: user[0].cards_bronce || 0,
-        plata: user[0].cards_plata || 0,
-        oro: user[0].cards_oro || 0
-      },
-      total: {
-        bronce: (user[0].gift_cards_bronce || 0) + (user[0].cards_bronce || 0),
-        plata: (user[0].gift_cards_plata || 0) + (user[0].cards_plata || 0),
-        oro: (user[0].gift_cards_oro || 0) + (user[0].cards_oro || 0)
+      giftCards: {
+        bronce: parseInt(totals[0].bronce) || 0,
+        plata: parseInt(totals[0].plata) || 0,
+        oro: parseInt(totals[0].oro) || 0
       }
     });
 
   } catch (error) {
-    console.error('❌ Error obteniendo stock de cartones:', error);
+    console.error('❌ Error obteniendo stock de cartones de regalo:', error);
     res.status(500).json({
       success: false,
       error: 'Error obteniendo stock'
