@@ -267,8 +267,8 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         username: datosIngreso.username,
         password: datosIngreso.password,
         role: tipoUsuario,
-        // Asignar parent_id del agente seleccionado (o del usuario actual si no hay selección)
-        parent_id: agenteSeleccionado?.id || currentUser.id,
+        // SIEMPRE asignar como parent_id el usuario autenticado (el panel que está creando)
+        parent_id: currentUser.id,
         // Datos personales opcionales
         ...(datosPersonales.nombre_completo && { nombre_completo: datosPersonales.nombre_completo }),
         ...(datosPersonales.documento && { documento: datosPersonales.documento }),
