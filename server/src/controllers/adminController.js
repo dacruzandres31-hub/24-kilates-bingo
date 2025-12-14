@@ -972,8 +972,7 @@ async function addCardsToUser(req, res) {
 
     // Transferir cartones usando cardInventoryService (maneja is_gift automáticamente)
     if (quantity > 0) {
-      // Agregar cartones = Transferir desde el inventario del admin al usuario
-      // Usar cardInventoryService para manejar is_gift correctamente
+      // AGREGAR cartones = Transferir desde el inventario del admin al usuario
       await cardInventoryService.transferCards(
         currentUserId,  // from (admin)
         userId,         // to (usuario)
@@ -982,14 +981,95 @@ async function addCardsToUser(req, res) {
         currentUserId   // executedBy
       );
     } else if (quantity < 0) {
-      // Quitar cartones y transferirlos de vuelta al admin
-      await cardInventoryService.transferCards(
-        userId,         // from (usuario)
-        currentUserId,  // to (admin)
-        room,
-        Math.abs(quantity),
-        currentUserId   // executedBy
-      );
+      // QUITAR cartones = Decrementar directamente del inventario del usuario
+      const connection = await db.getConnection();
+      try {
+        await connection.beginTransaction();
+
+        // Verificar que tenga suficientes cartones
+        const [inventory] = await connection.query(
+          `SELECT SUM(quantity) as total FROM user_card_inventory 
+           WHERE user_id = ? AND room = ?`,
+          [userId, room]
+        );
+
+        const totalAvailable = inventory[0]?.total || 0;
+        const quantityToRemove = Math.abs(quantity);
+
+        if (totalAvailable < quantityToRemove) {
+          throw new Error(`Usuario solo tiene ${totalAvailable} cartones, no se pueden quitar ${quantityToRemove}`);
+        }
+
+        // Decrementar proporcionalmente (primero los normales, luego los de regalo)
+        let remaining = quantityToRemove;
+        
+        // Primero quitar de cartones normales
+        const [normalCards] = await connection.query(
+          `SELECT id, quantity FROM user_card_inventory 
+           WHERE user_id = ? AND room = ? AND is_gift = FALSE
+           ORDER BY id ASC`,
+          [userId, room]
+        );
+
+        for (const card of normalCards) {
+          if (remaining <= 0) break;
+          
+          const toRemove = Math.min(card.quantity, remaining);
+          await connection.query(
+            `UPDATE user_card_inventory 
+             SET quantity = quantity - ?, updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?`,
+            [toRemove, card.id]
+          );
+          
+          remaining -= toRemove;
+        }
+
+        // Si aún quedan por quitar, sacar de los de regalo
+        if (remaining > 0) {
+          const [giftCards] = await connection.query(
+            `SELECT id, quantity FROM user_card_inventory 
+             WHERE user_id = ? AND room = ? AND is_gift = TRUE
+             ORDER BY id ASC`,
+            [userId, room]
+          );
+
+          for (const card of giftCards) {
+            if (remaining <= 0) break;
+            
+            const toRemove = Math.min(card.quantity, remaining);
+            await connection.query(
+              `UPDATE user_card_inventory 
+               SET quantity = quantity - ?, updated_at = CURRENT_TIMESTAMP
+               WHERE id = ?`,
+              [toRemove, card.id]
+            );
+            
+            remaining -= toRemove;
+          }
+        }
+
+        // Eliminar registros con cantidad 0
+        await connection.query(
+          `DELETE FROM user_card_inventory WHERE quantity = 0`
+        );
+
+        // Registrar movimiento en log
+        await connection.query(
+          `INSERT INTO card_movements_log 
+           (user_id, room, movement_type, quantity, is_gift, reason, executed_by)
+           VALUES (?, ?, 'debit', ?, FALSE, 'Admin removed cards', ?)`,
+          [userId, room, quantityToRemove, currentUserId]
+        );
+
+        await connection.commit();
+        connection.release();
+
+      } catch (error) {
+        await connection.rollback();
+        connection.release();
+        throw error;
+      }
     }
 
     res.json({
