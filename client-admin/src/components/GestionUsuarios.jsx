@@ -716,15 +716,26 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         }
         
         // Operación de cartones
-        const cantidadFinal = (tipo === 'cartones-agregar' ? 1 : -1) * parseInt(cantidad);
-        
-        await axios.post('/api/admin/users/add-cards', {
-          userId: userId,
-          room: sala,
-          quantity: cantidadFinal
-        }, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        if (tipo === 'cartones-agregar') {
+          // AGREGAR cartones
+          await axios.post('/api/admin/users/add-cards', {
+            userId: userId,
+            room: sala,
+            quantity: cantidadNum
+          }, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+        } else {
+          // QUITAR cartones usando transferencia (del usuario al admin)
+          await axios.post('/api/admin/cards/transfer', {
+            fromUserId: userId,
+            toUserId: currentUser.id,
+            room: sala,
+            quantity: cantidadNum
+          }, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+        }
 
         // Recargar usuarios y actualizar modal con datos frescos
         const response = await axios.get('/api/admin/users/hierarchy', {
