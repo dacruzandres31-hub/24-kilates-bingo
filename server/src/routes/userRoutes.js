@@ -6,6 +6,7 @@ const router = express.Router();
 
 /**
  * USER ROUTES
+ * GET    /users/profile          - Obtener perfil del usuario autenticado
  * POST   /users                  - Crear usuario (admin)
  * GET    /users/:id              - Obtener usuario
  * GET    /users/:id/network      - Red multinivel del usuario
@@ -16,6 +17,9 @@ const router = express.Router();
 
 // Todos requieren autenticación
 router.use(authMiddleware.authenticateToken);
+
+// Obtener perfil del usuario autenticado (debe ir antes de las rutas con parámetros)
+router.get('/profile', userController.getUserProfile);
 
 // Crear usuario
 router.post('/', userController.createUser);

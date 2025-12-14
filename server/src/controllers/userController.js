@@ -366,3 +366,54 @@ exports.getNetworkStats = async (req, res) => {
     res.status(500).json({ error: 'Error obteniendo estadísticas' });
   }
 };
+
+/**
+ * GET /api/users/profile
+ * Obtener perfil del usuario autenticado con sus recursos
+ */
+exports.getUserProfile = async (req, res) => {
+  try {
+    const { userId } = req.user;
+
+    // Obtener datos del usuario
+    const [users] = await pool.query(
+      'SELECT id, username, role, balance FROM users WHERE id = ?',
+      [userId]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    const user = users[0];
+
+    // Obtener cartones disponibles del inventario
+    const [inventory] = await pool.query(
+      `SELECT 
+        COUNT(CASE WHEN room_type = 'starter' AND status = 'active' THEN 1 END) as starter,
+        COUNT(CASE WHEN room_type = 'bronce' AND status = 'active' THEN 1 END) as bronze,
+        COUNT(CASE WHEN room_type = 'plata' AND status = 'active' THEN 1 END) as silver,
+        COUNT(CASE WHEN room_type = 'oro' AND status = 'active' THEN 1 END) as gold
+       FROM user_card_inventory
+       WHERE user_id = ?`,
+      [userId]
+    );
+
+    const tickets = inventory[0] || { starter: 0, bronze: 0, silver: 0, gold: 0 };
+
+    res.json({
+      username: user.username,
+      balance: user.balance || 0,
+      tickets: {
+        starter: parseInt(tickets.starter) || 0,
+        bronze: parseInt(tickets.bronze) || 0,
+        silver: parseInt(tickets.silver) || 0,
+        gold: parseInt(tickets.gold) || 0
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error obteniendo perfil de usuario:', error);
+    res.status(500).json({ error: 'Error obteniendo perfil' });
+  }
+};

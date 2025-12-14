@@ -8,7 +8,7 @@ import audioService from '../services/audioService';
 import PlayerSidebar from './PlayerSidebar';
 import CardSelectionLobby from './CardSelectionLobby';
 
-export default function BronzeRoom() {
+export default function BronzeRoom({ onLogout }) {
   const { sessionId } = useParams();
   const navigate = useNavigate();
   const [ballsDrawn, setBallsDrawn] = useState([]);
@@ -693,6 +693,7 @@ useEffect(() => {
             onToggle={() => setSidebarOpen(!sidebarOpen)}
             themeColor="#b87333"
             accentColor="#d4a574"
+            onLogout={onLogout}
           />
 
           {/* CELEBRACIÓN DE LÍNEA GANADORA */}

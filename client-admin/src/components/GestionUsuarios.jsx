@@ -4,6 +4,7 @@ import axios from 'axios';
 
 export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, onResourcesUpdate }) {
   const [usuarios, setUsuarios] = useState([]);
+  const [allUsersHierarchy, setAllUsersHierarchy] = useState([]); // TODOS los usuarios de la jerarquía (para búsqueda)
   const [arbolJerarquico, setArbolJerarquico] = useState([]);
   const [currentUser, setCurrentUser] = useState({ id: null, role: '', username: '' }); // Usuario actual del backend
   const [agenteSeleccionado, setAgenteSeleccionado] = useState(null); // Agente seleccionado en árbol
@@ -125,6 +126,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
       
       setArbolJerarquico(response.data.tree || []);
       setUsuarios(normalizedUsers);
+      setAllUsersHierarchy(normalizedUsers); // Guardar TODOS para búsqueda
       
       // Guardar información del usuario actual (dueño del panel)
       if (response.data.currentUser) {
@@ -185,7 +187,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
   // Cargar usuarios de un agente específico (red completa)
   const cargarUsuariosDelAgente = (agenteId, todosLosUsuarios) => {
     if (!todosLosUsuarios || todosLosUsuarios.length === 0) {
-      todosLosUsuarios = usuarios;
+      todosLosUsuarios = allUsersHierarchy.length > 0 ? allUsersHierarchy : usuarios;
     }
 
     // Obtener TODA la red del agente (hijos + descendientes)
@@ -308,6 +310,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
       
       setArbolJerarquico(hierarchyResponse.data.tree || []);
       setUsuarios(hierarchyResponse.data.all || []);
+      setAllUsersHierarchy(hierarchyResponse.data.all || []); // Actualizar búsqueda global
       
       // Actualizar lista de usuarios del agente seleccionado
       if (agenteSeleccionado) {
@@ -450,6 +453,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
       // Actualizar lista de usuarios
       setUsuarios(response.data.all || []);
       setArbolJerarquico(response.data.tree || []);
+      setAllUsersHierarchy(response.data.all || []); // Actualizar búsqueda global
       
       // CRÍTICO: Actualizar el modal de gestión si está abierto para el mismo usuario
       if (modalGestionUsuario.isOpen && modalGestionUsuario.usuario?.id === userId) {
@@ -528,14 +532,17 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         return;
       }
 
-      // SUPERADMIN: Agregar cartones sin límites
+      // SUPERADMIN: Agregar cartones sin límites (acreditación directa, no transferencia)
       if (tipo === 'superadmin-add-cards') {
         console.log('💎 Agregando cartones SuperAdmin:', { sala, cantidad: cantidadNum });
         
-        await axios.post('/api/admin/users/add-cards', {
-          userId: userId,
+        // Usar endpoint de acreditación SuperAdmin (sin límites)
+        await axios.post('/api/superadmin/cards/credit', {
+          user_id: userId,
           room: sala,
-          quantity: cantidadNum
+          quantity: cantidadNum,
+          is_gift: false,
+          reason: `Carga manual por ${currentUser.username}`
         }, {
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -614,6 +621,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         // Actualizar lista de usuarios
         setUsuarios(response.data.all || []);
         setArbolJerarquico(response.data.tree || []);
+        setAllUsersHierarchy(response.data.all || []); // Actualizar búsqueda global
         
         // CRÍTICO: Actualizar el modal de gestión si está abierto con el usuario completo
         if (modalGestionUsuario.isOpen && modalGestionUsuario.usuario?.id === userId) {
@@ -680,6 +688,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         
         setUsuarios(response.data.all || []);
         setArbolJerarquico(response.data.tree || []);
+        setAllUsersHierarchy(response.data.all || []); // Actualizar búsqueda global
         
         // Actualizar modal con usuario completo + gift cards
         if (modalGestionUsuario.isOpen && modalGestionUsuario.usuario?.id === userId) {
@@ -742,6 +751,13 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         // Actualizar lista de usuarios Y árbol jerárquico
         setUsuarios(response.data.all || []);
         setArbolJerarquico(response.data.tree || []);
+        setAllUsersHierarchy(response.data.all || []); // Actualizar búsqueda global
+        
+        // CRÍTICO: Actualizar currentUser con datos frescos para cálculos posteriores
+        const currentUserFresco = response.data.all.find(u => u.id === currentUser.id);
+        if (currentUserFresco) {
+          setCurrentUser(currentUserFresco);
+        }
         
         // CRÍTICO: Actualizar el modal con el usuario completo
         if (modalGestionUsuario.isOpen && modalGestionUsuario.usuario?.id === userId) {
@@ -761,37 +777,23 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         }
         
         // DESPUÉS de recargar, actualizar recursos del admin si transfirió cartones a otro usuario
-        if (tipo === 'cartones-agregar' && userId !== currentUser.id && onResourcesUpdate) {
-          // Admin transfirió cartones a otro usuario, descontar de sus recursos
+        if (tipo === 'cartones-agregar' && userId !== currentUser.id && onResourcesUpdate && currentUserFresco) {
+          // Usar datos frescos del admin para mostrar en panel
           const newAdminCards = {
-            bronce: sala === 'bronce' ? (currentUser.cards_bronce || 0) - cantidadNum : (currentUser.cards_bronce || 0),
-            plata: sala === 'plata' ? (currentUser.cards_plata || 0) - cantidadNum : (currentUser.cards_plata || 0),
-            oro: sala === 'oro' ? (currentUser.cards_oro || 0) - cantidadNum : (currentUser.cards_oro || 0)
+            bronce: currentUserFresco.cards_bronce || 0,
+            plata: currentUserFresco.cards_plata || 0,
+            oro: currentUserFresco.cards_oro || 0
           };
-          const newUserData = {
-            ...currentUser,
-            cards_bronce: newAdminCards.bronce,
-            cards_plata: newAdminCards.plata,
-            cards_oro: newAdminCards.oro
-          };
-          setCurrentUser(newUserData);
           onResourcesUpdate(null, newAdminCards);
         }
         
-        if (tipo === 'cartones-quitar' && userId !== currentUser.id && onResourcesUpdate) {
-          // Admin quitó cartones a otro usuario, sumar a sus recursos
+        if (tipo === 'cartones-quitar' && userId !== currentUser.id && onResourcesUpdate && currentUserFresco) {
+          // Usar datos frescos del admin para mostrar en panel
           const newAdminCards = {
-            bronce: sala === 'bronce' ? (currentUser.cards_bronce || 0) + cantidadNum : (currentUser.cards_bronce || 0),
-            plata: sala === 'plata' ? (currentUser.cards_plata || 0) + cantidadNum : (currentUser.cards_plata || 0),
-            oro: sala === 'oro' ? (currentUser.cards_oro || 0) + cantidadNum : (currentUser.cards_oro || 0)
+            bronce: currentUserFresco.cards_bronce || 0,
+            plata: currentUserFresco.cards_plata || 0,
+            oro: currentUserFresco.cards_oro || 0
           };
-          const newUserData = {
-            ...currentUser,
-            cards_bronce: newAdminCards.bronce,
-            cards_plata: newAdminCards.plata,
-            cards_oro: newAdminCards.oro
-          };
-          setCurrentUser(newUserData);
           onResourcesUpdate(null, newAdminCards);
         }
         
@@ -913,9 +915,20 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
           {/* Contenido del nodo */}
           <div
             className="flex items-center gap-2 flex-1"
-            onClick={() => {
+            onClick={async () => {
               setAgenteSeleccionado(nodo);
-              cargarUsuariosDelAgente(nodo.id, usuarios);
+              
+              // Recargar jerarquía completa para obtener TODOS los usuarios
+              const token = localStorage.getItem('adminToken');
+              const hierarchyResponse = await axios.get('/api/admin/users/hierarchy', {
+                headers: { Authorization: `Bearer ${token}` }
+              });
+              
+              const allUsers = hierarchyResponse.data.all || [];
+              setAllUsersHierarchy(allUsers); // Actualizar todos los usuarios
+              
+              // Cargar usuarios del agente con datos actualizados
+              cargarUsuariosDelAgente(nodo.id, allUsers);
               setUsuarioSeleccionado(null);
             }}
           >
@@ -1129,126 +1142,146 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                 </button>
               )}
             </div>
-            {busquedaUsuario && (
-              <p className="text-sm text-gray-400 mt-2">
-                Buscando "{busquedaUsuario}" en la red completa de {agenteSeleccionado?.username} • 
-                <span className="text-green-400 font-semibold ml-1">
-                  {usuariosDelAgente.filter(u => u.username.toLowerCase().includes(busquedaUsuario.toLowerCase())).length} encontrado(s)
-                </span>
-              </p>
-            )}
+            {busquedaUsuario && (() => {
+              // BUSCAR EN TODA LA BASE DE DATOS, no solo en red del agente
+              const baseUsuarios = allUsersHierarchy.length > 0 ? allUsersHierarchy : usuarios;
+              
+              // Filtrar directamente en TODOS los usuarios
+              const usuariosFiltrados = baseUsuarios.filter(u => 
+                u.username.toLowerCase().includes(busquedaUsuario.toLowerCase())
+              );
+              
+              return (
+                <p className="text-sm text-gray-400 mt-2">
+                  Buscando "{busquedaUsuario}" en TODA la base de datos • 
+                  <span className="text-green-400 font-semibold ml-1">
+                    {usuariosFiltrados.length} encontrado(s) de {baseUsuarios.length} total
+                  </span>
+                </p>
+              );
+            })()}
           </div>
 
           <div className="space-y-2 max-h-[600px] overflow-y-auto">
-            {usuariosDelAgente.filter(u => 
-              u.username.toLowerCase().includes(busquedaUsuario.toLowerCase())
-            ).length > 0 ? (
-              usuariosDelAgente
-                .filter(u => u.username.toLowerCase().includes(busquedaUsuario.toLowerCase()))
-                .map((usuario) => {
-                const esAgente = usuario.role === 'agente';
-                const tieneSubAgentesFlag = esAgente && tieneSubAgentes(usuario.id);
+            {(() => {
+              // BUSCAR EN TODA LA BASE DE DATOS cuando hay búsqueda activa
+              const baseUsuarios = allUsersHierarchy.length > 0 ? allUsersHierarchy : usuarios;
+              const usuariosParaMostrar = busquedaUsuario.trim() !== ''
+                ? baseUsuarios  // BUSCAR EN TODOS, no filtrar por agente
+                : usuariosDelAgente;
+              
+              const usuariosFiltrados = usuariosParaMostrar.filter(u => 
+                u.username.toLowerCase().includes(busquedaUsuario.toLowerCase())
+              );
+              
+              return usuariosFiltrados.length > 0 ? (
+                usuariosFiltrados.map((usuario) => {
+                  const esAgente = usuario.role === 'agente';
+                  const tieneSubAgentesFlag = esAgente && tieneSubAgentes(usuario.id);
 
-                return (
-                  <div
-                    key={usuario.id}
-                    className={`flex items-center justify-between px-4 py-3 rounded-lg border transition-all cursor-pointer ${
-                      modalGestionUsuario.usuario?.id === usuario.id
-                        ? 'bg-blue-600 border-blue-400 text-white shadow-lg'
-                        : esAgente 
-                          ? 'bg-indigo-900/30 border-indigo-600/50 text-indigo-200 hover:bg-indigo-900/50' 
-                          : 'bg-gray-700/30 border-gray-600/50 text-gray-200 hover:bg-gray-700/50'
-                    }`}
-                    onClick={async () => {
-                      // Abrir modal inmediatamente
-                      setModalGestionUsuario({
-                        isOpen: true,
-                        usuario: usuario,
-                        giftCards: { bronce: 0, plata: 0, oro: 0 }
-                      });
-                      
-                      // Cargar gift cards en segundo plano
-                      try {
-                        const giftCards = await cargarGiftCards(usuario.id);
-                        setModalGestionUsuario(prev => ({
-                          ...prev,
-                          giftCards: giftCards
-                        }));
-                      } catch (error) {
-                        console.error('Error cargando gift cards:', error);
-                      }
-                    }}
-                  >
-                    <div className="flex items-center gap-3 flex-1">
-                      <span className="text-2xl">{esAgente ? '🏢' : '👤'}</span>
-                      <div className="flex-1">
-                        <p className="font-semibold">{usuario.username}</p>
-                        <p className={`text-xs ${modalGestionUsuario.usuario?.id === usuario.id ? 'text-blue-200' : 'text-gray-400'}`}>
-                          {esAgente ? 'Agente' : 'Jugador'} • ID: {usuario.id}
-                        </p>
-                      </div>
-                      
-                      {/* Indicadores de recursos */}
-                      <div className="flex items-center gap-2">
-                        {/* Balance */}
-                        <div className="flex items-center gap-1 bg-green-900/30 border border-green-600/40 rounded-lg px-2 py-1">
-                          <span className="text-xs text-green-400">💰</span>
-                          <span className="text-xs font-semibold text-green-300">
-                            ${Math.floor(usuario.balance || 0).toLocaleString('es-CO')}
-                          </span>
+                  return (
+                    <div
+                      key={usuario.id}
+                      className={`flex items-center justify-between px-4 py-3 rounded-lg border transition-all cursor-pointer ${
+                        modalGestionUsuario.usuario?.id === usuario.id
+                          ? 'bg-blue-600 border-blue-400 text-white shadow-lg'
+                          : esAgente 
+                            ? 'bg-indigo-900/30 border-indigo-600/50 text-indigo-200 hover:bg-indigo-900/50' 
+                            : 'bg-gray-700/30 border-gray-600/50 text-gray-200 hover:bg-gray-700/50'
+                      }`}
+                      onClick={async () => {
+                        // Abrir modal inmediatamente
+                        setModalGestionUsuario({
+                          isOpen: true,
+                          usuario: usuario,
+                          giftCards: { bronce: 0, plata: 0, oro: 0 }
+                        });
+                        
+                        // Cargar gift cards en segundo plano
+                        try {
+                          const giftCards = await cargarGiftCards(usuario.id);
+                          setModalGestionUsuario(prev => ({
+                            ...prev,
+                            giftCards: giftCards
+                          }));
+                        } catch (error) {
+                          console.error('Error cargando gift cards:', error);
+                        }
+                      }}
+                    >
+                      <div className="flex items-center gap-3 flex-1">
+                        <span className="text-2xl">{esAgente ? '🏢' : '👤'}</span>
+                        <div className="flex-1">
+                          <p className="font-semibold">{usuario.username}</p>
+                          <p className={`text-xs ${modalGestionUsuario.usuario?.id === usuario.id ? 'text-blue-200' : 'text-gray-400'}`}>
+                            {esAgente ? 'Agente' : 'Jugador'} • ID: {usuario.id}
+                          </p>
                         </div>
                         
-                        {/* Cartones Bronce */}
-                        {(usuario.cards_bronce || 0) > 0 && (
-                          <div className="flex items-center gap-1 bg-orange-900/30 border border-orange-600/40 rounded-lg px-2 py-1">
-                            <div className="w-2 h-2 bg-gradient-to-br from-orange-500 to-orange-700 rounded-full"></div>
-                            <span className="text-xs font-semibold text-orange-300">
-                              {usuario.cards_bronce.toLocaleString('es-CO')}
+                        {/* Indicadores de recursos */}
+                        <div className="flex items-center gap-2">
+                          {/* Balance */}
+                          <div className="flex items-center gap-1 bg-green-900/30 border border-green-600/40 rounded-lg px-2 py-1">
+                            <span className="text-xs text-green-400">💰</span>
+                            <span className="text-xs font-semibold text-green-300">
+                              ${Math.floor(usuario.balance || 0).toLocaleString('es-CO')}
                             </span>
                           </div>
-                        )}
+                          
+                          {/* Cartones Bronce */}
+                          {(usuario.cards_bronce || 0) > 0 && (
+                            <div className="flex items-center gap-1 bg-orange-900/30 border border-orange-600/40 rounded-lg px-2 py-1">
+                              <div className="w-2 h-2 bg-gradient-to-br from-orange-500 to-orange-700 rounded-full"></div>
+                              <span className="text-xs font-semibold text-orange-300">
+                                {usuario.cards_bronce.toLocaleString('es-CO')}
+                              </span>
+                            </div>
+                          )}
+                          
+                          {/* Cartones Plata */}
+                          {(usuario.cards_plata || 0) > 0 && (
+                            <div className="flex items-center gap-1 bg-gray-700/30 border border-gray-500/40 rounded-lg px-2 py-1">
+                              <div className="w-2 h-2 bg-gradient-to-br from-gray-300 to-gray-500 rounded-full"></div>
+                              <span className="text-xs font-semibold text-gray-300">
+                                {usuario.cards_plata.toLocaleString('es-CO')}
+                              </span>
+                            </div>
+                          )}
+                          
+                          {/* Cartones Oro */}
+                          {(usuario.cards_oro || 0) > 0 && (
+                            <div className="flex items-center gap-1 bg-yellow-900/30 border border-yellow-600/40 rounded-lg px-2 py-1">
+                              <div className="w-2 h-2 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full"></div>
+                              <span className="text-xs font-semibold text-yellow-300">
+                                {usuario.cards_oro.toLocaleString('es-CO')}
+                              </span>
+                            </div>
+                          )}
+                        </div>
                         
-                        {/* Cartones Plata */}
-                        {(usuario.cards_plata || 0) > 0 && (
-                          <div className="flex items-center gap-1 bg-gray-700/30 border border-gray-500/40 rounded-lg px-2 py-1">
-                            <div className="w-2 h-2 bg-gradient-to-br from-gray-300 to-gray-500 rounded-full"></div>
-                            <span className="text-xs font-semibold text-gray-300">
-                              {usuario.cards_plata.toLocaleString('es-CO')}
-                            </span>
-                          </div>
-                        )}
-                        
-                        {/* Cartones Oro */}
-                        {(usuario.cards_oro || 0) > 0 && (
-                          <div className="flex items-center gap-1 bg-yellow-900/30 border border-yellow-600/40 rounded-lg px-2 py-1">
-                            <div className="w-2 h-2 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full"></div>
-                            <span className="text-xs font-semibold text-yellow-300">
-                              {usuario.cards_oro.toLocaleString('es-CO')}
-                            </span>
-                          </div>
+                        {/* Marca de sub-agentes */}
+                        {tieneSubAgentesFlag && (
+                          <span className="bg-yellow-500 text-black text-xs px-2 py-1 rounded-full font-bold">
+                            SUB-AGENTE
+                          </span>
                         )}
                       </div>
-                      
-                      {/* Marca de sub-agentes */}
-                      {tieneSubAgentesFlag && (
-                        <span className="bg-yellow-500 text-black text-xs px-2 py-1 rounded-full font-bold">
-                          SUB-AGENTE
-                        </span>
-                      )}
                     </div>
-                  </div>
-                );
-              })
-            ) : (
-              <p className="text-gray-400 text-center py-8">
-                {busquedaUsuario 
-                  ? `No se encontraron usuarios con "${busquedaUsuario}"`
-                  : agenteSeleccionado 
-                    ? `${agenteSeleccionado.username} no tiene usuarios en su red`
-                    : 'Selecciona un agente del árbol para ver sus usuarios'
-                }
-              </p>
-            )}
+                  );
+                })
+              ) : (
+                <div className="text-center py-8 text-gray-400">
+                  <p>
+                    {busquedaUsuario 
+                      ? `No se encontraron usuarios con "${busquedaUsuario}"`
+                      : agenteSeleccionado 
+                        ? `${agenteSeleccionado.username} no tiene usuarios en su red`
+                        : 'Selecciona un agente del árbol para ver sus usuarios'
+                    }
+                  </p>
+                </div>
+              );
+            })()}
           </div>
         </div>
 
@@ -2031,12 +2064,39 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
               
               {/* Mostrar balance del usuario para descargar */}
               {modalConfirmacion.tipo === 'dinero-descargar' && (() => {
-                const usuario = usuarios.find(u => u.id === modalConfirmacion.userId);
+                // Usar datos del modal de gestión en lugar de buscar en array
+                const usuario = modalGestionUsuario.usuario;
                 const saldoUsuario = usuario ? Math.floor(parseFloat(usuario.balance) || 0) : 0;
                 return (
                   <div className="mb-3 p-3 bg-gray-700/50 border border-gray-600 rounded-lg">
                     <p className="text-gray-300 text-sm text-center">
                       💰 Balance disponible del usuario: <span className="font-bold">${saldoUsuario.toLocaleString('es-CO')}</span>
+                    </p>
+                  </div>
+                );
+              })()}
+              
+              {/* Mostrar recursos disponibles para agregar cartones */}
+              {modalConfirmacion.tipo === 'cartones-agregar' && (() => {
+                const cartonesDisponibles = sharedCartonesStock?.[modalConfirmacion.sala] || currentUser[`cards_${modalConfirmacion.sala}`] || 0;
+                return (
+                  <div className="mb-3 p-3 bg-indigo-900/30 border border-indigo-500/50 rounded-lg">
+                    <p className="text-indigo-300 text-sm text-center">
+                      🎫 Tus cartones {modalConfirmacion.sala} disponibles: <span className="font-bold">{cartonesDisponibles.toLocaleString('es-CO')}</span>
+                    </p>
+                  </div>
+                );
+              })()}
+              
+              {/* Mostrar cartones del usuario para quitar */}
+              {modalConfirmacion.tipo === 'cartones-quitar' && (() => {
+                // Usar datos del modal de gestión en lugar de buscar en array
+                const usuario = modalGestionUsuario.usuario;
+                const cartonesUsuario = usuario ? (usuario[`cards_${modalConfirmacion.sala}`] || 0) : 0;
+                return (
+                  <div className="mb-3 p-3 bg-gray-700/50 border border-gray-600 rounded-lg">
+                    <p className="text-gray-300 text-sm text-center">
+                      🎫 Cartones {modalConfirmacion.sala} del usuario: <span className="font-bold">{cartonesUsuario.toLocaleString('es-CO')}</span>
                     </p>
                   </div>
                 );

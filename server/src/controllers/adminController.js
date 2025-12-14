@@ -26,7 +26,14 @@ async function getAdminProfile(req, res) {
     const { userId } = req.user;
 
     const [users] = await pool.query(
-      'SELECT id, username, role, balance FROM users WHERE id = ?',
+      `SELECT u.id, u.username, u.role, u.balance,
+        COALESCE(SUM(CASE WHEN uci.room = 'bronce' THEN uci.quantity ELSE 0 END), 0) as cards_bronce,
+        COALESCE(SUM(CASE WHEN uci.room = 'plata' THEN uci.quantity ELSE 0 END), 0) as cards_plata,
+        COALESCE(SUM(CASE WHEN uci.room = 'oro' THEN uci.quantity ELSE 0 END), 0) as cards_oro
+       FROM users u
+       LEFT JOIN user_card_inventory uci ON u.id = uci.user_id
+       WHERE u.id = ?
+       GROUP BY u.id`,
       [userId]
     );
 
@@ -661,7 +668,7 @@ async function getUsersHierarchy(req, res) {
                COALESCE(SUM(CASE WHEN uci.room = 'oro' THEN uci.quantity ELSE 0 END), 0) as cards_oro
         FROM users u
         LEFT JOIN user_card_inventory uci ON u.id = uci.user_id
-        GROUP BY u.id, u.username, u.role, u.parent_id, u.balance
+        GROUP BY u.id
         ORDER BY u.id
       `);
       
@@ -679,7 +686,7 @@ async function getUsersHierarchy(req, res) {
         FROM users u
         LEFT JOIN user_card_inventory uci ON u.id = uci.user_id
         WHERE u.id = ?
-        GROUP BY u.id, u.username, u.role, u.parent_id, u.balance
+        GROUP BY u.id
       `, [currentUserId]);
       
       currentUserData = currentUserRow[0];
@@ -710,7 +717,7 @@ async function getUsersHierarchy(req, res) {
           COALESCE(SUM(CASE WHEN uci.room = 'oro' THEN uci.quantity ELSE 0 END), 0) as cards_oro
         FROM network n
         LEFT JOIN user_card_inventory uci ON n.id = uci.user_id
-        GROUP BY n.id, n.username, n.role, n.parent_id, n.balance
+        GROUP BY n.id
         ORDER BY n.id
       `, [currentUserId]);
       
@@ -988,29 +995,36 @@ async function addCardsToUser(req, res) {
         currentUserId   // executedBy
       );
     } else if (quantity < 0) {
-      // QUITAR cartones = Decrementar directamente del inventario del usuario
+      // QUITAR cartones = Eliminar del usuario y crear para el admin
+      const quantityToRemove = Math.abs(quantity);
+      
       const connection = await pool.getConnection();
       try {
         await connection.beginTransaction();
 
-        // Verificar que tenga suficientes cartones
+        // 1. Verificar que el usuario tenga suficientes cartones
         const [inventory] = await connection.query(
-          `SELECT SUM(quantity) as total FROM user_card_inventory 
+          `SELECT COALESCE(SUM(quantity), 0) as total 
+           FROM user_card_inventory 
            WHERE user_id = ? AND room = ?`,
           [userId, room]
         );
 
-        const totalAvailable = inventory[0]?.total || 0;
-        const quantityToRemove = Math.abs(quantity);
+        const totalAvailable = parseInt(inventory[0]?.total) || 0;
 
         if (totalAvailable < quantityToRemove) {
-          throw new Error(`Usuario solo tiene ${totalAvailable} cartones, no se pueden quitar ${quantityToRemove}`);
+          await connection.rollback();
+          connection.release();
+          return res.status(400).json({
+            success: false,
+            error: `Usuario solo tiene ${totalAvailable} cartones de ${room}, no se pueden quitar ${quantityToRemove}`
+          });
         }
 
-        // Decrementar proporcionalmente (primero los normales, luego los de regalo)
+        // 2. Eliminar cartones del usuario (primero normales, luego gift)
         let remaining = quantityToRemove;
         
-        // Primero quitar de cartones normales
+        // Eliminar de cartones normales primero
         const [normalCards] = await connection.query(
           `SELECT id, quantity FROM user_card_inventory 
            WHERE user_id = ? AND room = ? AND is_gift = FALSE
@@ -1032,7 +1046,7 @@ async function addCardsToUser(req, res) {
           remaining -= toRemove;
         }
 
-        // Si aún quedan por quitar, sacar de los de regalo
+        // Si quedan por quitar, sacar de gift cards
         if (remaining > 0) {
           const [giftCards] = await connection.query(
             `SELECT id, quantity FROM user_card_inventory 
@@ -1061,17 +1075,49 @@ async function addCardsToUser(req, res) {
           `DELETE FROM user_card_inventory WHERE quantity = 0`
         );
 
-        // Registrar movimiento en log
+        // 3. Crear cartones para el admin (como normales, no regalo)
+        // Verificar si ya tiene un registro
+        const [existingAdmin] = await connection.query(
+          `SELECT id, quantity FROM user_card_inventory 
+           WHERE user_id = ? AND room = ? AND is_gift = FALSE
+           LIMIT 1`,
+          [currentUserId, room]
+        );
+
+        if (existingAdmin.length > 0) {
+          // Actualizar registro existente
+          await connection.query(
+            `UPDATE user_card_inventory 
+             SET quantity = quantity + ?, updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?`,
+            [quantityToRemove, existingAdmin[0].id]
+          );
+        } else {
+          // Crear nuevo registro
+          await connection.query(
+            `INSERT INTO user_card_inventory 
+             (user_id, room, quantity, is_gift, created_at, updated_at)
+             VALUES (?, ?, ?, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+            [currentUserId, room, quantityToRemove]
+          );
+        }
+
+        // 4. Registrar movimientos en log
         await connection.query(
           `INSERT INTO card_movements_log 
-           (user_id, room, movement_type, quantity, is_gift, reason, executed_by)
-           VALUES (?, ?, 'debit', ?, FALSE, 'Admin removed cards', ?)`,
-          [userId, room, quantityToRemove, currentUserId]
+           (user_id, room, movement_type, quantity, is_gift, reason, executed_by, created_at)
+           VALUES 
+           (?, ?, 'debit', ?, FALSE, 'Cartones quitados por admin', ?, CURRENT_TIMESTAMP),
+           (?, ?, 'credit', ?, FALSE, 'Cartones recuperados de usuario', ?, CURRENT_TIMESTAMP)`,
+          [userId, room, quantityToRemove, currentUserId, 
+           currentUserId, room, quantityToRemove, currentUserId]
         );
 
         await connection.commit();
         connection.release();
-
+        
+        console.log(`✅ Cartones quitados: ${quantityToRemove} ${room} de usuario ${userId} → admin ${currentUserId}`);
+        
       } catch (error) {
         await connection.rollback();
         connection.release();
@@ -1091,6 +1137,47 @@ async function addCardsToUser(req, res) {
        GROUP BY u.id`,
       [userId]
     );
+
+    // Emitir evento WebSocket para actualizar cartones en client-player
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user_${userId}`).emit('resources_updated', {
+        cartones: {
+          bronce: updatedUser[0].cards_bronce,
+          plata: updatedUser[0].cards_plata,
+          oro: updatedUser[0].cards_oro
+        },
+        message: `Tus cartones ${room} han sido ${quantity > 0 ? 'incrementados' : 'reducidos'} en ${Math.abs(quantity)}`
+      });
+      console.log(`📡 [WebSocket] Cartones actualizados para user_${userId}: ${room}=${updatedUser[0]['cards_' + room]}`);
+      
+      // Si es una transferencia (no es el mismo usuario), actualizar también al admin
+      if (userId !== currentUserId) {
+        const [adminUser] = await pool.query(
+          `SELECT u.*, 
+            COALESCE(SUM(CASE WHEN uci.room = 'bronce' THEN uci.quantity ELSE 0 END), 0) as cards_bronce,
+            COALESCE(SUM(CASE WHEN uci.room = 'plata' THEN uci.quantity ELSE 0 END), 0) as cards_plata,
+            COALESCE(SUM(CASE WHEN uci.room = 'oro' THEN uci.quantity ELSE 0 END), 0) as cards_oro
+           FROM users u
+           LEFT JOIN user_card_inventory uci ON u.id = uci.user_id
+           WHERE u.id = ?
+           GROUP BY u.id`,
+          [currentUserId]
+        );
+        
+        if (adminUser.length > 0) {
+          io.to(`user_${currentUserId}`).emit('resources_updated', {
+            cartones: {
+              bronce: adminUser[0].cards_bronce,
+              plata: adminUser[0].cards_plata,
+              oro: adminUser[0].cards_oro
+            },
+            message: `Transferencia de cartones ${quantity > 0 ? 'enviada' : 'recibida'}`
+          });
+          console.log(`📡 [WebSocket] Cartones actualizados para admin ${currentUserId}`);
+        }
+      }
+    }
 
     res.json({
       success: true,
@@ -1186,6 +1273,64 @@ async function addBalanceToUser(req, res) {
       [MoneyMath.toNumber(newBalance), userId]
     );
 
+    // Si el admin está descargando dinero de otro usuario, acreditárselo
+    if (amount < 0 && userId !== currentUserId) {
+      const [adminData] = await pool.query(
+        'SELECT balance FROM users WHERE id = ?',
+        [currentUserId]
+      );
+      
+      if (adminData.length > 0) {
+        const adminBalance = MoneyMath.decimal(adminData[0].balance);
+        const amountToCredit = MoneyMath.decimal(Math.abs(amount));
+        const newAdminBalance = adminBalance.plus(amountToCredit);
+        
+        await pool.query(
+          'UPDATE users SET balance = ? WHERE id = ?',
+          [MoneyMath.toNumber(newAdminBalance), currentUserId]
+        );
+        
+        // Registrar movimiento para el admin
+        await pool.query(
+          `INSERT INTO chips_movements 
+           (user_id, movement_type, amount, balance_after, description, created_at)
+           VALUES (?, ?, ?, ?, ?, NOW())`,
+          [currentUserId, 'deposit', Math.abs(amount), MoneyMath.toNumber(newAdminBalance), `Descarga desde usuario ${username}`]
+        );
+        
+        console.log(`💰 Dinero acreditado al admin: $${Math.abs(amount).toLocaleString('es-CO')}`);
+      }
+    }
+
+    // Si el admin está cargando dinero a otro usuario, debitarlo de su balance
+    if (amount > 0 && userId !== currentUserId) {
+      const [adminData] = await pool.query(
+        'SELECT balance FROM users WHERE id = ?',
+        [currentUserId]
+      );
+      
+      if (adminData.length > 0) {
+        const adminBalance = MoneyMath.decimal(adminData[0].balance);
+        const amountToDebit = MoneyMath.decimal(amount);
+        const newAdminBalance = adminBalance.minus(amountToDebit);
+        
+        await pool.query(
+          'UPDATE users SET balance = ? WHERE id = ?',
+          [MoneyMath.toNumber(newAdminBalance), currentUserId]
+        );
+        
+        // Registrar movimiento para el admin
+        await pool.query(
+          `INSERT INTO chips_movements 
+           (user_id, movement_type, amount, balance_after, description, created_at)
+           VALUES (?, ?, ?, ?, ?, NOW())`,
+          [currentUserId, 'withdrawal', amount, MoneyMath.toNumber(newAdminBalance), `Carga a usuario ${username}`]
+        );
+        
+        console.log(`💸 Dinero debitado del admin: $${amount.toLocaleString('es-CO')}`);
+      }
+    }
+
     // Registrar movimiento
     const movementType = amount > 0 ? 'deposit' : 'withdrawal';
     const description = amount > 0 
@@ -1198,6 +1343,32 @@ async function addBalanceToUser(req, res) {
        VALUES (?, ?, ?, ?, ?, NOW())`,
       [userId, movementType, Math.abs(amount), MoneyMath.toNumber(newBalance), description]
     );
+
+    // Emitir evento WebSocket para actualizar recursos en client-player
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user_${userId}`).emit('resources_updated', {
+        balance: MoneyMath.toNumber(newBalance),
+        message: `Tu balance ha sido ${amount > 0 ? 'incrementado' : 'reducido'} en $${Math.abs(amount).toLocaleString('es-CO')}`
+      });
+      console.log(`📡 [WebSocket] Balance actualizado para user_${userId}: $${MoneyMath.toNumber(newBalance).toLocaleString('es-CO')}`);
+      
+      // Si es una transferencia (no es el mismo usuario), actualizar también al admin
+      if (userId !== currentUserId) {
+        const [adminData] = await pool.query(
+          'SELECT balance FROM users WHERE id = ?',
+          [currentUserId]
+        );
+        
+        if (adminData.length > 0) {
+          io.to(`user_${currentUserId}`).emit('resources_updated', {
+            balance: MoneyMath.toNumber(adminData[0].balance),
+            message: `Transferencia ${amount > 0 ? 'enviada' : 'recibida'}`
+          });
+          console.log(`📡 [WebSocket] Balance actualizado para admin ${currentUserId}: $${MoneyMath.toNumber(adminData[0].balance).toLocaleString('es-CO')}`);
+        }
+      }
+    }
 
     res.json({
       success: true,

@@ -8,7 +8,7 @@ import audioService from '../services/audioService';
 import PlayerSidebar from './PlayerSidebar';
 import CardSelectionLobby from './CardSelectionLobby';
 
-export default function SilverRoom() {
+export default function SilverRoom({ onLogout }) {
   const { sessionId } = useParams();
   const navigate = useNavigate();
   const [ballsDrawn, setBallsDrawn] = useState([]);
@@ -646,6 +646,7 @@ useEffect(() => {
           <PlayerSidebar 
             isOpen={sidebarOpen} 
             onToggle={() => setSidebarOpen(!sidebarOpen)} 
+            onLogout={onLogout}
           />
 
           {/* CELEBRACIÓN DE LÍNEA GANADORA */}

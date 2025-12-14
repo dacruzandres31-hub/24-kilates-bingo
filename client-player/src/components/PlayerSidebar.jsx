@@ -1,17 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { FaUser, FaWallet, FaTicketAlt, FaHeadset, FaTimes, FaBars, FaEye, FaEyeSlash, FaHome, FaMusic, FaVolumeUp, FaVolumeMute } from 'react-icons/fa';
+import { FaUser, FaWallet, FaTicketAlt, FaHeadset, FaTimes, FaBars, FaEye, FaEyeSlash, FaHome, FaMusic, FaVolumeUp, FaVolumeMute, FaUserCircle, FaSignOutAlt } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import '../styles/PlayerSidebar.css';
 import bronzeIcon from '../assets/bronze_icon.png';
 import audioService from '../services/audioService';
+import useSocket from '../hooks/useSocket';
+import axios from 'axios';
 
-const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor = '#ff00ff' }) => {
+const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor = '#ff00ff', onLogout }) => {
   const navigate = useNavigate();
+  const socket = useSocket();
   const [showBalance, setShowBalance] = useState(false);
   const [audioStatus, setAudioStatus] = useState({ musicEnabled: true, efectosEnabled: true });
   const [ticketsExpanded, setTicketsExpanded] = useState(false); // Colapsable cartones
   const [audioExpanded, setAudioExpanded] = useState(false); // Colapsable audio
   const [showChangePassword, setShowChangePassword] = useState(false); // Modal cambiar contraseña
+  const [notificationMessage, setNotificationMessage] = useState(null); // Notificación de cambios
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
     newPassword: '',
@@ -23,28 +27,95 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
     confirm: false
   });
   const [userData, setUserData] = useState({
-    username: 'JugadorPro24',
-    balance: 12500,
+    username: 'Cargando...',
+    balance: 0,
     tickets: {
-      starter: 3,
-      bronze: 5,
-      silver: 2,
-      gold: 1
+      starter: 0,
+      bronze: 0,
+      silver: 0,
+      gold: 0
     }
   });
 
-  // TODO: Cargar datos reales del usuario desde API
+  // Listener de WebSocket para actualizar recursos en tiempo real
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleResourcesUpdated = (data) => {
+      console.log('📡 [PlayerSidebar] Recursos actualizados desde admin:', data);
+      
+      setUserData(prev => {
+        const updated = { ...prev };
+        
+        // Actualizar balance si viene
+        if (data.balance !== undefined) {
+          updated.balance = data.balance;
+        }
+        
+        // Actualizar cartones si vienen
+        if (data.cartones) {
+          updated.tickets = {
+            ...prev.tickets,
+            bronze: data.cartones.bronce || prev.tickets.bronze,
+            silver: data.cartones.plata || prev.tickets.silver,
+            gold: data.cartones.oro || prev.tickets.gold
+          };
+        }
+        
+        return updated;
+      });
+
+      // Mostrar notificación
+      if (data.message) {
+        setNotificationMessage(data.message);
+        setTimeout(() => setNotificationMessage(null), 4000);
+      }
+    };
+
+    socket.on('resources_updated', handleResourcesUpdated);
+
+    return () => {
+      socket.off('resources_updated', handleResourcesUpdated);
+    };
+  }, [socket]);
+
+  // Cargar datos reales del usuario desde API
   useEffect(() => {
     // Actualizar estado inicial del audio
     setAudioStatus(audioService.getStatus());
     
-    // Aquí iría la llamada a la API para obtener datos del usuario
-    // const fetchUserData = async () => {
-    //   const response = await fetch('/api/user/profile');
-    //   const data = await response.json();
-    //   setUserData(data);
-    // };
-    // fetchUserData();
+    const fetchUserData = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          console.warn('No hay token, usando datos por defecto');
+          return;
+        }
+        
+        const response = await axios.get('/api/users/profile', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        // El API devuelve los datos directamente sin wrapper
+        const data = response.data;
+        setUserData({
+          username: data.username || 'Usuario',
+          balance: data.balance || 0,
+          tickets: data.tickets || {
+            starter: 0,
+            bronze: 0,
+            silver: 0,
+            gold: 0
+          }
+        });
+        console.log('✅ Datos de usuario cargados:', data);
+      } catch (error) {
+        console.error('❌ Error cargando datos del usuario:', error);
+        // Mantener datos por defecto si falla
+      }
+    };
+    
+    fetchUserData();
   }, []);
   
   const toggleMusic = () => {
@@ -133,6 +204,31 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
         <div className="sidebar-overlay" onClick={onToggle}></div>
       )}
 
+      {/* Notificación de actualización de recursos */}
+      {notificationMessage && (
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          right: '20px',
+          background: 'linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)',
+          color: 'white',
+          padding: '15px 25px',
+          borderRadius: '12px',
+          boxShadow: '0 4px 20px rgba(76, 175, 80, 0.4)',
+          zIndex: 9999,
+          animation: 'slideInRight 0.3s ease-out',
+          maxWidth: '350px',
+          fontSize: '0.95rem',
+          fontWeight: '500',
+          border: '2px solid rgba(255, 255, 255, 0.3)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '1.5rem' }}>📡</span>
+            <span>{notificationMessage}</span>
+          </div>
+        </div>
+      )}
+
       {/* Sidebar */}
       <aside className={`player-sidebar ${isOpen ? 'open' : ''}`} style={{
         '--theme-color': themeColor,
@@ -159,11 +255,11 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
             <FaUser className="sidebar-icon user-icon" style={{ color: themeColor }} />
             <div className="sidebar-item-content">
               <span className="sidebar-label">Usuario</span>
-              <span className="sidebar-value username" style={{ color: accentColor }}>{userData.username}</span>
+              <span className="sidebar-value username" style={{ color: accentColor }}>{userData?.username || 'Cargando...'}</span>
             </div>
           </div>
           
-          {/* Botón Cambiar Contraseña */}
+          {/* Botón Mi Perfil */}
           <button 
             className="change-password-btn" 
             onClick={() => setShowChangePassword(true)}
@@ -172,13 +268,17 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
               borderColor: `${themeColor}50`,
               marginTop: '10px',
               width: '100%',
-              padding: '8px',
+              padding: '10px',
               background: 'rgba(255, 255, 255, 0.05)',
               border: '1px solid',
               borderRadius: '8px',
               cursor: 'pointer',
-              fontSize: '0.85rem',
-              transition: 'all 0.3s'
+              fontSize: '0.9rem',
+              transition: 'all 0.3s',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
             }}
             onMouseEnter={(e) => {
               e.target.style.background = `${themeColor}20`;
@@ -189,7 +289,8 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
               e.target.style.borderColor = `${themeColor}50`;
             }}
           >
-            🔑 Cambiar Contraseña
+            <FaUserCircle size={16} />
+            Mi Perfil
           </button>
         </div>
 
@@ -200,7 +301,7 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
             <div className="sidebar-item-content">
               <span className="sidebar-label">Saldo</span>
               {showBalance ? (
-                <span className="sidebar-value balance" style={{ color: accentColor }}>{formatCurrency(userData.balance)}</span>
+                <span className="sidebar-value balance" style={{ color: accentColor }}>{formatCurrency(userData?.balance || 0)}</span>
               ) : (
                 <span className="sidebar-value balance hidden">•••••••</span>
               )}
@@ -230,19 +331,19 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
             <div className="tickets-list">
               <div className="ticket-item starter">
                 <span className="ticket-room">Starter</span>
-                <span className="ticket-count">{userData.tickets.starter}</span>
+                <span className="ticket-count">{userData?.tickets?.starter || 0}</span>
               </div>
               <div className="ticket-item bronze">
                 <span className="ticket-room">Bronce</span>
-                <span className="ticket-count">{userData.tickets.bronze}</span>
+                <span className="ticket-count">{userData?.tickets?.bronze || 0}</span>
               </div>
               <div className="ticket-item silver">
                 <span className="ticket-room">Plata</span>
-                <span className="ticket-count">{userData.tickets.silver}</span>
+                <span className="ticket-count">{userData?.tickets?.silver || 0}</span>
               </div>
               <div className="ticket-item gold">
                 <span className="ticket-room">Oro</span>
-                <span className="ticket-count">{userData.tickets.gold}</span>
+                <span className="ticket-count">{userData?.tickets?.gold || 0}</span>
               </div>
             </div>
           )}
@@ -511,6 +612,47 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
                 </button>
               </div>
             </form>
+            
+            {/* Separador */}
+            <div style={{ margin: '1.5rem 0', borderTop: '1px solid #334155' }} />
+            
+            {/* Botón Cerrar Sesión */}
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm('¿Estás seguro que deseas cerrar sesión?')) {
+                  setShowChangePassword(false);
+                  onLogout();
+                }
+              }}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                background: 'rgba(244, 67, 54, 0.1)',
+                color: '#f44336',
+                border: '1px solid rgba(244, 67, 54, 0.5)',
+                borderRadius: '0.5rem',
+                cursor: 'pointer',
+                fontSize: '1rem',
+                fontWeight: 'bold',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem',
+                transition: 'all 0.3s'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.background = 'rgba(244, 67, 54, 0.2)';
+                e.target.style.borderColor = '#f44336';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.background = 'rgba(244, 67, 54, 0.1)';
+                e.target.style.borderColor = 'rgba(244, 67, 54, 0.5)';
+              }}
+            >
+              <FaSignOutAlt size={16} />
+              Cerrar Sesión
+            </button>
           </div>
         </div>
       )}
