@@ -783,9 +783,24 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
       setModalConfirmacion({ isOpen: false, tipo: '', sala: '', cantidad: '', userId: null, isProcessing: false, isGift: false });
       
     } catch (error) {
-      console.error('Error en ejecutarOperacion:', error);
+      console.error('❌ Error en ejecutarOperacion:', error);
+      console.error('📋 Detalles del error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        tipo,
+        sala,
+        cantidad,
+        userId
+      });
       setModalConfirmacion(prev => ({ ...prev, isProcessing: false }));
-      alert('❌ ' + (error.response?.data?.error || error.message));
+      
+      const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message || 'Error desconocido';
+      setErrorMessage(`Error en operación: ${errorMsg}`);
+      setShowErrorPopup(true);
+      setTimeout(() => {
+        setShowErrorPopup(false);
+      }, 4000);
     }
   };
 
