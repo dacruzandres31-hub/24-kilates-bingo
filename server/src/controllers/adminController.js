@@ -970,62 +970,25 @@ async function addCardsToUser(req, res) {
       });
     }
 
-    // Si se van a quitar cartones, verificar que el usuario tenga suficientes
-    if (quantity < 0) {
-      const [cards] = await pool.query(
-        `SELECT COUNT(*) as total FROM user_cards 
-         WHERE user_id = ? AND room = ?`,
-        [userId, room]
-      );
-
-      const cartonesActuales = cards[0].total;
-      const cartonesAQuitar = Math.abs(quantity);
-
-      if (cartonesActuales === 0) {
-        return res.status(400).json({
-          success: false,
-          error: `El usuario no tiene cartones de ${room} para descargar`
-        });
-      }
-
-      if (cartonesActuales < cartonesAQuitar) {
-        return res.status(400).json({
-          success: false,
-          error: `El usuario solo tiene ${cartonesActuales} cartón(es) de ${room}, no se pueden descargar ${cartonesAQuitar}`
-        });
-      }
-    }
-
+    // Transferir cartones usando cardInventoryService (maneja is_gift automáticamente)
     if (quantity > 0) {
-      // Agregar cartones
-      // Optimización: Para cantidades grandes (>100), usar INSERT múltiple
-      if (quantity > 100) {
-        const values = Array(quantity).fill('(?, ?, NOW())').join(', ');
-        const params = Array(quantity).fill([userId, room]).flat();
-        
-        await pool.query(
-          `INSERT INTO user_cards (user_id, room, created_at) VALUES ${values}`,
-          params
-        );
-      } else {
-        // Para cantidades pequeñas, insertar uno por uno (más legible en logs)
-        for (let i = 0; i < quantity; i++) {
-          await pool.query(
-            `INSERT INTO user_cards (user_id, room, created_at)
-             VALUES (?, ?, NOW())`,
-            [userId, room]
-          );
-        }
-      }
+      // Agregar cartones = Transferir desde el inventario del admin al usuario
+      // Usar cardInventoryService para manejar is_gift correctamente
+      await cardInventoryService.transferCards(
+        currentUserId,  // from (admin)
+        userId,         // to (usuario)
+        room,
+        quantity,
+        currentUserId   // executedBy
+      );
     } else if (quantity < 0) {
-      // Quitar cartones y transferirlos al admin que los descarga
-      // 1. Transferir cartones al admin
-      await pool.query(
-        `UPDATE user_cards 
-         SET user_id = ? 
-         WHERE user_id = ? AND room = ? 
-         LIMIT ?`,
-        [currentUserId, userId, room, Math.abs(quantity)]
+      // Quitar cartones y transferirlos de vuelta al admin
+      await cardInventoryService.transferCards(
+        userId,         // from (usuario)
+        currentUserId,  // to (admin)
+        room,
+        Math.abs(quantity),
+        currentUserId   // executedBy
       );
     }
 

@@ -83,24 +83,27 @@ export default function Dashboard() {
     try {
       const token = localStorage.getItem('adminToken');
       
-      const [userRes, finRes, stockRes] = await Promise.all([
+      const [userRes, finRes, inventoryRes] = await Promise.all([
         axios.get('/api/admin/profile', {
           headers: { Authorization: `Bearer ${token}` }
         }),
         axios.get('/api/admin/financial-summary', {
           headers: { Authorization: `Bearer ${token}` }
         }),
-        axios.get('/api/admin/stock-summary', {
+        axios.get('/api/admin/cards/inventory', {
           headers: { Authorization: `Bearer ${token}` }
         })
       ]);
       
       setUserData(userRes.data);
       setFinancialData(finRes.data);
+      
+      // Convertir inventario a formato de stock
+      const inventory = inventoryRes.data.inventory || [];
       setCartonesStock({
-        bronce: stockRes.data.bronce || 0,
-        plata: stockRes.data.plata || 0,
-        oro: stockRes.data.oro || 0
+        bronce: parseInt(inventory.find(i => i.room === 'bronce')?.total_cards || 0),
+        plata: parseInt(inventory.find(i => i.room === 'plata')?.total_cards || 0),
+        oro: parseInt(inventory.find(i => i.room === 'oro')?.total_cards || 0)
       });
     } catch (error) {
       console.error('Error fetching dashboard data:', error);

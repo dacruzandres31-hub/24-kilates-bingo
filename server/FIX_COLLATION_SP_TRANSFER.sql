@@ -1,0 +1,88 @@
+-- ========================================
+-- FIX: Collation mismatch en sp_transfer_cards
+-- ========================================
+-- Error: Illegal mix of collations (utf8mb4_unicode_ci,IMPLICIT) and (utf8mb4_0900_ai_ci,IMPLICIT)
+-- Solución: Forzar COLLATE en comparaciones de room
+
+DROP PROCEDURE IF EXISTS sp_transfer_cards;
+
+DELIMITER $$
+
+CREATE PROCEDURE sp_transfer_cards(
+  IN p_from_user_id INT,
+  IN p_to_user_id INT,
+  IN p_room VARCHAR(10) COLLATE utf8mb4_unicode_ci,
+  IN p_quantity INT,
+  IN p_executed_by INT
+)
+BEGIN
+  DECLARE v_remaining INT DEFAULT p_quantity;
+  DECLARE v_is_gift BOOLEAN;
+  DECLARE v_available INT;
+  DECLARE done INT DEFAULT FALSE;
+  
+  DECLARE cur_cards CURSOR FOR 
+    SELECT is_gift, quantity 
+    FROM user_card_inventory
+    WHERE user_id = p_from_user_id 
+      AND room COLLATE utf8mb4_unicode_ci = p_room
+    ORDER BY is_gift ASC; -- Primero normales, luego regalo
+  
+  DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
+  
+  -- Verificar que hay suficientes cartones
+  IF (SELECT SUM(quantity) FROM user_card_inventory 
+      WHERE user_id = p_from_user_id 
+        AND room COLLATE utf8mb4_unicode_ci = p_room) < p_quantity THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Cartones insuficientes';
+  END IF;
+  
+  OPEN cur_cards;
+  
+  transfer_loop: LOOP
+    FETCH cur_cards INTO v_is_gift, v_available;
+    
+    IF done OR v_remaining = 0 THEN
+      LEAVE transfer_loop;
+    END IF;
+    
+    SET @to_transfer = LEAST(v_remaining, v_available);
+    
+    -- Deducir del origen
+    UPDATE user_card_inventory
+    SET quantity = quantity - @to_transfer
+    WHERE user_id = p_from_user_id 
+      AND room COLLATE utf8mb4_unicode_ci = p_room 
+      AND is_gift = v_is_gift;
+    
+    -- Acreditar al destino
+    INSERT INTO user_card_inventory (user_id, room, is_gift, quantity)
+    VALUES (p_to_user_id, p_room, v_is_gift, @to_transfer)
+    ON DUPLICATE KEY UPDATE quantity = quantity + @to_transfer;
+    
+    -- Log salida
+    INSERT INTO card_movements_log 
+    (user_id, room, movement_type, quantity, is_gift, to_user_id, executed_by, reason)
+    VALUES (p_from_user_id, p_room, 'transfer_out', @to_transfer, v_is_gift, p_to_user_id, p_executed_by, 'Transferencia de cartones');
+    
+    -- Log entrada
+    INSERT INTO card_movements_log 
+    (user_id, room, movement_type, quantity, is_gift, from_user_id, executed_by, reason)
+    VALUES (p_to_user_id, p_room, 'transfer_in', @to_transfer, v_is_gift, p_from_user_id, p_executed_by, 'Recepción de cartones');
+    
+    SET v_remaining = v_remaining - @to_transfer;
+  END LOOP;
+  
+  CLOSE cur_cards;
+  
+  -- Limpiar registros con cantidad 0
+  DELETE FROM user_card_inventory WHERE quantity = 0;
+  
+END$$
+
+DELIMITER ;
+
+-- ========================================
+-- VERIFICAR QUE FUNCIONA
+-- ========================================
+SELECT '✅ sp_transfer_cards recreado con collation forzada' AS status;
