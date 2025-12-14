@@ -188,12 +188,12 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
     // Obtener TODA la red del agente (hijos + descendientes)
     const redCompleta = obtenerRedCompleta(agenteId, todosLosUsuarios);
     
-    // Ordenar: primero agentes, luego jugadores, AMBOS por ID descendente (más recientes primero)
+    // Ordenar: primero agentes, luego jugadores, AMBOS alfabéticamente
     const ordenados = redCompleta.sort((a, b) => {
       if (a.role === 'agente' && b.role !== 'agente') return -1;
       if (a.role !== 'agente' && b.role === 'agente') return 1;
-      // Dentro de cada categoría, ordenar por ID descendente (más recientes primero)
-      return b.id - a.id;
+      // Dentro de cada categoría, ordenar alfabéticamente
+      return a.username.localeCompare(b.username);
     });
 
     setUsuariosDelAgente(ordenados);
@@ -859,11 +859,8 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         {tieneHijosFlag && estaExpandido && nodo.children && (
           nodo.children
             .sort((a, b) => {
-              // Primero ordenar por rol: agentes antes que jugadores
-              if (a.role === 'agente' && b.role !== 'agente') return -1;
-              if (a.role !== 'agente' && b.role === 'agente') return 1;
-              // Luego alfabéticamente por username
-              return a.username.localeCompare(b.username);
+              // Ordenar por ID descendente (más recientes primero = arriba en el árbol)
+              return b.id - a.id;
             })
             .map(child => renderArbolReferidos(child, nivel + 1))
         )}
