@@ -20,7 +20,9 @@ const {
   getMyCardInventory,
   transferCardsToUser,
   getMyCardMovements,
-  changePassword
+  changePassword,
+  changeUserPassword,
+  updateUserPersonalData
 } = require('../controllers/adminController');
 
 /**
@@ -61,6 +63,8 @@ router.get('/users/hierarchy', authenticateToken, isAdmin, getUsersHierarchy);
 router.post('/users/create', authenticateToken, isAdmin, createUser);
 router.post('/users/add-cards', authenticateToken, isAdmin, addCardsToUser);
 router.post('/users/add-balance', authenticateToken, isAdmin, addBalanceToUser);
+router.post('/users/change-password', authenticateToken, isAdmin, changeUserPassword);
+router.put('/users/:userId/personal-data', authenticateToken, isAdmin, updateUserPersonalData);
 
 // ========================================
 // 🎴 INVENTARIO DE CARTONES (v1.4.0)

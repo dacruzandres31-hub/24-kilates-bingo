@@ -21,7 +21,7 @@ export function useAuth() {
   };
 
   const isAdmin = () => {
-    return user?.role === 'admin' || user?.role === 'superadmin';
+    return user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'agente';
   };
 
   const hasPermission = (permission) => {

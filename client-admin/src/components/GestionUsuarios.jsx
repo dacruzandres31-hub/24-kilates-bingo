@@ -69,6 +69,40 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
   });
   const [showPasswordCreate, setShowPasswordCreate] = useState(false);
   const [passwordStrengthCreate, setPasswordStrengthCreate] = useState({ level: 0, text: '', color: '' });
+  
+  // Estado para modal de información del usuario
+  const [modalInformacion, setModalInformacion] = useState({
+    isOpen: false,
+    usuario: null,
+    estructura: [], // Camino desde el panel hasta el usuario
+    agentesCount: 0,
+    jugadoresCount: 0,
+    parent: null
+  });
+
+  // Estado para modal de cambio de contraseña
+  const [modalCambiarPassword, setModalCambiarPassword] = useState({
+    isOpen: false,
+    usuario: null,
+    newPassword: '',
+    confirmPassword: '',
+    showPassword: false,
+    isProcessing: false
+  });
+  const [passwordStrengthChange, setPasswordStrengthChange] = useState({ level: 0, text: '', color: '' });
+
+  // Estado para modal de modificar datos personales
+  const [modalModificar, setModalModificar] = useState({
+    isOpen: false,
+    usuario: null,
+    datosPersonales: {
+      nombre_completo: '',
+      documento: '',
+      email: '',
+      telefono: ''
+    },
+    isProcessing: false
+  });
 
   useEffect(() => {
     cargarUsuarios();
@@ -83,13 +117,16 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
     const handleOpenManagementModal = (event) => {
       console.log('🟢 GestionUsuarios recibió evento openUserManagementModal:', event.detail);
       const user = event.detail.user;
-      // Normalizar balance a número
+      // Normalizar balance a número y mantener cartones separados
       const normalizedUser = {
         ...user,
         balance: parseFloat(user.balance) || 0,
         cards_bronce: parseInt(user.cards_bronce) || 0,
         cards_plata: parseInt(user.cards_plata) || 0,
-        cards_oro: parseInt(user.cards_oro) || 0
+        cards_oro: parseInt(user.cards_oro) || 0,
+        gift_bronce: parseInt(user.gift_bronce) || 0,
+        gift_plata: parseInt(user.gift_plata) || 0,
+        gift_oro: parseInt(user.gift_oro) || 0
       };
       setModalGestionUsuario({
         isOpen: true,
@@ -115,13 +152,16 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      // Normalizar datos: convertir balance a número
+      // Normalizar datos: convertir balance a número y mantener cartones separados
       const normalizedUsers = (response.data.all || []).map(user => ({
         ...user,
         balance: parseFloat(user.balance) || 0,
         cards_bronce: parseInt(user.cards_bronce) || 0,
         cards_plata: parseInt(user.cards_plata) || 0,
-        cards_oro: parseInt(user.cards_oro) || 0
+        cards_oro: parseInt(user.cards_oro) || 0,
+        gift_bronce: parseInt(user.gift_bronce) || 0,
+        gift_plata: parseInt(user.gift_plata) || 0,
+        gift_oro: parseInt(user.gift_oro) || 0
       }));
       
       setArbolJerarquico(response.data.tree || []);
@@ -137,17 +177,28 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
           balance: currentUserComplete?.balance || 0,
           cards_bronce: currentUserComplete?.cards_bronce || 0,
           cards_plata: currentUserComplete?.cards_plata || 0,
-          cards_oro: currentUserComplete?.cards_oro || 0
+          cards_oro: currentUserComplete?.cards_oro || 0,
+          gift_bronce: currentUserComplete?.gift_bronce || 0,
+          gift_plata: currentUserComplete?.gift_plata || 0,
+          gift_oro: currentUserComplete?.gift_oro || 0
         };
         
         setCurrentUser(updatedUser);
         
         // Actualizar recursos compartidos con el Dashboard
+        // Para agentes: sumar normales + regalo, para SuperAdmin: solo normales
         if (onResourcesUpdate) {
+          const role = response.data.currentUser.role;
           onResourcesUpdate(updatedUser, {
-            bronce: updatedUser.cards_bronce || 0,
-            plata: updatedUser.cards_plata || 0,
-            oro: updatedUser.cards_oro || 0
+            bronce: role === 'agente' 
+              ? (updatedUser.cards_bronce || 0) + (updatedUser.gift_bronce || 0)
+              : updatedUser.cards_bronce || 0,
+            plata: role === 'agente'
+              ? (updatedUser.cards_plata || 0) + (updatedUser.gift_plata || 0)
+              : updatedUser.cards_plata || 0,
+            oro: role === 'agente'
+              ? (updatedUser.cards_oro || 0) + (updatedUser.gift_oro || 0)
+              : updatedUser.cards_oro || 0
           });
         }
         
@@ -239,6 +290,175 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         telefono: ''
       }
     });
+  };
+
+  // Función para abrir modal de información
+  const abrirModalInformacion = async (usuario) => {
+    try {
+      // Construir estructura jerárquica desde el panel hasta el usuario
+      const estructura = [];
+      let currentId = usuario.parent_id;
+      
+      // Buscar en toda la jerarquía
+      const todosUsuarios = allUsersHierarchy.length > 0 ? allUsersHierarchy : usuarios;
+      
+      // Construir camino desde arriba (panel) hasta el usuario
+      while (currentId) {
+        const parent = todosUsuarios.find(u => u.id === currentId);
+        if (parent) {
+          estructura.unshift(parent.username); // Agregar al inicio
+          currentId = parent.parent_id;
+        } else {
+          break;
+        }
+      }
+      
+      // Agregar el usuario actual al final
+      estructura.push(usuario.username);
+      
+      // Encontrar padre directo
+      const parent = todosUsuarios.find(u => u.id === usuario.parent_id);
+      
+      // Contar agentes y jugadores directos (hijos)
+      const hijosDirectos = todosUsuarios.filter(u => u.parent_id === usuario.id);
+      const agentesCount = hijosDirectos.filter(u => u.role === 'agente' || u.role === 'superadmin').length;
+      const jugadoresCount = hijosDirectos.filter(u => u.role === 'jugador').length;
+      
+      setModalInformacion({
+        isOpen: true,
+        usuario: usuario,
+        estructura: estructura,
+        agentesCount: agentesCount,
+        jugadoresCount: jugadoresCount,
+        parent: parent
+      });
+    } catch (error) {
+      console.error('Error abriendo modal de información:', error);
+    }
+  };
+
+  // Función para cambiar contraseña de usuario
+  const handleCambiarPassword = async () => {
+    const { newPassword, confirmPassword, usuario } = modalCambiarPassword;
+
+    // Validaciones
+    if (!newPassword || !confirmPassword) {
+      setErrorMessage('❌ Debe completar ambos campos de contraseña');
+      setShowErrorPopup(true);
+      setTimeout(() => setShowErrorPopup(false), 3000);
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setErrorMessage('❌ Las contraseñas no coinciden');
+      setShowErrorPopup(true);
+      setTimeout(() => setShowErrorPopup(false), 3000);
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setErrorMessage('❌ La contraseña debe tener al menos 6 caracteres');
+      setShowErrorPopup(true);
+      setTimeout(() => setShowErrorPopup(false), 3000);
+      return;
+    }
+
+    setModalCambiarPassword(prev => ({ ...prev, isProcessing: true }));
+
+    try {
+      const token = localStorage.getItem('adminToken');
+      const response = await axios.post(
+        '/api/admin/users/change-password',
+        {
+          userId: usuario.id,
+          newPassword: newPassword
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      if (response.data.success) {
+        setSuccessMessage(`✅ Contraseña de ${usuario.username} actualizada correctamente`);
+        setShowSuccessPopup(true);
+        setTimeout(() => setShowSuccessPopup(false), 3000);
+        
+        // Cerrar modal
+        setModalCambiarPassword({
+          isOpen: false,
+          usuario: null,
+          newPassword: '',
+          confirmPassword: '',
+          showPassword: false,
+          isProcessing: false
+        });
+        setPasswordStrengthChange({ level: 0, text: '', color: '' });
+      }
+    } catch (error) {
+      console.error('Error cambiando contraseña:', error);
+      setErrorMessage(error.response?.data?.error || '❌ Error al cambiar la contraseña');
+      setShowErrorPopup(true);
+      setTimeout(() => setShowErrorPopup(false), 3000);
+      setModalCambiarPassword(prev => ({ ...prev, isProcessing: false }));
+    }
+  };
+
+  // Función para guardar modificación de datos personales
+  const handleModificarUsuario = async () => {
+    const { usuario, datosPersonales } = modalModificar;
+
+    setModalModificar(prev => ({ ...prev, isProcessing: true }));
+
+    try {
+      const token = localStorage.getItem('adminToken');
+      const response = await axios.put(
+        `/api/admin/users/${usuario.id}/personal-data`,
+        datosPersonales,
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      if (response.data.success) {
+        setSuccessMessage(`✅ Datos de ${usuario.username} actualizados correctamente`);
+        setShowSuccessPopup(true);
+        setTimeout(() => setShowSuccessPopup(false), 3000);
+        
+        // Recargar jerarquía para actualizar datos
+        const hierarchyResponse = await axios.get('/api/admin/users/hierarchy', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        if (hierarchyResponse.data.success) {
+          const allUsers = hierarchyResponse.data.all || [];
+          setAllUsersHierarchy(allUsers);
+          
+          // Actualizar usuarios del agente si hay uno seleccionado
+          if (agenteSeleccionado) {
+            cargarUsuariosDelAgente(agenteSeleccionado.id, allUsers);
+          }
+        }
+        
+        // Cerrar modal
+        setModalModificar({
+          isOpen: false,
+          usuario: null,
+          datosPersonales: {
+            nombre_completo: '',
+            documento: '',
+            email: '',
+            telefono: ''
+          },
+          isProcessing: false
+        });
+      }
+    } catch (error) {
+      console.error('Error modificando usuario:', error);
+      setErrorMessage(error.response?.data?.error || '❌ Error al modificar los datos');
+      setShowErrorPopup(true);
+      setTimeout(() => setShowErrorPopup(false), 3000);
+      setModalModificar(prev => ({ ...prev, isProcessing: false }));
+    }
   };
 
   const calculatePasswordStrength = (password) => {
@@ -555,9 +775,15 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         setCurrentUser(newCurrentUser);
         if (onResourcesUpdate) {
           onResourcesUpdate(null, {
-            bronce: newCurrentUser.cards_bronce || 0,
-            plata: newCurrentUser.cards_plata || 0,
-            oro: newCurrentUser.cards_oro || 0
+            bronce: currentUser.role === 'agente'
+              ? (newCurrentUser.cards_bronce || 0) + (newCurrentUser.gift_bronce || 0)
+              : newCurrentUser.cards_bronce || 0,
+            plata: currentUser.role === 'agente'
+              ? (newCurrentUser.cards_plata || 0) + (newCurrentUser.gift_plata || 0)
+              : newCurrentUser.cards_plata || 0,
+            oro: currentUser.role === 'agente'
+              ? (newCurrentUser.cards_oro || 0) + (newCurrentUser.gift_oro || 0)
+              : newCurrentUser.cards_oro || 0
           });
         }
 
@@ -780,9 +1006,15 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         if (tipo === 'cartones-agregar' && userId !== currentUser.id && onResourcesUpdate && currentUserFresco) {
           // Usar datos frescos del admin para mostrar en panel
           const newAdminCards = {
-            bronce: currentUserFresco.cards_bronce || 0,
-            plata: currentUserFresco.cards_plata || 0,
-            oro: currentUserFresco.cards_oro || 0
+            bronce: currentUser.role === 'agente'
+              ? (currentUserFresco.cards_bronce || 0) + (currentUserFresco.gift_bronce || 0)
+              : currentUserFresco.cards_bronce || 0,
+            plata: currentUser.role === 'agente'
+              ? (currentUserFresco.cards_plata || 0) + (currentUserFresco.gift_plata || 0)
+              : currentUserFresco.cards_plata || 0,
+            oro: currentUser.role === 'agente'
+              ? (currentUserFresco.cards_oro || 0) + (currentUserFresco.gift_oro || 0)
+              : currentUserFresco.cards_oro || 0
           };
           onResourcesUpdate(null, newAdminCards);
         }
@@ -790,9 +1022,15 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         if (tipo === 'cartones-quitar' && userId !== currentUser.id && onResourcesUpdate && currentUserFresco) {
           // Usar datos frescos del admin para mostrar en panel
           const newAdminCards = {
-            bronce: currentUserFresco.cards_bronce || 0,
-            plata: currentUserFresco.cards_plata || 0,
-            oro: currentUserFresco.cards_oro || 0
+            bronce: currentUser.role === 'agente'
+              ? (currentUserFresco.cards_bronce || 0) + (currentUserFresco.gift_bronce || 0)
+              : currentUserFresco.cards_bronce || 0,
+            plata: currentUser.role === 'agente'
+              ? (currentUserFresco.cards_plata || 0) + (currentUserFresco.gift_plata || 0)
+              : currentUserFresco.cards_plata || 0,
+            oro: currentUser.role === 'agente'
+              ? (currentUserFresco.cards_oro || 0) + (currentUserFresco.gift_oro || 0)
+              : currentUserFresco.cards_oro || 0
           };
           onResourcesUpdate(null, newAdminCards);
         }
@@ -809,13 +1047,22 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                 ...currentUser,
                 cards_bronce: parseInt(usuarioActualizado.cards_bronce) || 0,
                 cards_plata: parseInt(usuarioActualizado.cards_plata) || 0,
-                cards_oro: parseInt(usuarioActualizado.cards_oro) || 0
+                cards_oro: parseInt(usuarioActualizado.cards_oro) || 0,
+                gift_bronce: parseInt(usuarioActualizado.gift_bronce) || 0,
+                gift_plata: parseInt(usuarioActualizado.gift_plata) || 0,
+                gift_oro: parseInt(usuarioActualizado.gift_oro) || 0
               };
               setCurrentUser(newCurrentUser);
               onResourcesUpdate(null, {
-                bronce: newCurrentUser.cards_bronce,
-                plata: newCurrentUser.cards_plata,
-                oro: newCurrentUser.cards_oro
+                bronce: currentUser.role === 'agente'
+                  ? (newCurrentUser.cards_bronce || 0) + (newCurrentUser.gift_bronce || 0)
+                  : newCurrentUser.cards_bronce,
+                plata: currentUser.role === 'agente'
+                  ? (newCurrentUser.cards_plata || 0) + (newCurrentUser.gift_plata || 0)
+                  : newCurrentUser.cards_plata,
+                oro: currentUser.role === 'agente'
+                  ? (newCurrentUser.cards_oro || 0) + (newCurrentUser.gift_oro || 0)
+                  : newCurrentUser.cards_oro
               });
             }
           } catch (error) {
@@ -888,7 +1135,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
     return (
       <div key={nodo.id}>
         <div
-          className={`flex items-center gap-2 p-3 rounded-lg cursor-pointer transition-all ${
+          className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all ${
             esSeleccionado
               ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg'
               : 'hover:bg-gray-700/50 text-gray-200'
@@ -902,19 +1149,19 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                 e.stopPropagation();
                 toggleNodo(nodo.id);
               }}
-              className="w-5 h-5 flex items-center justify-center hover:bg-gray-600 rounded transition-colors"
+              className="w-4 h-4 flex items-center justify-center hover:bg-gray-600 rounded transition-colors"
             >
               <span className="text-xs">{estaExpandido ? '▼' : '▶'}</span>
             </button>
           ) : (
-            <div className="w-5 h-5 flex items-center justify-center">
-              <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
+            <div className="w-4 h-4 flex items-center justify-center">
+              <div className="w-1.5 h-1.5 bg-gray-500 rounded-full"></div>
             </div>
           )}
 
           {/* Contenido del nodo */}
           <div
-            className="flex items-center gap-2 flex-1"
+            className="flex items-center gap-2 flex-1 text-sm"
             onClick={async () => {
               setAgenteSeleccionado(nodo);
               
@@ -933,10 +1180,10 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
             }}
           >
             {/* Icono según rol */}
-            <span className="text-xl">{iconoRole}</span>
+            <span className="text-lg">{iconoRole}</span>
             
             {/* Nombre */}
-            <span className="font-semibold flex-1">{nodo.username}</span>
+            <span className="font-medium flex-1">{nodo.username}</span>
             
             {/* Punto amarillo si tiene sub-agentes */}
             {tieneSubAgentesFlag && (
@@ -1067,9 +1314,9 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Panel Izquierdo: Árbol de Referidos (solo agentes) */}
-      <div className="space-y-6">
+      <div className="space-y-6 lg:col-span-1">
         <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50 shadow-lg">
           <div className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white text-center py-4 rounded-xl mb-6">
             <h3 className="text-2xl font-bold">🌳 Árbol de Referidos</h3>
@@ -1080,7 +1327,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
           <div className="grid grid-cols-2 gap-4 mb-6">
             <button
               onClick={() => abrirModalCrearUsuario('jugador')}
-              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] shadow-lg"
+              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold py-2 px-3 rounded-lg text-sm flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] shadow-lg"
             >
               <span>👤</span>
               <span>Nuevo Jugador</span>
@@ -1089,7 +1336,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
             {(currentUser.role === 'superadmin' || currentUser.role === 'agente') && (
               <button
                 onClick={() => abrirModalCrearUsuario('agente')}
-                className="bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] shadow-lg"
+                className="bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-semibold py-2 px-3 rounded-lg text-sm flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] shadow-lg"
               >
                 <span>🏢</span>
                 <span>Nuevo Agente</span>
@@ -1098,7 +1345,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
           </div>
 
           {/* Árbol de solo agentes */}
-          <div className="space-y-2 max-h-[600px] overflow-y-auto">
+          <div className="space-y-2 max-h-[400px] overflow-y-auto">
             {arbolJerarquico.length > 0 ? (
               arbolJerarquico.map(nodo => renderArbolReferidos(nodo))
             ) : (
@@ -1111,7 +1358,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
       </div>
 
       {/* Panel Derecho: Listado de Usuarios del agente seleccionado */}
-      <div className="space-y-6">
+      <div className="space-y-6 lg:col-span-2">
         <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50 shadow-lg">
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-center py-4 rounded-xl mb-6">
             <h3 className="text-2xl font-bold">📋 Listado de Usuarios</h3>
@@ -1162,7 +1409,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
             })()}
           </div>
 
-          <div className="space-y-2 max-h-[600px] overflow-y-auto">
+          <div className="space-y-2 max-h-[700px] overflow-y-auto">
             {(() => {
               // BUSCAR EN TODA LA BASE DE DATOS cuando hay búsqueda activa
               const baseUsuarios = allUsersHierarchy.length > 0 ? allUsersHierarchy : usuarios;
@@ -1182,6 +1429,12 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                   return (
                     <div
                       key={usuario.id}
+                      onClick={() => {
+                        setModalGestionUsuario({
+                          isOpen: true,
+                          usuario: usuario
+                        });
+                      }}
                       className={`flex items-center justify-between px-4 py-3 rounded-lg border transition-all cursor-pointer ${
                         modalGestionUsuario.usuario?.id === usuario.id
                           ? 'bg-blue-600 border-blue-400 text-white shadow-lg'
@@ -1189,25 +1442,6 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                             ? 'bg-indigo-900/30 border-indigo-600/50 text-indigo-200 hover:bg-indigo-900/50' 
                             : 'bg-gray-700/30 border-gray-600/50 text-gray-200 hover:bg-gray-700/50'
                       }`}
-                      onClick={async () => {
-                        // Abrir modal inmediatamente
-                        setModalGestionUsuario({
-                          isOpen: true,
-                          usuario: usuario,
-                          giftCards: { bronce: 0, plata: 0, oro: 0 }
-                        });
-                        
-                        // Cargar gift cards en segundo plano
-                        try {
-                          const giftCards = await cargarGiftCards(usuario.id);
-                          setModalGestionUsuario(prev => ({
-                            ...prev,
-                            giftCards: giftCards
-                          }));
-                        } catch (error) {
-                          console.error('Error cargando gift cards:', error);
-                        }
-                      }}
                     >
                       <div className="flex items-center gap-3 flex-1">
                         <span className="text-2xl">{esAgente ? '🏢' : '👤'}</span>
@@ -1229,48 +1463,130 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                           </div>
                           
                           {/* Cartones Bronce */}
-                          {((usuario.cards_bronce || 0) > 0 || (currentUser.role === 'superadmin' && (usuario.gift_bronce || 0) > 0)) && (
+                          {((usuario.cards_bronce || 0) > 0 || (usuario.gift_bronce || 0) > 0) && (
                             <div className="flex items-center gap-1 bg-orange-900/30 border border-orange-600/40 rounded-lg px-2 py-1">
                               <div className="w-2 h-2 bg-gradient-to-br from-orange-500 to-orange-700 rounded-full"></div>
                               <span className="text-xs font-semibold text-orange-300">
                                 {currentUser.role === 'superadmin' && (usuario.gift_bronce || 0) > 0
                                   ? `${usuario.cards_bronce || 0}+${usuario.gift_bronce}🎁`
-                                  : (usuario.cards_bronce || 0).toLocaleString('es-CO')
+                                  : ((usuario.cards_bronce || 0) + (usuario.gift_bronce || 0)).toLocaleString('es-CO')
                                 }
                               </span>
                             </div>
                           )}
                           
                           {/* Cartones Plata */}
-                          {((usuario.cards_plata || 0) > 0 || (currentUser.role === 'superadmin' && (usuario.gift_plata || 0) > 0)) && (
+                          {((usuario.cards_plata || 0) > 0 || (usuario.gift_plata || 0) > 0) && (
                             <div className="flex items-center gap-1 bg-gray-700/30 border border-gray-500/40 rounded-lg px-2 py-1">
                               <div className="w-2 h-2 bg-gradient-to-br from-gray-300 to-gray-500 rounded-full"></div>
                               <span className="text-xs font-semibold text-gray-300">
                                 {currentUser.role === 'superadmin' && (usuario.gift_plata || 0) > 0
                                   ? `${usuario.cards_plata || 0}+${usuario.gift_plata}🎁`
-                                  : (usuario.cards_plata || 0).toLocaleString('es-CO')
+                                  : ((usuario.cards_plata || 0) + (usuario.gift_plata || 0)).toLocaleString('es-CO')
                                 }
                               </span>
                             </div>
                           )}
                           
                           {/* Cartones Oro */}
-                          {((usuario.cards_oro || 0) > 0 || (currentUser.role === 'superadmin' && (usuario.gift_oro || 0) > 0)) && (
+                          {((usuario.cards_oro || 0) > 0 || (usuario.gift_oro || 0) > 0) && (
                             <div className="flex items-center gap-1 bg-yellow-900/30 border border-yellow-600/40 rounded-lg px-2 py-1">
                               <div className="w-2 h-2 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full"></div>
                               <span className="text-xs font-semibold text-yellow-300">
                                 {currentUser.role === 'superadmin' && (usuario.gift_oro || 0) > 0
                                   ? `${usuario.cards_oro || 0}+${usuario.gift_oro}🎁`
-                                  : (usuario.cards_oro || 0).toLocaleString('es-CO')
+                                  : ((usuario.cards_oro || 0) + (usuario.gift_oro || 0)).toLocaleString('es-CO')
                                 }
                               </span>
                             </div>
                           )}
                         </div>
                         
+                        {/* Iconos de acción */}
+                        <div className="flex items-center gap-1.5 ml-3">
+                          {/* Ver información */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              abrirModalInformacion(usuario);
+                            }}
+                            className="w-8 h-8 rounded-lg bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/30 flex items-center justify-center transition-all hover:scale-110"
+                            title="Ver información"
+                          >
+                            <span className="text-cyan-400 text-sm">ℹ️</span>
+                          </button>
+
+                          {/* Cambiar Contraseña */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setModalCambiarPassword({
+                                isOpen: true,
+                                usuario: usuario,
+                                newPassword: '',
+                                confirmPassword: '',
+                                showPassword: false,
+                                isProcessing: false
+                              });
+                            }}
+                            className="w-8 h-8 rounded-lg bg-yellow-600/20 hover:bg-yellow-600/40 border border-yellow-500/30 flex items-center justify-center transition-all hover:scale-110"
+                            title="Cambiar contraseña"
+                          >
+                            <span className="text-yellow-400 text-sm">🔑</span>
+                          </button>
+
+                          {/* Modificar */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setModalModificar({
+                                isOpen: true,
+                                usuario: usuario,
+                                datosPersonales: {
+                                  nombre_completo: usuario.nombre_completo || '',
+                                  documento: usuario.documento || '',
+                                  email: usuario.email || '',
+                                  telefono: usuario.telefono || ''
+                                },
+                                isProcessing: false
+                              });
+                            }}
+                            className="w-8 h-8 rounded-lg bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/30 flex items-center justify-center transition-all hover:scale-110"
+                            title="Modificar usuario"
+                          >
+                            <span className="text-blue-400 text-sm">✏️</span>
+                          </button>
+
+                          {/* Bloquear */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              // TODO: Implementar bloqueo de usuario
+                              console.log('Bloquear usuario:', usuario.username);
+                            }}
+                            className="w-8 h-8 rounded-lg bg-red-600/20 hover:bg-red-600/40 border border-red-500/30 flex items-center justify-center transition-all hover:scale-110"
+                            title="Bloquear usuario"
+                          >
+                            <span className="text-red-400 text-sm">🔒</span>
+                          </button>
+
+                          {/* Ocultar */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              // TODO: Implementar ocultar usuario
+                              console.log('Ocultar usuario:', usuario.username);
+                            }}
+                            className="w-8 h-8 rounded-lg bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/30 flex items-center justify-center transition-all hover:scale-110"
+                            title="Ocultar usuario"
+                          >
+                            <span className="text-purple-400 text-sm">👁️</span>
+                          </button>
+                        </div>
+                        
                         {/* Marca de sub-agentes */}
                         {tieneSubAgentesFlag && (
-                          <span className="bg-yellow-500 text-black text-xs px-2 py-1 rounded-full font-bold">
+                          <span className="bg-yellow-500 text-black text-xs px-2 py-1 rounded-full font-bold ml-2">
                             SUB-AGENTE
                           </span>
                         )}
@@ -2175,6 +2491,373 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                 }`}
               >
                 {modalConfirmacion.isProcessing ? '⏳ PROCESANDO...' : '✓ ACEPTAR'}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Modal de Información del Usuario */}
+      {modalInformacion.isOpen && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl shadow-2xl border border-gray-700 w-full max-w-md">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-2xl flex items-center justify-between">
+              <h3 className="text-xl font-bold">Informacion del Usuario</h3>
+              <button
+                onClick={() => setModalInformacion({ isOpen: false, usuario: null, estructura: [], agentesCount: 0, jugadoresCount: 0, parent: null })}
+                className="text-white hover:text-red-300 transition-colors text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Contenido */}
+            <div className="p-6 space-y-4 text-gray-200">
+              {/* ID */}
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">ID:</span>
+                <span className="font-semibold">{modalInformacion.usuario?.id}</span>
+              </div>
+
+              {/* Usuario */}
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Usuario:</span>
+                <span className="font-semibold">{modalInformacion.usuario?.username}</span>
+              </div>
+
+              {/* Padre */}
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Padre:</span>
+                <span className="font-semibold">
+                  {modalInformacion.parent?.username || 'Sin padre'}
+                </span>
+              </div>
+
+              {/* Rol */}
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Rol:</span>
+                <span className="font-semibold">
+                  {modalInformacion.usuario?.role === 'jugador' ? 'Jugador' : 'Agente'}
+                </span>
+              </div>
+
+              {/* Marca */}
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Marca:</span>
+                <span className="font-semibold">{modalInformacion.usuario?.username}</span>
+              </div>
+
+              {/* Agentes */}
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Agentes:</span>
+                <span className="font-semibold text-blue-400">{modalInformacion.agentesCount}</span>
+              </div>
+
+              {/* Jugadores */}
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Jugadores:</span>
+                <span className="font-semibold text-green-400">{modalInformacion.jugadoresCount}</span>
+              </div>
+
+              {/* Creado */}
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Creado:</span>
+                <span className="font-semibold">
+                  {modalInformacion.usuario?.created_at 
+                    ? new Date(modalInformacion.usuario.created_at).toLocaleString('es-CO', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })
+                    : 'No disponible'}
+                </span>
+              </div>
+
+              {/* Estructura */}
+              <div className="border-t border-gray-700 pt-4 mt-4">
+                <span className="text-gray-400 block mb-2">Estructura:</span>
+                <ul className="space-y-1 ml-4">
+                  {modalInformacion.estructura.map((username, index) => (
+                    <li 
+                      key={index}
+                      className={index === modalInformacion.estructura.length - 1 
+                        ? 'text-blue-400 font-bold' 
+                        : 'text-gray-300'}
+                    >
+                      • {username}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 pb-6">
+              <button
+                onClick={() => setModalInformacion({ isOpen: false, usuario: null, estructura: [], agentesCount: 0, jugadoresCount: 0, parent: null })}
+                className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold rounded-xl transition-all"
+              >
+                CERRAR
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Modal de Cambiar Contraseña */}
+      {modalCambiarPassword.isOpen && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl shadow-2xl border border-gray-700 w-full max-w-md">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-yellow-600 to-amber-600 text-white px-6 py-4 rounded-t-2xl flex items-center justify-between">
+              <h3 className="text-xl font-bold">🔑 Cambiar Contraseña</h3>
+              <button
+                onClick={() => {
+                  setModalCambiarPassword({
+                    isOpen: false,
+                    usuario: null,
+                    newPassword: '',
+                    confirmPassword: '',
+                    showPassword: false,
+                    isProcessing: false
+                  });
+                  setPasswordStrengthChange({ level: 0, text: '', color: '' });
+                }}
+                className="text-white hover:text-red-300 transition-colors text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Contenido */}
+            <div className="p-6 space-y-4">
+              {/* Usuario */}
+              <div className="bg-blue-900/20 border border-blue-600/30 rounded-lg p-3">
+                <p className="text-sm text-gray-400">Cambiando contraseña de:</p>
+                <p className="text-lg font-bold text-white">{modalCambiarPassword.usuario?.username}</p>
+              </div>
+
+              {/* Nueva Contraseña */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Nueva Contraseña
+                </label>
+                <div className="relative">
+                  <input
+                    type={modalCambiarPassword.showPassword ? 'text' : 'password'}
+                    value={modalCambiarPassword.newPassword}
+                    onChange={(e) => {
+                      const pwd = e.target.value;
+                      setModalCambiarPassword(prev => ({ ...prev, newPassword: pwd }));
+                      setPasswordStrengthChange(calculatePasswordStrength(pwd));
+                    }}
+                    className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                    placeholder="Mínimo 6 caracteres"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setModalCambiarPassword(prev => ({ ...prev, showPassword: !prev.showPassword }))}
+                    className="absolute right-3 top-3.5 text-gray-400 hover:text-white transition-colors"
+                  >
+                    {modalCambiarPassword.showPassword ? '👁️' : '👁️‍🗨️'}
+                  </button>
+                </div>
+                {/* Indicador de fortaleza */}
+                {modalCambiarPassword.newPassword && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <div className="flex-1 h-2 bg-gray-700 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full transition-all ${
+                          passwordStrengthChange.level === 1 ? 'bg-red-500 w-1/3' :
+                          passwordStrengthChange.level === 2 ? 'bg-yellow-500 w-2/3' :
+                          'bg-green-500 w-full'
+                        }`}
+                      ></div>
+                    </div>
+                    <span className={`text-sm font-semibold ${passwordStrengthChange.color}`}>
+                      {passwordStrengthChange.text}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Confirmar Contraseña */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Confirmar Contraseña
+                </label>
+                <input
+                  type={modalCambiarPassword.showPassword ? 'text' : 'password'}
+                  value={modalCambiarPassword.confirmPassword}
+                  onChange={(e) => setModalCambiarPassword(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                  className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                  placeholder="Repetir contraseña"
+                />
+                {/* Indicador de coincidencia */}
+                {modalCambiarPassword.confirmPassword && (
+                  <p className={`text-sm mt-2 ${
+                    modalCambiarPassword.newPassword === modalCambiarPassword.confirmPassword 
+                      ? 'text-green-400' 
+                      : 'text-red-400'
+                  }`}>
+                    {modalCambiarPassword.newPassword === modalCambiarPassword.confirmPassword 
+                      ? '✓ Las contraseñas coinciden' 
+                      : '✗ Las contraseñas no coinciden'}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 pb-6 flex gap-3">
+              <button
+                onClick={() => {
+                  setModalCambiarPassword({
+                    isOpen: false,
+                    usuario: null,
+                    newPassword: '',
+                    confirmPassword: '',
+                    showPassword: false,
+                    isProcessing: false
+                  });
+                  setPasswordStrengthChange({ level: 0, text: '', color: '' });
+                }}
+                className="flex-1 py-3 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-500 hover:to-gray-600 text-white font-bold rounded-xl transition-all"
+              >
+                CANCELAR
+              </button>
+              <button
+                onClick={handleCambiarPassword}
+                disabled={modalCambiarPassword.isProcessing}
+                className={`flex-1 py-3 text-white font-bold rounded-xl transition-all ${
+                  modalCambiarPassword.isProcessing 
+                    ? 'opacity-50 cursor-not-allowed bg-gray-600' 
+                    : 'bg-gradient-to-r from-yellow-600 to-amber-600 hover:from-yellow-500 hover:to-amber-500'
+                }`}
+              >
+                {modalCambiarPassword.isProcessing ? '⏳ CAMBIANDO...' : '✓ CAMBIAR CONTRASEÑA'}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Modal de Modificar Datos Personales */}
+      {modalModificar.isOpen && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl shadow-2xl border border-blue-500/50 w-full max-w-md">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-4 rounded-t-2xl flex items-center justify-between">
+              <h3 className="text-xl font-bold">✏️ Modificar Usuario</h3>
+              <button
+                onClick={() => {
+                  setModalModificar({
+                    isOpen: false,
+                    usuario: null,
+                    datosPersonales: {
+                      nombre_completo: '',
+                      documento: '',
+                      email: '',
+                      telefono: ''
+                    },
+                    isProcessing: false
+                  });
+                }}
+                className="text-white hover:text-red-300 transition-colors text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Contenido */}
+            <div className="p-6">
+              {/* Usuario */}
+              <div className="bg-blue-900/20 border border-blue-600/30 rounded-lg p-3 mb-6">
+                <p className="text-sm text-gray-400">Modificando datos de:</p>
+                <p className="text-lg font-bold text-white">{modalModificar.usuario?.username}</p>
+              </div>
+
+              {/* Tab: Datos personales */}
+              <div className="space-y-4">
+                <input
+                  type="text"
+                  value={modalModificar.datosPersonales.nombre_completo}
+                  onChange={(e) => setModalModificar({
+                    ...modalModificar,
+                    datosPersonales: { ...modalModificar.datosPersonales, nombre_completo: e.target.value }
+                  })}
+                  placeholder="Nombre completo (opcional)"
+                  className="w-full px-4 py-3 bg-gray-700/50 border-b-2 border-gray-600 focus:outline-none focus:border-blue-500 text-white placeholder-gray-400 rounded-t-lg transition-colors"
+                />
+                <input
+                  type="text"
+                  value={modalModificar.datosPersonales.documento}
+                  onChange={(e) => setModalModificar({
+                    ...modalModificar,
+                    datosPersonales: { ...modalModificar.datosPersonales, documento: e.target.value }
+                  })}
+                  placeholder="Documento (opcional)"
+                  className="w-full px-4 py-3 bg-gray-700/50 border-b-2 border-gray-600 focus:outline-none focus:border-blue-500 text-white placeholder-gray-400 transition-colors"
+                />
+                <input
+                  type="email"
+                  value={modalModificar.datosPersonales.email}
+                  onChange={(e) => setModalModificar({
+                    ...modalModificar,
+                    datosPersonales: { ...modalModificar.datosPersonales, email: e.target.value }
+                  })}
+                  placeholder="Email (opcional)"
+                  className="w-full px-4 py-3 bg-gray-700/50 border-b-2 border-gray-600 focus:outline-none focus:border-blue-500 text-white placeholder-gray-400 transition-colors"
+                />
+                <input
+                  type="tel"
+                  value={modalModificar.datosPersonales.telefono}
+                  onChange={(e) => setModalModificar({
+                    ...modalModificar,
+                    datosPersonales: { ...modalModificar.datosPersonales, telefono: e.target.value }
+                  })}
+                  placeholder="Teléfono (opcional)"
+                  className="w-full px-4 py-3 bg-gray-700/50 border-b-2 border-gray-600 focus:outline-none focus:border-blue-500 text-white placeholder-gray-400 rounded-b-lg transition-colors"
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 pb-6 flex gap-3">
+              <button
+                onClick={() => {
+                  setModalModificar({
+                    isOpen: false,
+                    usuario: null,
+                    datosPersonales: {
+                      nombre_completo: '',
+                      documento: '',
+                      email: '',
+                      telefono: ''
+                    },
+                    isProcessing: false
+                  });
+                }}
+                className="flex-1 py-3 border-2 border-blue-500 text-blue-400 hover:bg-blue-500/10 font-semibold rounded-xl transition-all"
+              >
+                CANCELAR
+              </button>
+              <button
+                onClick={handleModificarUsuario}
+                disabled={modalModificar.isProcessing}
+                className={`flex-1 py-3 text-white font-semibold rounded-xl transition-all ${
+                  modalModificar.isProcessing 
+                    ? 'opacity-50 cursor-not-allowed bg-gray-600' 
+                    : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500'
+                }`}
+              >
+                {modalModificar.isProcessing ? '⏳ GUARDANDO...' : 'ACEPTAR'}
               </button>
             </div>
           </div>

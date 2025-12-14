@@ -687,7 +687,8 @@ async function getUsersHierarchy(req, res) {
     // SuperAdmin ve TODOS los usuarios con cartones normales y regalo separados
     if (currentUserRole === 'superadmin') {
       [allUsers] = await pool.query(`
-        SELECT u.id, u.username, u.role, u.parent_id, u.balance,
+        SELECT u.id, u.username, u.role, u.parent_id, u.balance, u.created_at,
+               u.nombre_completo, u.documento, u.email, u.telefono,
                COALESCE(SUM(CASE WHEN uci.room = 'bronce' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_bronce,
                COALESCE(SUM(CASE WHEN uci.room = 'plata' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_plata,
                COALESCE(SUM(CASE WHEN uci.room = 'oro' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_oro,
@@ -705,12 +706,16 @@ async function getUsersHierarchy(req, res) {
     } 
     // Agentes solo ven su RED (hijos directos y todos los descendientes)
     else if (currentUserRole === 'agente') {
-      // Primero obtener datos del agente actual
+      // Primero obtener datos del agente actual (con cartones normales y regalo separados)
       const [currentUserRow] = await pool.query(`
-        SELECT u.id, u.username, u.role, u.parent_id, u.balance,
-               COALESCE(SUM(CASE WHEN uci.room = 'bronce' THEN uci.quantity ELSE 0 END), 0) as cards_bronce,
-               COALESCE(SUM(CASE WHEN uci.room = 'plata' THEN uci.quantity ELSE 0 END), 0) as cards_plata,
-               COALESCE(SUM(CASE WHEN uci.room = 'oro' THEN uci.quantity ELSE 0 END), 0) as cards_oro
+        SELECT u.id, u.username, u.role, u.parent_id, u.balance, u.created_at,
+               u.nombre_completo, u.documento, u.email, u.telefono,
+               COALESCE(SUM(CASE WHEN uci.room = 'bronce' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_bronce,
+               COALESCE(SUM(CASE WHEN uci.room = 'plata' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_plata,
+               COALESCE(SUM(CASE WHEN uci.room = 'oro' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_oro,
+               COALESCE(SUM(CASE WHEN uci.room = 'bronce' AND uci.is_gift = TRUE THEN uci.quantity ELSE 0 END), 0) as gift_bronce,
+               COALESCE(SUM(CASE WHEN uci.room = 'plata' AND uci.is_gift = TRUE THEN uci.quantity ELSE 0 END), 0) as gift_plata,
+               COALESCE(SUM(CASE WHEN uci.room = 'oro' AND uci.is_gift = TRUE THEN uci.quantity ELSE 0 END), 0) as gift_oro
         FROM users u
         LEFT JOIN user_card_inventory uci ON u.id = uci.user_id
         WHERE u.id = ?
@@ -723,14 +728,16 @@ async function getUsersHierarchy(req, res) {
       const [networkUsers] = await pool.query(`
         WITH RECURSIVE network AS (
           -- Caso base: hijos directos del agente actual
-          SELECT id, username, role, parent_id, balance
+          SELECT id, username, role, parent_id, balance, created_at,
+                 nombre_completo, documento, email, telefono
           FROM users 
           WHERE parent_id = ?
           
           UNION ALL
           
           -- Caso recursivo: hijos de los hijos
-          SELECT u.id, u.username, u.role, u.parent_id, u.balance
+          SELECT u.id, u.username, u.role, u.parent_id, u.balance, u.created_at,
+                 u.nombre_completo, u.documento, u.email, u.telefono
           FROM users u
           INNER JOIN network n ON u.parent_id = n.id
         )
@@ -740,12 +747,20 @@ async function getUsersHierarchy(req, res) {
           n.role, 
           n.parent_id, 
           n.balance,
-          COALESCE(SUM(CASE WHEN uci.room = 'bronce' THEN uci.quantity ELSE 0 END), 0) as cards_bronce,
-          COALESCE(SUM(CASE WHEN uci.room = 'plata' THEN uci.quantity ELSE 0 END), 0) as cards_plata,
-          COALESCE(SUM(CASE WHEN uci.room = 'oro' THEN uci.quantity ELSE 0 END), 0) as cards_oro
+          n.created_at,
+          n.nombre_completo,
+          n.documento,
+          n.email,
+          n.telefono,
+          COALESCE(SUM(CASE WHEN uci.room = 'bronce' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_bronce,
+          COALESCE(SUM(CASE WHEN uci.room = 'plata' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_plata,
+          COALESCE(SUM(CASE WHEN uci.room = 'oro' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_oro,
+          COALESCE(SUM(CASE WHEN uci.room = 'bronce' AND uci.is_gift = TRUE THEN uci.quantity ELSE 0 END), 0) as gift_bronce,
+          COALESCE(SUM(CASE WHEN uci.room = 'plata' AND uci.is_gift = TRUE THEN uci.quantity ELSE 0 END), 0) as gift_plata,
+          COALESCE(SUM(CASE WHEN uci.room = 'oro' AND uci.is_gift = TRUE THEN uci.quantity ELSE 0 END), 0) as gift_oro
         FROM network n
         LEFT JOIN user_card_inventory uci ON n.id = uci.user_id
-        GROUP BY n.id
+        GROUP BY n.id, n.username, n.role, n.parent_id, n.balance, n.created_at, n.nombre_completo, n.documento, n.email, n.telefono
         ORDER BY n.id
       `, [currentUserId]);
       
@@ -1616,6 +1631,198 @@ async function changePassword(req, res) {
   }
 }
 
+/**
+ * POST /api/admin/users/change-password
+ * Cambia la contraseña de cualquier usuario (sin necesitar contraseña actual)
+ * Solo para administradores
+ */
+async function changeUserPassword(req, res) {
+  try {
+    const { userId, newPassword } = req.body;
+    const adminId = req.user.id;
+    const adminRole = req.user.role;
+
+    // Validar campos
+    if (!userId || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        error: 'userId y newPassword son requeridos'
+      });
+    }
+
+    // Validar longitud mínima
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        error: 'La contraseña debe tener al menos 6 caracteres'
+      });
+    }
+
+    // Verificar que el usuario a modificar existe
+    const [userRows] = await pool.query(
+      'SELECT id, username, role, parent_id FROM users WHERE id = ?',
+      [userId]
+    );
+
+    if (userRows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Usuario no encontrado'
+      });
+    }
+
+    const targetUser = userRows[0];
+
+    // Verificar permisos: 
+    // - SuperAdmin puede cambiar contraseña de cualquiera
+    // - Agentes solo pueden cambiar contraseña de sus usuarios (hijos directos o descendientes)
+    if (adminRole !== 'superadmin') {
+      // Verificar que el usuario esté en la red del agente
+      const [networkCheck] = await pool.query(`
+        WITH RECURSIVE network AS (
+          SELECT id FROM users WHERE id = ?
+          UNION ALL
+          SELECT u.id FROM users u
+          INNER JOIN network n ON u.parent_id = n.id
+        )
+        SELECT 1 FROM network WHERE id = ?
+      `, [adminId, userId]);
+
+      if (networkCheck.length === 0) {
+        return res.status(403).json({
+          success: false,
+          error: 'No tienes permisos para modificar este usuario'
+        });
+      }
+    }
+
+    // Hash de la nueva contraseña
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Actualizar contraseña
+    await pool.query(
+      'UPDATE users SET password_hash = ? WHERE id = ?',
+      [hashedPassword, userId]
+    );
+
+    console.log(`✅ Admin ${adminId} cambió contraseña del usuario ${userId} (${targetUser.username})`);
+
+    res.json({
+      success: true,
+      message: `Contraseña de ${targetUser.username} actualizada correctamente`
+    });
+
+  } catch (error) {
+    console.error('❌ Error cambiando contraseña de usuario:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al cambiar la contraseña',
+      details: error.message
+    });
+  }
+}
+
+/**
+ * PUT /api/admin/users/:userId/personal-data
+ * Actualiza los datos personales de un usuario
+ * Solo para administradores
+ */
+async function updateUserPersonalData(req, res) {
+  try {
+    const { userId } = req.params;
+    const { nombre_completo, documento, email, telefono } = req.body;
+    const adminId = req.user.id;
+    const adminRole = req.user.role;
+
+    // Verificar que el usuario existe
+    const [userRows] = await pool.query(
+      'SELECT id, username, role, parent_id FROM users WHERE id = ?',
+      [userId]
+    );
+
+    if (userRows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Usuario no encontrado'
+      });
+    }
+
+    const targetUser = userRows[0];
+
+    // Verificar permisos: 
+    // - SuperAdmin puede modificar cualquiera
+    // - Agentes solo pueden modificar usuarios en su red
+    if (adminRole !== 'superadmin') {
+      const [networkCheck] = await pool.query(`
+        WITH RECURSIVE network AS (
+          SELECT id FROM users WHERE id = ?
+          UNION ALL
+          SELECT u.id FROM users u
+          INNER JOIN network n ON u.parent_id = n.id
+        )
+        SELECT 1 FROM network WHERE id = ?
+      `, [adminId, userId]);
+
+      if (networkCheck.length === 0) {
+        return res.status(403).json({
+          success: false,
+          error: 'No tienes permisos para modificar este usuario'
+        });
+      }
+    }
+
+    // Construir query de actualización dinámica
+    const updates = [];
+    const values = [];
+
+    if (nombre_completo !== undefined) {
+      updates.push('nombre_completo = ?');
+      values.push(nombre_completo || null);
+    }
+    if (documento !== undefined) {
+      updates.push('documento = ?');
+      values.push(documento || null);
+    }
+    if (email !== undefined) {
+      updates.push('email = ?');
+      values.push(email || null);
+    }
+    if (telefono !== undefined) {
+      updates.push('telefono = ?');
+      values.push(telefono || null);
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No se proporcionaron campos para actualizar'
+      });
+    }
+
+    // Ejecutar actualización
+    values.push(userId);
+    await pool.query(
+      `UPDATE users SET ${updates.join(', ')} WHERE id = ?`,
+      values
+    );
+
+    console.log(`✅ Admin ${adminId} actualizó datos personales del usuario ${userId} (${targetUser.username})`);
+
+    res.json({
+      success: true,
+      message: `Datos de ${targetUser.username} actualizados correctamente`
+    });
+
+  } catch (error) {
+    console.error('❌ Error actualizando datos personales:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al actualizar los datos',
+      details: error.message
+    });
+  }
+}
+
 module.exports = {
   getAdminProfile,
   getFinancialSummary,
@@ -1633,5 +1840,7 @@ module.exports = {
   getMyCardInventory,
   transferCardsToUser,
   getMyCardMovements,
-  changePassword
+  changePassword,
+  changeUserPassword,
+  updateUserPersonalData
 };

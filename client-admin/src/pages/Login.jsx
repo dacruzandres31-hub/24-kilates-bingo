@@ -21,9 +21,9 @@ export default function Login({ onLogin }) {
 
       const { token, user } = response.data;
 
-      // Verificar que sea admin o superadmin
-      if (user.role !== 'admin' && user.role !== 'superadmin') {
-        setError('Acceso denegado. Solo administradores pueden acceder.');
+      // Verificar que sea admin, superadmin o agente
+      if (user.role !== 'admin' && user.role !== 'superadmin' && user.role !== 'agente') {
+        setError('Acceso denegado. Solo administradores y agentes pueden acceder.');
         setLoading(false);
         return;
       }
