@@ -972,28 +972,15 @@ async function addCardsToUser(req, res) {
 
     // Agregar o quitar cartones
     if (quantity > 0) {
-      // AGREGAR cartones
-      if (currentUserRole === 'superadmin') {
-        // SUPERADMIN: Crear cartones desde cero (ilimitado)
-        await cardInventoryService.creditCards(
-          userId,         // userId
-          room,           // room
-          quantity,       // quantity
-          false,          // isGift
-          null,           // purchasePrice
-          currentUserId,  // executedBy
-          'Admin credit'  // reason
-        );
-      } else {
-        // AGENTE/ADMIN: Transferir desde su inventario al usuario
-        await cardInventoryService.transferCards(
-          currentUserId,  // from (admin)
-          userId,         // to (usuario)
-          room,
-          quantity,
-          currentUserId   // executedBy
-        );
-      }
+      // AGREGAR cartones = Transferir desde inventario del admin (para todos)
+      // SuperAdmin debe cargar su inventario primero usando Card Inventory panel
+      await cardInventoryService.transferCards(
+        currentUserId,  // from (admin)
+        userId,         // to (usuario)
+        room,
+        quantity,
+        currentUserId   // executedBy
+      );
     } else if (quantity < 0) {
       // QUITAR cartones = Decrementar directamente del inventario del usuario
       const connection = await pool.getConnection();
@@ -1086,9 +1073,23 @@ async function addCardsToUser(req, res) {
       }
     }
 
+    // Obtener datos actualizados del usuario para devolver
+    const [updatedUser] = await pool.query(
+      `SELECT u.*, 
+        COALESCE(SUM(CASE WHEN uci.room = 'bronce' THEN uci.quantity ELSE 0 END), 0) as cards_bronce,
+        COALESCE(SUM(CASE WHEN uci.room = 'plata' THEN uci.quantity ELSE 0 END), 0) as cards_plata,
+        COALESCE(SUM(CASE WHEN uci.room = 'oro' THEN uci.quantity ELSE 0 END), 0) as cards_oro
+       FROM users u
+       LEFT JOIN user_card_inventory uci ON u.id = uci.user_id
+       WHERE u.id = ?
+       GROUP BY u.id`,
+      [userId]
+    );
+
     res.json({
       success: true,
-      message: `${Math.abs(quantity)} cartón(es) de ${room} ${quantity > 0 ? 'agregado(s)' : 'descargado(s)'} exitosamente`
+      message: `${Math.abs(quantity)} cartón(es) de ${room} ${quantity > 0 ? 'agregado(s)' : 'descargado(s)'} exitosamente`,
+      user: updatedUser[0]
     });
 
   } catch (error) {
