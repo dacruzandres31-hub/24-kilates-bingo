@@ -259,7 +259,7 @@ const WinnersTicker = () => {
 };
 
 
-const CasinoLobby = () => {
+const CasinoLobby = ({ user, onLogout }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showBalance, setShowBalance] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -351,7 +351,16 @@ const CasinoLobby = () => {
               <h3>Usuario</h3>
             </div>
             <div className="player-info">
-              <span className="player-name">JugadorPro24</span>
+              <span className="player-name">{user?.username || 'Jugador'}</span>
+              {onLogout && (
+                <button 
+                  onClick={onLogout}
+                  className="logout-btn"
+                  title="Cerrar Sesión"
+                >
+                  Salir
+                </button>
+              )}
             </div>
           </div>
 

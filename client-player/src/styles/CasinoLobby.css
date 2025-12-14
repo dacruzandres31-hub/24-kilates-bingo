@@ -1528,7 +1528,9 @@
 .player-info {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .player-name {
@@ -1536,6 +1538,31 @@
   font-weight: 700;
   color: #FFD700;
   text-shadow: 0 2px 8px rgba(255, 215, 0, 0.4);
+  flex: 1;
+}
+
+.logout-btn {
+  padding: 8px 16px;
+  background: linear-gradient(135deg, rgba(220, 53, 69, 0.8), rgba(185, 28, 28, 0.9));
+  border: 1px solid rgba(220, 53, 69, 0.5);
+  border-radius: 8px;
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3);
+}
+
+.logout-btn:hover {
+  background: linear-gradient(135deg, rgba(220, 53, 69, 1), rgba(185, 28, 28, 1));
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(220, 53, 69, 0.5);
+}
+
+.logout-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(220, 53, 69, 0.4);
 }
 
 /* Balance Section */
