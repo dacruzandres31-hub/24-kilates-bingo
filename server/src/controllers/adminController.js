@@ -1018,12 +1018,14 @@ async function addCardsToUser(req, res) {
         }
       }
     } else if (quantity < 0) {
-      // Quitar cartones (ya validamos que tiene suficientes)
+      // Quitar cartones y transferirlos al admin que los descarga
+      // 1. Transferir cartones al admin
       await pool.query(
-        `DELETE FROM user_cards 
+        `UPDATE user_cards 
+         SET user_id = ? 
          WHERE user_id = ? AND room = ? 
          LIMIT ?`,
-        [userId, room, Math.abs(quantity)]
+        [currentUserId, userId, room, Math.abs(quantity)]
       );
     }
 
