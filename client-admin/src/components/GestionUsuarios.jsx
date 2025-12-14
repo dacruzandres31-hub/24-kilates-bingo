@@ -760,6 +760,41 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
           cargarUsuariosDelAgente(agenteSeleccionado.id, response.data.all || []);
         }
         
+        // DESPUÉS de recargar, actualizar recursos del admin si transfirió cartones a otro usuario
+        if (tipo === 'cartones-agregar' && userId !== currentUser.id && onResourcesUpdate) {
+          // Admin transfirió cartones a otro usuario, descontar de sus recursos
+          const newAdminCards = {
+            bronce: sala === 'bronce' ? (currentUser.cards_bronce || 0) - cantidadNum : (currentUser.cards_bronce || 0),
+            plata: sala === 'plata' ? (currentUser.cards_plata || 0) - cantidadNum : (currentUser.cards_plata || 0),
+            oro: sala === 'oro' ? (currentUser.cards_oro || 0) - cantidadNum : (currentUser.cards_oro || 0)
+          };
+          const newUserData = {
+            ...currentUser,
+            cards_bronce: newAdminCards.bronce,
+            cards_plata: newAdminCards.plata,
+            cards_oro: newAdminCards.oro
+          };
+          setCurrentUser(newUserData);
+          onResourcesUpdate(null, newAdminCards);
+        }
+        
+        if (tipo === 'cartones-quitar' && userId !== currentUser.id && onResourcesUpdate) {
+          // Admin quitó cartones a otro usuario, sumar a sus recursos
+          const newAdminCards = {
+            bronce: sala === 'bronce' ? (currentUser.cards_bronce || 0) + cantidadNum : (currentUser.cards_bronce || 0),
+            plata: sala === 'plata' ? (currentUser.cards_plata || 0) + cantidadNum : (currentUser.cards_plata || 0),
+            oro: sala === 'oro' ? (currentUser.cards_oro || 0) + cantidadNum : (currentUser.cards_oro || 0)
+          };
+          const newUserData = {
+            ...currentUser,
+            cards_bronce: newAdminCards.bronce,
+            cards_plata: newAdminCards.plata,
+            cards_oro: newAdminCards.oro
+          };
+          setCurrentUser(newUserData);
+          onResourcesUpdate(null, newAdminCards);
+        }
+        
         // Si es el usuario actual, actualizar recursos compartidos con Dashboard
         if (userId === currentUser.id && onResourcesUpdate) {
           try {
