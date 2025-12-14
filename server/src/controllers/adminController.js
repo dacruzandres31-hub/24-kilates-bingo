@@ -655,12 +655,14 @@ async function getUsersHierarchy(req, res) {
     // SuperAdmin ve TODOS los usuarios (incluyéndose a sí mismo)
     if (currentUserRole === 'superadmin') {
       [allUsers] = await pool.query(`
-        SELECT id, username, role, parent_id, balance,
-               (SELECT COUNT(*) FROM user_cards WHERE user_id = users.id AND room = 'bronce') as cards_bronce,
-               (SELECT COUNT(*) FROM user_cards WHERE user_id = users.id AND room = 'plata') as cards_plata,
-               (SELECT COUNT(*) FROM user_cards WHERE user_id = users.id AND room = 'oro') as cards_oro
-        FROM users
-        ORDER BY id
+        SELECT u.id, u.username, u.role, u.parent_id, u.balance,
+               COALESCE(SUM(CASE WHEN uci.room = 'bronce' THEN uci.quantity ELSE 0 END), 0) as cards_bronce,
+               COALESCE(SUM(CASE WHEN uci.room = 'plata' THEN uci.quantity ELSE 0 END), 0) as cards_plata,
+               COALESCE(SUM(CASE WHEN uci.room = 'oro' THEN uci.quantity ELSE 0 END), 0) as cards_oro
+        FROM users u
+        LEFT JOIN user_card_inventory uci ON u.id = uci.user_id
+        GROUP BY u.id, u.username, u.role, u.parent_id, u.balance
+        ORDER BY u.id
       `);
       
       // Obtener datos del usuario actual
@@ -670,12 +672,14 @@ async function getUsersHierarchy(req, res) {
     else if (currentUserRole === 'agente') {
       // Primero obtener datos del agente actual
       const [currentUserRow] = await pool.query(`
-        SELECT id, username, role, parent_id, balance,
-               (SELECT COUNT(*) FROM user_cards WHERE user_id = users.id AND room = 'bronce') as cards_bronce,
-               (SELECT COUNT(*) FROM user_cards WHERE user_id = users.id AND room = 'plata') as cards_plata,
-               (SELECT COUNT(*) FROM user_cards WHERE user_id = users.id AND room = 'oro') as cards_oro
-        FROM users
-        WHERE id = ?
+        SELECT u.id, u.username, u.role, u.parent_id, u.balance,
+               COALESCE(SUM(CASE WHEN uci.room = 'bronce' THEN uci.quantity ELSE 0 END), 0) as cards_bronce,
+               COALESCE(SUM(CASE WHEN uci.room = 'plata' THEN uci.quantity ELSE 0 END), 0) as cards_plata,
+               COALESCE(SUM(CASE WHEN uci.room = 'oro' THEN uci.quantity ELSE 0 END), 0) as cards_oro
+        FROM users u
+        LEFT JOIN user_card_inventory uci ON u.id = uci.user_id
+        WHERE u.id = ?
+        GROUP BY u.id, u.username, u.role, u.parent_id, u.balance
       `, [currentUserId]);
       
       currentUserData = currentUserRow[0];
@@ -701,10 +705,12 @@ async function getUsersHierarchy(req, res) {
           n.role, 
           n.parent_id, 
           n.balance,
-          (SELECT COUNT(*) FROM user_cards WHERE user_id = n.id AND room = 'bronce') as cards_bronce,
-          (SELECT COUNT(*) FROM user_cards WHERE user_id = n.id AND room = 'plata') as cards_plata,
-          (SELECT COUNT(*) FROM user_cards WHERE user_id = n.id AND room = 'oro') as cards_oro
+          COALESCE(SUM(CASE WHEN uci.room = 'bronce' THEN uci.quantity ELSE 0 END), 0) as cards_bronce,
+          COALESCE(SUM(CASE WHEN uci.room = 'plata' THEN uci.quantity ELSE 0 END), 0) as cards_plata,
+          COALESCE(SUM(CASE WHEN uci.room = 'oro' THEN uci.quantity ELSE 0 END), 0) as cards_oro
         FROM network n
+        LEFT JOIN user_card_inventory uci ON n.id = uci.user_id
+        GROUP BY n.id, n.username, n.role, n.parent_id, n.balance
         ORDER BY n.id
       `, [currentUserId]);
       
