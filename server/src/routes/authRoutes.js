@@ -28,4 +28,7 @@ router.post('/logout', authMiddleware.authenticateToken, authController.logout);
 // Verificar token (con autenticación)
 router.get('/verify', authMiddleware.authenticateToken, authController.verifyToken);
 
+// Cambiar contraseña (con autenticación)
+router.post('/change-password', authMiddleware.authenticateToken, authController.changePassword);
+
 module.exports = router;

@@ -11,6 +11,17 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
   const [audioStatus, setAudioStatus] = useState({ musicEnabled: true, efectosEnabled: true });
   const [ticketsExpanded, setTicketsExpanded] = useState(false); // Colapsable cartones
   const [audioExpanded, setAudioExpanded] = useState(false); // Colapsable audio
+  const [showChangePassword, setShowChangePassword] = useState(false); // Modal cambiar contraseña
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [showPasswords, setShowPasswords] = useState({
+    current: false,
+    new: false,
+    confirm: false
+  });
   const [userData, setUserData] = useState({
     username: 'JugadorPro24',
     balance: 12500,
@@ -65,6 +76,46 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
     console.log('Abrir soporte');
   };
 
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      alert('❌ Las contraseñas no coinciden');
+      return;
+    }
+    
+    if (passwordData.newPassword.length < 6) {
+      alert('❌ La contraseña debe tener al menos 6 caracteres');
+      return;
+    }
+    
+    try {
+      const token = localStorage.getItem('playerToken');
+      const response = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          currentPassword: passwordData.currentPassword,
+          newPassword: passwordData.newPassword
+        })
+      });
+      
+      if (response.ok) {
+        alert('✅ Contraseña cambiada exitosamente');
+        setShowChangePassword(false);
+        setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      } else {
+        const data = await response.json();
+        alert('❌ ' + (data.error || 'Error al cambiar la contraseña'));
+      }
+    } catch (error) {
+      alert('❌ Error al cambiar la contraseña');
+    }
+  };
+
   return (
     <>
       {/* Botón flotante para abrir sidebar */}
@@ -111,6 +162,35 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
               <span className="sidebar-value username" style={{ color: accentColor }}>{userData.username}</span>
             </div>
           </div>
+          
+          {/* Botón Cambiar Contraseña */}
+          <button 
+            className="change-password-btn" 
+            onClick={() => setShowChangePassword(true)}
+            style={{ 
+              color: themeColor,
+              borderColor: `${themeColor}50`,
+              marginTop: '10px',
+              width: '100%',
+              padding: '8px',
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '0.85rem',
+              transition: 'all 0.3s'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.background = `${themeColor}20`;
+              e.target.style.borderColor = themeColor;
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background = 'rgba(255, 255, 255, 0.05)';
+              e.target.style.borderColor = `${themeColor}50`;
+            }}
+          >
+            🔑 Cambiar Contraseña
+          </button>
         </div>
 
         {/* Saldo */}
@@ -221,8 +301,222 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
           <span className="sidebar-version">v1.3.0</span>
         </div>
       </aside>
+
+      {/* Modal de Cambiar Contraseña */}
+      {showChangePassword && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            backdropFilter: 'blur(5px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            padding: '1rem'
+          }}
+          onClick={() => setShowChangePassword(false)}
+        >
+          <div 
+            style={{
+              background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+              borderRadius: '1rem',
+              padding: '2rem',
+              maxWidth: '400px',
+              width: '100%',
+              border: `2px solid ${themeColor}`,
+              boxShadow: `0 0 30px ${themeColor}50`
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ 
+              color: themeColor, 
+              marginBottom: '1.5rem', 
+              textAlign: 'center',
+              fontSize: '1.5rem',
+              fontWeight: 'bold'
+            }}>
+              🔑 Cambiar Contraseña
+            </h3>
+
+            <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {/* Contraseña Actual */}
+              <div>
+                <label style={{ display: 'block', color: '#cbd5e1', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>
+                  Contraseña Actual:
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showPasswords.current ? "text" : "password"}
+                    value={passwordData.currentPassword}
+                    onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 2.5rem 0.75rem 1rem',
+                      background: '#0f172a',
+                      border: '1px solid #475569',
+                      borderRadius: '0.5rem',
+                      color: 'white',
+                      fontSize: '1rem'
+                    }}
+                    placeholder="Tu contraseña actual"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswords({ ...showPasswords, current: !showPasswords.current })}
+                    style={{
+                      position: 'absolute',
+                      right: '0.75rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      color: '#94a3b8',
+                      cursor: 'pointer',
+                      fontSize: '1.2rem'
+                    }}
+                  >
+                    {showPasswords.current ? '👁' : '🔒'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Nueva Contraseña */}
+              <div>
+                <label style={{ display: 'block', color: '#cbd5e1', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>
+                  Nueva Contraseña:
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showPasswords.new ? "text" : "password"}
+                    value={passwordData.newPassword}
+                    onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 2.5rem 0.75rem 1rem',
+                      background: '#0f172a',
+                      border: '1px solid #475569',
+                      borderRadius: '0.5rem',
+                      color: 'white',
+                      fontSize: '1rem'
+                    }}
+                    placeholder="Mínimo 6 caracteres"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswords({ ...showPasswords, new: !showPasswords.new })}
+                    style={{
+                      position: 'absolute',
+                      right: '0.75rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      color: '#94a3b8',
+                      cursor: 'pointer',
+                      fontSize: '1.2rem'
+                    }}
+                  >
+                    {showPasswords.new ? '👁' : '🔒'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Confirmar Contraseña */}
+              <div>
+                <label style={{ display: 'block', color: '#cbd5e1', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>
+                  Confirmar Nueva Contraseña:
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showPasswords.confirm ? "text" : "password"}
+                    value={passwordData.confirmPassword}
+                    onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem 2.5rem 0.75rem 1rem',
+                      background: '#0f172a',
+                      border: '1px solid #475569',
+                      borderRadius: '0.5rem',
+                      color: 'white',
+                      fontSize: '1rem'
+                    }}
+                    placeholder="Confirma tu nueva contraseña"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswords({ ...showPasswords, confirm: !showPasswords.confirm })}
+                    style={{
+                      position: 'absolute',
+                      right: '0.75rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      color: '#94a3b8',
+                      cursor: 'pointer',
+                      fontSize: '1.2rem'
+                    }}
+                  >
+                    {showPasswords.confirm ? '👁' : '🔒'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Botones */}
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowChangePassword(false);
+                    setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '0.75rem',
+                    background: '#374151',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '0.5rem',
+                    cursor: 'pointer',
+                    fontSize: '1rem',
+                    fontWeight: '600'
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    flex: 1,
+                    padding: '0.75rem',
+                    background: `linear-gradient(135deg, ${themeColor} 0%, ${accentColor} 100%)`,
+                    color: '#0f172a',
+                    border: 'none',
+                    borderRadius: '0.5rem',
+                    cursor: 'pointer',
+                    fontSize: '1rem',
+                    fontWeight: 'bold',
+                    boxShadow: `0 4px 15px ${themeColor}40`
+                  }}
+                >
+                  Guardar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </>
   );
 };
 
 export default PlayerSidebar;
+

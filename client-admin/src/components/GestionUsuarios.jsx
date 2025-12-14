@@ -188,11 +188,12 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
     // Obtener TODA la red del agente (hijos + descendientes)
     const redCompleta = obtenerRedCompleta(agenteId, todosLosUsuarios);
     
-    // Ordenar: primero agentes, luego jugadores
+    // Ordenar: primero agentes, luego jugadores, AMBOS por ID descendente (más recientes primero)
     const ordenados = redCompleta.sort((a, b) => {
       if (a.role === 'agente' && b.role !== 'agente') return -1;
       if (a.role !== 'agente' && b.role === 'agente') return 1;
-      return a.username.localeCompare(b.username);
+      // Dentro de cada categoría, ordenar por ID descendente (más recientes primero)
+      return b.id - a.id;
     });
 
     setUsuariosDelAgente(ordenados);

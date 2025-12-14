@@ -172,3 +172,55 @@ exports.verifyToken = async (req, res) => {
     res.status(401).json({ valid: false, error: 'Token inválido' });
   }
 };
+
+// CHANGE PASSWORD - Cambiar contraseña del usuario autenticado
+exports.changePassword = async (req, res) => {
+  try {
+    const { userId } = req.user;
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Contraseña actual y nueva requeridas' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 6 caracteres' });
+    }
+
+    // Obtener contraseña actual del usuario
+    const [userResult] = await pool.query(
+      'SELECT password_hash FROM users WHERE id = ?',
+      [userId]
+    );
+
+    if (userResult.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    const user = userResult[0];
+
+    // Verificar contraseña actual
+    const passwordMatch = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!passwordMatch) {
+      return res.status(401).json({ error: 'Contraseña actual incorrecta' });
+    }
+
+    // Hash de la nueva contraseña
+    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+
+    // Actualizar contraseña en la base de datos
+    await pool.query(
+      'UPDATE users SET password_hash = ? WHERE id = ?',
+      [newPasswordHash, userId]
+    );
+
+    res.json({ 
+      success: true, 
+      message: 'Contraseña actualizada exitosamente' 
+    });
+  } catch (error) {
+    console.error('Error cambiando contraseña:', error);
+    res.status(500).json({ error: 'Error al cambiar contraseña' });
+  }
+};
+
