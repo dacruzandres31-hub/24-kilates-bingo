@@ -54,8 +54,8 @@ async function addGiftCards(req, res) {
       });
     }
 
-    // Determinar columna según si es regalo o normal
-    const cardColumn = isGift ? `gift_cards_${room}` : `cards_${room}`;
+    // Los cartones de regalo siempre van a gift_cards_{room}
+    const cardColumn = `gift_cards_${room}`;
 
     // Actualizar cartones del usuario
     await pool.query(
@@ -63,36 +63,28 @@ async function addGiftCards(req, res) {
       [quantityNum, userId]
     );
 
-    // Registrar movimiento si es de regalo
-    if (isGift) {
-      await pool.query(
-        `INSERT INTO gift_cards_movements 
-        (user_id, admin_id, room, quantity, movement_type, notes)
+    // Registrar movimiento
+    await pool.query(
+      `INSERT INTO gift_cards_movements 
+      (user_id, admin_id, room, quantity, movement_type, notes)
         VALUES (?, ?, ?, ?, 'add', ?)`,
         [userId, adminId, room, quantityNum, `Cartones de regalo agregados por admin ${adminId}`]
       );
-    }
 
     // Obtener nuevos totales
     const [user] = await pool.query(
-      `SELECT gift_cards_bronce, gift_cards_plata, gift_cards_oro,
-              cards_bronce, cards_plata, cards_oro
+      `SELECT gift_cards_bronce, gift_cards_plata, gift_cards_oro
        FROM users WHERE id = ?`,
       [userId]
     );
 
     res.json({
       success: true,
-      message: `${quantityNum} cartones ${isGift ? 'de regalo' : 'normales'} de ${room} agregados`,
+      message: `${quantityNum} cartones de regalo de ${room} agregados`,
       giftCards: {
         bronce: user[0].gift_cards_bronce,
         plata: user[0].gift_cards_plata,
         oro: user[0].gift_cards_oro
-      },
-      normalCards: {
-        bronce: user[0].cards_bronce,
-        plata: user[0].cards_plata,
-        oro: user[0].cards_oro
       }
     });
 
@@ -130,9 +122,9 @@ async function removeGiftCards(req, res) {
     }
 
     const quantityNum = parseInt(quantity);
-    const cardColumn = isGift ? `gift_cards_${room}` : `cards_${room}`;
+    const cardColumn = `gift_cards_${room}`;
 
-    // Verificar que tenga suficientes cartones
+    // Verificar que tenga suficientes cartones de regalo
     const [user] = await pool.query(
       `SELECT ${cardColumn} as current_cards FROM users WHERE id = ?`,
       [userId]
@@ -142,46 +134,40 @@ async function removeGiftCards(req, res) {
     if (currentCards < quantityNum) {
       return res.status(400).json({
         success: false,
-        error: `El usuario solo tiene ${currentCards} ${isGift ? 'cartones de regalo' : 'cartones normales'} de ${room}`
+        error: `El usuario solo tiene ${currentCards} cartones de regalo de ${room}`
       });
     }
 
-    // Quitar cartones
+    // Quitar cartones de regalo
     await pool.query(
       `UPDATE users SET ${cardColumn} = ${cardColumn} - ? WHERE id = ?`,
       [quantityNum, userId]
     );
 
-    // Registrar movimiento si es de regalo
-    if (isGift) {
-      await pool.query(
-        `INSERT INTO gift_cards_movements 
-        (user_id, admin_id, room, quantity, movement_type, notes)
-        VALUES (?, ?, ?, ?, 'remove', ?)`,
-        [userId, adminId, room, quantityNum, `Cartones de regalo removidos por admin ${adminId}`]
-      );
-    }
+    // Registrar movimiento
+    await pool.query(
+      `INSERT INTO gift_cards_movements 
+      (user_id, admin_id, room, quantity, movement_type, notes)
+      VALUES (?, ?, ?, ?, 'remove', ?)`,
+      [userId, adminId, room, quantityNum, `Cartones de regalo removidos por admin ${adminId}`]
+    );
 
     // Obtener nuevos totales
     const [updatedUser] = await pool.query(
-      `SELECT gift_cards_bronce, gift_cards_plata, gift_cards_oro,
-              cards_bronce, cards_plata, cards_oro
+      `SELECT gift_cards_bronce, gift_cards_plata, gift_cards_oro
        FROM users WHERE id = ?`,
       [userId]
     );
 
+    const roomCardKey = `gift_cards_${room}`;
     res.json({
       success: true,
-      message: `${quantityNum} ${isGift ? 'cartones de regalo' : 'cartones normales'} de ${room} removidos`,
+      message: `${quantityNum} cartones de regalo de ${room} removidos`,
+      newStock: updatedUser[0][roomCardKey],
       giftCards: {
         bronce: updatedUser[0].gift_cards_bronce,
         plata: updatedUser[0].gift_cards_plata,
         oro: updatedUser[0].gift_cards_oro
-      },
-      normalCards: {
-        bronce: updatedUser[0].cards_bronce,
-        plata: updatedUser[0].cards_plata,
-        oro: updatedUser[0].cards_oro
       }
     });
 
@@ -203,8 +189,7 @@ async function getGiftCardsStock(req, res) {
     const { userId } = req.params;
 
     const [user] = await pool.query(
-      `SELECT gift_cards_bronce, gift_cards_plata, gift_cards_oro,
-              cards_bronce, cards_plata, cards_oro
+      `SELECT gift_cards_bronce, gift_cards_plata, gift_cards_oro
        FROM users WHERE id = ?`,
       [userId]
     );
@@ -218,7 +203,7 @@ async function getGiftCardsStock(req, res) {
 
     res.json({
       success: true,
-      giftCards: {
+      stock: {
         bronce: user[0].gift_cards_bronce || 0,
         plata: user[0].gift_cards_plata || 0,
         oro: user[0].gift_cards_oro || 0
@@ -244,8 +229,38 @@ async function getGiftCardsStock(req, res) {
   }
 }
 
+/**
+ * GET /api/admin/gift-cards/history/:userId
+ * Obtiene el historial de movimientos de cartones de regalo
+ */
+async function getGiftCardsHistory(req, res) {
+  try {
+    const { userId } = req.params;
+
+    const [movements] = await pool.query(
+      `SELECT id, user_id, admin_id, room, quantity, movement_type, notes, created_at
+       FROM gift_cards_movements
+       WHERE user_id = ?
+       ORDER BY created_at DESC`,
+      [userId]
+    );
+
+    res.json({
+      success: true,
+      movements: movements
+    });
+  } catch (error) {
+    console.error('❌ Error obteniendo historial:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error obteniendo historial'
+    });
+  }
+}
+
 module.exports = {
   addGiftCards,
   removeGiftCards,
-  getGiftCardsStock
+  getGiftCardsStock,
+  getGiftCardsHistory
 };

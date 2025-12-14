@@ -28,4 +28,10 @@ router.get('/stock/:userId',
   giftCardsController.getGiftCardsStock
 );
 
+// Obtener historial de movimientos
+router.get('/history/:userId',
+  authenticateToken,
+  giftCardsController.getGiftCardsHistory
+);
+
 module.exports = router;

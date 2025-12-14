@@ -415,37 +415,37 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      // Cerrar modal
+      // Cerrar modal de dinero
       setModalDinero({ isOpen: false, tipo: null, userId: null, username: '', saldoActual: 0, monto: '', buttonPosition: null });
       
       // Mostrar popup de éxito
       setShowSuccessPopup(true);
       setTimeout(() => setShowSuccessPopup(false), 2000);
 
-      // Recargar usuarios y actualizar modal si está abierto
-      await cargarUsuarios();
+      // Recargar usuarios y actualizar modal de gestión con datos frescos
+      const response = await axios.get('/api/admin/users/hierarchy', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       
-      // Después de recargar, actualizar el modal de gestión si está abierto
+      // Actualizar lista de usuarios
+      setUsuarios(response.data.all || []);
+      setArbolJerarquico(response.data.tree || []);
+      
+      // CRÍTICO: Actualizar el modal de gestión si está abierto para el mismo usuario
       if (modalGestionUsuario.isOpen && modalGestionUsuario.usuario?.id === userId) {
-        // Hacer una consulta fresca del usuario
-        try {
-          const response = await axios.get('/api/admin/users-hierarchy', {
-            headers: { Authorization: `Bearer ${token}` }
+        const usuarioActualizado = response.data.all.find(u => u.id === userId);
+        if (usuarioActualizado) {
+          console.log('✅ Modal actualizado - Balance anterior:', modalGestionUsuario.usuario.balance, 'Nuevo balance:', usuarioActualizado.balance);
+          setModalGestionUsuario({
+            ...modalGestionUsuario,
+            usuario: usuarioActualizado // Reemplazar TODO el objeto usuario con datos frescos
           });
-          
-          const usuarioActualizado = response.data.all.find(u => u.id === userId);
-          if (usuarioActualizado) {
-            setModalGestionUsuario({
-              ...modalGestionUsuario,
-              usuario: {
-                ...modalGestionUsuario.usuario,
-                balance: parseFloat(usuarioActualizado.balance) || 0
-              }
-            });
-          }
-        } catch (error) {
-          console.error('Error actualizando modal de gestión:', error);
         }
+      }
+      
+      // Actualizar usuarios del agente seleccionado
+      if (agenteSeleccionado) {
+        cargarUsuariosDelAgente(agenteSeleccionado.id, response.data.all || []);
       }
     } catch (error) {
       alert('❌ ' + (error.response?.data?.error || error.message));
@@ -582,32 +582,30 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
           headers: { Authorization: `Bearer ${token}` }
         });
         
-        // Recargar usuarios para asegurar consistencia
-        await cargarUsuarios();
+        // Recargar usuarios y actualizar modal con datos frescos
+        const response = await axios.get('/api/admin/users/hierarchy', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
         
-        // DESPUÉS de recargar, actualizar el modal con datos frescos de la BD
+        // Actualizar lista de usuarios
+        setUsuarios(response.data.all || []);
+        setArbolJerarquico(response.data.tree || []);
+        
+        // CRÍTICO: Actualizar el modal de gestión si está abierto con el usuario completo
         if (modalGestionUsuario.isOpen && modalGestionUsuario.usuario?.id === userId) {
-          try {
-            const response = await axios.get('/api/admin/users-hierarchy', {
-              headers: { Authorization: `Bearer ${token}` }
+          const usuarioActualizado = response.data.all.find(u => u.id === userId);
+          if (usuarioActualizado) {
+            console.log('✅ Modal actualizado - Balance anterior:', modalGestionUsuario.usuario.balance, 'Nuevo:', usuarioActualizado.balance);
+            setModalGestionUsuario({
+              ...modalGestionUsuario,
+              usuario: usuarioActualizado // Reemplazar TODO el objeto con datos frescos
             });
-            
-            const usuarioActualizado = response.data.all.find(u => u.id === userId);
-            if (usuarioActualizado) {
-              setModalGestionUsuario({
-                ...modalGestionUsuario,
-                usuario: {
-                  ...modalGestionUsuario.usuario,
-                  balance: parseFloat(usuarioActualizado.balance) || 0,
-                  cards_bronce: parseInt(usuarioActualizado.cards_bronce) || 0,
-                  cards_plata: parseInt(usuarioActualizado.cards_plata) || 0,
-                  cards_oro: parseInt(usuarioActualizado.cards_oro) || 0
-                }
-              });
-            }
-          } catch (error) {
-            console.error('Error actualizando modal de gestión:', error);
           }
+        }
+        
+        // Actualizar usuarios del agente seleccionado
+        if (agenteSeleccionado) {
+          cargarUsuariosDelAgente(agenteSeleccionado.id, response.data.all || []);
         }
         
         // DESPUÉS de recargar, actualizar recursos del admin si cargó/descargó a otro usuario
@@ -648,15 +646,33 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
           headers: { Authorization: `Bearer ${token}` }
         });
 
-        // Recargar gift cards
+        // Recargar gift cards y actualizar modal completo
         const giftCards = await cargarGiftCards(userId);
         
-        // Actualizar modal con nuevos datos
+        // Recargar usuarios completos
+        const response = await axios.get('/api/admin/users/hierarchy', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        setUsuarios(response.data.all || []);
+        setArbolJerarquico(response.data.tree || []);
+        
+        // Actualizar modal con usuario completo + gift cards
         if (modalGestionUsuario.isOpen && modalGestionUsuario.usuario?.id === userId) {
-          setModalGestionUsuario({
-            ...modalGestionUsuario,
-            giftCards: giftCards
-          });
+          const usuarioActualizado = response.data.all.find(u => u.id === userId);
+          if (usuarioActualizado) {
+            console.log('✅ Modal actualizado - Gift cards', sala, ':', giftCards[sala]);
+            setModalGestionUsuario({
+              ...modalGestionUsuario,
+              usuario: usuarioActualizado,
+              giftCards: giftCards
+            });
+          }
+        }
+        
+        // Actualizar usuarios del agente seleccionado
+        if (agenteSeleccionado) {
+          cargarUsuariosDelAgente(agenteSeleccionado.id, response.data.all || []);
         }
       } else {
         // OPERACIONES DE CARTONES NORMALES
@@ -690,38 +706,36 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
           headers: { Authorization: `Bearer ${token}` }
         });
 
-        // Recargar usuarios para asegurar consistencia
-        await cargarUsuarios();
+        // Recargar usuarios y actualizar modal con datos frescos
+        const response = await axios.get('/api/admin/users/hierarchy', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
         
-        // DESPUÉS de recargar, actualizar el modal con datos frescos
+        // Actualizar lista de usuarios
+        setUsuarios(response.data.all || []);
+        setArbolJerarquico(response.data.tree || []);
+        
+        // CRÍTICO: Actualizar el modal con el usuario completo
         if (modalGestionUsuario.isOpen && modalGestionUsuario.usuario?.id === userId) {
-          try {
-            const response = await axios.get('/api/admin/users-hierarchy', {
-              headers: { Authorization: `Bearer ${token}` }
+          const usuarioActualizado = response.data.all.find(u => u.id === userId);
+          if (usuarioActualizado) {
+            console.log('✅ Modal actualizado - Cartones', sala, ':', usuarioActualizado[`cards_${sala}`]);
+            setModalGestionUsuario({
+              ...modalGestionUsuario,
+              usuario: usuarioActualizado // Reemplazar TODO el objeto
             });
-            
-            const usuarioActualizado = response.data.all.find(u => u.id === userId);
-            if (usuarioActualizado) {
-              setModalGestionUsuario({
-                ...modalGestionUsuario,
-                usuario: {
-                  ...modalGestionUsuario.usuario,
-                  balance: parseFloat(usuarioActualizado.balance) || 0,
-                  cards_bronce: parseInt(usuarioActualizado.cards_bronce) || 0,
-                  cards_plata: parseInt(usuarioActualizado.cards_plata) || 0,
-                  cards_oro: parseInt(usuarioActualizado.cards_oro) || 0
-                }
-              });
-            }
-          } catch (error) {
-            console.error('Error actualizando modal de gestión:', error);
           }
+        }
+        
+        // Actualizar usuarios del agente seleccionado
+        if (agenteSeleccionado) {
+          cargarUsuariosDelAgente(agenteSeleccionado.id, response.data.all || []);
         }
         
         // Si es el usuario actual, actualizar recursos compartidos con Dashboard
         if (userId === currentUser.id && onResourcesUpdate) {
           try {
-            const response = await axios.get('/api/admin/users-hierarchy', {
+            const response = await axios.get('/api/admin/users/hierarchy', {
               headers: { Authorization: `Bearer ${token}` }
             });
             const usuarioActualizado = response.data.all.find(u => u.id === userId);
@@ -1529,7 +1543,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
       {/* Modal de Gestión de Usuario - Renderizado con portal */}
       {modalGestionUsuario.isOpen && modalGestionUsuario.usuario && createPortal(
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-start justify-center pt-20">
-          <div className="bg-gradient-to-br from-gray-900 to-gray-800 border border-purple-500/50 rounded-2xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden animate-in fade-in slide-in-from-top-4 duration-200">
+          <div className="bg-gradient-to-br from-gray-900 to-gray-800 border border-purple-500/50 rounded-2xl shadow-2xl w-full max-w-5xl mx-4 overflow-hidden animate-in fade-in slide-in-from-top-4 duration-200">
             {/* Header */}
             <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-6 text-white">
               <div className="flex items-center justify-between">
@@ -1552,53 +1566,57 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
 
             {/* Body */}
             <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
-              {/* Balance */}
-              <div>
-                <h3 className="text-white font-bold text-lg mb-3 flex items-center gap-2">
-                  💰 Balance
-                </h3>
-                <div className="bg-gradient-to-r from-green-900/40 to-emerald-900/30 border border-green-600/50 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-green-300 font-semibold">Saldo Actual:</span>
-                    <span className="text-white font-bold text-2xl">
-                      ${Math.floor(modalGestionUsuario.usuario.balance || 0).toLocaleString('es-CO')}
-                    </span>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setModalConfirmacion({
-                        isOpen: true,
-                        tipo: 'dinero-cargar',
-                        sala: '',
-                        cantidad: '',
-                        userId: modalGestionUsuario.usuario.id
-                      })}
-                      className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-2 px-4 rounded-lg transition-all"
-                    >
-                      + Cargar
-                    </button>
-                    <button
-                      onClick={() => setModalConfirmacion({
-                        isOpen: true,
-                        tipo: 'dinero-descargar',
-                        sala: '',
-                        cantidad: '',
-                        userId: modalGestionUsuario.usuario.id
-                      })}
-                      className="flex-1 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-500 hover:to-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-all"
-                    >
-                      − Descargar
-                    </button>
+              {/* Balance - Solo visible para SuperAdmin */}
+              {currentUser.role === 'superadmin' && (
+                <div>
+                  <h3 className="text-white font-bold text-lg mb-3 flex items-center gap-2">
+                    💰 Balance
+                  </h3>
+                  <div className="bg-gradient-to-r from-green-900/40 to-emerald-900/30 border border-green-600/50 rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-green-300 font-semibold">Saldo Actual:</span>
+                      <span className="text-white font-bold text-2xl">
+                        ${Math.floor(modalGestionUsuario.usuario.balance || 0).toLocaleString('es-CO')}
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setModalConfirmacion({
+                          isOpen: true,
+                          tipo: 'dinero-cargar',
+                          sala: '',
+                          cantidad: '',
+                          userId: modalGestionUsuario.usuario.id
+                        })}
+                        className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-2 px-4 rounded-lg transition-all"
+                      >
+                        + Cargar
+                      </button>
+                      <button
+                        onClick={() => setModalConfirmacion({
+                          isOpen: true,
+                          tipo: 'dinero-descargar',
+                          sala: '',
+                          cantidad: '',
+                          userId: modalGestionUsuario.usuario.id
+                        })}
+                        className="flex-1 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-500 hover:to-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-all"
+                      >
+                        − Descargar
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
-              {/* Cartones */}
+              {/* Cartones y Gift Cards en 2 columnas */}
               <div>
                 <h3 className="text-white font-bold text-lg mb-3 flex items-center gap-2">
                   🎫 Cartones
                 </h3>
-                <div className="space-y-3">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Columna 1: Cartones Normales */}
+                  <div className="space-y-3">
                   {/* Bronce */}
                   <div className="bg-gradient-to-r from-orange-900/30 to-orange-800/20 border border-orange-700/50 rounded-xl p-4">
                     <div className="flex items-center justify-between mb-3">
@@ -1718,17 +1736,15 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                       </button>
                     </div>
                   </div>
-                </div>
-              </div>
+                  </div> {/* Cierra columna de cartones normales */}
 
-              {/* SISTEMA DE GIFT CARDS - Solo visible para Andy (SuperAdmin) */}
-              {currentUser.role === 'superadmin' && currentUser.username?.toLowerCase() === 'andy' && (
-                <div>
-                  <h3 className="text-white font-bold text-lg mb-3 flex items-center gap-2">
-                    🎁 Cartones de Regalo
-                    <span className="text-xs text-purple-300 bg-purple-900/50 px-2 py-1 rounded-full">Solo Andy</span>
-                  </h3>
-                  <div className="space-y-3">
+                  {/* Columna 2: Gift Cards - Solo visible para Andy */}
+                  {currentUser.role === 'superadmin' && currentUser.username?.toLowerCase() === 'andy' && <div className="space-y-3">
+                      <div className="text-pink-300 font-semibold text-sm mb-2 flex items-center gap-2">
+                        🎁 Cartones de Regalo
+                        <span className="text-xs text-purple-300 bg-purple-900/50 px-2 py-1 rounded-full">Solo Andy</span>
+                      </div>
+                    
                     {/* Gift Bronce */}
                     <div className="bg-gradient-to-r from-orange-900/40 to-orange-800/30 border-2 border-orange-500/70 rounded-xl p-4 relative overflow-hidden">
                       <div className="absolute top-2 right-2 bg-orange-500/20 px-2 py-1 rounded text-xs text-orange-300 font-bold">
@@ -1862,10 +1878,10 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                           − Quitar
                         </button>
                       </div>
-                    </div>
-                  </div>
-                </div>
-              )}
+                    </div> {/* Cierra Gift Oro */}
+                  </div>} {/* Cierra <div className="space-y-3"> - columna gift cards */}
+                </div> {/* Cierra grid de 2 columnas */}
+              </div> {/* Cierra sección de Cartones */}
             </div> {/* Cierra el contenedor del Body */}
 
             {/* Footer */}
@@ -2024,3 +2040,4 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
     </>
   );
 }
+

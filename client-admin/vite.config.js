@@ -8,14 +8,17 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: 'http://localhost:3001',
-        changeOrigin: true
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path
       },
       '/socket.io': {
         target: 'http://localhost:3001',
         changeOrigin: true,
         ws: true
       }
-    }
+    },
+    cors: true
   },
   build: {
     outDir: 'dist',
