@@ -315,9 +315,8 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
       }
       
       // Expandir nodo del parent donde se creó el usuario
-      const parentId = userData.parent_id;
-      if (parentId) {
-        setNodosExpandidos(prev => new Set([...prev, parentId]));
+      if (userData.parent_id) {
+        setNodosExpandidos(prev => new Set([...prev, userData.parent_id]));
       }
     } catch (error) {
       setErrorMessage('Error creando usuario: ' + (error.response?.data?.error || error.message));
