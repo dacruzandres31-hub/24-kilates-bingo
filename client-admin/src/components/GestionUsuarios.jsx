@@ -490,6 +490,10 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
       return;
     }
     
+    // LIMPIAR mensaje de éxito anterior (evitar que se quede pegado)
+    setSuccessMessage('');
+    setShowSuccessPopup(false);
+    
     // Bloquear múltiples ejecuciones
     setModalConfirmacion(prev => ({ ...prev, isProcessing: true }));
 
@@ -715,27 +719,16 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
           }
         }
         
-        // Operación de cartones
-        if (tipo === 'cartones-agregar') {
-          // AGREGAR cartones
-          await axios.post('/api/admin/users/add-cards', {
-            userId: userId,
-            room: sala,
-            quantity: cantidadNum
-          }, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-        } else {
-          // QUITAR cartones usando transferencia (del usuario al admin)
-          await axios.post('/api/admin/cards/transfer', {
-            fromUserId: userId,
-            toUserId: currentUser.id,
-            room: sala,
-            quantity: cantidadNum
-          }, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-        }
+        // Operación de cartones (agregar o quitar)
+        const cantidadFinal = (tipo === 'cartones-agregar' ? 1 : -1) * cantidadNum;
+        
+        await axios.post('/api/admin/users/add-cards', {
+          userId: userId,
+          room: sala,
+          quantity: cantidadFinal
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
 
         // Recargar usuarios y actualizar modal con datos frescos
         const response = await axios.get('/api/admin/users/hierarchy', {
