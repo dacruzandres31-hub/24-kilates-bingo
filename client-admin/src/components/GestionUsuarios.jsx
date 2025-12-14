@@ -722,13 +722,17 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         // Operación de cartones (agregar o quitar)
         const cantidadFinal = (tipo === 'cartones-agregar' ? 1 : -1) * cantidadNum;
         
-        await axios.post('/api/admin/users/add-cards', {
+        console.log('📤 Enviando request add-cards:', { userId, room: sala, quantity: cantidadFinal });
+        
+        const cardsResponse = await axios.post('/api/admin/users/add-cards', {
           userId: userId,
           room: sala,
           quantity: cantidadFinal
         }, {
           headers: { Authorization: `Bearer ${token}` }
         });
+        
+        console.log('✅ Respuesta add-cards:', cardsResponse.data);
 
         // Recargar usuarios y actualizar modal con datos frescos
         const response = await axios.get('/api/admin/users/hierarchy', {
