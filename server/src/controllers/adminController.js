@@ -970,16 +970,30 @@ async function addCardsToUser(req, res) {
       });
     }
 
-    // Transferir cartones usando cardInventoryService (maneja is_gift automáticamente)
+    // Agregar o quitar cartones
     if (quantity > 0) {
-      // AGREGAR cartones = Transferir desde el inventario del admin al usuario
-      await cardInventoryService.transferCards(
-        currentUserId,  // from (admin)
-        userId,         // to (usuario)
-        room,
-        quantity,
-        currentUserId   // executedBy
-      );
+      // AGREGAR cartones
+      if (currentUserRole === 'superadmin') {
+        // SUPERADMIN: Crear cartones desde cero (ilimitado)
+        await cardInventoryService.creditCards(
+          userId,         // userId
+          room,           // room
+          quantity,       // quantity
+          false,          // isGift
+          null,           // purchasePrice
+          currentUserId,  // executedBy
+          'Admin credit'  // reason
+        );
+      } else {
+        // AGENTE/ADMIN: Transferir desde su inventario al usuario
+        await cardInventoryService.transferCards(
+          currentUserId,  // from (admin)
+          userId,         // to (usuario)
+          room,
+          quantity,
+          currentUserId   // executedBy
+        );
+      }
     } else if (quantity < 0) {
       // QUITAR cartones = Decrementar directamente del inventario del usuario
       const connection = await pool.getConnection();
