@@ -388,6 +388,7 @@ exports.getUserProfile = async (req, res) => {
     const user = users[0];
 
     // Obtener cartones disponibles del inventario (suma normales + regalo)
+    // Los jugadores ven el total combinado sin discriminación
     const [inventory] = await pool.query(
       `SELECT 
         COALESCE(SUM(CASE WHEN room = 'bronce' THEN quantity ELSE 0 END), 0) as bronze,

@@ -1168,12 +1168,15 @@ async function addCardsToUser(req, res) {
       }
     }
 
-    // Obtener datos actualizados del usuario para devolver
+    // Obtener datos actualizados del usuario para devolver (con normales + regalo separados)
     const [updatedUser] = await pool.query(
       `SELECT u.*, 
-        COALESCE(SUM(CASE WHEN uci.room = 'bronce' THEN uci.quantity ELSE 0 END), 0) as cards_bronce,
-        COALESCE(SUM(CASE WHEN uci.room = 'plata' THEN uci.quantity ELSE 0 END), 0) as cards_plata,
-        COALESCE(SUM(CASE WHEN uci.room = 'oro' THEN uci.quantity ELSE 0 END), 0) as cards_oro
+        COALESCE(SUM(CASE WHEN uci.room = 'bronce' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_bronce,
+        COALESCE(SUM(CASE WHEN uci.room = 'plata' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_plata,
+        COALESCE(SUM(CASE WHEN uci.room = 'oro' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_oro,
+        COALESCE(SUM(CASE WHEN uci.room = 'bronce' AND uci.is_gift = TRUE THEN uci.quantity ELSE 0 END), 0) as gift_bronce,
+        COALESCE(SUM(CASE WHEN uci.room = 'plata' AND uci.is_gift = TRUE THEN uci.quantity ELSE 0 END), 0) as gift_plata,
+        COALESCE(SUM(CASE WHEN uci.room = 'oro' AND uci.is_gift = TRUE THEN uci.quantity ELSE 0 END), 0) as gift_oro
        FROM users u
        LEFT JOIN user_card_inventory uci ON u.id = uci.user_id
        WHERE u.id = ?
@@ -1186,21 +1189,24 @@ async function addCardsToUser(req, res) {
     if (io) {
       io.to(`user_${userId}`).emit('resources_updated', {
         cartones: {
-          bronce: updatedUser[0].cards_bronce,
-          plata: updatedUser[0].cards_plata,
-          oro: updatedUser[0].cards_oro
+          bronce: (parseInt(updatedUser[0].cards_bronce) || 0) + (parseInt(updatedUser[0].gift_bronce) || 0),
+          plata: (parseInt(updatedUser[0].cards_plata) || 0) + (parseInt(updatedUser[0].gift_plata) || 0),
+          oro: (parseInt(updatedUser[0].cards_oro) || 0) + (parseInt(updatedUser[0].gift_oro) || 0)
         },
         message: `Tus cartones ${room} han sido ${quantity > 0 ? 'incrementados' : 'reducidos'} en ${Math.abs(quantity)}`
       });
-      console.log(`📡 [WebSocket] Cartones actualizados para user_${userId}: ${room}=${updatedUser[0]['cards_' + room]}`);
+      console.log(`📡 [WebSocket] Cartones actualizados para user_${userId}: ${room}=${(parseInt(updatedUser[0]['cards_' + room]) || 0) + (parseInt(updatedUser[0]['gift_' + room]) || 0)}`);
       
       // Si es una transferencia (no es el mismo usuario), actualizar también al admin
       if (userId !== currentUserId) {
         const [adminUser] = await pool.query(
           `SELECT u.*, 
-            COALESCE(SUM(CASE WHEN uci.room = 'bronce' THEN uci.quantity ELSE 0 END), 0) as cards_bronce,
-            COALESCE(SUM(CASE WHEN uci.room = 'plata' THEN uci.quantity ELSE 0 END), 0) as cards_plata,
-            COALESCE(SUM(CASE WHEN uci.room = 'oro' THEN uci.quantity ELSE 0 END), 0) as cards_oro
+            COALESCE(SUM(CASE WHEN uci.room = 'bronce' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_bronce,
+            COALESCE(SUM(CASE WHEN uci.room = 'plata' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_plata,
+            COALESCE(SUM(CASE WHEN uci.room = 'oro' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_oro,
+            COALESCE(SUM(CASE WHEN uci.room = 'bronce' AND uci.is_gift = TRUE THEN uci.quantity ELSE 0 END), 0) as gift_bronce,
+            COALESCE(SUM(CASE WHEN uci.room = 'plata' AND uci.is_gift = TRUE THEN uci.quantity ELSE 0 END), 0) as gift_plata,
+            COALESCE(SUM(CASE WHEN uci.room = 'oro' AND uci.is_gift = TRUE THEN uci.quantity ELSE 0 END), 0) as gift_oro
            FROM users u
            LEFT JOIN user_card_inventory uci ON u.id = uci.user_id
            WHERE u.id = ?
@@ -1209,11 +1215,19 @@ async function addCardsToUser(req, res) {
         );
         
         if (adminUser.length > 0) {
+          // Para agentes: sumar normales + regalo, para SuperAdmin: solo normales
+          const isAgente = adminUser[0].role === 'agente';
           io.to(`user_${currentUserId}`).emit('resources_updated', {
             cartones: {
-              bronce: adminUser[0].cards_bronce,
-              plata: adminUser[0].cards_plata,
-              oro: adminUser[0].cards_oro
+              bronce: isAgente 
+                ? (parseInt(adminUser[0].cards_bronce) || 0) + (parseInt(adminUser[0].gift_bronce) || 0)
+                : parseInt(adminUser[0].cards_bronce) || 0,
+              plata: isAgente
+                ? (parseInt(adminUser[0].cards_plata) || 0) + (parseInt(adminUser[0].gift_plata) || 0)
+                : parseInt(adminUser[0].cards_plata) || 0,
+              oro: isAgente
+                ? (parseInt(adminUser[0].cards_oro) || 0) + (parseInt(adminUser[0].gift_oro) || 0)
+                : parseInt(adminUser[0].cards_oro) || 0
             },
             message: `Transferencia de cartones ${quantity > 0 ? 'enviada' : 'recibida'}`
           });
