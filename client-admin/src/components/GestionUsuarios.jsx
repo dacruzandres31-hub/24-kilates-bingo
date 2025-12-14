@@ -739,7 +739,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
           headers: { Authorization: `Bearer ${token}` }
         });
         
-        // Actualizar lista de usuarios
+        // Actualizar lista de usuarios Y árbol jerárquico
         setUsuarios(response.data.all || []);
         setArbolJerarquico(response.data.tree || []);
         
@@ -755,7 +755,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
           }
         }
         
-        // Actualizar usuarios del agente seleccionado
+        // Actualizar vista del agente seleccionado
         if (agenteSeleccionado) {
           cargarUsuariosDelAgente(agenteSeleccionado.id, response.data.all || []);
         }

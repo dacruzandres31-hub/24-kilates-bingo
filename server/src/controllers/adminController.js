@@ -982,7 +982,7 @@ async function addCardsToUser(req, res) {
       );
     } else if (quantity < 0) {
       // QUITAR cartones = Decrementar directamente del inventario del usuario
-      const connection = await db.getConnection();
+      const connection = await pool.getConnection();
       try {
         await connection.beginTransaction();
 
