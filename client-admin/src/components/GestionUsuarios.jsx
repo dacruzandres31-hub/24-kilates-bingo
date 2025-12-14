@@ -46,6 +46,9 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
     buttonPosition: null
   });
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [showErrorPopup, setShowErrorPopup] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   // Estados para el modal de creación de usuario
   const [modalCrearUsuario, setModalCrearUsuario] = useState({
@@ -263,12 +266,16 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
     try {
       const token = localStorage.getItem('adminToken');
       
+      // Solo superadmin puede seleccionar parent_id, otros usuarios siempre crean hijos directos
+      const parentId = currentUser.role === 'superadmin' && agenteSeleccionado 
+        ? agenteSeleccionado.id 
+        : currentUser.id;
+
       const userData = {
         username: datosIngreso.username,
         password: datosIngreso.password,
         role: tipoUsuario,
-        // SIEMPRE asignar como parent_id el usuario autenticado (el panel que está creando)
-        parent_id: currentUser.id,
+        parent_id: parentId,
         // Datos personales opcionales
         ...(datosPersonales.nombre_completo && { nombre_completo: datosPersonales.nombre_completo }),
         ...(datosPersonales.documento && { documento: datosPersonales.documento }),
@@ -280,10 +287,19 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      alert(`✅ ${response.data.message || `${tipoUsuario.toUpperCase()} "${datosIngreso.username}" creado exitosamente`}`);
+      // Mostrar popup de éxito
+      setSuccessMessage(`${tipoUsuario.toUpperCase()} "${datosIngreso.username}" creado exitosamente`);
+      setShowSuccessPopup(true);
       
-      // Cerrar modal
-      setModalCrearUsuario({ ...modalCrearUsuario, isOpen: false });
+      // Desvanecer popup después de 3 segundos
+      setTimeout(() => {
+        setShowSuccessPopup(false);
+      }, 3000);
+      
+      // Cerrar modal después de 500ms
+      setTimeout(() => {
+        setModalCrearUsuario({ ...modalCrearUsuario, isOpen: false });
+      }, 500);
       
       // Recargar jerarquía completa
       const hierarchyResponse = await axios.get('/api/admin/users/hierarchy', {
@@ -304,7 +320,11 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         setNodosExpandidos(prev => new Set([...prev, parentId]));
       }
     } catch (error) {
-      alert('❌ Error creando usuario: ' + (error.response?.data?.error || error.message));
+      setErrorMessage('Error creando usuario: ' + (error.response?.data?.error || error.message));
+      setShowErrorPopup(true);
+      setTimeout(() => {
+        setShowErrorPopup(false);
+      }, 3000);
     }
   };
 
@@ -2035,7 +2055,66 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         </div>,
         document.body
       )}
+
+      {/* Popup de Éxito - Elegante con desvanecimiento */}
+      {showSuccessPopup && createPortal(
+        <div 
+          className="fixed top-20 left-1/2 transform -translate-x-1/2 z-[10000] animate-fade-in-down"
+          style={{
+            animation: 'fadeInDown 0.5s ease-out, fadeOut 0.5s ease-in 2.5s forwards'
+          }}
+        >
+          <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-4 border-2 border-green-300">
+            <div className="text-3xl animate-bounce">✅</div>
+            <div>
+              <p className="font-bold text-lg">{successMessage}</p>
+        
+
+      {/* Popup de Error - Elegante con desvanecimiento */}
+      {showErrorPopup && createPortal(
+        <div 
+          className="fixed top-20 left-1/2 transform -translate-x-1/2 z-[10000] animate-fade-in-down"
+          style={{
+            animation: 'fadeInDown 0.5s ease-out, fadeOut 0.5s ease-in 2.5s forwards'
+          }}
+        >
+          <div className="bg-gradient-to-r from-red-500 to-rose-600 text-white px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-4 border-2 border-red-300">
+            <div className="text-3xl">❌</div>
+            <div>
+              <p className="font-bold text-lg">{errorMessage}</p>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}    </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      <style>{`
+        @keyframes fadeInDown {
+          from {
+            opacity: 0;
+            transform: translate(-50%, -20px);
+          }
+          to {
+            opacity: 1;
+            transform: translate(-50%, 0);
+          }
+        }
+        
+        @keyframes fadeOut {
+          from {
+            opacity: 1;
+          }
+          to {
+            opacity: 0;
+          }
+        }
+      `}</style>
     </>
   );
 }
+
 
