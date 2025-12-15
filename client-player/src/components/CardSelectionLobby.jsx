@@ -199,8 +199,6 @@ const CardSelectionLobby = ({
       <div className="cards-grid">
         {availableCards.map((card) => {
           const selected = isCardSelected(card);
-          const reserved = card.status === 'reserved';
-          
           
           return (
             <BingoCardPreview
@@ -213,7 +211,9 @@ const CardSelectionLobby = ({
               selected={selected}
               onClick={() => handleCardToggle(card)}
               showSerial={true}
-            /
+            />
+          );
+        })}
       </div>
 
       {/* Footer con acciones */}
