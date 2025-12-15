@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Gamepad2, LogOut, Settings } from 'lucide-react';
+import { Gamepad2, LogOut, Settings, User, Key } from 'lucide-react';
 import '../styles/LobbyPage.css';
 
 export default function LobbyPage() {
   const navigate = useNavigate();
   const [rooms, setRooms] = useState([]);
   const [user, setUser] = useState(null);
+  const [userData, setUserData] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [loading, setLoading] = useState(true);
   const [freeRewards, setFreeRewards] = useState(0);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   useEffect(() => {
     // Obtener usuario actual
@@ -29,9 +31,24 @@ export default function LobbyPage() {
 
     // Cargar salas disponibles
     loadRooms();
+    loadUserProfile();
 
     return () => clearInterval(timer);
   }, [navigate]);
+
+  const loadUserProfile = async () => {
+    try {
+      const response = await fetch('/api/users/profile', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setUserData(data);
+      }
+    } catch (error) {
+      console.error('Error loading profile:', error);
+    }
+  };
 
   const loadRooms = async () => {
     try {
@@ -89,6 +106,53 @@ export default function LobbyPage() {
 
   return (
     <div className="lobby-container">
+      {/* Top User Bar - NUEVA */}
+      <div className="user-top-bar">
+        <div className="user-info-section">
+          <span className="user-name">👤 {user?.username || 'Usuario'}</span>
+          <div className="user-resources">
+            <span className="balance">
+              💰 ${userData?.balance ? parseFloat(userData.balance).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : '0'}
+            </span>
+            <div className="tickets-display">
+              <span className="ticket-item">🎴 Bronce: {userData?.tickets?.bronze || 0}</span>
+              <span className="ticket-item">🥈 Plata: {userData?.tickets?.silver || 0}</span>
+              <span className="ticket-item">🥇 Oro: {userData?.tickets?.gold || 0}</span>
+            </div>
+          </div>
+        </div>
+        <div className="user-actions">
+          <div className="profile-menu-container">
+            <button
+              className="btn-profile"
+              onClick={() => setShowProfileMenu(!showProfileMenu)}
+            >
+              <User size={20} />
+              <span>Perfil</span>
+            </button>
+            {showProfileMenu && (
+              <div className="profile-dropdown">
+                <button className="dropdown-item" onClick={() => {
+                  setShowProfileMenu(false);
+                  // TODO: Abrir modal cambiar contraseña
+                  alert('Función de cambio de contraseña próximamente');
+                }}>
+                  <Key size={16} />
+                  <span>Cambiar Contraseña</span>
+                </button>
+                <button className="dropdown-item logout" onClick={() => {
+                  localStorage.removeItem('token');
+                  navigate('/login');
+                }}>
+                  <LogOut size={16} />
+                  <span>Cerrar Sesión</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Header */}
       <div className="lobby-header">
         <div className="header-left">
