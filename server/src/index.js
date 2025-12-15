@@ -23,6 +23,7 @@ const superAdminRoutes = require('./routes/superAdminRoutes');
 const gameAdminRoutes = require('./routes/gameAdminRoutes');
 const starterRoomRoutes = require('./routes/starterRoom');
 const giftCardsRoutes = require('./routes/giftCards');
+const cardsRoutes = require('./routes/cardsRoutes');
 const gameAdminController = require('./controllers/gameAdminController');
 const cardPoolService = require('./services/cardPoolService');
 const db = require('./db');
@@ -123,6 +124,7 @@ io.on('connection', (socket) => {
 // RUTAS API
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/cards', cardsRoutes); // Pool de cartones
 app.use('/api/game/starter', starterRoomRoutes); // DEBE IR ANTES de /api/game
 app.use('/api/game', gameRoutes);
 app.use('/api/finance', financeRoutes);
