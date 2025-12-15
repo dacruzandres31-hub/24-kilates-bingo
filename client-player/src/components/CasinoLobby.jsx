@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
+import axios from 'axios';
 import '../styles/CasinoLobby.css';
 import '../styles/Countdown.css';
 import Countdown from './Countdown';
@@ -263,6 +265,18 @@ const CasinoLobby = ({ user, onLogout }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [userData, setUserData] = useState(null);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [showPasswords, setShowPasswords] = useState({
+    current: false,
+    new: false,
+    confirm: false
+  });
+  const [passwordStrength, setPasswordStrength] = useState({ level: 0, text: '', color: '' });
   
   // Estado de audio
   const [audioStatus, setAudioStatus] = useState({
@@ -274,6 +288,49 @@ const CasinoLobby = ({ user, onLogout }) => {
   useEffect(() => {
     loadUserProfile();
   }, []);
+
+  const calculatePasswordStrength = (password) => {
+    let strength = 0;
+    if (password.length >= 6) strength++;
+    if (password.length >= 10) strength++;
+    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
+    if (/[0-9]/.test(password)) strength++;
+    if (/[^a-zA-Z0-9]/.test(password)) strength++;
+    
+    if (strength <= 2) return { level: 1, text: 'Débil', color: 'text-red-500' };
+    if (strength <= 3) return { level: 2, text: 'Media', color: 'text-yellow-500' };
+    return { level: 3, text: 'Fuerte', color: 'text-green-500' };
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      alert('❌ Las contraseñas no coinciden');
+      return;
+    }
+    
+    if (passwordData.newPassword.length < 6) {
+      alert('❌ La contraseña debe tener al menos 6 caracteres');
+      return;
+    }
+    
+    try {
+      const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
+      await axios.post('/api/auth/change-password', {
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      alert('✅ Contraseña cambiada exitosamente');
+      setShowChangePasswordModal(false);
+      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (error) {
+      alert('❌ ' + (error.response?.data?.error || 'Error al cambiar la contraseña'));
+    }
+  };
 
   const loadUserProfile = async () => {
     try {
@@ -356,7 +413,7 @@ const CasinoLobby = ({ user, onLogout }) => {
               <div className="profile-dropdown">
                 <button className="dropdown-item" onClick={() => {
                   setShowProfileMenu(false);
-                  alert('Función de cambio de contraseña próximamente');
+                  setShowChangePasswordModal(true);
                 }}>
                   <FaKey />
                   <span>Cambiar Contraseña</span>
@@ -452,6 +509,135 @@ const CasinoLobby = ({ user, onLogout }) => {
       </footer>
 
       <WinnersTicker />
+
+      {/* Modal de Cambiar Contraseña */}
+      {showChangePasswordModal && createPortal(
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[9999]">
+          <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border-2 border-purple-500/50 rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+            {/* Header */}
+            <div className="p-6 bg-gradient-to-r from-purple-600 to-indigo-600">
+              <h3 className="text-2xl font-bold text-white text-center">
+                🔑 Cambiar Contraseña
+              </h3>
+            </div>
+
+            {/* Body */}
+            <form onSubmit={handleChangePassword} className="p-6 space-y-4">
+              <div>
+                <label className="block text-gray-300 font-semibold mb-2 text-sm">
+                  Contraseña Actual:
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPasswords.current ? "text" : "password"}
+                    value={passwordData.currentPassword}
+                    onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                    className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-4 py-3 pr-12 text-white focus:outline-none focus:border-purple-500 transition-colors"
+                    placeholder="Ingresa tu contraseña actual"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswords({ ...showPasswords, current: !showPasswords.current })}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-purple-400 transition-colors text-lg"
+                  >
+                    {showPasswords.current ? '👁' : '🔒'}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-gray-300 font-semibold mb-2 text-sm">
+                  Nueva Contraseña:
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPasswords.new ? "text" : "password"}
+                    value={passwordData.newPassword}
+                    onChange={(e) => {
+                      const newPwd = e.target.value;
+                      setPasswordData({ ...passwordData, newPassword: newPwd });
+                      setPasswordStrength(calculatePasswordStrength(newPwd));
+                    }}
+                    className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-4 py-3 pr-12 text-white focus:outline-none focus:border-purple-500 transition-colors"
+                    placeholder="Mínimo 6 caracteres"
+                    required
+                    minLength={6}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswords({ ...showPasswords, new: !showPasswords.new })}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-purple-400 transition-colors text-lg"
+                  >
+                    {showPasswords.new ? '👁' : '🔒'}
+                  </button>
+                </div>
+                {passwordData.newPassword && passwordStrength.level > 0 && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <div className="flex-1 h-2 bg-gray-600 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full transition-all duration-300 ${
+                          passwordStrength.level === 1 ? 'bg-red-500 w-1/3' :
+                          passwordStrength.level === 2 ? 'bg-yellow-500 w-2/3' :
+                          'bg-green-500 w-full'
+                        }`}
+                      ></div>
+                    </div>
+                    <span className={`text-sm font-semibold ${passwordStrength.color}`}>
+                      {passwordStrength.text}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-gray-300 font-semibold mb-2 text-sm">
+                  Confirmar Nueva Contraseña:
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPasswords.confirm ? "text" : "password"}
+                    value={passwordData.confirmPassword}
+                    onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                    className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-4 py-3 pr-12 text-white focus:outline-none focus:border-purple-500 transition-colors"
+                    placeholder="Repite la nueva contraseña"
+                    required
+                    minLength={6}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswords({ ...showPasswords, confirm: !showPasswords.confirm })}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-purple-400 transition-colors text-lg"
+                  >
+                    {showPasswords.confirm ? '👁' : '🔒'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowChangePasswordModal(false);
+                    setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+                  }}
+                  className="flex-1 py-3 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-500 hover:to-gray-600 text-white font-bold rounded-xl transition-all"
+                >
+                  CANCELAR
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-xl transition-all"
+                >
+                  ✓ CAMBIAR
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };
