@@ -261,8 +261,6 @@ const WinnersTicker = () => {
 
 const CasinoLobby = ({ user, onLogout }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [showBalance, setShowBalance] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userData, setUserData] = useState(null);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   
@@ -271,8 +269,6 @@ const CasinoLobby = ({ user, onLogout }) => {
     musicEnabled: audioService.enabled,
     efectosEnabled: audioService.efectosEnabled,
   });
-  const [ticketsExpanded, setTicketsExpanded] = useState(false);
-  const [audioExpanded, setAudioExpanded] = useState(false);
 
   // Cargar perfil del usuario
   useEffect(() => {
@@ -373,153 +369,6 @@ const CasinoLobby = ({ user, onLogout }) => {
                 </button>
               </div>
             )}
-          </div>
-        </div>
-      </div>
-
-      {/* Botón Toggle Sidebar */}
-      <button 
-        className="sidebar-toggle-btn"
-        onClick={() => setSidebarOpen(!sidebarOpen)}
-        title="Abrir Menú"
-      >
-        <div className="hamburger-icon">
-          <span></span>
-          <span></span>
-          <span></span>
-        </div>
-      </button>
-
-      {/* Overlay oscuro cuando sidebar está abierto */}
-      {sidebarOpen && (
-        <div 
-          className="sidebar-overlay"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* Sidebar Lateral Izquierda */}
-      <div className={`lobby-sidebar ${sidebarOpen ? 'open' : ''}`}>
-        <div className="sidebar-header">
-          <h2 className="sidebar-title">Menú Principal</h2>
-          <button 
-            className="sidebar-close-btn"
-            onClick={() => setSidebarOpen(false)}
-          >
-            ×
-          </button>
-        </div>
-
-        <div className="sidebar-content">
-          {/* Información del Jugador */}
-          <div className="sidebar-section player-section">
-            <div className="section-header">
-              <FaUsers className="section-icon" />
-              <h3>Usuario</h3>
-            </div>
-            <div className="player-info">
-              <span className="player-name">{user?.username || 'Jugador'}</span>
-              {onLogout && (
-                <button 
-                  onClick={onLogout}
-                  className="logout-btn"
-                  title="Cerrar Sesión"
-                >
-                  Salir
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Saldo */}
-          <div className="sidebar-section balance-section">
-            <div className="section-header">
-              <FaMoneyBillWave className="section-icon" />
-              <h3>Saldo</h3>
-            </div>
-            <div className="balance-info" onClick={() => setShowBalance(!showBalance)}>
-              <img src={bronzeIcon} alt="Saldo" className="balance-icon-sidebar" />
-              {showBalance ? (
-                <span className="balance-amount-sidebar">$12,500</span>
-              ) : (
-                <span className="balance-hidden-sidebar">•••••</span>
-              )}
-              <button className="balance-toggle-sidebar">
-                {showBalance ? <FaEye /> : <FaEyeSlash />}
-              </button>
-            </div>
-          </div>
-
-          {/* Mis Cartones - Colapsable */}
-          <div className="sidebar-section tickets-section">
-            <div 
-              className="section-header collapsible"
-              onClick={() => setTicketsExpanded(!ticketsExpanded)}
-            >
-              <FaTicketAlt className="section-icon" />
-              <h3>Mis Cartones</h3>
-              <span className={`expand-icon ${ticketsExpanded ? 'expanded' : ''}`}>▼</span>
-            </div>
-            {ticketsExpanded && (
-              <div className="tickets-list">
-                <div className="ticket-item">
-                  <span className="ticket-room-name">Starter</span>
-                  <span className="ticket-count-badge">3</span>
-                </div>
-                <div className="ticket-item">
-                  <span className="ticket-room-name">Bronce</span>
-                  <span className="ticket-count-badge">5</span>
-                </div>
-                <div className="ticket-item">
-                  <span className="ticket-room-name">Plata</span>
-                  <span className="ticket-count-badge">2</span>
-                </div>
-                <div className="ticket-item">
-                  <span className="ticket-room-name">Oro</span>
-                  <span className="ticket-count-badge">1</span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Controles de Audio - Colapsable */}
-          <div className="sidebar-section audio-controls-section">
-            <div 
-              className="section-header collapsible"
-              onClick={() => setAudioExpanded(!audioExpanded)}
-            >
-              <h3>Audio</h3>
-              <span className={`expand-icon ${audioExpanded ? 'expanded' : ''}`}>▼</span>
-            </div>
-            {audioExpanded && (
-              <div className="audio-controls">
-                <button 
-                  className={`audio-control-btn ${audioStatus.musicEnabled ? 'active' : ''}`}
-                  onClick={toggleMusic}
-                  title={audioStatus.musicEnabled ? 'Desactivar música' : 'Activar música'}
-                >
-                  {audioStatus.musicEnabled ? <FaMusic /> : <FaVolumeMute />}
-                  <span>{audioStatus.musicEnabled ? 'Música ON' : 'Música OFF'}</span>
-                </button>
-                
-                <button 
-                  className={`audio-control-btn ${audioStatus.efectosEnabled ? 'active' : ''}`}
-                  onClick={toggleEfectos}
-                  title={audioStatus.efectosEnabled ? 'Desactivar efectos' : 'Activar efectos'}
-                >
-                  {audioStatus.efectosEnabled ? <FaVolumeUp /> : <FaVolumeMute />}
-                  <span>{audioStatus.efectosEnabled ? 'Efectos ON' : 'Efectos OFF'}</span>
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Botón Soporte */}
-          <div className="sidebar-section support-section">
-            <button className="support-button-sidebar">
-              <FaHeadset className="support-icon" />
-              <span>Contactar Soporte</span>
-            </button>
           </div>
         </div>
       </div>
