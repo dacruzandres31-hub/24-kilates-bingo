@@ -52,13 +52,14 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
           updated.balance = data.balance;
         }
         
-        // Actualizar cartones si vienen
-        if (data.cartones) {
+        // Actualizar cartones si vienen (puede venir como 'cartones' o 'tickets')
+        if (data.cartones || data.tickets) {
+          const cartonesData = data.cartones || data.tickets;
           updated.tickets = {
-            ...prev.tickets,
-            bronze: data.cartones.bronce || prev.tickets.bronze,
-            silver: data.cartones.plata || prev.tickets.silver,
-            gold: data.cartones.oro || prev.tickets.gold
+            starter: cartonesData.starter || prev.tickets.starter,
+            bronze: cartonesData.bronce || cartonesData.bronze || prev.tickets.bronze,
+            silver: cartonesData.plata || cartonesData.silver || prev.tickets.silver,
+            gold: cartonesData.oro || cartonesData.gold || prev.tickets.gold
           };
         }
         
@@ -86,13 +87,13 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
     
     const fetchUserData = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
         if (!token) {
           console.warn('No hay token, usando datos por defecto');
           return;
         }
         
-        const response = await axios.get('/api/users/profile', {
+        const response = await axios.get('http://localhost:3001/api/users/profile', {
           headers: { Authorization: `Bearer ${token}` }
         });
         
@@ -101,16 +102,16 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
         setUserData({
           username: data.username || 'Usuario',
           balance: data.balance || 0,
-          tickets: data.tickets || {
-            starter: 0,
-            bronze: 0,
-            silver: 0,
-            gold: 0
+          tickets: {
+            starter: data.tickets?.starter || 0,
+            bronze: data.tickets?.bronze || 0,
+            silver: data.tickets?.silver || 0,
+            gold: data.tickets?.gold || 0
           }
         });
-        console.log('✅ Datos de usuario cargados:', data);
+        console.log('✅ [PlayerSidebar] Datos de usuario cargados:', data);
       } catch (error) {
-        console.error('❌ Error cargando datos del usuario:', error);
+        console.error('❌ [PlayerSidebar] Error cargando datos del usuario:', error);
         // Mantener datos por defecto si falla
       }
     };
