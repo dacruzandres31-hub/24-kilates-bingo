@@ -140,41 +140,6 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
     
     fetchUserData();
   }, []);
-
-  // Recargar datos cuando se abre el sidebar
-  useEffect(() => {
-    if (isOpen) {
-      const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
-      if (!token) {
-        console.warn('[PlayerSidebar] ⚠️ Sidebar abierto pero sin token');
-        return;
-      }
-
-      console.log('[PlayerSidebar] 🔄 Sidebar abierto, recargando datos...');
-      
-      axios.get('http://localhost:3001/api/users/profile', {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      .then(response => {
-        const data = response.data;
-        console.log('[PlayerSidebar] ✅ Datos actualizados al abrir:', data);
-        
-        setUserData({
-          username: data.username || 'Usuario',
-          balance: parseFloat(data.balance) || 0,
-          tickets: {
-            starter: parseInt(data.tickets?.starter) || 0,
-            bronze: parseInt(data.tickets?.bronze) || 0,
-            silver: parseInt(data.tickets?.silver) || 0,
-            gold: parseInt(data.tickets?.gold) || 0
-          }
-        });
-      })
-      .catch(error => {
-        console.error('[PlayerSidebar] ❌ Error recargando datos:', error);
-      });
-    }
-  }, [isOpen]);
   
   const toggleMusic = () => {
     const newState = audioService.toggleMusic();
