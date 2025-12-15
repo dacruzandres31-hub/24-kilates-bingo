@@ -102,7 +102,7 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
         console.log('[PlayerSidebar] 🔄 Cargando datos de usuario...');
         console.log('[PlayerSidebar] 🔑 Token:', token.substring(0, 20) + '...');
         
-        const response = await axios.get('http://localhost:3001/api/users/profile', {
+        const response = await axios.get('/api/users/profile', {
           headers: { Authorization: `Bearer ${token}` }
         });
         

@@ -27,7 +27,7 @@
 
 /* ===== TOP USER BAR ===== */
 .user-top-bar {
-  background: linear-gradient(to bottom, rgba(0,0,0,0.95), rgba(0,0,0,0.85));
+  background: linear-gradient(to bottom, rgba(0,0,0,0.5), rgba(0,0,0,0.5));
   border-bottom: 1px solid rgba(212, 175, 55, 0.3);
   padding: 1rem 2rem;
   display: flex;
