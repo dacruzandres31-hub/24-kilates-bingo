@@ -8,13 +8,13 @@ const CardSelectionLobby = ({
   sessionId, 
   onCardsSelected, 
   onCancel,
-  maxCards = 20,
   currentCards = 0, // Cartones ya seleccionados
   timeWindow = 'open', // 'open', 'closed', 'drawing'
   roomTheme = 'starter' // 'starter', 'bronze', 'silver', 'gold'
 }) => {
   const [availableCards, setAvailableCards] = useState([]);
   const [selectedCards, setSelectedCards] = useState([]);
+  const [maxCards, setMaxCards] = useState(20);
   const [loading, setLoading] = useState(true);
   const [playersOnline, setPlayersOnline] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(null);
@@ -33,6 +33,9 @@ const CardSelectionLobby = ({
       const response = await axios.get(`/api/cards/available/${roomTheme}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
+      
+      console.log('[CardSelection] Cartones recibidos:', response.data.cards);
+      console.log('[CardSelection] Primer cartón:', response.data.cards[0]);
       
       setAvailableCards(response.data.cards || []);
       setMaxCards(response.data.maxSelection || 20);

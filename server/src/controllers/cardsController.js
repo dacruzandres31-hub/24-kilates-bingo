@@ -1,6 +1,16 @@
 const pool = require('../db');
 
 /**
+ * Mapeo de nombres de salas (inglés → español para BD)
+ */
+const ROOM_MAP = {
+  'bronze': 'bronce',
+  'silver': 'plata',
+  'gold': 'oro',
+  'starter': 'starter'
+};
+
+/**
  * GET /api/cards/available/:room
  * Obtener cartones disponibles del pool para seleccionar
  */
@@ -10,23 +20,31 @@ exports.getAvailableCards = async (req, res) => {
     const userId = req.user.id;
     const limit = parseInt(req.query.limit) || 100; // Mostrar 100 cartones por defecto
 
-    console.log(`[Cards] 🎴 Obteniendo cartones disponibles para sala: ${room}, usuario: ${userId}`);
+    // Mapear nombre de sala a español para BD
+    const roomDB = ROOM_MAP[room] || room;
 
-    // Verificar que el usuario tenga tickets disponibles en su inventario
+    console.log(`[Cards] 🎴 Obteniendo cartones disponibles para sala: ${room} (BD: ${roomDB}), usuario: ${userId}`);
+
+    // Verificar que el usuario tenga tickets disponibles en user_card_inventory
     const [inventory] = await pool.query(
-      `SELECT quantity FROM user_card_inventory 
-       WHERE user_id = ? AND room = ? AND quantity > 0`,
-      [userId, room]
+      `SELECT COALESCE(SUM(quantity), 0) as quantity
+       FROM user_card_inventory 
+       WHERE user_id = ? AND room = ?`,
+      [userId, roomDB]
     );
 
+    console.log(`[Cards] 🔍 Resultado búsqueda tickets - room: ${room} (BD: ${roomDB}), userId: ${userId}`, inventory);
+
     if (!inventory || inventory.length === 0 || inventory[0].quantity === 0) {
+      console.log(`[Cards] ❌ No se encontraron tickets para sala ${room}`);
       return res.status(400).json({ 
         error: 'No tienes tickets disponibles para esta sala',
         availableTickets: 0
       });
     }
 
-    const availableTickets = inventory[0].quantity;
+    const availableTickets = parseInt(inventory[0].quantity);
+    console.log(`[Cards] ✅ Tickets disponibles: ${availableTickets}`);
 
     // Obtener cartones disponibles del pool
     const [cards] = await pool.query(
@@ -35,16 +53,32 @@ exports.getAvailableCards = async (req, res) => {
        WHERE room = ? AND status = 'available'
        ORDER BY RAND()
        LIMIT ?`,
-      [room, limit]
+      [roomDB, limit]
     );
 
     // Parsear JSON de números
-    const formattedCards = cards.map(card => ({
-      id: card.id,
-      serial: card.card_serial,
-      numbers: JSON.parse(card.numbers),
-      createdAt: card.created_at
-    }));
+    const formattedCards = cards.map(card => {
+      let parsedNumbers;
+      
+      // El campo numbers puede venir como JSON string o como ya parseado
+      if (typeof card.numbers === 'string') {
+        try {
+          parsedNumbers = JSON.parse(card.numbers);
+        } catch (e) {
+          console.log(`[Cards] ⚠️ Error parseando JSON del cartón ${card.id}, intentando parsearlo como está`);
+          parsedNumbers = card.numbers;
+        }
+      } else {
+        parsedNumbers = card.numbers;
+      }
+
+      return {
+        id: card.id,
+        serial: card.card_serial,
+        numbers: parsedNumbers,
+        createdAt: card.created_at
+      };
+    });
 
     console.log(`[Cards] ✅ ${formattedCards.length} cartones disponibles`);
 
