@@ -1,4 +1,4 @@
-const pool = require('../config/database');
+const pool = require('../db');
 
 /**
  * GET /api/cards/available/:room
