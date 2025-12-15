@@ -967,21 +967,26 @@ async function canModifyUser(currentUserId, currentUserRole, targetUserId) {
     return true;
   }
 
-  // Agentes solo pueden modificar usuarios de su red
+  // Agentes pueden modificarse a sí mismos
+  if (currentUserRole === 'agente' && currentUserId === targetUserId) {
+    return true;
+  }
+
+  // Agentes pueden modificar TODOS sus descendientes (sin límite de profundidad)
   if (currentUserRole === 'agente') {
     const [result] = await pool.query(`
       WITH RECURSIVE network AS (
-        -- Caso base: hijos directos
-        SELECT id FROM users WHERE parent_id = ?
+        -- Caso base: el agente mismo y sus hijos directos
+        SELECT id FROM users WHERE id = ? OR parent_id = ?
         
         UNION ALL
         
-        -- Caso recursivo: descendientes
+        -- Caso recursivo: todos los descendientes en cascada
         SELECT u.id FROM users u
         INNER JOIN network n ON u.parent_id = n.id
       )
       SELECT COUNT(*) as count FROM network WHERE id = ?
-    `, [currentUserId, targetUserId]);
+    `, [currentUserId, currentUserId, targetUserId]);
 
     return result[0].count > 0;
   }
