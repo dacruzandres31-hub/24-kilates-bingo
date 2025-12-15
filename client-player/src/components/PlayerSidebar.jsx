@@ -10,9 +10,7 @@ import axios from 'axios';
 const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor = '#ff00ff', onLogout }) => {
   const navigate = useNavigate();
   const socket = useSocket();
-  const [showBalance, setShowBalance] = useState(false);
   const [audioStatus, setAudioStatus] = useState({ musicEnabled: true, efectosEnabled: true });
-  const [ticketsExpanded, setTicketsExpanded] = useState(false); // Colapsable cartones
   const [audioExpanded, setAudioExpanded] = useState(false); // Colapsable audio
   const [showChangePassword, setShowChangePassword] = useState(false); // Modal cambiar contraseña
   const [notificationMessage, setNotificationMessage] = useState(null); // Notificación de cambios
@@ -319,57 +317,40 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
 
         {/* Saldo */}
         <div className="sidebar-section" style={{ borderBottom: `1px solid ${themeColor}30` }}>
-          <div className="sidebar-item balance-info" onClick={() => setShowBalance(!showBalance)}>
+          <div className="sidebar-item balance-info">
             <img src={bronzeIcon} alt="Saldo" className="sidebar-balance-icon" style={{ filter: 'sepia(1) saturate(3) hue-rotate(10deg) brightness(0.9)' }} />
             <div className="sidebar-item-content">
               <span className="sidebar-label">Saldo</span>
-              {showBalance ? (
-                <span className="sidebar-value balance" style={{ color: accentColor }}>{formatCurrency(userData?.balance || 0)}</span>
-              ) : (
-                <span className="sidebar-value balance hidden">•••••••</span>
-              )}
+              <span className="sidebar-value balance" style={{ color: accentColor }}>{formatCurrency(userData?.balance || 0)}</span>
             </div>
-            <button 
-              className="balance-toggle-btn" 
-              onClick={(e) => { e.stopPropagation(); setShowBalance(!showBalance); }}
-              style={{ color: themeColor, borderColor: themeColor }}
-            >
-              {showBalance ? <FaEye /> : <FaEyeSlash />}
-            </button>
           </div>
         </div>
 
-        {/* Mis Cartones - Colapsable */}
+        {/* Mis Cartones */}
         <div className="sidebar-section" style={{ borderBottom: `1px solid ${themeColor}30` }}>
-          <div 
-            className="sidebar-section-header collapsible" 
-            onClick={() => setTicketsExpanded(!ticketsExpanded)}
-          >
+          <div className="sidebar-section-header">
             <FaTicketAlt className="section-icon" style={{ color: themeColor }} />
             <h4 className="section-title" style={{ color: accentColor }}>Mis Cartones</h4>
-            <span className={`expand-icon ${ticketsExpanded ? 'expanded' : ''}`} style={{ color: themeColor }}>▼</span>
           </div>
           
-          {ticketsExpanded && (
-            <div className="tickets-list">
-              <div className="ticket-item starter">
-                <span className="ticket-room">Starter</span>
-                <span className="ticket-count">{userData?.tickets?.starter || 0}</span>
-              </div>
-              <div className="ticket-item bronze">
-                <span className="ticket-room">Bronce</span>
-                <span className="ticket-count">{userData?.tickets?.bronze || 0}</span>
-              </div>
-              <div className="ticket-item silver">
-                <span className="ticket-room">Plata</span>
-                <span className="ticket-count">{userData?.tickets?.silver || 0}</span>
-              </div>
-              <div className="ticket-item gold">
-                <span className="ticket-room">Oro</span>
-                <span className="ticket-count">{userData?.tickets?.gold || 0}</span>
-              </div>
+          <div className="tickets-list">
+            <div className="ticket-item starter">
+              <span className="ticket-room">Starter</span>
+              <span className="ticket-count">{userData?.tickets?.starter || 0}</span>
             </div>
-          )}
+            <div className="ticket-item bronze">
+              <span className="ticket-room">Bronce</span>
+              <span className="ticket-count">{userData?.tickets?.bronze || 0}</span>
+            </div>
+            <div className="ticket-item silver">
+              <span className="ticket-room">Plata</span>
+              <span className="ticket-count">{userData?.tickets?.silver || 0}</span>
+            </div>
+            <div className="ticket-item gold">
+              <span className="ticket-room">Oro</span>
+              <span className="ticket-count">{userData?.tickets?.gold || 0}</span>
+            </div>
+          </div>
         </div>
 
         {/* Botones de Acción */}
