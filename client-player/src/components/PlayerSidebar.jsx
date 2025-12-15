@@ -91,11 +91,17 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
       try {
         const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
         if (!token) {
-          console.warn('[PlayerSidebar] No hay token, usando datos por defecto');
+          console.warn('[PlayerSidebar] ⚠️ No hay token disponible');
+          setUserData(prev => ({
+            ...prev,
+            username: 'Sin sesión'
+          }));
           return;
         }
         
         console.log('[PlayerSidebar] 🔄 Cargando datos de usuario...');
+        console.log('[PlayerSidebar] 🔑 Token:', token.substring(0, 20) + '...');
+        
         const response = await axios.get('http://localhost:3001/api/users/profile', {
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -106,24 +112,69 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
         
         setUserData({
           username: data.username || 'Usuario',
-          balance: data.balance || 0,
+          balance: parseFloat(data.balance) || 0,
           tickets: {
-            starter: data.tickets?.starter || 0,
-            bronze: data.tickets?.bronze || 0,
-            silver: data.tickets?.silver || 0,
-            gold: data.tickets?.gold || 0
+            starter: parseInt(data.tickets?.starter) || 0,
+            bronze: parseInt(data.tickets?.bronze) || 0,
+            silver: parseInt(data.tickets?.silver) || 0,
+            gold: parseInt(data.tickets?.gold) || 0
           }
         });
         console.log('[PlayerSidebar] ✅ Estado actualizado correctamente');
       } catch (error) {
         console.error('[PlayerSidebar] ❌ Error cargando datos del usuario:', error);
+        console.error('[PlayerSidebar] ❌ Status:', error.response?.status);
         console.error('[PlayerSidebar] ❌ Detalles:', error.response?.data || error.message);
-        // Mantener datos por defecto si falla
+        
+        // Mostrar error en UI
+        setUserData(prev => ({
+          ...prev,
+          username: 'Error al cargar'
+        }));
+        
+        // Mostrar notificación de error
+        setNotificationMessage('❌ Error cargando datos del perfil');
+        setTimeout(() => setNotificationMessage(null), 4000);
       }
     };
     
     fetchUserData();
   }, []);
+
+  // Recargar datos cuando se abre el sidebar
+  useEffect(() => {
+    if (isOpen) {
+      const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
+      if (!token) {
+        console.warn('[PlayerSidebar] ⚠️ Sidebar abierto pero sin token');
+        return;
+      }
+
+      console.log('[PlayerSidebar] 🔄 Sidebar abierto, recargando datos...');
+      
+      axios.get('http://localhost:3001/api/users/profile', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      .then(response => {
+        const data = response.data;
+        console.log('[PlayerSidebar] ✅ Datos actualizados al abrir:', data);
+        
+        setUserData({
+          username: data.username || 'Usuario',
+          balance: parseFloat(data.balance) || 0,
+          tickets: {
+            starter: parseInt(data.tickets?.starter) || 0,
+            bronze: parseInt(data.tickets?.bronze) || 0,
+            silver: parseInt(data.tickets?.silver) || 0,
+            gold: parseInt(data.tickets?.gold) || 0
+          }
+        });
+      })
+      .catch(error => {
+        console.error('[PlayerSidebar] ❌ Error recargando datos:', error);
+      });
+    }
+  }, [isOpen]);
   
   const toggleMusic = () => {
     const newState = audioService.toggleMusic();
