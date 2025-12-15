@@ -37,6 +37,8 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
     }
   });
 
+  console.log('[PlayerSidebar] 🚀 Componente montado');
+
   // Listener de WebSocket para actualizar recursos en tiempo real
   useEffect(() => {
     if (!socket) return;
