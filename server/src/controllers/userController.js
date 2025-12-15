@@ -373,7 +373,9 @@ exports.getNetworkStats = async (req, res) => {
  */
 exports.getUserProfile = async (req, res) => {
   try {
-    const { userId } = req.user;
+    const userId = req.user.id; // El token contiene 'id', no 'userId'
+    
+    console.log('[getUserProfile] 🔍 Buscando usuario ID:', userId);
 
     // Obtener datos del usuario
     const [users] = await pool.query(
@@ -382,10 +384,12 @@ exports.getUserProfile = async (req, res) => {
     );
 
     if (users.length === 0) {
+      console.log('[getUserProfile] ❌ Usuario no encontrado:', userId);
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
 
     const user = users[0];
+    console.log('[getUserProfile] ✅ Usuario encontrado:', user.username);
 
     // Obtener cartones disponibles del inventario (suma normales + regalo)
     // Los jugadores ven el total combinado sin discriminación
@@ -400,8 +404,9 @@ exports.getUserProfile = async (req, res) => {
     );
 
     const tickets = inventory[0] || { bronze: 0, silver: 0, gold: 0 };
+    console.log('[getUserProfile] 🎴 Tickets:', tickets);
 
-    res.json({
+    const response = {
       username: user.username,
       balance: user.balance || 0,
       tickets: {
@@ -410,7 +415,10 @@ exports.getUserProfile = async (req, res) => {
         silver: parseInt(tickets.silver) || 0,
         gold: parseInt(tickets.gold) || 0
       }
-    });
+    };
+    
+    console.log('[getUserProfile] 📤 Enviando respuesta:', response);
+    res.json(response);
 
   } catch (error) {
     console.error('❌ Error obteniendo perfil de usuario:', error);
