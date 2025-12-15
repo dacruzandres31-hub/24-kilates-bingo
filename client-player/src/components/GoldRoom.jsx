@@ -650,6 +650,8 @@ useEffect(() => {
             isOpen={sidebarOpen} 
             onToggle={() => setSidebarOpen(!sidebarOpen)} 
             onLogout={onLogout}
+            themeColor="#FFD700"
+            accentColor="#FFD700"
           />
 
           {/* CELEBRACIÓN DE LÍNEA GANADORA */}
