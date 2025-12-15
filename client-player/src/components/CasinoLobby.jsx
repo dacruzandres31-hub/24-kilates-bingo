@@ -334,16 +334,26 @@ const CasinoLobby = ({ user, onLogout }) => {
 
   const loadUserProfile = async () => {
     try {
+      console.log('[CasinoLobby] 🔄 Cargando perfil de usuario...');
       const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
-      const response = await fetch('/api/users/profile', {
+      
+      if (!token) {
+        console.warn('[CasinoLobby] ⚠️ No hay token disponible');
+        return;
+      }
+      
+      console.log('[CasinoLobby] 🔑 Token:', token.substring(0, 20) + '...');
+      
+      const response = await axios.get('http://localhost:3001/api/users/profile', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (response.ok) {
-        const data = await response.json();
-        setUserData(data);
-      }
+      
+      console.log('[CasinoLobby] ✅ Datos recibidos:', response.data);
+      setUserData(response.data);
     } catch (error) {
-      console.error('Error loading profile:', error);
+      console.error('[CasinoLobby] ❌ Error loading profile:', error);
+      console.error('[CasinoLobby] ❌ Status:', error.response?.status);
+      console.error('[CasinoLobby] ❌ Detalles:', error.response?.data);
     }
   };
 
