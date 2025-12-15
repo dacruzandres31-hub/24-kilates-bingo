@@ -3,6 +3,7 @@
  * Genera 1000 cartones por sala (starter, bronce, plata, oro)
  */
 
+require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
 const mysql = require('mysql2/promise');
 const BingoCardGenerator = require('../src/utils/cardGenerator');
 
@@ -12,7 +13,7 @@ const dbConfig = {
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'bingo_24k',
-  port: process.env.DB_PORT || 3306
+  port: parseInt(process.env.DB_PORT) || 3306
 };
 
 const ROOMS = ['starter', 'bronce', 'plata', 'oro'];
@@ -26,16 +27,29 @@ async function generateCardsForAllRooms() {
     connection = await mysql.createConnection(dbConfig);
     console.log('✅ Conexión establecida\n');
     
-    // Verificar si la tabla existe
-    const [tables] = await connection.query(
-      "SHOW TABLES LIKE 'bingo_cards_pool'"
-    );
+    // Crear tabla si no existe
+    console.log('📋 Creando tabla bingo_cards_pool si no existe...');
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS bingo_cards_pool (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        card_serial VARCHAR(50) UNIQUE NOT NULL,
+        room ENUM('starter', 'bronce', 'plata', 'oro') NOT NULL,
+        numbers JSON NOT NULL COMMENT 'Matriz 3x9 del cartón',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        status ENUM('available', 'selected', 'used') DEFAULT 'available',
+        selected_by INT NULL COMMENT 'ID del usuario que seleccionó el cartón',
+        selected_at TIMESTAMP NULL,
+        game_session_id INT NULL COMMENT 'ID de la sesión en la que se usó',
+        
+        INDEX idx_room_status (room, status),
+        INDEX idx_serial (card_serial),
+        INDEX idx_selected_by (selected_by),
+        INDEX idx_room_available (room, status, id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      COMMENT='Pool de cartones pre-generados para cada sala'
+    `);
     
-    if (tables.length === 0) {
-      console.log('❌ La tabla bingo_cards_pool no existe.');
-      console.log('   Ejecuta primero: mysql -u root -p bingo_24k < server/CARTONES_MIGRATION.sql');
-      process.exit(1);
-    }
+    console.log('✅ Tabla creada correctamente\n');
     
     for (const room of ROOMS) {
       console.log(`\n${'='.repeat(50)}`);
