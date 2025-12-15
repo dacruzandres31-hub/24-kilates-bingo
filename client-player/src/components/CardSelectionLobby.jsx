@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FaTicketAlt, FaLock, FaCheck, FaTimes, FaClock, FaUsers, FaArrowLeft } from 'react-icons/fa';
+import BingoCardPreview from './BingoCardPreview';
+import axios from 'axios';
 import '../styles/CardSelectionLobby.css';
 
 const CardSelectionLobby = ({ 
@@ -27,18 +29,18 @@ const CardSelectionLobby = ({
 
   const loadAvailableCards = async () => {
     try {
-      const response = await fetch(`/api/game/starter/available-cards/${sessionId}`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
+      const response = await axios.get(`/api/cards/available/${roomTheme}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       
-      if (!response.ok) throw new Error('Error cargando cartones');
-      
-      const data = await response.json();
-      setAvailableCards(data.cards || []);
-      setPlayersOnline(data.playersOnline || 0);
-      setTimeRemaining(data.timeRemaining || null);
+      setAvailableCards(response.data.cards || []);
+      setMaxCards(response.data.maxSelection || 20);
     } catch (error) {
       console.error('Error loading cards:', error);
+      if (error.response?.status === 400) {
+        alert(error.response.data.error || 'No tienes tickets disponibles');
+      }
     } finally {
       setLoading(false);
     }
@@ -69,28 +71,26 @@ const CardSelectionLobby = ({
     }
 
     try {
-      const response = await fetch(`/api/game/starter/reserve-cards`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
+      const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
+      const response = await axios.post('/api/cards/select', 
+        {
+          cardIds: selectedCards.map(c => c.id),
+          room: roomTheme
         },
-        body: JSON.stringify({
-          sessionId,
-          cardIds: selectedCards.map(c => c.id)
-        })
-      });
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Error reservando cartones');
-      }
-
-      const data = await response.json();
-      onCardsSelected(data.reservedCards);
+      alert(`✅ ${response.data.message}`);
+      onCardsSelected(response.data.cards);
     } catch (error) {
       console.error('Error reserving cards:', error);
-      alert(`❌ ${error.message}`);
+      const errorMsg = error.response?.data?.error || 'Error seleccionando cartones';
+      alert(`❌ ${errorMsg}`);
       // Recargar lista por si algunos cartones ya fueron tomados
       loadAvailableCards();
     }
@@ -201,52 +201,19 @@ const CardSelectionLobby = ({
           const selected = isCardSelected(card);
           const reserved = card.status === 'reserved';
           
+          
           return (
-            <div
+            <BingoCardPreview
               key={card.id}
-              className={`card-preview ${getCardStatusColor(card.status)} ${selected ? 'selected' : ''} ${reserved ? 'reserved' : ''}`}
-              onClick={() => !reserved && handleCardToggle(card)}
-            >
-              {/* Header del cartón */}
-              <div className="card-preview-header">
-                <span className="card-serial">{card.serial}</span>
-                {selected && (
-                  <div className="card-check">
-                    <FaCheck />
-                  </div>
-                )}
-                {reserved && (
-                  <div className="card-lock">
-                    <FaLock />
-                  </div>
-                )}
-              </div>
-
-              {/* Grid 3x9 del cartón */}
-              <div className="card-preview-grid">
-                {card.numbers.map((row, rowIdx) => (
-                  <div key={rowIdx} className="card-preview-row">
-                    {row.map((num, colIdx) => (
-                      <div
-                        key={colIdx}
-                        className={`card-preview-cell ${num === null ? 'empty' : 'filled'}`}
-                      >
-                        {num !== null && <span className="cell-num">{num}</span>}
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-
-              {/* Footer con indicador */}
-              <div className="card-preview-footer">
-                {selected && <span className="status-text selected">✓ Seleccionado</span>}
-                {reserved && <span className="status-text reserved">🔒 Reservado</span>}
-                {!selected && !reserved && <span className="status-text available">Disponible</span>}
-              </div>
-            </div>
-          );
-        })}
+              card={{
+                card_serial: card.serial,
+                numbers: card.numbers
+              }}
+              room={roomTheme}
+              selected={selected}
+              onClick={() => handleCardToggle(card)}
+              showSerial={true}
+            /
       </div>
 
       {/* Footer con acciones */}
