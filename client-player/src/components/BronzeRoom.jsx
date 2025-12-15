@@ -531,7 +531,7 @@ celebrationAudio.volume = 0.7;
       setHighlightedLine(cardsWithWinningLines[0].lines[0].numbers);
     }
   }
-}, [ballsDrawn, playerCards]);
+}, [ballsDrawn.length, playerCards.length, lineCelebrated, gameStatus, winnerCards.length]);
 
 useEffect(() => {
   return () => {
