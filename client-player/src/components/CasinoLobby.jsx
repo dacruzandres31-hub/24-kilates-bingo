@@ -512,45 +512,105 @@ const CasinoLobby = ({ user, onLogout }) => {
 
       {/* Modal de Cambiar Contraseña */}
       {showChangePasswordModal && createPortal(
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[9999]">
-          <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border-2 border-purple-500/50 rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          backdropFilter: 'blur(10px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
+            border: '2px solid rgba(147, 51, 234, 0.5)',
+            borderRadius: '16px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            width: '100%',
+            maxWidth: '28rem',
+            margin: '0 1rem',
+            overflow: 'hidden'
+          }}>
             {/* Header */}
-            <div className="p-6 bg-gradient-to-r from-purple-600 to-indigo-600">
-              <h3 className="text-2xl font-bold text-white text-center">
+            <div style={{
+              padding: '1.5rem',
+              background: 'linear-gradient(to right, rgb(147, 51, 234), rgb(79, 70, 229))',
+              textAlign: 'center'
+            }}>
+              <h3 style={{
+                fontSize: '1.5rem',
+                fontWeight: 'bold',
+                color: 'white',
+                margin: 0
+              }}>
                 🔑 Cambiar Contraseña
               </h3>
             </div>
 
             {/* Body */}
-            <form onSubmit={handleChangePassword} className="p-6 space-y-4">
-              <div>
-                <label className="block text-gray-300 font-semibold mb-2 text-sm">
+            <form onSubmit={handleChangePassword} style={{ padding: '1.5rem' }}>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{
+                  display: 'block',
+                  color: '#d1d5db',
+                  fontWeight: '600',
+                  marginBottom: '0.5rem',
+                  fontSize: '0.875rem'
+                }}>
                   Contraseña Actual:
                 </label>
-                <div className="relative">
+                <div style={{ position: 'relative' }}>
                   <input
                     type={showPasswords.current ? "text" : "password"}
                     value={passwordData.currentPassword}
                     onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
-                    className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-4 py-3 pr-12 text-white focus:outline-none focus:border-purple-500 transition-colors"
+                    style={{
+                      width: '100%',
+                      backgroundColor: 'rgba(55, 65, 81, 0.5)',
+                      border: '1px solid rgb(75, 85, 99)',
+                      borderRadius: '0.5rem',
+                      padding: '0.75rem 3rem 0.75rem 1rem',
+                      color: 'white',
+                      outline: 'none'
+                    }}
                     placeholder="Ingresa tu contraseña actual"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPasswords({ ...showPasswords, current: !showPasswords.current })}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-purple-400 transition-colors text-lg"
+                    style={{
+                      position: 'absolute',
+                      right: '0.75rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      color: 'white',
+                      cursor: 'pointer',
+                      fontSize: '1.125rem'
+                    }}
                   >
                     {showPasswords.current ? '👁' : '🔒'}
                   </button>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-gray-300 font-semibold mb-2 text-sm">
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{
+                  display: 'block',
+                  color: '#d1d5db',
+                  fontWeight: '600',
+                  marginBottom: '0.5rem',
+                  fontSize: '0.875rem'
+                }}>
                   Nueva Contraseña:
                 </label>
-                <div className="relative">
+                <div style={{ position: 'relative' }}>
                   <input
                     type={showPasswords.new ? "text" : "password"}
                     value={passwordData.newPassword}
@@ -559,7 +619,15 @@ const CasinoLobby = ({ user, onLogout }) => {
                       setPasswordData({ ...passwordData, newPassword: newPwd });
                       setPasswordStrength(calculatePasswordStrength(newPwd));
                     }}
-                    className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-4 py-3 pr-12 text-white focus:outline-none focus:border-purple-500 transition-colors"
+                    style={{
+                      width: '100%',
+                      backgroundColor: 'rgba(55, 65, 81, 0.5)',
+                      border: '1px solid rgb(75, 85, 99)',
+                      borderRadius: '0.5rem',
+                      padding: '0.75rem 3rem 0.75rem 1rem',
+                      color: 'white',
+                      outline: 'none'
+                    }}
                     placeholder="Mínimo 6 caracteres"
                     required
                     minLength={6}
@@ -567,39 +635,66 @@ const CasinoLobby = ({ user, onLogout }) => {
                   <button
                     type="button"
                     onClick={() => setShowPasswords({ ...showPasswords, new: !showPasswords.new })}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-purple-400 transition-colors text-lg"
+                    style={{
+                      position: 'absolute',
+                      right: '0.75rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      color: 'white',
+                      cursor: 'pointer',
+                      fontSize: '1.125rem'
+                    }}
                   >
                     {showPasswords.new ? '👁' : '🔒'}
                   </button>
                 </div>
                 {passwordData.newPassword && passwordStrength.level > 0 && (
-                  <div className="mt-2 flex items-center gap-2">
-                    <div className="flex-1 h-2 bg-gray-600 rounded-full overflow-hidden">
-                      <div 
-                        className={`h-full transition-all duration-300 ${
-                          passwordStrength.level === 1 ? 'bg-red-500 w-1/3' :
-                          passwordStrength.level === 2 ? 'bg-yellow-500 w-2/3' :
-                          'bg-green-500 w-full'
-                        }`}
-                      ></div>
+                  <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div style={{ flex: 1, height: '0.5rem', backgroundColor: 'rgb(75, 85, 99)', borderRadius: '9999px', overflow: 'hidden' }}>
+                      <div style={{
+                        height: '100%',
+                        transition: 'all 0.3s',
+                        backgroundColor: passwordStrength.level === 1 ? 'rgb(239, 68, 68)' : passwordStrength.level === 2 ? 'rgb(234, 179, 8)' : 'rgb(34, 197, 94)',
+                        width: passwordStrength.level === 1 ? '33.33%' : passwordStrength.level === 2 ? '66.66%' : '100%'
+                      }}></div>
                     </div>
-                    <span className={`text-sm font-semibold ${passwordStrength.color}`}>
+                    <span style={{
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      color: passwordStrength.level === 1 ? 'rgb(239, 68, 68)' : passwordStrength.level === 2 ? 'rgb(234, 179, 8)' : 'rgb(34, 197, 94)'
+                    }}>
                       {passwordStrength.text}
                     </span>
                   </div>
                 )}
               </div>
 
-              <div>
-                <label className="block text-gray-300 font-semibold mb-2 text-sm">
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{
+                  display: 'block',
+                  color: '#d1d5db',
+                  fontWeight: '600',
+                  marginBottom: '0.5rem',
+                  fontSize: '0.875rem'
+                }}>
                   Confirmar Nueva Contraseña:
                 </label>
-                <div className="relative">
+                <div style={{ position: 'relative' }}>
                   <input
                     type={showPasswords.confirm ? "text" : "password"}
                     value={passwordData.confirmPassword}
                     onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                    className="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-4 py-3 pr-12 text-white focus:outline-none focus:border-purple-500 transition-colors"
+                    style={{
+                      width: '100%',
+                      backgroundColor: 'rgba(55, 65, 81, 0.5)',
+                      border: '1px solid rgb(75, 85, 99)',
+                      borderRadius: '0.5rem',
+                      padding: '0.75rem 3rem 0.75rem 1rem',
+                      color: 'white',
+                      outline: 'none'
+                    }}
                     placeholder="Repite la nueva contraseña"
                     required
                     minLength={6}
@@ -607,7 +702,17 @@ const CasinoLobby = ({ user, onLogout }) => {
                   <button
                     type="button"
                     onClick={() => setShowPasswords({ ...showPasswords, confirm: !showPasswords.confirm })}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-purple-400 transition-colors text-lg"
+                    style={{
+                      position: 'absolute',
+                      right: '0.75rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      color: 'white',
+                      cursor: 'pointer',
+                      fontSize: '1.125rem'
+                    }}
                   >
                     {showPasswords.confirm ? '👁' : '🔒'}
                   </button>
@@ -615,20 +720,44 @@ const CasinoLobby = ({ user, onLogout }) => {
               </div>
 
               {/* Footer */}
-              <div className="flex gap-3 pt-4">
+              <div style={{ display: 'flex', gap: '0.75rem', paddingTop: '1rem' }}>
                 <button
                   type="button"
                   onClick={() => {
                     setShowChangePasswordModal(false);
                     setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
                   }}
-                  className="flex-1 py-3 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-500 hover:to-gray-600 text-white font-bold rounded-xl transition-all"
+                  style={{
+                    flex: 1,
+                    padding: '0.75rem',
+                    background: 'linear-gradient(to right, rgb(75, 85, 99), rgb(55, 65, 81))',
+                    color: 'white',
+                    fontWeight: 'bold',
+                    borderRadius: '0.75rem',
+                    border: 'none',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseOver={(e) => e.target.style.background = 'linear-gradient(to right, rgb(107, 114, 128), rgb(75, 85, 99))'}
+                  onMouseOut={(e) => e.target.style.background = 'linear-gradient(to right, rgb(75, 85, 99), rgb(55, 65, 81))'}
                 >
                   CANCELAR
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-xl transition-all"
+                  style={{
+                    flex: 1,
+                    padding: '0.75rem',
+                    background: 'linear-gradient(to right, rgb(147, 51, 234), rgb(79, 70, 229))',
+                    color: 'white',
+                    fontWeight: 'bold',
+                    borderRadius: '0.75rem',
+                    border: 'none',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseOver={(e) => e.target.style.background = 'linear-gradient(to right, rgb(168, 85, 247), rgb(99, 102, 241))'}
+                  onMouseOut={(e) => e.target.style.background = 'linear-gradient(to right, rgb(147, 51, 234), rgb(79, 70, 229))'}
                 >
                   ✓ CAMBIAR
                 </button>

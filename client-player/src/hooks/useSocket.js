@@ -26,8 +26,8 @@ export function useSocket() {
     }
 
     // Crear nueva conexión
-    const serverUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001';
-    const token = localStorage.getItem('token');
+    const serverUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
 
     const newSocket = io(serverUrl, {
       auth: {
