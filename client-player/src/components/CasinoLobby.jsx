@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import '../styles/CasinoLobby.css';
 import '../styles/Countdown.css';
 import Countdown from './Countdown';
-import { FaClock, FaUsers, FaMoneyBillWave, FaTrophy, FaStar, FaGlassCheers, FaGift, FaHeadset, FaTicketAlt, FaEye, FaEyeSlash, FaMusic, FaVolumeUp, FaVolumeMute } from 'react-icons/fa';
+import { FaClock, FaUsers, FaMoneyBillWave, FaTrophy, FaStar, FaGlassCheers, FaGift, FaHeadset, FaTicketAlt, FaEye, FaEyeSlash, FaMusic, FaVolumeUp, FaVolumeMute, FaUser, FaKey, FaSignOutAlt } from 'react-icons/fa';
 import logo from '../assets/logo.png';
 import giftIcon from '../assets/Gift_icon.png';
 import bronzeIcon from '../assets/bronze_icon.png';
@@ -263,6 +263,8 @@ const CasinoLobby = ({ user, onLogout }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showBalance, setShowBalance] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [userData, setUserData] = useState(null);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
   
   // Estado de audio
   const [audioStatus, setAudioStatus] = useState({
@@ -271,6 +273,26 @@ const CasinoLobby = ({ user, onLogout }) => {
   });
   const [ticketsExpanded, setTicketsExpanded] = useState(false);
   const [audioExpanded, setAudioExpanded] = useState(false);
+
+  // Cargar perfil del usuario
+  useEffect(() => {
+    loadUserProfile();
+  }, []);
+
+  const loadUserProfile = async () => {
+    try {
+      const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
+      const response = await fetch('/api/users/profile', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setUserData(data);
+      }
+    } catch (error) {
+      console.error('Error loading profile:', error);
+    }
+  };
 
   // Handlers de audio
   const toggleMusic = () => {
@@ -310,6 +332,51 @@ const CasinoLobby = ({ user, onLogout }) => {
 
   return (
     <div className="casino-lobby" style={{ '--lobby-bg-image': `url(${lobbyBackground})` }}>
+      {/* Top User Bar */}
+      <div className="user-top-bar">
+        <div className="user-info-section">
+          <span className="user-name">👤 {user?.username || 'Usuario'}</span>
+          <div className="user-resources">
+            <span className="balance">
+              💰 ${userData?.balance ? parseFloat(userData.balance).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : '0'}
+            </span>
+            <div className="tickets-display">
+              <span className="ticket-item">🎴 Bronce: {userData?.tickets?.bronze || 0}</span>
+              <span className="ticket-item">🥈 Plata: {userData?.tickets?.silver || 0}</span>
+              <span className="ticket-item">🥇 Oro: {userData?.tickets?.gold || 0}</span>
+            </div>
+          </div>
+        </div>
+        <div className="user-actions">
+          <div className="profile-menu-container">
+            <button
+              className="btn-profile"
+              onClick={() => setShowProfileMenu(!showProfileMenu)}
+            >
+              <FaUser />
+              <span>Perfil</span>
+            </button>
+            {showProfileMenu && (
+              <div className="profile-dropdown">
+                <button className="dropdown-item" onClick={() => {
+                  setShowProfileMenu(false);
+                  alert('Función de cambio de contraseña próximamente');
+                }}>
+                  <FaKey />
+                  <span>Cambiar Contraseña</span>
+                </button>
+                <button className="dropdown-item logout" onClick={() => {
+                  onLogout();
+                }}>
+                  <FaSignOutAlt />
+                  <span>Cerrar Sesión</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Botón Toggle Sidebar */}
       <button 
         className="sidebar-toggle-btn"
