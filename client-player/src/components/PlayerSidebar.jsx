@@ -89,16 +89,19 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
       try {
         const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
         if (!token) {
-          console.warn('No hay token, usando datos por defecto');
+          console.warn('[PlayerSidebar] No hay token, usando datos por defecto');
           return;
         }
         
+        console.log('[PlayerSidebar] 🔄 Cargando datos de usuario...');
         const response = await axios.get('http://localhost:3001/api/users/profile', {
           headers: { Authorization: `Bearer ${token}` }
         });
         
         // El API devuelve los datos directamente sin wrapper
         const data = response.data;
+        console.log('[PlayerSidebar] ✅ Datos recibidos:', data);
+        
         setUserData({
           username: data.username || 'Usuario',
           balance: data.balance || 0,
@@ -109,9 +112,10 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
             gold: data.tickets?.gold || 0
           }
         });
-        console.log('✅ [PlayerSidebar] Datos de usuario cargados:', data);
+        console.log('[PlayerSidebar] ✅ Estado actualizado correctamente');
       } catch (error) {
-        console.error('❌ [PlayerSidebar] Error cargando datos del usuario:', error);
+        console.error('[PlayerSidebar] ❌ Error cargando datos del usuario:', error);
+        console.error('[PlayerSidebar] ❌ Detalles:', error.response?.data || error.message);
         // Mantener datos por defecto si falla
       }
     };
