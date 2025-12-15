@@ -1,0 +1,108 @@
+/* Cartón de Bingo - Vista Previa */
+.bingo-card-preview {
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  width: 280px;
+  margin: 10px;
+  user-select: none;
+}
+
+.bingo-card-preview:hover {
+  transform: translateY(-5px);
+}
+
+.bingo-card-preview.selected {
+  transform: translateY(-5px) scale(1.02);
+}
+
+.card-serial-header {
+  padding: 8px 12px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  text-align: center;
+  letter-spacing: 1px;
+}
+
+.card-grid {
+  padding: 12px;
+  background: white;
+}
+
+.card-row {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 2px;
+}
+
+.card-row:last-child {
+  margin-bottom: 0;
+}
+
+.card-cell {
+  flex: 1;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid;
+  border-radius: 4px;
+  font-weight: bold;
+  font-size: 1.1rem;
+  transition: all 0.2s;
+  min-width: 26px;
+  min-height: 26px;
+}
+
+.card-cell.filled {
+  font-size: 1.2rem;
+}
+
+.card-cell.empty {
+  opacity: 0.7;
+}
+
+.cell-number {
+  font-family: 'Arial Black', sans-serif;
+}
+
+.card-footer {
+  padding: 6px 12px;
+  font-size: 0.7rem;
+  font-weight: bold;
+  text-align: center;
+  letter-spacing: 2px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .bingo-card-preview {
+    width: 100%;
+    max-width: 320px;
+  }
+  
+  .card-cell {
+    font-size: 0.9rem;
+    min-width: 22px;
+    min-height: 22px;
+  }
+  
+  .card-cell.filled {
+    font-size: 1rem;
+  }
+}
+
+/* Animación de selección */
+@keyframes pulse-border {
+  0%, 100% {
+    box-shadow: 0 0 15px currentColor;
+  }
+  50% {
+    box-shadow: 0 0 25px currentColor;
+  }
+}
+
+.bingo-card-preview.selected {
+  animation: pulse-border 2s infinite;
+}
