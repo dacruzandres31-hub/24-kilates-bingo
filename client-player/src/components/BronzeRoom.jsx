@@ -172,7 +172,7 @@ celebrationAudio.volume = 0.7;
     celebrationAudio.play();
     addFloatingEmoji('🎉');
     addFloatingEmoji('🏆');
-    addFloatingEmoji('💰');
+    addFloatingEmoji('�');
     
     setTimeout(() => {
       setCelebrationMode(false);

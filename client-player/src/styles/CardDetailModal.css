@@ -1,0 +1,185 @@
+/* Modal para vista detallada del cartón */
+.card-detail-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 20px;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.card-detail-modal {
+  position: relative;
+  animation: scaleIn 0.3s ease;
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.close-button {
+  position: absolute;
+  top: -15px;
+  right: -15px;
+  background: #ff4444;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  cursor: pointer;
+  z-index: 10001;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.close-button:hover {
+  background: #cc0000;
+  transform: rotate(90deg) scale(1.1);
+}
+
+/* Cartón en tamaño grande (doble del original) */
+.modal-card-container {
+  background: white;
+  border-radius: 20px;
+  overflow: hidden;
+  width: 560px; /* Doble de 280px */
+  max-width: 90vw;
+}
+
+.modal-card-header {
+  padding: 20px;
+  text-align: center;
+}
+
+.sala-name {
+  font-size: 1.4rem;
+  font-weight: bold;
+  letter-spacing: 3px;
+  margin-bottom: 10px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.card-serial {
+  font-size: 0.85rem;
+  letter-spacing: 1.5px;
+  opacity: 0.9;
+  font-family: 'Courier New', monospace;
+}
+
+/* Grid del cartón grande */
+.modal-card-grid {
+  padding: 24px;
+  background: white;
+}
+
+.modal-card-row {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.modal-card-row:last-child {
+  margin-bottom: 0;
+}
+
+.modal-card-cell {
+  flex: 1;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid;
+  border-radius: 8px;
+  font-weight: bold;
+  transition: all 0.2s;
+  min-width: 52px; /* Doble de 26px */
+  min-height: 52px;
+  height: 64px; /* Doble de 32px */
+  max-height: 80px;
+}
+
+.modal-card-cell.filled {
+  cursor: default;
+}
+
+.modal-card-cell.empty {
+  opacity: 0.7;
+}
+
+.modal-cell-number {
+  font-family: 'Arial Black', sans-serif;
+  font-size: 2.4rem; /* Doble de 1.2rem */
+}
+
+.modal-card-footer {
+  padding: 16px;
+  font-size: 1.2rem;
+  font-weight: bold;
+  text-align: center;
+  letter-spacing: 4px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Responsive para móviles */
+@media (max-width: 768px) {
+  .modal-card-container {
+    width: 90vw;
+    max-width: 400px;
+  }
+  
+  .sala-name {
+    font-size: 1.1rem;
+  }
+  
+  .card-serial {
+    font-size: 0.7rem;
+  }
+  
+  .modal-card-cell {
+    min-width: 36px;
+    min-height: 36px;
+    height: 44px;
+  }
+  
+  .modal-cell-number {
+    font-size: 1.6rem;
+  }
+  
+  .modal-card-footer {
+    font-size: 0.9rem;
+    padding: 12px;
+  }
+}
+
+/* Animación hover para celdas llenas */
+.modal-card-cell.filled:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+}

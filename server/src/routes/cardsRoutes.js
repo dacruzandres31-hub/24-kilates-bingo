@@ -15,7 +15,13 @@ router.use(authMiddleware.authenticateToken);
 // Obtener cartones disponibles para seleccionar
 router.get('/available/:room', cardsController.getAvailableCards);
 
-// Seleccionar cartones del pool
+// Reservar cartón temporalmente (al hacer click)
+router.post('/reserve', cardsController.reserveCard);
+
+// Liberar reserva de cartón (al deseleccionar)
+router.post('/unreserve', cardsController.unreserveCard);
+
+// Seleccionar cartones del pool (confirmar selección)
 router.post('/select', cardsController.selectCards);
 
 // Obtener mis cartones seleccionados

@@ -18,11 +18,13 @@
 }
 
 .card-serial-header {
-  padding: 8px 12px;
-  font-size: 0.75rem;
-  font-weight: bold;
+  padding: 6px 10px;
+  font-size: 0.65rem;
+  font-weight: 600;
   text-align: center;
-  letter-spacing: 1px;
+  letter-spacing: 0.8px;
+  font-family: 'Courier New', monospace;
+  transition: all 0.3s ease;
 }
 
 .card-grid {
@@ -53,6 +55,8 @@
   transition: all 0.2s;
   min-width: 26px;
   min-height: 26px;
+  height: 32px;
+  max-height: 40px;
 }
 
 .card-cell.filled {
