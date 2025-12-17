@@ -2339,26 +2339,32 @@
 }
 
 .compact-card-serial {
-  font-size: 1rem;
-  font-weight: 700;
-  color: #D4A574;
-  background: #6B4423;
-  text-align: center;
-  letter-spacing: 0.8px;
-  text-shadow: 0 0 8px rgba(212, 165, 116, 0.4);
-  position: absolute;
-  z-index: 2;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 90%;
-  padding: 4px 6px;
-  line-height: 1.2;
-  border-radius: 4px;
-  opacity: 0.9;
-  font-family: 'Courier New', monospace;
-  cursor: pointer;
+  font-size: 1.2rem !important;
+  font-weight: 800 !important;
+  color: #d4a574 !important;
+  text-align: center !important;
+  letter-spacing: 0.8px !important;
+  text-shadow: 0 0 8px rgba(212, 165, 116, 0.6), 1px 1px 2px rgba(0, 0, 0, 0.8) !important;
+  position: absolute !important;
+  z-index: 10 !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  width: 95% !important;
+  padding: 4px 6px !important;
+  line-height: 1.2 !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  opacity: 1 !important;
+  font-family: 'Courier New', monospace !important;
+  cursor: pointer !important;
+  border: none !important;
+}
   transition: all 0.3s ease;
+  border: 1px solid rgba(155, 127, 87, 0.2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .compact-card-progress {
@@ -2603,12 +2609,13 @@
 }
 
 .card-number {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: #1a1310;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
-  letter-spacing: 1.5px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #5d4e37;
+  text-shadow: 0 0 4px rgba(139, 111, 71, 0.2);
+  letter-spacing: 1px;
   font-family: 'Courier New', monospace;
+  opacity: 0.85;
 }
 
 .card-glow-border {

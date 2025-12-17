@@ -21,6 +21,8 @@ const CardSelectionLobby = ({
   const [refreshing, setRefreshing] = useState(false);
   const [totalAvailable, setTotalAvailable] = useState(0);
   const [showExitWarning, setShowExitWarning] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [purchasedCount, setPurchasedCount] = useState(0);
 
   useEffect(() => {
     loadAvailableCards();
@@ -38,7 +40,9 @@ const CardSelectionLobby = ({
       console.log('[CardSelection] Length:', response.data.cards?.length);
       
       setAvailableCards(response.data.cards || []);
-      setMaxCards(response.data.maxSelection || 20);
+      // Ajustar maxCards descontando cartones ya en sala
+      const maxAllowed = Math.min(response.data.maxSelection || 20, 20 - currentCards);
+      setMaxCards(maxAllowed);
       setTotalAvailable(response.data.totalAvailable || 0);
       
       console.log('[CardSelection] Estado actualizado - availableCards length:', response.data.cards?.length);
@@ -70,9 +74,10 @@ const CardSelectionLobby = ({
           headers: { 'Authorization': `Bearer ${token}` }
         });
         
-        // Actualizar cartones disponibles Y maxCards basado en tickets
+        // Actualizar cartones disponibles Y maxCards basado en tickets y cartones en sala
         setAvailableCards(response.data.cards || []);
-        setMaxCards(response.data.maxSelection || 20);
+        const maxAllowed = Math.min(response.data.maxSelection || 20, 20 - currentCards);
+        setMaxCards(maxAllowed);
         setTotalAvailable(response.data.totalAvailable || 0);
         
         console.log('[CardSelection] Cartones actualizados. Seleccionados mantenidos:', selectedCards.length);
@@ -181,8 +186,15 @@ const CardSelectionLobby = ({
         }
       );
 
-      alert(`✅ ${response.data.message}`);
-      onCardsSelected(response.data.cards);
+      // Mostrar modal de éxito
+      setPurchasedCount(selectedCards.length);
+      setShowSuccessModal(true);
+
+      // Después de 3 segundos, cerrar modal y redirigir a sala
+      setTimeout(() => {
+        setShowSuccessModal(false);
+        onCardsSelected(response.data.cards);
+      }, 3000);
     } catch (error) {
       console.error('Error reserving cards:', error);
       console.error('Error details:', error.response?.data);
@@ -436,6 +448,21 @@ const CardSelectionLobby = ({
                 <FaCheck /> Salir de todas formas
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de éxito */}
+      {showSuccessModal && (
+        <div className="success-modal-overlay">
+          <div className={`success-modal success-modal-${roomTheme}`}>
+            <div className="success-icon">✅</div>
+            <h2>¡Compra Exitosa!</h2>
+            <p className="success-count">
+              {purchasedCount} cartón{purchasedCount > 1 ? 'es' : ''} confirmado{purchasedCount > 1 ? 's' : ''}
+            </p>
+            <p className="success-message">Redirigiendo a la sala...</p>
+            <div className="success-spinner"></div>
           </div>
         </div>
       )}

@@ -2413,22 +2413,26 @@
 }
 
 .compact-card-serial {
-  font-size: 2.2rem;
-  font-weight: 900;
-  color: #c0c0c0;
-  text-align: center;
-  letter-spacing: 1px;
-  text-shadow: 0 0 15px rgba(192, 192, 192, 1),
-               0 0 30px rgba(192, 192, 192, 0.8),
-               0 0 45px rgba(192, 192, 192, 0.6);
-  position: absolute;
-  z-index: 2;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 100%;
-  padding: 0 3px;
-  line-height: 1;
+  font-size: 1.2rem !important;
+  font-weight: 800 !important;
+  color: #e8e8e8 !important;
+  text-align: center !important;
+  letter-spacing: 0.8px !important;
+  text-shadow: 0 0 8px rgba(232, 232, 232, 0.6), 1px 1px 2px rgba(0, 0, 0, 0.8) !important;
+  position: absolute !important;
+  z-index: 10 !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  width: 95% !important;
+  padding: 4px 6px !important;
+  line-height: 1.2 !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  opacity: 1 !important;
+  font-family: 'Courier New', monospace !important;
+  cursor: pointer !important;
+  border: none !important;
 }
 
 .compact-card-progress {

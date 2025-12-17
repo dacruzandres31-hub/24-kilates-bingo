@@ -100,10 +100,12 @@ const BingoCardPreview = ({ card, room, selected = false, onClick, showSerial = 
           <div 
             className="card-serial-header"
             style={{ 
-              background: '#6B4423',
-              color: '#D4A574',
-              fontSize: '0.65rem',
-              opacity: '0.85'
+              background: colors.primary,
+              color: '#ffffff',
+              fontSize: '1.1rem',
+              fontWeight: '800',
+              opacity: '1',
+              textShadow: '1px 1px 3px rgba(0, 0, 0, 0.7)'
             }}
           >
             {card.card_serial}
