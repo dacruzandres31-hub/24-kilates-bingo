@@ -7,8 +7,7 @@ import AlertsList from '../components/AlertsList';
 import Sidebar from '../components/Sidebar';
 import EstadisticasGenerales from '../components/EstadisticasGenerales';
 import GestionUsuarios from '../components/GestionUsuarios';
-import CardInventoryPanel from '../components/CardInventoryPanel';
-import AdminCardInventory from '../components/AdminCardInventory';
+
 import AllInventoriesPanel from '../components/AllInventoriesPanel';
 import CardMovementsHistory from '../components/CardMovementsHistory';
 import { SuperAdminOnly } from '../components/ProtectedContent';
@@ -46,7 +45,6 @@ export default function Dashboard() {
     'card-inventory': false,
     'inventories-panel': false,
     'movements-history': false,
-    'card-management': false,
     'finanzas-hoy': false,
     'movimientos': false,
     'movimientos-recientes': false,
@@ -363,24 +361,6 @@ export default function Dashboard() {
           {activeSections['movements-history'] && (
             <section className="mb-8">
               <CardMovementsHistory />
-            </section>
-          )}
-
-          {/* Acreditar/Transferir - Panel Original */}
-          {activeSections['card-management'] && (
-            <section className="mb-8">
-              <SuperAdminOnly fallback={<AdminCardInventory />}>
-                <CardInventoryPanel />
-              </SuperAdminOnly>
-            </section>
-          )}
-
-          {/* Mantener compatibilidad con card-inventory antiguo */}
-          {activeSections['card-inventory'] && (
-            <section className="mb-8">
-              <SuperAdminOnly fallback={<AdminCardInventory />}>
-                <CardInventoryPanel />
-              </SuperAdminOnly>
             </section>
           )}
 

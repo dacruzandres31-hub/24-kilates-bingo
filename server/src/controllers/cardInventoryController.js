@@ -330,9 +330,9 @@ exports.getAllInventories = async (req, res) => {
           free_percentage: item.free_percentage
         };
 
-        acc[item.user_id].total_all += item.total_cards;
-        acc[item.user_id].total_paid += item.normal_cards;
-        acc[item.user_id].total_free += item.gift_cards;
+        acc[item.user_id].total_all += Number(item.total_cards) || 0;
+        acc[item.user_id].total_paid += Number(item.normal_cards) || 0;
+        acc[item.user_id].total_free += Number(item.gift_cards) || 0;
 
         return acc;
       }, {});
@@ -346,9 +346,9 @@ exports.getAllInventories = async (req, res) => {
 
       // Estadísticas globales
       const totalUsers = Object.keys(grouped).length;
-      const totalCards = Object.values(grouped).reduce((sum, u) => sum + u.total_all, 0);
-      const totalPaid = Object.values(grouped).reduce((sum, u) => sum + u.total_paid, 0);
-      const totalFree = Object.values(grouped).reduce((sum, u) => sum + u.total_free, 0);
+      const totalCards = Object.values(grouped).reduce((sum, u) => sum + Number(u.total_all), 0);
+      const totalPaid = Object.values(grouped).reduce((sum, u) => sum + Number(u.total_paid), 0);
+      const totalFree = Object.values(grouped).reduce((sum, u) => sum + Number(u.total_free), 0);
       const usersWithAlerts = Object.values(grouped).filter(u => u.avg_free_percentage > 10).length;
 
       res.json({
@@ -399,13 +399,13 @@ exports.getAllInventories = async (req, res) => {
           total_cards: item.total_cards
         };
 
-        acc[item.user_id].total_all += item.total_cards;
+        acc[item.user_id].total_all += Number(item.total_cards) || 0;
 
         return acc;
       }, {});
 
       const totalUsers = Object.keys(grouped).length;
-      const totalCards = Object.values(grouped).reduce((sum, u) => sum + u.total_all, 0);
+      const totalCards = Object.values(grouped).reduce((sum, u) => sum + Number(u.total_all), 0);
 
       res.json({
         success: true,

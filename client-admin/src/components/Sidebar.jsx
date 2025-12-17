@@ -48,8 +48,7 @@ export default function Sidebar({ activeSections, onToggleSection }) {
       icon: '📦',
       sections: [
         { id: 'inventories-panel', name: 'Ver Inventarios de Red' },
-        { id: 'movements-history', name: 'Historial de Movimientos' },
-        { id: 'card-management', name: 'Acreditar/Transferir' }
+        { id: 'movements-history', name: 'Historial de Movimientos' }
       ]
     },
     {
