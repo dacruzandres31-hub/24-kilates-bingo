@@ -417,20 +417,34 @@ exports.selectCards = async (req, res) => {
 
     console.log(`[Cards] ✅ ${formattedCards.length} cartones seleccionados correctamente`);
 
+    // Calcular tickets restantes según si es starter o no
+    let remainingTickets = room === 'starter' ? 20 - formattedCards.length : 0;
+    
+    // Para salas que no son starter, obtener tickets desde BD
+    if (room !== 'starter') {
+      const [updatedInventory] = await connection.query(
+        `SELECT COALESCE(SUM(quantity), 0) as quantity 
+         FROM user_card_inventory 
+         WHERE user_id = ? AND room = ?`,
+        [userId, room]
+      );
+      remainingTickets = updatedInventory[0]?.quantity || 0;
+    }
+
     // Notificar via Socket.IO
     const io = req.app.get('io');
     if (io) {
       io.to(`user_${userId}`).emit('cards_selected', {
         room,
         cards: formattedCards,
-        remainingTickets: inventory[0].quantity - cardIds.length
+        remainingTickets
       });
     }
 
     res.json({
       success: true,
       cards: formattedCards,
-      remainingTickets: inventory[0].quantity - cardIds.length,
+      remainingTickets,
       message: `${formattedCards.length} cartón${formattedCards.length > 1 ? 'es' : ''} seleccionado${formattedCards.length > 1 ? 's' : ''} exitosamente`
     });
 
