@@ -1218,6 +1218,22 @@ useEffect(() => {
             <span className="cards-icon">🎴</span>
             <span>MIS CARTONES</span>
           </div>
+          
+          {/* Modal de Alerta de Casi Línea - Al lado del título */}
+          {almostLineCards.length > 0 && ballsDrawn.length < 40 && (() => {
+            const minMissing = Math.min(...almostLineCards.map(card => card.minMissing));
+            return (
+              <div className="almost-line-modal">
+                <div className="almost-line-content">
+                  <span className="alert-icon-modal">⚡</span>
+                  <span className="alert-text-modal">
+                    ¡A {minMissing} NÚMERO{minMissing > 1 ? 'S' : ''} DE LÍNEA!
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
+          
           <div className="cards-count">{playerCards.length} cartones</div>
         </div>
 
