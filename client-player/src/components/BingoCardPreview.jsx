@@ -91,9 +91,13 @@ const BingoCardPreview = ({ card, room, selected = false, onClick, showSerial = 
         onClick={handleCardClick}
         onDoubleClick={handleCardDoubleClick}
         style={{
-          border: `3px solid ${colors.border}`,
-          boxShadow: selected ? `0 0 15px ${colors.primary}` : '0 2px 8px rgba(0,0,0,0.2)',
-          cursor: onClick ? 'pointer' : 'default'
+          border: `3px solid ${selected ? colors.primary : colors.border}`,
+          boxShadow: selected 
+            ? `0 0 40px ${colors.primary}, 0 0 80px ${colors.primary}, 0 0 120px ${colors.primary}, inset 0 0 30px ${colors.primary}` 
+            : '0 2px 8px rgba(0,0,0,0.2)',
+          cursor: onClick ? 'pointer' : 'default',
+          transform: selected ? 'scale(1.03)' : 'scale(1)',
+          filter: selected ? 'brightness(1.3) saturate(1.5)' : 'none'
         }}
       >
         {showSerial && card.card_serial && (

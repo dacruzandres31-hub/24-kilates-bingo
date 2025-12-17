@@ -7,6 +7,7 @@ import voiceService from '../services/voiceService';
 import audioService from '../services/audioService';
 import PlayerSidebar from './PlayerSidebar';
 import CardSelectionLobby from './CardSelectionLobby';
+import BingoCardPreview from './BingoCardPreview';
 
 export default function BronzeRoom({ onLogout }) {
   const { sessionId } = useParams();
@@ -1261,58 +1262,30 @@ useEffect(() => {
 
           {/* Cartón expandido en el centro */}
           {expandedCard && (
-            <div className="expanded-card-overlay">
-              {playerCards
-                .filter(card => card.id === expandedCard)
-                .map(card => {
-                  const cardSerial = card.serial || generateCardSerial(playerCards.indexOf(card));
-                  
-                  return (
-                    <div key={card.id} className="bingo-card-expanded bingo-card-starter-90">
-                      <div className="card-header">
-                        <span className="card-number">N° Serie: {cardSerial}</span>
-                        <div className="card-glow-border"></div>
-                      </div>
-                    
-                      <div className="card-grid card-grid-90">
-                        {card.numbers.map((row, rowIndex) => (
-                          <div key={rowIndex} className="card-row">
-                            {row.map((num, colIndex) => {
-                              const isEmpty = num === null || num === undefined;
-                              const isCalled = !isEmpty && isNumberCalled(num);
-                              const isLatest = !isEmpty && ballsDrawn.length > 0 && 
-                                              ballsDrawn[ballsDrawn.length - 1].number === num;
-                              
-                              return (
-                                <div 
-                                  key={colIndex} 
-                                  className={`card-cell ${isEmpty ? 'empty' : ''} ${isCalled ? 'marked' : ''} ${isLatest ? 'latest-hit' : ''}`}
-                                >
-                                  {isEmpty ? (
-                                    <span className="empty-space"></span>
-                                  ) : (
-                                    <>
-                                      <span className="cell-number">{num}</span>
-                                      {isCalled && (
-                                        <div 
-                                          className="cell-mark"
-                                          style={{
-                                            backgroundColor: getBallColor(num),
-                                            boxShadow: `0 0 15px ${getBallColor(num)}`
-                                          }}
-                                        />
-                                      )}
-                                    </>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
+            <div className="expanded-card-overlay" onClick={() => setExpandedCard(null)}>
+              <div className="expanded-card-container" onClick={(e) => e.stopPropagation()}>
+                {playerCards
+                  .filter(card => card.id === expandedCard)
+                  .map(card => (
+                    <BingoCardPreview
+                      key={card.id}
+                      card={{
+                        card_serial: card.serial || generateCardSerial(playerCards.indexOf(card)),
+                        numbers: card.numbers
+                      }}
+                      room="bronze"
+                      selected={false}
+                      onClick={null}
+                      showSerial={true}
+                    />
+                  ))}
+                <button 
+                  className="close-expanded-btn"
+                  onClick={() => setExpandedCard(null)}
+                >
+                  ✕
+                </button>
+              </div>
             </div>
           )}
         </div>

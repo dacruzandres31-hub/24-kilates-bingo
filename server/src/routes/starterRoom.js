@@ -55,6 +55,14 @@ router.post('/reserve-cards', optionalAuth, (req, res) => {
 });
 
 /**
+ * POST /api/game/starter/auto-assign-cards/:sessionId
+ * Asigna automáticamente 20 cartones al jugador si no tiene ninguno
+ */
+router.post('/auto-assign-cards/:sessionId', optionalAuth, (req, res) => {
+  starterRoomController.autoAssignCards(req, res);
+});
+
+/**
  * GET /api/game/starter/session-stats/:sessionId
  * Obtiene estadísticas de la sesión (jugadores, cartones, etc)
  */

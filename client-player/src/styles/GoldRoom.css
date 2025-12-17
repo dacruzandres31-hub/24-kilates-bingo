@@ -2510,7 +2510,7 @@
    ============================================ */
 
 .expanded-card-overlay {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
   right: 0;
@@ -2518,11 +2518,83 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(5px);
-  z-index: 100;
-  animation: overlay-fade-in 0.3s ease-out;
-  padding: 20px;
+  background: rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(2px);
+  z-index: 10000;
+  animation: overlay-appear 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  padding: 40px 20px;
+}
+
+.expanded-card-container {
+  position: relative;
+  max-width: 1200px;
+  max-height: 95vh;
+  overflow: auto;
+  animation: card-bounce-in 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  filter: drop-shadow(0 20px 60px rgba(255, 215, 0, 0.6));
+}
+
+.close-expanded-btn {
+  position: absolute;
+  top: -60px;
+  right: 10px;
+  background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+  color: #333;
+  border: 3px solid #ffed4e;
+  border-radius: 50%;
+  width: 55px;
+  height: 55px;
+  font-size: 2.2rem;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  box-shadow: 0 6px 20px rgba(255, 215, 0, 0.7),
+              inset 0 2px 8px rgba(255, 255, 255, 0.5);
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.close-expanded-btn:hover {
+  background: linear-gradient(135deg, #ffed4e 0%, #ffd700 100%);
+  transform: rotate(90deg) scale(1.15);
+  box-shadow: 0 8px 30px rgba(255, 215, 0, 1),
+              inset 0 2px 12px rgba(255, 255, 255, 0.7);
+}
+
+@keyframes overlay-appear {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes card-bounce-in {
+  0% {
+    transform: scale(0.3) rotate(-5deg);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.05) rotate(2deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 6px 20px rgba(255, 215, 0, 0.7),
+                inset 0 2px 8px rgba(255, 255, 255, 0.5);
+  }
+  50% {
+    box-shadow: 0 8px 30px rgba(255, 215, 0, 0.9),
+                inset 0 2px 12px rgba(255, 255, 255, 0.7);
+  }
 }
 
 @keyframes overlay-fade-in {

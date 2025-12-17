@@ -277,6 +277,63 @@ class StarterRoomController {
   }
 
   /**
+   * POST /api/game/starter/auto-assign-cards/:sessionId
+   * Asigna automáticamente 20 cartones al jugador si no tiene ninguno
+   */
+  async autoAssignCards(req, res) {
+    try {
+      const { sessionId } = req.params;
+      const userId = req.user ? req.user.id : null;
+
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: 'Usuario no autenticado'
+        });
+      }
+
+      console.log(`🎁 Auto-asignando 20 cartones para usuario ${userId} en sesión ${sessionId}`);
+
+      // Obtener cartones disponibles
+      const availableCards = cardPoolService.getAvailableCards(sessionId, 20);
+
+      if (availableCards.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'No hay cartones disponibles en el pool'
+        });
+      }
+
+      // Tomar los primeros 20 (o los que haya disponibles)
+      const cardsToAssign = availableCards.slice(0, 20);
+      const cardIds = cardsToAssign.map(c => c.id);
+
+      // Reservar los cartones
+      const reserved = cardPoolService.reserveCards(sessionId, userId, cardIds);
+
+      if (!reserved) {
+        return res.status(400).json({
+          success: false,
+          message: 'Error al reservar cartones'
+        });
+      }
+
+      res.json({
+        success: true,
+        message: `${cardsToAssign.length} cartones asignados automáticamente`,
+        cards: cardsToAssign,
+        count: cardsToAssign.length
+      });
+    } catch (error) {
+      console.error('❌ Error en auto-asignación:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al asignar cartones automáticamente'
+      });
+    }
+  }
+
+  /**
    * Calcula tiempo restante para inicio del sorteo
    */
   calculateTimeRemaining(sessionId) {
