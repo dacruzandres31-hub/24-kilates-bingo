@@ -29,6 +29,7 @@ export default function BronzeRoom({ onLogout }) {
 const [lineCelebrated, setLineCelebrated] = useState(false); // ¿Ya se festejó la línea?
 const [pauseTimeout, setPauseTimeout] = useState(null); // Controlar pausa automática
 const [highlightedLine, setHighlightedLine] = useState(null); // Línea a resaltar
+const [cardWinningLines, setCardWinningLines] = useState({}); // {cardId: [0,1,2]} líneas ganadoras por cartón
   const [sidebarOpen, setSidebarOpen] = useState(false); // Estado del sidebar
   const [showCardSelection, setShowCardSelection] = useState(false); // Mostrar lobby de selección de cartones
   const [selectedPlayerCards, setSelectedPlayerCards] = useState([]); // Cartones seleccionados por el jugador
@@ -463,11 +464,13 @@ celebrationAudio.volume = 0.7;
     setWinnerCards([]);
     setLineCelebrated(false);
     setHighlightedLine(null);
+    setCardWinningLines({});
     return;
   }
 
   const cardsAlmostThere = [];
   const cardsWithWinningLines = [];
+  const newCardWinningLines = {};
 
   playerCards.forEach(card => {
     const linesStatus = checkLineStatus(card);
@@ -485,6 +488,10 @@ celebrationAudio.volume = 0.7;
     }
 
     if (completedLines.length > 0) {
+      // Guardar qué filas (índices 0, 1, 2) están completas
+      const winningRowIndices = completedLines.map(line => line.row);
+      newCardWinningLines[card.id] = winningRowIndices;
+      
       cardsWithWinningLines.push({
         cardId: card.id,
         cardSerial: card.serial || generateCardSerial(playerCards.indexOf(card)),
@@ -496,6 +503,7 @@ celebrationAudio.volume = 0.7;
   });
 
   setAlmostLineCards(cardsAlmostThere);
+  setCardWinningLines(newCardWinningLines); // Actualizar líneas ganadoras
 
   // Mostrar celebración si hay nuevos ganadores y no se festejó la línea
   if (
@@ -1277,6 +1285,8 @@ useEffect(() => {
                       selected={false}
                       onClick={null}
                       showSerial={true}
+                      drawnNumbers={ballsDrawn.map(b => b.number)}
+                      winningLines={cardWinningLines[card.id] || []}
                     />
                   ))}
                 <button 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import CardDetailModal from './CardDetailModal';
 import '../styles/BingoCardPreview.css';
 
@@ -7,10 +7,24 @@ import '../styles/BingoCardPreview.css';
  * - 3 filas x 9 columnas
  * - Números en celdas claras
  * - Espacios vacíos en color de sala
+ * - Marcado automático de números sorteados
+ * - Resaltado de líneas ganadoras
  */
-const BingoCardPreview = ({ card, room, selected = false, onClick, showSerial = true }) => {
+const BingoCardPreview = ({ 
+  card, 
+  room, 
+  selected = false, 
+  onClick, 
+  showSerial = true,
+  drawnNumbers = [],  // Números ya sorteados
+  winningLines = []   // Líneas ganadoras (ej: [0, 1, 2] para filas)
+}) => {
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [animatingNumbers, setAnimatingNumbers] = useState([]);
+  
   console.log('[BingoCardPreview] Renderizando cartón:', card);
+  console.log('[BingoCardPreview] drawnNumbers:', drawnNumbers);
+  console.log('[BingoCardPreview] winningLines:', winningLines);
   console.log('[BingoCardPreview] card.numbers:', card.numbers);
   console.log('[BingoCardPreview] card.numbers type:', typeof card.numbers);
   console.log('[BingoCardPreview] card.numbers isArray:', Array.isArray(card.numbers));
@@ -84,6 +98,36 @@ const BingoCardPreview = ({ card, room, selected = false, onClick, showSerial = 
     setShowDetailModal(true);
   };
 
+  // Detectar nuevos números sorteados y animarlos
+  useEffect(() => {
+    if (drawnNumbers.length > 0) {
+      const latestNumber = drawnNumbers[drawnNumbers.length - 1];
+      
+      // Verificar si el número está en este cartón
+      const isInCard = card.numbers.flat().includes(latestNumber);
+      
+      if (isInCard && !animatingNumbers.includes(latestNumber)) {
+        setAnimatingNumbers(prev => [...prev, latestNumber]);
+        
+        // Remover de la animación después de 500ms
+        setTimeout(() => {
+          setAnimatingNumbers(prev => prev.filter(n => n !== latestNumber));
+        }, 500);
+      }
+    }
+  }, [drawnNumbers, card.numbers]);
+
+  // Función para verificar si un número está marcado
+  const isNumberMarked = (num) => {
+    return num !== null && drawnNumbers.includes(num);
+  };
+
+  // Función para verificar si una celda es parte de una línea ganadora
+  const isWinningCell = (rowIdx, colIdx) => {
+    // Verificar si la fila está en winningLines
+    return winningLines.includes(rowIdx);
+  };
+
   return (
     <>
       <div 
@@ -119,19 +163,24 @@ const BingoCardPreview = ({ card, room, selected = false, onClick, showSerial = 
       <div className="card-grid">
         {card.numbers.map((row, rowIdx) => (
           <div key={rowIdx} className="card-row">
-            {row.map((num, colIdx) => (
-              <div
-                key={colIdx}
-                className={`card-cell ${num === null ? 'empty' : 'filled'}`}
-                style={{
-                  backgroundColor: num === null ? colors.dark : colors.light,
-                  color: num === null ? 'transparent' : colors.text,
-                  borderColor: colors.border
-                }}
-              >
-                {num !== null && <span className="cell-number">{num}</span>}
-              </div>
-            ))}
+            {row.map((num, colIdx) => {
+              const marked = isNumberMarked(num);
+              const winning = num !== null && isWinningCell(rowIdx, colIdx);
+              
+              return (
+                <div
+                  key={colIdx}
+                  className={`card-cell ${num === null ? 'empty' : 'filled'} ${marked ? 'marked' : ''} ${winning ? 'winning-line' : ''}`}
+                  style={{
+                    backgroundColor: num === null ? colors.dark : colors.light,
+                    color: num === null ? 'transparent' : colors.text,
+                    borderColor: colors.border
+                  }}
+                >
+                  {num !== null && <span className="cell-number">{num}</span>}
+                </div>
+              );
+            })}
           </div>
         ))}
       </div>

@@ -119,4 +119,100 @@
   }
 }
 
+/* ===== MARCADO AUTOMÁTICO DE NÚMEROS ===== */
+.card-cell.marked {
+  background-color: rgba(255, 215, 0, 0.4) !important;
+  border: 2px solid #FFD700 !important;
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
+  animation: number-marked 0.5s ease-out;
+  position: relative;
+}
+
+@keyframes number-marked {
+  0% {
+    transform: scale(1);
+    background-color: rgba(255, 215, 0, 0.2);
+  }
+  50% {
+    transform: scale(1.2);
+    background-color: rgba(255, 215, 0, 0.8);
+  }
+  100% {
+    transform: scale(1);
+    background-color: rgba(255, 215, 0, 0.4);
+  }
+}
+
+/* ===== LÍNEA GANADORA CON PULSO BRILLANTE ===== */
+.card-cell.winning-line {
+  background: linear-gradient(135deg, #FFD700 0%, #FFA500 50%, #FFD700 100%) !important;
+  border: 3px solid #FF4500 !important;
+  animation: line-pulse-glow 1.5s ease-in-out infinite;
+  position: relative;
+  z-index: 10;
+}
+
+.card-cell.winning-line::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
+  background: linear-gradient(45deg, 
+    #FFD700, #FFA500, #FF4500, #FFA500, #FFD700
+  );
+  border-radius: 6px;
+  z-index: -1;
+  animation: line-border-spin 3s linear infinite;
+  opacity: 0.8;
+}
+
+@keyframes line-pulse-glow {
+  0%, 100% {
+    box-shadow: 
+      0 0 15px rgba(255, 215, 0, 0.8),
+      0 0 30px rgba(255, 165, 0, 0.6),
+      0 0 45px rgba(255, 69, 0, 0.4),
+      inset 0 0 15px rgba(255, 255, 255, 0.5);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 
+      0 0 25px rgba(255, 215, 0, 1),
+      0 0 50px rgba(255, 165, 0, 0.8),
+      0 0 75px rgba(255, 69, 0, 0.6),
+      inset 0 0 25px rgba(255, 255, 255, 0.7);
+    transform: scale(1.08);
+  }
+}
+
+@keyframes line-border-spin {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+
+/* Texto del número en línea ganadora */
+.card-cell.winning-line .cell-number {
+  color: #FFFFFF !important;
+  font-weight: 900 !important;
+  text-shadow: 
+    2px 2px 4px rgba(0, 0, 0, 0.8),
+    0 0 10px rgba(255, 255, 255, 0.9);
+  animation: text-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes text-pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+}
+
 
