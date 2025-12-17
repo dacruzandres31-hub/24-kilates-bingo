@@ -11,6 +11,12 @@ import GestionUsuarios from '../components/GestionUsuarios';
 import AllInventoriesPanel from '../components/AllInventoriesPanel';
 import CardMovementsHistory from '../components/CardMovementsHistory';
 import { SuperAdminOnly } from '../components/ProtectedContent';
+
+// Paneles de Sesiones y Pozos
+import PotStatusPanel from '../components/PotStatusPanel';
+import SessionStatusPanel from '../components/SessionStatusPanel';
+import SessionControlPanel from '../components/SessionControlPanel';
+import LiveMonitoringPanel from '../components/LiveMonitoringPanel';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 
 export default function Dashboard() {
@@ -50,6 +56,8 @@ export default function Dashboard() {
     'movimientos-recientes': false,
     'pozos': false,
     'sesiones-stats': false,
+    'sesiones-control': false,
+    'sesiones-live': false,
     'alertas': false
   });
 
@@ -433,6 +441,36 @@ export default function Dashboard() {
               <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-6 border border-gray-700">
                 <p className="text-gray-300">Monitoreo de sesiones en tiempo real...</p>
               </div>
+            </section>
+          )}
+
+          {/* Estado de Pozos */}
+          {activeSections['pozos'] && (
+            <section className="mb-8">
+              <PotStatusPanel />
+            </section>
+          )}
+
+          {/* Estado de Sesiones */}
+          {activeSections['sesiones-stats'] && (
+            <section className="mb-8">
+              <SessionStatusPanel />
+            </section>
+          )}
+
+          {/* Control de Sesiones (SuperAdmin only) */}
+          {activeSections['sesiones-control'] && (
+            <section className="mb-8">
+              <SuperAdminOnly>
+                <SessionControlPanel />
+              </SuperAdminOnly>
+            </section>
+          )}
+
+          {/* Monitoreo en Vivo */}
+          {activeSections['sesiones-live'] && (
+            <section className="mb-8">
+              <LiveMonitoringPanel userRole={userData?.role} />
             </section>
           )}
 

@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 
 export default function Sidebar({ activeSections, onToggleSection }) {
+  const [userRole, setUserRole] = useState(null);
   const [expandedMenus, setExpandedMenus] = useState({
     estadisticas: true,
     finanzas: true,
@@ -9,6 +10,19 @@ export default function Sidebar({ activeSections, onToggleSection }) {
     sesiones: true,
     sistema: true
   });
+
+  useEffect(() => {
+    // Obtener rol del usuario desde localStorage
+    const token = localStorage.getItem('adminToken');
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        setUserRole(payload.role);
+      } catch (error) {
+        console.error('Error parsing token:', error);
+      }
+    }
+  }, []);
 
   const toggleMenu = (menu) => {
     setExpandedMenus(prev => ({
@@ -57,7 +71,9 @@ export default function Sidebar({ activeSections, onToggleSection }) {
       icon: '🎲',
       sections: [
         { id: 'pozos', name: 'Estado de Pozos' },
-        { id: 'sesiones-stats', name: 'Estado de Sesiones' }
+        { id: 'sesiones-stats', name: 'Estado de Sesiones' },
+        { id: 'sesiones-control', name: 'Control de Sesiones', superAdminOnly: true },
+        { id: 'sesiones-live', name: 'Monitoreo en Vivo' }
       ]
     },
     {
@@ -106,19 +122,21 @@ export default function Sidebar({ activeSections, onToggleSection }) {
               {/* Submenu Items */}
               {menu.sections.length > 0 && expandedMenus[menu.id] && (
                 <div className="ml-6 mt-1 space-y-1">
-                  {menu.sections.map((section) => (
-                    <button
-                      key={section.id}
-                      onClick={() => onToggleSection(section.id)}
-                      className={`w-full px-3 py-2 rounded-lg text-left text-sm transition-all ${
-                        activeSections[section.id]
-                          ? 'bg-gold-500/20 text-gold-300 border-l-2 border-gold-500'
-                          : 'text-slate-400 hover:bg-slate-700 hover:text-slate-200'
-                      }`}
-                    >
-                      {section.name}
-                    </button>
-                  ))}
+                  {menu.sections
+                    .filter(section => !section.superAdminOnly || userRole === 'superadmin')
+                    .map((section) => (
+                      <button
+                        key={section.id}
+                        onClick={() => onToggleSection(section.id)}
+                        className={`w-full px-3 py-2 rounded-lg text-left text-sm transition-all ${
+                          activeSections[section.id]
+                            ? 'bg-gold-500/20 text-gold-300 border-l-2 border-gold-500'
+                            : 'text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+                        }`}
+                      >
+                        {section.name}
+                      </button>
+                    ))}
                 </div>
               )}
             </div>

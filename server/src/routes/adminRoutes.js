@@ -26,6 +26,7 @@ const {
 } = require('../controllers/adminController');
 
 const cardInventoryController = require('../controllers/cardInventoryController');
+const sessionController = require('../controllers/sessionController');
 
 /**
  * RUTAS DEL DASHBOARD ADMINISTRATIVO
@@ -77,5 +78,13 @@ router.get('/cards/all-inventories', authenticateToken, isAdmin, cardInventoryCo
 router.get('/cards/all-movements', authenticateToken, isAdmin, cardInventoryController.getAllMovements);
 router.post('/cards/transfer', authenticateToken, isAdmin, transferCardsToUser);
 router.get('/cards/movements', authenticateToken, isAdmin, getMyCardMovements);
+
+// ========================================
+// 🎲 SESIONES DE JUEGO
+// Consulta de sesiones activas, próximas y recientes
+// ========================================
+router.get('/sessions/active', authenticateToken, isAdmin, sessionController.getActiveSessions);
+router.get('/sessions/recent', authenticateToken, isAdmin, sessionController.getRecentSessions);
+router.get('/sessions/:id/live', authenticateToken, isAdmin, sessionController.getLiveSession);
 
 module.exports = router;

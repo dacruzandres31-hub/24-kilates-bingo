@@ -16,6 +16,7 @@ const {
 } = require('../controllers/superAdminController');
 
 const cardInventoryController = require('../controllers/cardInventoryController');
+const sessionController = require('../controllers/sessionController');
 
 // Todas las rutas requieren autenticación de admin
 router.use(authenticateToken);
@@ -51,5 +52,15 @@ router.get('/cards/movements/:userId', cardInventoryController.getMovementsLog);
 router.get('/cards/all-inventories', cardInventoryController.getAllInventories);
 router.get('/cards/all-movements', cardInventoryController.getAllMovements);
 router.post('/cards/transfer', cardInventoryController.transferCards);
+
+// ========================================
+// 🎲 GESTIÓN DE SESIONES (SuperAdmin only)
+// Crear, modificar, eliminar y controlar sesiones
+// ========================================
+router.post('/sessions/create', sessionController.createSession);
+router.put('/sessions/:id', sessionController.updateSession);
+router.delete('/sessions/:id', sessionController.deleteSession);
+router.post('/sessions/:id/pause', sessionController.pauseSession);
+router.post('/sessions/:id/resume', sessionController.resumeSession);
 
 module.exports = router;
