@@ -4060,3 +4060,78 @@
     0 3px 15px rgba(0, 255, 255, 0.4),
     inset 0 -2px 5px rgba(0, 0, 0, 0.2);
 }
+
+/* Variante Starter - Cyan/Magenta */
+.starter-modal {
+  border-color: #00ffff !important;
+  box-shadow: 
+    0 0 30px rgba(0, 255, 255, 0.5),
+    0 0 60px rgba(255, 0, 255, 0.3),
+    inset 0 0 50px rgba(0, 255, 255, 0.1) !important;
+}
+
+.starter-modal .ready-modal-title {
+  color: #00ffff !important;
+  text-shadow: 
+    0 0 20px rgba(0, 255, 255, 1),
+    0 0 40px rgba(0, 255, 255, 0.5),
+    0 0 60px rgba(255, 0, 255, 0.3) !important;
+}
+
+.starter-modal .ready-modal-countdown {
+  border-color: rgba(0, 255, 255, 0.3) !important;
+}
+
+.starter-modal .ready-modal-countdown-label {
+  color: #00ffff !important;
+}
+
+/* Variante Starter - Cyan/Magenta */
+.starter-modal {
+  border-color: #00ffff !important;
+  box-shadow: 
+    0 0 30px rgba(0, 255, 255, 0.5),
+    0 0 60px rgba(255, 0, 255, 0.3),
+    inset 0 0 50px rgba(0, 255, 255, 0.1) !important;
+}
+
+.starter-modal .ready-modal-title {
+  color: #00ffff !important;
+  text-shadow: 
+    0 0 20px rgba(0, 255, 255, 1),
+    0 0 40px rgba(0, 255, 255, 0.5),
+    0 0 60px rgba(255, 0, 255, 0.3) !important;
+}
+
+.starter-modal .ready-modal-countdown {
+  border-color: rgba(0, 255, 255, 0.3) !important;
+}
+
+.starter-modal .ready-modal-countdown-label {
+  color: #00ffff !important;
+}
+
+/* Variante Starter - Cyan/Magenta */
+.starter-modal {
+  border-color: #00ffff !important;
+  box-shadow: 
+    0 0 30px rgba(0, 255, 255, 0.5),
+    0 0 60px rgba(255, 0, 255, 0.3),
+    inset 0 0 50px rgba(0, 255, 255, 0.1) !important;
+}
+
+.starter-modal .ready-modal-title {
+  color: #00ffff !important;
+  text-shadow: 
+    0 0 20px rgba(0, 255, 255, 1),
+    0 0 40px rgba(0, 255, 255, 0.5),
+    0 0 60px rgba(255, 0, 255, 0.3) !important;
+}
+
+.starter-modal .ready-modal-countdown {
+  border-color: rgba(0, 255, 255, 0.3) !important;
+}
+
+.starter-modal .ready-modal-countdown-label {
+  color: #00ffff !important;
+}

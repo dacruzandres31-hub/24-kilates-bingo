@@ -36,6 +36,16 @@ const [cardWinningLines, setCardWinningLines] = useState({}); // {cardId: [0,1,2
   const [selectedPlayerCards, setSelectedPlayerCards] = useState([]); // Cartones seleccionados por el jugador
   const [cardsRemaining, setCardsRemaining] = useState(20); // Cartones que faltan por seleccionar
   const [showReadyModal, setShowReadyModal] = useState(false); // Modal "¡¡Todo Listo!!"
+
+  // Auto-cerrar modal "¡¡Todo Listo!!" después de 5 segundos
+  useEffect(() => {
+    if (showReadyModal) {
+      const timer = setTimeout(() => {
+        setShowReadyModal(false);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [showReadyModal]);
   
   // Estados para mejoras visuales
   const [toasts, setToasts] = useState([]); // Notificaciones toast
@@ -1267,8 +1277,8 @@ useEffect(() => {
 
       {/* Modal "¡¡Todo Listo!!" cuando se completan 20 cartones */}
       {showReadyModal && (
-        <div className="ready-modal-overlay" onClick={() => setShowReadyModal(false)}>
-          <div className="ready-modal-content" onClick={e => e.stopPropagation()}>
+        <div className="ready-modal-overlay">
+          <div className="ready-modal-content starter-modal">
             <div className="ready-modal-icon">🎉</div>
             <h2 className="ready-modal-title">¡¡Todo Listo!!</h2>
             <p className="ready-modal-subtitle">Tienes {selectedPlayerCards.length} cartones listos para jugar</p>
@@ -1287,12 +1297,6 @@ useEffect(() => {
                 return drawTime;
               })()} />
             </div>
-            <button 
-              className="ready-modal-close-btn"
-              onClick={() => setShowReadyModal(false)}
-            >
-              Entendido
-            </button>
           </div>
         </div>
       )}

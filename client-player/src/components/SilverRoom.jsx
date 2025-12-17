@@ -8,6 +8,7 @@ import audioService from '../services/audioService';
 import PlayerSidebar from './PlayerSidebar';
 import CardSelectionLobby from './CardSelectionLobby';
 import BingoCardPreview from './BingoCardPreview';
+import Countdown from './Countdown';
 
 export default function SilverRoom({ onLogout }) {
   const { sessionId } = useParams();
@@ -34,6 +35,17 @@ const [cardWinningLines, setCardWinningLines] = useState({}); // {cardId: [0,1,2
   const [showCardSelection, setShowCardSelection] = useState(false); // Mostrar lobby de selección de cartones
   const [selectedPlayerCards, setSelectedPlayerCards] = useState([]); // Cartones seleccionados por el jugador
   const [cardsRemaining, setCardsRemaining] = useState(20); // Cartones que faltan por seleccionar
+  const [showReadyModal, setShowReadyModal] = useState(false); // Modal "¡¡Todo Listo!!"
+
+  // Auto-cerrar modal "¡¡Todo Listo!!" después de 5 segundos
+  useEffect(() => {
+    if (showReadyModal) {
+      const timer = setTimeout(() => {
+        setShowReadyModal(false);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [showReadyModal]);
   
   // Estados para mejoras visuales
   const [toasts, setToasts] = useState([]); // Notificaciones toast
@@ -343,6 +355,11 @@ celebrationAudio.volume = 0.7;
     setCardsRemaining(remaining);
     setShowCardSelection(false);
     console.log(`✅ Total de cartones: ${allCards.length}, faltan: ${remaining}`);
+    
+    // Si se completaron los 20 cartones, mostrar modal
+    if (allCards.length === 20) {
+      setShowReadyModal(true);
+    }
   };
 
   const handleCancelSelection = () => {
@@ -1315,6 +1332,32 @@ useEffect(() => {
           </div>
         </div>
       ))}
+
+      {/* Modal "¡¡Todo Listo!!" cuando se completan 20 cartones */}
+      {showReadyModal && (
+        <div className="ready-modal-overlay">
+          <div className="ready-modal-content silver-modal">
+            <div className="ready-modal-icon">🎉</div>
+            <h2 className="ready-modal-title">¡¡Todo Listo!!</h2>
+            <p className="ready-modal-subtitle">Tienes {selectedPlayerCards.length} cartones listos para jugar</p>
+            <div className="ready-modal-countdown">
+              <p className="ready-modal-countdown-label">Próximo Sorteo en:</p>
+              <Countdown targetDate={(() => {
+                const today = new Date();
+                const drawTime = new Date(today);
+                drawTime.setHours(21, 0, 0, 0);
+                
+                // Si ya pasó las 21:00 hoy, programar para mañana
+                if (today > drawTime) {
+                  drawTime.setDate(drawTime.getDate() + 1);
+                }
+                
+                return drawTime;
+              })()} />
+            </div>
+          </div>
+        </div>
+      )}
         </>
       )}
     </div>
