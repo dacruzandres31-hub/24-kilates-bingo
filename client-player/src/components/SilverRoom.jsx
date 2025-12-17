@@ -432,7 +432,8 @@ celebrationAudio.volume = 0.7;
   playerCards.forEach(card => {
     const linesStatus = checkLineStatus(card);
     const almostLines = linesStatus.filter(line => line.missing === 1 || line.missing === 2);
-    const completedLines = linesStatus.filter(line => line.missing === 0);
+    // Una línea está completa solo si missing === 0 Y tiene al menos 5 números marcados
+    const completedLines = linesStatus.filter(line => line.missing === 0 && line.markedCount >= 5);
 
     if (almostLines.length > 0) {
       const minMissing = Math.min(...almostLines.map(line => line.missing));
