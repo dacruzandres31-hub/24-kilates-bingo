@@ -37,6 +37,23 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
 
   console.log('[PlayerSidebar] 🚀 Componente montado');
 
+  // Manejar clic en sala Starter para recargar si no tiene cartones
+  const handleStarterClick = async () => {
+    const starterCount = userData?.tickets?.starter || 0;
+    
+    if (starterCount === 0) {
+      console.log('🎁 Starter sin cartones - Recargando para permitir selección...');
+      
+      // Navegar a Starter
+      navigate('/sala/starter');
+      
+      // Forzar recarga de la página después de un momento
+      setTimeout(() => {
+        window.location.reload();
+      }, 300);
+    }
+  };
+
   // Listener de WebSocket para actualizar recursos en tiempo real
   useEffect(() => {
     if (!socket) return;
@@ -334,7 +351,19 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
           </div>
           
           <div className="tickets-list">
-            <div className="ticket-item starter">
+            <div 
+              className="ticket-item starter" 
+              onClick={handleStarterClick}
+              style={{ cursor: 'pointer' }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateX(5px)';
+                e.currentTarget.style.background = 'rgba(76, 175, 80, 0.2)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateX(0)';
+                e.currentTarget.style.background = '';
+              }}
+            >
               <span className="ticket-room">Starter</span>
               <span className="ticket-count">{userData?.tickets?.starter || 0}</span>
             </div>
