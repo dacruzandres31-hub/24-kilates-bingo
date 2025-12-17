@@ -46,7 +46,11 @@ export default function Sidebar({ activeSections, onToggleSection }) {
       id: 'card-inventory',
       title: '📦 Inventario de Cartones',
       icon: '📦',
-      sections: []
+      sections: [
+        { id: 'inventories-panel', name: 'Ver Inventarios de Red' },
+        { id: 'movements-history', name: 'Historial de Movimientos' },
+        { id: 'card-management', name: 'Acreditar/Transferir' }
+      ]
     },
     {
       id: 'sesiones',

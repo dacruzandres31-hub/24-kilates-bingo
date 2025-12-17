@@ -286,53 +286,299 @@ exports.transferCards = async (req, res) => {
 exports.getAllInventories = async (req, res) => {
   try {
     const db = require('../db');
+    const isSuperAdmin = req.user.role === 'superadmin';
     
-    const [inventories] = await db.query(
-      `SELECT 
-         i.user_id,
-         u.username,
-         u.role,
-         i.room,
-         i.normal_cards,
-         i.gift_cards,
-         i.total_cards
-       FROM v_superadmin_inventory i
-       JOIN users u ON i.user_id = u.id
-       ORDER BY u.username, 
-                FIELD(i.room, 'bronce', 'plata', 'oro')`
-    );
+    if (isSuperAdmin) {
+      // SUPERADMIN: Vista completa con distinción pagos/gratis
+      const [inventories] = await db.query(
+        `SELECT 
+           i.user_id,
+           u.username,
+           u.role,
+           i.room,
+           i.normal_cards,
+           i.gift_cards,
+           i.total_cards,
+           i.free_percentage
+         FROM v_superadmin_inventory i
+         JOIN users u ON i.user_id = u.id
+         WHERE u.parent_id = ? OR u.id = ?
+         ORDER BY u.username, 
+                  FIELD(i.room, 'bronce', 'plata', 'oro')`,
+        [req.user.id, req.user.id]
+      );
 
-    // Agrupar por usuario
-    const grouped = inventories.reduce((acc, item) => {
-      if (!acc[item.user_id]) {
-        acc[item.user_id] = {
-          user_id: item.user_id,
-          username: item.username,
-          role: item.role,
-          rooms: {}
+      // Agrupar por usuario
+      const grouped = inventories.reduce((acc, item) => {
+        if (!acc[item.user_id]) {
+          acc[item.user_id] = {
+            user_id: item.user_id,
+            username: item.username,
+            role: item.role,
+            rooms: {},
+            total_all: 0,
+            total_paid: 0,
+            total_free: 0,
+            avg_free_percentage: 0
+          };
+        }
+
+        acc[item.user_id].rooms[item.room] = {
+          normal_cards: item.normal_cards,
+          gift_cards: item.gift_cards,
+          total_cards: item.total_cards,
+          free_percentage: item.free_percentage
         };
-      }
 
-      acc[item.user_id].rooms[item.room] = {
-        normal_cards: item.normal_cards,
-        gift_cards: item.gift_cards,
-        total_cards: item.total_cards
-      };
+        acc[item.user_id].total_all += item.total_cards;
+        acc[item.user_id].total_paid += item.normal_cards;
+        acc[item.user_id].total_free += item.gift_cards;
 
-      return acc;
-    }, {});
+        return acc;
+      }, {});
 
-    res.json({
-      success: true,
-      total_users: Object.keys(grouped).length,
-      inventories: Object.values(grouped)
-    });
+      // Calcular promedio de % gratis por usuario
+      Object.values(grouped).forEach(user => {
+        user.avg_free_percentage = user.total_all > 0 
+          ? Math.round((user.total_free / user.total_all) * 100) 
+          : 0;
+      });
+
+      // Estadísticas globales
+      const totalUsers = Object.keys(grouped).length;
+      const totalCards = Object.values(grouped).reduce((sum, u) => sum + u.total_all, 0);
+      const totalPaid = Object.values(grouped).reduce((sum, u) => sum + u.total_paid, 0);
+      const totalFree = Object.values(grouped).reduce((sum, u) => sum + u.total_free, 0);
+      const usersWithAlerts = Object.values(grouped).filter(u => u.avg_free_percentage > 10).length;
+
+      res.json({
+        success: true,
+        role: 'superadmin',
+        total_users: totalUsers,
+        stats: {
+          total_cards: totalCards,
+          total_paid: totalPaid,
+          total_free: totalFree,
+          global_free_percentage: totalCards > 0 ? Math.round((totalFree / totalCards) * 100) : 0,
+          users_with_alerts: usersWithAlerts,
+          compliance_rate: totalUsers > 0 ? Math.round(((totalUsers - usersWithAlerts) / totalUsers) * 100) : 100
+        },
+        inventories: Object.values(grouped)
+      });
+
+    } else {
+      // AGENTES: Vista simplificada SIN distinción pagos/gratis
+      const [inventories] = await db.query(
+        `SELECT 
+           i.user_id,
+           u.username,
+           u.role,
+           i.room,
+           i.total_cards
+         FROM v_admin_inventory i
+         JOIN users u ON i.user_id = u.id
+         WHERE u.parent_id = ? OR u.id = ?
+         ORDER BY u.username, 
+                  FIELD(i.room, 'bronce', 'plata', 'oro')`,
+        [req.user.id, req.user.id]
+      );
+
+      // Agrupar por usuario
+      const grouped = inventories.reduce((acc, item) => {
+        if (!acc[item.user_id]) {
+          acc[item.user_id] = {
+            user_id: item.user_id,
+            username: item.username,
+            role: item.role,
+            rooms: {},
+            total_all: 0
+          };
+        }
+
+        acc[item.user_id].rooms[item.room] = {
+          total_cards: item.total_cards
+        };
+
+        acc[item.user_id].total_all += item.total_cards;
+
+        return acc;
+      }, {});
+
+      const totalUsers = Object.keys(grouped).length;
+      const totalCards = Object.values(grouped).reduce((sum, u) => sum + u.total_all, 0);
+
+      res.json({
+        success: true,
+        role: 'agente',
+        total_users: totalUsers,
+        stats: {
+          total_cards: totalCards
+        },
+        inventories: Object.values(grouped)
+      });
+    }
 
   } catch (error) {
     console.error('Error al obtener todos los inventarios:', error);
     res.status(500).json({
       success: false,
       message: error.message || 'Error al obtener inventarios'
+    });
+  }
+};
+
+/**
+ * GET /api/admin/cards/movements
+ * GET /api/superadmin/cards/movements
+ * Obtiene historial de movimientos de cartones
+ * SuperAdmin: ve todos los detalles incluyendo is_gift
+ * Agentes: solo ven totales sin distinción
+ */
+exports.getAllMovements = async (req, res) => {
+  try {
+    const db = require('../db');
+    const isSuperAdmin = req.user.role === 'superadmin';
+    const { user_id, room, movement_type, date_from, date_to, limit = 50, offset = 0 } = req.query;
+
+    let whereConditions = [];
+    let queryParams = [];
+
+    // Filtro por jerarquía (solo ver movimientos de su red)
+    if (isSuperAdmin) {
+      // SuperAdmin ve todo
+      whereConditions.push('1=1');
+    } else {
+      // Agentes solo ven su red
+      whereConditions.push(`(
+        cm.user_id IN (SELECT id FROM users WHERE parent_id = ? OR id = ?)
+        OR cm.from_user_id IN (SELECT id FROM users WHERE parent_id = ? OR id = ?)
+        OR cm.to_user_id IN (SELECT id FROM users WHERE parent_id = ? OR id = ?)
+      )`);
+      queryParams.push(req.user.id, req.user.id, req.user.id, req.user.id, req.user.id, req.user.id);
+    }
+
+    // Filtros opcionales
+    if (user_id) {
+      whereConditions.push('cm.user_id = ?');
+      queryParams.push(user_id);
+    }
+
+    if (room) {
+      whereConditions.push('cm.room = ?');
+      queryParams.push(room);
+    }
+
+    if (movement_type) {
+      whereConditions.push('cm.movement_type = ?');
+      queryParams.push(movement_type);
+    }
+
+    if (date_from) {
+      whereConditions.push('cm.created_at >= ?');
+      queryParams.push(date_from);
+    }
+
+    if (date_to) {
+      whereConditions.push('cm.created_at <= ?');
+      queryParams.push(date_to);
+    }
+
+    const whereClause = whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : '';
+
+    if (isSuperAdmin) {
+      // SUPERADMIN: Ve is_gift y todos los detalles
+      const [movements] = await db.query(
+        `SELECT 
+           cm.id,
+           cm.created_at,
+           cm.user_id,
+           u.username,
+           cm.room,
+           cm.movement_type,
+           cm.quantity,
+           cm.is_gift,
+           cm.from_user_id,
+           u_from.username as from_username,
+           cm.to_user_id,
+           u_to.username as to_username,
+           cm.reason,
+           cm.executed_by,
+           u_exec.username as executed_by_username
+         FROM card_movements_log cm
+         LEFT JOIN users u ON cm.user_id = u.id
+         LEFT JOIN users u_from ON cm.from_user_id = u_from.id
+         LEFT JOIN users u_to ON cm.to_user_id = u_to.id
+         LEFT JOIN users u_exec ON cm.executed_by = u_exec.id
+         ${whereClause}
+         ORDER BY cm.created_at DESC
+         LIMIT ? OFFSET ?`,
+        [...queryParams, parseInt(limit), parseInt(offset)]
+      );
+
+      // Count total
+      const [countResult] = await db.query(
+        `SELECT COUNT(*) as total FROM card_movements_log cm ${whereClause}`,
+        queryParams
+      );
+
+      res.json({
+        success: true,
+        role: 'superadmin',
+        total: countResult[0].total,
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        movements
+      });
+
+    } else {
+      // AGENTES: NO ven is_gift, solo totales
+      const [movements] = await db.query(
+        `SELECT 
+           cm.id,
+           cm.created_at,
+           cm.user_id,
+           u.username,
+           cm.room,
+           cm.movement_type,
+           cm.quantity,
+           cm.from_user_id,
+           u_from.username as from_username,
+           cm.to_user_id,
+           u_to.username as to_username,
+           cm.reason,
+           cm.executed_by,
+           u_exec.username as executed_by_username
+         FROM card_movements_log cm
+         LEFT JOIN users u ON cm.user_id = u.id
+         LEFT JOIN users u_from ON cm.from_user_id = u_from.id
+         LEFT JOIN users u_to ON cm.to_user_id = u_to.id
+         LEFT JOIN users u_exec ON cm.executed_by = u_exec.id
+         ${whereClause}
+         ORDER BY cm.created_at DESC
+         LIMIT ? OFFSET ?`,
+        [...queryParams, parseInt(limit), parseInt(offset)]
+      );
+
+      const [countResult] = await db.query(
+        `SELECT COUNT(*) as total FROM card_movements_log cm ${whereClause}`,
+        queryParams
+      );
+
+      res.json({
+        success: true,
+        role: 'agente',
+        total: countResult[0].total,
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        movements
+      });
+    }
+
+  } catch (error) {
+    console.error('Error al obtener movimientos:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Error al obtener movimientos'
     });
   }
 };

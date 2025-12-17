@@ -9,6 +9,8 @@ import EstadisticasGenerales from '../components/EstadisticasGenerales';
 import GestionUsuarios from '../components/GestionUsuarios';
 import CardInventoryPanel from '../components/CardInventoryPanel';
 import AdminCardInventory from '../components/AdminCardInventory';
+import AllInventoriesPanel from '../components/AllInventoriesPanel';
+import CardMovementsHistory from '../components/CardMovementsHistory';
 import { SuperAdminOnly } from '../components/ProtectedContent';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 
@@ -42,6 +44,9 @@ export default function Dashboard() {
     'estadisticas-generales': true,
     'usuarios': false,
     'card-inventory': false,
+    'inventories-panel': false,
+    'movements-history': false,
+    'card-management': false,
     'finanzas-hoy': false,
     'movimientos': false,
     'movimientos-recientes': false,
@@ -347,7 +352,30 @@ export default function Dashboard() {
             />
           </section>
 
-          {/* Inventario de Cartones */}
+          {/* Ver Inventarios de Red */}
+          {activeSections['inventories-panel'] && (
+            <section className="mb-8">
+              <AllInventoriesPanel />
+            </section>
+          )}
+
+          {/* Historial de Movimientos */}
+          {activeSections['movements-history'] && (
+            <section className="mb-8">
+              <CardMovementsHistory />
+            </section>
+          )}
+
+          {/* Acreditar/Transferir - Panel Original */}
+          {activeSections['card-management'] && (
+            <section className="mb-8">
+              <SuperAdminOnly fallback={<AdminCardInventory />}>
+                <CardInventoryPanel />
+              </SuperAdminOnly>
+            </section>
+          )}
+
+          {/* Mantener compatibilidad con card-inventory antiguo */}
           {activeSections['card-inventory'] && (
             <section className="mb-8">
               <SuperAdminOnly fallback={<AdminCardInventory />}>

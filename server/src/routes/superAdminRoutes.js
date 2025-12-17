@@ -48,7 +48,8 @@ router.post('/stock/transfer', transferStock);
 router.post('/cards/credit', cardInventoryController.creditCards);
 router.get('/cards/inventory/:userId', cardInventoryController.getUserInventory);
 router.get('/cards/movements/:userId', cardInventoryController.getMovementsLog);
-router.post('/cards/transfer', cardInventoryController.transferCards);
 router.get('/cards/all-inventories', cardInventoryController.getAllInventories);
+router.get('/cards/all-movements', cardInventoryController.getAllMovements);
+router.post('/cards/transfer', cardInventoryController.transferCards);
 
 module.exports = router;

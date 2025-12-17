@@ -25,6 +25,8 @@ const {
   updateUserPersonalData
 } = require('../controllers/adminController');
 
+const cardInventoryController = require('../controllers/cardInventoryController');
+
 /**
  * RUTAS DEL DASHBOARD ADMINISTRATIVO
  * 
@@ -68,9 +70,11 @@ router.put('/users/:userId/personal-data', authenticateToken, isAdmin, updateUse
 
 // ========================================
 // 🎴 INVENTARIO DE CARTONES (v1.4.0)
-// Admin/Cajero - Vista filtrada (solo totales)
+// Admin/Cajero - Vista filtrada (solo totales, sin is_gift)
 // ========================================
 router.get('/cards/inventory', authenticateToken, isAdmin, getMyCardInventory);
+router.get('/cards/all-inventories', authenticateToken, isAdmin, cardInventoryController.getAllInventories);
+router.get('/cards/all-movements', authenticateToken, isAdmin, cardInventoryController.getAllMovements);
 router.post('/cards/transfer', authenticateToken, isAdmin, transferCardsToUser);
 router.get('/cards/movements', authenticateToken, isAdmin, getMyCardMovements);
 
