@@ -515,14 +515,6 @@ celebrationAudio.volume = 0.7;
 
   setAlmostLineCards(cardsAlmostThere);
   setCardWinningLines(newCardWinningLines); // Actualizar líneas ganadoras
-        cardId: card.id,
-        cardSerial: card.serial || generateCardSerial(playerCards.indexOf(card)),
-        lineCount: completedLines.length,
-        lines: completedLines,
-        card // importante para renderizado
-      });
-    }
-  });
 
   setAlmostLineCards(cardsAlmostThere);
 
