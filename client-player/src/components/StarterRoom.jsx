@@ -77,56 +77,14 @@ celebrationAudio.volume = 0.7;
           setSelectedPlayerCards(currentCards);
           const remaining = 20 - currentCards.length;
           setCardsRemaining(remaining);
-          
-          // Si NO tiene cartones, verificar tickets y asignar 20 automáticamente
-          if (currentCards.length === 0) {
-            console.log('🎁 Starter: Sin cartones seleccionados, verificando tickets...');
-            try {
-              // Verificar perfil para obtener tickets de starter
-              const profileResponse = await fetch('/api/users/profile', {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-              });
-              
-              if (profileResponse.ok) {
-                const profileData = await profileResponse.json();
-                const starterTickets = profileData.tickets?.starter || 0;
-                
-                console.log(`🎫 Tickets Starter disponibles: ${starterTickets}`);
-                
-                // Si NO tiene tickets de starter, acreditar 20 automáticamente
-                if (starterTickets === 0) {
-                  console.log('💳 Acreditando 20 tickets Starter automáticamente...');
-                  const creditResponse = await fetch('/api/game/starter/credit-tickets', {
-                    method: 'POST',
-                    headers: { 
-                      'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                      'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ quantity: 20 })
-                  });
-                  
-                  if (creditResponse.ok) {
-                    const creditData = await creditResponse.json();
-                    console.log('✅ 20 tickets Starter acreditados:', creditData);
-                  }
-                }
-              }
-            } catch (error) {
-              console.error('❌ Error al verificar/acreditar tickets:', error);
-            }
-          } else if (remaining > 0) {
-            console.log(`📋 Tiene ${currentCards.length} cartones, faltan ${remaining}`);
-          } else {
-            console.log('✅ Ya tiene 20 cartones completos');
-          }
+          console.log(`✅ Sala Starter: ${currentCards.length} cartones cargados, ${remaining} restantes (máx 20)`);
         }
       } catch (error) {
-        console.log('Sin cartones previos');
-        setCardsRemaining(20);
+        console.error('❌ Error cargando cartones:', error);
       }
     };
-    
-    checkExistingCards();
+
+    loadPlayerCards();
   }, [sessionId]);
 
   // Generar número de serie del cartón: DDMMYY-S0001
