@@ -16,18 +16,20 @@ export default function PotStatusPanel() {
 
   const fetchPozos = async () => {
     try {
-      const response = await axios.get('/api/admin/sessions/active', {
+      const response = await axios.get('/api/admin/room-settings/current-pots', {
         headers: { Authorization: `Bearer ${getToken()}` }
       });
       
-      // Agrupar pozos por sala
-      const pozosData = response.data.active.map(session => ({
-        room: session.room,
-        linea: session.current_pot_linea,
-        bingo: session.current_pot_bingo,
-        jackpot: session.current_pot_jackpot,
-        sessionId: session.id,
-        status: session.status
+      // Mapear pozos por sala (incluye salas sin sesión activa)
+      const pozosData = response.data.pots.map(pot => ({
+        room: pot.room,
+        linea: parseFloat(pot.current_pot_linea) || 0,
+        bingo: parseFloat(pot.current_pot_bingo) || 0,
+        jackpot: parseFloat(pot.jackpot) || 0,
+        sessionId: pot.session_id,
+        status: pot.status || 'no_session',
+        cardsSold: pot.cards_sold || 0,
+        cardPrice: parseFloat(pot.card_price) || 0
       }));
       
       setPozos(pozosData);
@@ -89,7 +91,7 @@ export default function PotStatusPanel() {
         </h2>
         <div className="bg-gray-800/50 rounded-xl p-12 text-center">
           <div className="text-6xl mb-4">💰</div>
-          <p className="text-gray-400 text-lg">No hay sesiones activas con pozos</p>
+          <p className="text-gray-400 text-lg">No hay datos de pozos disponibles</p>
         </div>
       </div>
     );
@@ -129,9 +131,11 @@ export default function PotStatusPanel() {
               <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
                 pozo.status === 'playing' 
                   ? 'bg-green-500/20 text-green-400' 
-                  : 'bg-blue-500/20 text-blue-400'
+                  : pozo.status === 'active'
+                  ? 'bg-blue-500/20 text-blue-400'
+                  : 'bg-gray-500/20 text-gray-400'
               }`}>
-                {pozo.status === 'playing' ? 'EN JUEGO' : 'ACTIVA'}
+                {pozo.status === 'playing' ? 'EN JUEGO' : pozo.status === 'active' ? 'ACTIVA' : 'SIN SESIÓN'}
               </div>
             </div>
 
@@ -152,10 +156,22 @@ export default function PotStatusPanel() {
               </div>
 
               <div className="bg-black/20 rounded-lg p-4">
-                <div className="text-sm text-gray-400 mb-1">JACKPOT</div>
+                <div className="text-sm text-gray-400 mb-1">Pozo Acumulado Pre-40</div>
                 <div className="text-3xl font-bold text-yellow-400">
                   {formatMoney(pozo.jackpot)}
                 </div>
+              </div>
+            </div>
+
+            {/* Info adicional */}
+            <div className="mt-4 pt-4 border-t border-gray-700/50">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-400">Cartones vendidos</span>
+                <span className="text-white font-semibold">{pozo.cardsSold}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm mt-1">
+                <span className="text-gray-400">Precio cartón</span>
+                <span className="text-white font-semibold">{formatMoney(pozo.cardPrice)}</span>
               </div>
             </div>
 

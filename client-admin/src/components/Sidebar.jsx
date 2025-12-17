@@ -73,7 +73,8 @@ export default function Sidebar({ activeSections, onToggleSection }) {
         { id: 'pozos', name: 'Estado de Pozos' },
         { id: 'sesiones-stats', name: 'Estado de Sesiones' },
         { id: 'sesiones-control', name: 'Control de Sesiones', superAdminOnly: true },
-        { id: 'sesiones-live', name: 'Monitoreo en Vivo' }
+        { id: 'sesiones-live', name: 'Monitoreo en Vivo' },
+        { id: 'room-config', name: 'Configuración de Salas', superAdminOnly: true }
       ]
     },
     {

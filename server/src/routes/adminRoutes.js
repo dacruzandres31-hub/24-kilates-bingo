@@ -27,6 +27,7 @@ const {
 
 const cardInventoryController = require('../controllers/cardInventoryController');
 const sessionController = require('../controllers/sessionController');
+const roomSettingsController = require('../controllers/roomSettingsController');
 
 /**
  * RUTAS DEL DASHBOARD ADMINISTRATIVO
@@ -86,5 +87,11 @@ router.get('/cards/movements', authenticateToken, isAdmin, getMyCardMovements);
 router.get('/sessions/active', authenticateToken, isAdmin, sessionController.getActiveSessions);
 router.get('/sessions/recent', authenticateToken, isAdmin, sessionController.getRecentSessions);
 router.get('/sessions/:id/live', authenticateToken, isAdmin, sessionController.getLiveSession);
+
+// ========================================
+// 💰 POZOS Y CONFIGURACIÓN DE SALAS
+// Consulta de pozos actuales (Admin + SuperAdmin)
+// ========================================
+router.get('/room-settings/current-pots', authenticateToken, isAdmin, roomSettingsController.getCurrentPots);
 
 module.exports = router;

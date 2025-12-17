@@ -17,6 +17,7 @@ import PotStatusPanel from '../components/PotStatusPanel';
 import SessionStatusPanel from '../components/SessionStatusPanel';
 import SessionControlPanel from '../components/SessionControlPanel';
 import LiveMonitoringPanel from '../components/LiveMonitoringPanel';
+import RoomConfigPanel from '../components/RoomConfigPanel';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 
 export default function Dashboard() {
@@ -58,6 +59,7 @@ export default function Dashboard() {
     'sesiones-stats': false,
     'sesiones-control': false,
     'sesiones-live': false,
+    'room-config': false,
     'alertas': false
   });
 
@@ -471,6 +473,15 @@ export default function Dashboard() {
           {activeSections['sesiones-live'] && (
             <section className="mb-8">
               <LiveMonitoringPanel userRole={userData?.role} />
+            </section>
+          )}
+
+          {/* Configuración de Salas (SuperAdmin only) */}
+          {activeSections['room-config'] && (
+            <section className="mb-8">
+              <SuperAdminOnly>
+                <RoomConfigPanel />
+              </SuperAdminOnly>
             </section>
           )}
 

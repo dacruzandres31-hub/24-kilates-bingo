@@ -17,6 +17,7 @@ const {
 
 const cardInventoryController = require('../controllers/cardInventoryController');
 const sessionController = require('../controllers/sessionController');
+const roomSettingsController = require('../controllers/roomSettingsController');
 
 // Todas las rutas requieren autenticación de admin
 router.use(authenticateToken);
@@ -62,5 +63,14 @@ router.put('/sessions/:id', sessionController.updateSession);
 router.delete('/sessions/:id', sessionController.deleteSession);
 router.post('/sessions/:id/pause', sessionController.pauseSession);
 router.post('/sessions/:id/resume', sessionController.resumeSession);
+
+// ========================================
+// 💰 CONFIGURACIÓN DE SALAS Y POZOS
+// Configurar precios de cartones y porcentajes de distribución
+// ========================================
+router.get('/room-settings', roomSettingsController.getRoomSettings);
+router.put('/room-settings/:room', roomSettingsController.updateRoomPrice);
+router.put('/room-settings/:room/percentages', roomSettingsController.updateRoomPercentages);
+router.post('/room-settings/:room/reset-accumulated', roomSettingsController.resetAccumulatedPot);
 
 module.exports = router;
