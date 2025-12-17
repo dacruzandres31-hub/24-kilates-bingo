@@ -15,6 +15,9 @@ router.use(authMiddleware.authenticateToken);
 // Obtener cartones disponibles para seleccionar
 router.get('/available/:room', cardsController.getAvailableCards);
 
+// Obtener estadísticas de cartones (pagos vs gratis) - Solo SuperAdmin
+router.get('/stats', authMiddleware.isSuperAdmin, cardsController.getCardStats);
+
 // Reservar cartón temporalmente (al hacer click)
 router.post('/reserve', cardsController.reserveCard);
 

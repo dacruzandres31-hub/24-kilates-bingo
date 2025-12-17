@@ -271,26 +271,84 @@ exports.selectCards = async (req, res) => {
 
     // Solo validar tickets si NO es sala starter
     if (room !== 'starter') {
-      // Verificar tickets disponibles SIN FOR UPDATE (para evitar lock issues)
+      // Verificar tickets disponibles por tipo (pagos vs gratis)
       const [inventory] = await connection.query(
-        `SELECT COALESCE(SUM(quantity), 0) as total_quantity 
+        `SELECT 
+           COALESCE(SUM(CASE WHEN is_gift = 0 THEN quantity ELSE 0 END), 0) as paid_quantity,
+           COALESCE(SUM(CASE WHEN is_gift = 1 THEN quantity ELSE 0 END), 0) as free_quantity
          FROM user_card_inventory 
          WHERE user_id = ? AND room = ?`,
         [userId, room]
       );
 
-      const availableTickets = inventory[0]?.total_quantity || 0;
+      const availablePaid = inventory[0]?.paid_quantity || 0;
+      const availableFree = inventory[0]?.free_quantity || 0;
+      const totalAvailable = availablePaid + availableFree;
       
-      console.log(`[Cards] 📊 Tickets disponibles: ${availableTickets}, solicitados: ${cardIds.length}`);
+      console.log(`[Cards] 📊 Tickets disponibles - Pagos: ${availablePaid}, Gratis: ${availableFree}, Total: ${totalAvailable}, Solicitados: ${cardIds.length}`);
 
-      if (availableTickets < cardIds.length) {
+      if (totalAvailable < cardIds.length) {
         await connection.rollback();
-        console.log(`[Cards] ❌ Tickets insuficientes - Disponibles: ${availableTickets}, Necesarios: ${cardIds.length}`);
+        console.log(`[Cards] ❌ Tickets insuficientes - Total: ${totalAvailable}, Necesarios: ${cardIds.length}`);
         return res.status(400).json({ 
           error: 'No tienes suficientes tickets disponibles',
           required: cardIds.length,
-          available: availableTickets
+          available: {
+            paid: availablePaid,
+            free: availableFree,
+            total: totalAvailable
+          }
         });
+      }
+
+      // ========================================
+      // REGLA DEL 10%: Máximo 10% de cartones pueden ser gratis
+      // MODO FLEXIBLE: Si no hay suficientes pagos, usar todos los disponibles
+      // ========================================
+      const maxFree = Math.ceil(cardIds.length * 0.10); // Máximo 10% gratis (redondeado hacia arriba)
+      let actualFree = Math.min(maxFree, availableFree);
+      let needPaid = cardIds.length - actualFree;
+      let flexibleMode = false;
+
+      console.log(`[Cards] 📐 Distribución calculada - Máx gratis (10%): ${maxFree}, Gratis a usar: ${actualFree}, Pagos necesarios: ${needPaid}`);
+
+      // MODO FLEXIBLE: Si no hay suficientes pagos, usar todos los disponibles
+      if (needPaid > availablePaid) {
+        console.log(`[Cards] ⚠️ MODO FLEXIBLE activado - Pagos insuficientes (${availablePaid}/${needPaid})`);
+        
+        // Usar TODOS los pagos disponibles
+        needPaid = availablePaid;
+        actualFree = cardIds.length - needPaid;
+        
+        // Verificar que haya suficientes gratis para completar
+        if (actualFree > availableFree) {
+          await connection.rollback();
+          console.log(`[Cards] ❌ Tickets insuficientes TOTALES - Necesita ${actualFree} gratis pero solo tiene ${availableFree}`);
+          return res.status(400).json({ 
+            error: 'No tienes suficientes tickets disponibles',
+            required: cardIds.length,
+            available: {
+              paid: availablePaid,
+              free: availableFree,
+              total: totalAvailable
+            }
+          });
+        }
+        
+        flexibleMode = true;
+        const actualPercentage = Math.round(actualFree/cardIds.length*100);
+        console.log(`[Cards] 🔄 FLEXIBLE: Usará ${needPaid} pagos + ${actualFree} gratis (${actualPercentage}% gratis - EXCEDE regla 10%)`);
+      }
+
+      // Guardar distribución para usar después en el descuento
+      req.ticketDistribution = {
+        paid: needPaid,
+        free: actualFree,
+        flexibleMode
+      };
+      
+      if (!flexibleMode) {
+        console.log(`[Cards] ✅ Distribución validada - Usará ${needPaid} pagos + ${actualFree} gratis (${Math.round(actualFree/cardIds.length*100)}% gratis)`);
       }
     } else {
       console.log('[Cards] 🎁 Sala Starter - Acceso libre, omitiendo validación de tickets');
@@ -345,23 +403,32 @@ exports.selectCards = async (req, res) => {
 
     // Descontar tickets del inventario solo si NO es sala starter
     if (room !== 'starter') {
-      let ticketsToDeduct = cardIds.length;
+      const distribution = req.ticketDistribution;
       
-      // Obtener registros de inventario ordenados por fecha
-      const [inventoryRecords] = await connection.query(
+      if (distribution.flexibleMode) {
+        console.log(`[Cards] 🔄 Iniciando descuento MODO FLEXIBLE - ${distribution.paid} pagos + ${distribution.free} gratis (${Math.round(distribution.free/(distribution.paid+distribution.free)*100)}% gratis)`);
+      } else {
+        console.log(`[Cards] 🔄 Iniciando descuento según distribución - ${distribution.paid} pagos + ${distribution.free} gratis`);
+      }
+
+      // ========================================
+      // PASO 1: Descontar tickets PAGOS (is_gift = 0)
+      // ========================================
+      let paidToDeduct = distribution.paid;
+      
+      const [paidRecords] = await connection.query(
         `SELECT id, quantity FROM user_card_inventory
-         WHERE user_id = ? AND room = ? AND quantity > 0
+         WHERE user_id = ? AND room = ? AND is_gift = 0 AND quantity > 0
          ORDER BY created_at ASC FOR UPDATE`,
         [userId, room]
       );
 
-      console.log(`[Cards] 📦 Registros de inventario encontrados: ${inventoryRecords.length}`);
+      console.log(`[Cards] 💰 Descontando ${paidToDeduct} tickets PAGOS de ${paidRecords.length} registros`);
 
-      // Descontar de los registros más antiguos primero (FIFO)
-      for (const record of inventoryRecords) {
-        if (ticketsToDeduct <= 0) break;
+      for (const record of paidRecords) {
+        if (paidToDeduct <= 0) break;
 
-        const deductFromThis = Math.min(record.quantity, ticketsToDeduct);
+        const deductFromThis = Math.min(record.quantity, paidToDeduct);
         
         await connection.query(
           `UPDATE user_card_inventory
@@ -370,8 +437,40 @@ exports.selectCards = async (req, res) => {
           [deductFromThis, record.id]
         );
 
-        ticketsToDeduct -= deductFromThis;
-        console.log(`[Cards] ✂️ Descontados ${deductFromThis} tickets del registro ${record.id}. Quedan por descontar: ${ticketsToDeduct}`);
+        paidToDeduct -= deductFromThis;
+        console.log(`[Cards] ✂️ PAGOS: Descontados ${deductFromThis} del registro ${record.id}. Quedan: ${paidToDeduct}`);
+      }
+
+      // ========================================
+      // PASO 2: Descontar tickets GRATIS (is_gift = 1)
+      // ========================================
+      let freeToDeduct = distribution.free;
+      
+      if (freeToDeduct > 0) {
+        const [freeRecords] = await connection.query(
+          `SELECT id, quantity FROM user_card_inventory
+           WHERE user_id = ? AND room = ? AND is_gift = 1 AND quantity > 0
+           ORDER BY created_at ASC FOR UPDATE`,
+          [userId, room]
+        );
+
+        console.log(`[Cards] 🎁 Descontando ${freeToDeduct} tickets GRATIS de ${freeRecords.length} registros`);
+
+        for (const record of freeRecords) {
+          if (freeToDeduct <= 0) break;
+
+          const deductFromThis = Math.min(record.quantity, freeToDeduct);
+          
+          await connection.query(
+            `UPDATE user_card_inventory
+             SET quantity = quantity - ?
+             WHERE id = ?`,
+            [deductFromThis, record.id]
+          );
+
+          freeToDeduct -= deductFromThis;
+          console.log(`[Cards] ✂️ GRATIS: Descontados ${deductFromThis} del registro ${record.id}. Quedan: ${freeToDeduct}`);
+        }
       }
 
       // Eliminar registros con cantidad = 0
@@ -380,6 +479,8 @@ exports.selectCards = async (req, res) => {
          WHERE user_id = ? AND room = ? AND quantity = 0`,
         [userId, room]
       );
+      
+      console.log(`[Cards] 🧹 Registros vacíos eliminados`);
     } else {
       console.log('[Cards] 🎁 Sala Starter - No se descontarán tickets');
     }
@@ -484,10 +585,72 @@ exports.getMySelectedCards = async (req, res) => {
     }));
 
     res.json({ cards: formattedCards });
-
   } catch (error) {
     console.error('[Cards] ❌ Error obteniendo cartones seleccionados:', error);
-    res.status(500).json({ error: 'Error obteniendo tus cartones' });
+    res.status(500).json({ error: 'Error al obtener cartones seleccionados' });
+  }
+};
+
+/**
+ * GET /api/cards/stats
+ * Obtener estadísticas de cartones pagos vs gratis por sala (SuperAdmin)
+ */
+exports.getCardStats = async (req, res) => {
+  try {
+    const [stats] = await pool.query(`
+      SELECT 
+        room,
+        SUM(CASE WHEN is_gift = 0 THEN quantity ELSE 0 END) as total_paid,
+        SUM(CASE WHEN is_gift = 1 THEN quantity ELSE 0 END) as total_free,
+        SUM(quantity) as total_cards,
+        COUNT(DISTINCT CASE WHEN is_gift = 0 THEN user_id ELSE NULL END) as users_with_paid,
+        COUNT(DISTINCT CASE WHEN is_gift = 1 THEN user_id ELSE NULL END) as users_with_free,
+        COUNT(DISTINCT user_id) as total_users,
+        ROUND(
+          (SUM(CASE WHEN is_gift = 1 THEN quantity ELSE 0 END) / 
+           NULLIF(SUM(quantity), 0) * 100), 
+          2
+        ) as free_percentage
+      FROM user_card_inventory
+      WHERE quantity > 0
+      GROUP BY room
+      ORDER BY FIELD(room, 'bronce', 'plata', 'oro')
+    `);
+
+    // Calcular totales globales
+    const [globalStats] = await pool.query(`
+      SELECT 
+        SUM(CASE WHEN is_gift = 0 THEN quantity ELSE 0 END) as total_paid,
+        SUM(CASE WHEN is_gift = 1 THEN quantity ELSE 0 END) as total_free,
+        SUM(quantity) as total_cards,
+        COUNT(DISTINCT user_id) as total_users,
+        ROUND(
+          (SUM(CASE WHEN is_gift = 1 THEN quantity ELSE 0 END) / 
+           NULLIF(SUM(quantity), 0) * 100), 
+          2
+        ) as free_percentage
+      FROM user_card_inventory
+      WHERE quantity > 0
+    `);
+
+    console.log('[Cards Stats] 📊 Estadísticas de cartones consultadas');
+
+    res.json({
+      success: true,
+      timestamp: new Date().toISOString(),
+      by_room: stats,
+      global: globalStats[0],
+      compliance: {
+        rule: 'Máximo 10% de cartones pueden ser gratis',
+        compliant: (globalStats[0]?.free_percentage || 0) <= 10
+      }
+    });
+  } catch (error) {
+    console.error('[Cards Stats] ❌ Error:', error);
+    res.status(500).json({ 
+      error: 'Error al obtener estadísticas de cartones',
+      details: error.message 
+    });
   }
 };
 
