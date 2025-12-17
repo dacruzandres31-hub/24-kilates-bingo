@@ -269,26 +269,31 @@ exports.selectCards = async (req, res) => {
 
     console.log(`[Cards] 🎯 Usuario ${userId} seleccionando ${cardIds.length} cartones para sala ${room}`);
 
-    // Verificar tickets disponibles SIN FOR UPDATE (para evitar lock issues)
-    const [inventory] = await connection.query(
-      `SELECT COALESCE(SUM(quantity), 0) as total_quantity 
-       FROM user_card_inventory 
-       WHERE user_id = ? AND room = ?`,
-      [userId, room]
-    );
+    // Solo validar tickets si NO es sala starter
+    if (room !== 'starter') {
+      // Verificar tickets disponibles SIN FOR UPDATE (para evitar lock issues)
+      const [inventory] = await connection.query(
+        `SELECT COALESCE(SUM(quantity), 0) as total_quantity 
+         FROM user_card_inventory 
+         WHERE user_id = ? AND room = ?`,
+        [userId, room]
+      );
 
-    const availableTickets = inventory[0]?.total_quantity || 0;
-    
-    console.log(`[Cards] 📊 Tickets disponibles: ${availableTickets}, solicitados: ${cardIds.length}`);
+      const availableTickets = inventory[0]?.total_quantity || 0;
+      
+      console.log(`[Cards] 📊 Tickets disponibles: ${availableTickets}, solicitados: ${cardIds.length}`);
 
-    if (availableTickets < cardIds.length) {
-      await connection.rollback();
-      console.log(`[Cards] ❌ Tickets insuficientes - Disponibles: ${availableTickets}, Necesarios: ${cardIds.length}`);
-      return res.status(400).json({ 
-        error: 'No tienes suficientes tickets disponibles',
-        required: cardIds.length,
-        available: availableTickets
-      });
+      if (availableTickets < cardIds.length) {
+        await connection.rollback();
+        console.log(`[Cards] ❌ Tickets insuficientes - Disponibles: ${availableTickets}, Necesarios: ${cardIds.length}`);
+        return res.status(400).json({ 
+          error: 'No tienes suficientes tickets disponibles',
+          required: cardIds.length,
+          available: availableTickets
+        });
+      }
+    } else {
+      console.log('[Cards] 🎁 Sala Starter - Acceso libre, omitiendo validación de tickets');
     }
 
     // Verificar que los cartones estén disponibles, reservados O ya seleccionados por este usuario
@@ -338,42 +343,46 @@ exports.selectCards = async (req, res) => {
       [userId, cardIds]
     );
 
-    // Descontar tickets del inventario (restar de forma inteligente)
-    let ticketsToDeduct = cardIds.length;
-    
-    // Obtener registros de inventario ordenados por fecha
-    const [inventoryRecords] = await connection.query(
-      `SELECT id, quantity FROM user_card_inventory
-       WHERE user_id = ? AND room = ? AND quantity > 0
-       ORDER BY created_at ASC FOR UPDATE`,
-      [userId, room]
-    );
-
-    console.log(`[Cards] 📦 Registros de inventario encontrados: ${inventoryRecords.length}`);
-
-    // Descontar de los registros más antiguos primero (FIFO)
-    for (const record of inventoryRecords) {
-      if (ticketsToDeduct <= 0) break;
-
-      const deductFromThis = Math.min(record.quantity, ticketsToDeduct);
+    // Descontar tickets del inventario solo si NO es sala starter
+    if (room !== 'starter') {
+      let ticketsToDeduct = cardIds.length;
       
-      await connection.query(
-        `UPDATE user_card_inventory
-         SET quantity = quantity - ?
-         WHERE id = ?`,
-        [deductFromThis, record.id]
+      // Obtener registros de inventario ordenados por fecha
+      const [inventoryRecords] = await connection.query(
+        `SELECT id, quantity FROM user_card_inventory
+         WHERE user_id = ? AND room = ? AND quantity > 0
+         ORDER BY created_at ASC FOR UPDATE`,
+        [userId, room]
       );
 
-      ticketsToDeduct -= deductFromThis;
-      console.log(`[Cards] ✂️ Descontados ${deductFromThis} tickets del registro ${record.id}. Quedan por descontar: ${ticketsToDeduct}`);
-    }
+      console.log(`[Cards] 📦 Registros de inventario encontrados: ${inventoryRecords.length}`);
 
-    // Eliminar registros con cantidad = 0
-    await connection.query(
-      `DELETE FROM user_card_inventory
-       WHERE user_id = ? AND room = ? AND quantity = 0`,
-      [userId, room]
-    );
+      // Descontar de los registros más antiguos primero (FIFO)
+      for (const record of inventoryRecords) {
+        if (ticketsToDeduct <= 0) break;
+
+        const deductFromThis = Math.min(record.quantity, ticketsToDeduct);
+        
+        await connection.query(
+          `UPDATE user_card_inventory
+           SET quantity = quantity - ?
+           WHERE id = ?`,
+          [deductFromThis, record.id]
+        );
+
+        ticketsToDeduct -= deductFromThis;
+        console.log(`[Cards] ✂️ Descontados ${deductFromThis} tickets del registro ${record.id}. Quedan por descontar: ${ticketsToDeduct}`);
+      }
+
+      // Eliminar registros con cantidad = 0
+      await connection.query(
+        `DELETE FROM user_card_inventory
+         WHERE user_id = ? AND room = ? AND quantity = 0`,
+        [userId, room]
+      );
+    } else {
+      console.log('[Cards] 🎁 Sala Starter - No se descontarán tickets');
+    }
 
     // Obtener cartones seleccionados con detalles
     const [selectedCards] = await connection.query(

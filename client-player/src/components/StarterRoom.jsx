@@ -84,7 +84,7 @@ celebrationAudio.volume = 0.7;
       }
     };
 
-    loadPlayerCards();
+    checkExistingCards();
   }, [sessionId]);
 
   // Generar número de serie del cartón: DDMMYY-S0001
