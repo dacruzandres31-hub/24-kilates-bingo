@@ -2527,9 +2527,10 @@
 
 .expanded-card-container {
   position: relative;
-  max-width: 1200px;
+  max-width: 2400px;
   max-height: 95vh;
   overflow: auto;
+  transform: scale(1.5);
   animation: card-bounce-in 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
   filter: drop-shadow(0 20px 60px rgba(255, 215, 0, 0.6));
 }

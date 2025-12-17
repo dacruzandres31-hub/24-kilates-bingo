@@ -55,6 +55,15 @@ router.post('/reserve-cards', optionalAuth, (req, res) => {
 });
 
 /**
+ * POST /api/game/starter/credit-tickets
+ * Acredita tickets de Starter en el inventario del jugador
+ * Body: { quantity: 20 }
+ */
+router.post('/credit-tickets', optionalAuth, (req, res) => {
+  starterRoomController.creditTickets(req, res);
+});
+
+/**
  * POST /api/game/starter/auto-assign-cards/:sessionId
  * Asigna automáticamente 20 cartones al jugador si no tiene ninguno
  */

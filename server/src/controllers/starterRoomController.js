@@ -277,6 +277,81 @@ class StarterRoomController {
   }
 
   /**
+   * POST /api/game/starter/credit-tickets
+   * Acredita tickets de Starter en el inventario del jugador
+   */
+  async creditTickets(req, res) {
+    try {
+      const userId = req.user ? req.user.id : null;
+      const { quantity } = req.body;
+
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: 'Usuario no autenticado'
+        });
+      }
+
+      const ticketsToCredit = quantity || 20;
+      console.log(`🎫 Acreditando ${ticketsToCredit} tickets Starter para usuario ${userId}`);
+
+      const db = require('../db');
+
+      // Verificar si ya tiene tickets de starter
+      const [existing] = await db.query(`
+        SELECT id, quantity 
+        FROM cosmetic_inventory 
+        WHERE user_id = ? AND item_id = (
+          SELECT id FROM cosmetic_items WHERE ticket_room = 'starter' LIMIT 1
+        )
+      `, [userId]);
+
+      if (existing.length > 0) {
+        // Actualizar cantidad existente
+        const newQuantity = parseInt(existing[0].quantity) + ticketsToCredit;
+        await db.query(`
+          UPDATE cosmetic_inventory 
+          SET quantity = ?, updated_at = NOW()
+          WHERE id = ?
+        `, [newQuantity, existing[0].id]);
+
+        console.log(`✅ Tickets actualizados: ${existing[0].quantity} → ${newQuantity}`);
+      } else {
+        // Crear nuevo registro
+        const [starterItem] = await db.query(`
+          SELECT id FROM cosmetic_items WHERE ticket_room = 'starter' LIMIT 1
+        `);
+
+        if (starterItem.length === 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'No existe item de tickets para Starter'
+          });
+        }
+
+        await db.query(`
+          INSERT INTO cosmetic_inventory (user_id, item_id, quantity, created_at, updated_at)
+          VALUES (?, ?, ?, NOW(), NOW())
+        `, [userId, starterItem[0].id, ticketsToCredit]);
+
+        console.log(`✅ ${ticketsToCredit} tickets Starter creados para usuario ${userId}`);
+      }
+
+      res.json({
+        success: true,
+        message: `${ticketsToCredit} tickets Starter acreditados`,
+        quantity: ticketsToCredit
+      });
+    } catch (error) {
+      console.error('❌ Error acreditando tickets:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al acreditar tickets'
+      });
+    }
+  }
+
+  /**
    * POST /api/game/starter/auto-assign-cards/:sessionId
    * Asigna automáticamente 20 cartones al jugador si no tiene ninguno
    */
