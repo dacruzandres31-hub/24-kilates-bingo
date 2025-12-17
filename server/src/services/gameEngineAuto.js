@@ -626,6 +626,56 @@ class GameEngineAuto {
 
     return Object.values(grouped);
   }
+
+  /**
+   * Pausar el sorteo automático (SuperAdmin only)
+   */
+  pauseGame(gameSessionId) {
+    const gameState = this.activeGames.get(gameSessionId);
+    if (!gameState) {
+      throw new Error('Juego no encontrado');
+    }
+
+    if (gameState.isPaused) {
+      throw new Error('El juego ya está pausado');
+    }
+
+    gameState.isPaused = true;
+    console.log(`[GameEngine] ⏸️ Juego ${gameSessionId} pausado`);
+
+    // Notificar a todos los jugadores
+    this.io.to(`session_${gameSessionId}`).emit('game_paused', {
+      gameSessionId,
+      message: 'El sorteo ha sido pausado temporalmente'
+    });
+
+    return { success: true, message: 'Juego pausado' };
+  }
+
+  /**
+   * Reanudar el sorteo automático (SuperAdmin only)
+   */
+  resumeGame(gameSessionId) {
+    const gameState = this.activeGames.get(gameSessionId);
+    if (!gameState) {
+      throw new Error('Juego no encontrado');
+    }
+
+    if (!gameState.isPaused) {
+      throw new Error('El juego no está pausado');
+    }
+
+    gameState.isPaused = false;
+    console.log(`[GameEngine] ▶️ Juego ${gameSessionId} reanudado`);
+
+    // Notificar a todos los jugadores
+    this.io.to(`session_${gameSessionId}`).emit('game_resumed', {
+      gameSessionId,
+      message: 'El sorteo ha sido reanudado'
+    });
+
+    return { success: true, message: 'Juego reanudado' };
+  }
 }
 
 module.exports = GameEngineAuto;
