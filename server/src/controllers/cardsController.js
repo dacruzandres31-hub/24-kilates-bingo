@@ -26,26 +26,35 @@ exports.getAvailableCards = async (req, res) => {
 
     console.log(`[Cards] 🎴 Obteniendo cartones disponibles para sala: ${room} (BD: ${roomDB}), usuario: ${userId}, limit: ${limit}, offset: ${offset}`);
 
-    // Verificar que el usuario tenga tickets disponibles en user_card_inventory
-    const [inventory] = await pool.query(
-      `SELECT COALESCE(SUM(quantity), 0) as quantity
-       FROM user_card_inventory 
-       WHERE user_id = ? AND room = ?`,
-      [userId, roomDB]
-    );
+    let availableTickets = 20; // Por defecto para starter
+    let maxSelection = 20;
 
-    console.log(`[Cards] 🔍 Resultado búsqueda tickets - room: ${room} (BD: ${roomDB}), userId: ${userId}`, inventory);
+    // Solo validar tickets para salas que NO sean starter
+    if (roomDB !== 'starter') {
+      // Verificar que el usuario tenga tickets disponibles en user_card_inventory
+      const [inventory] = await pool.query(
+        `SELECT COALESCE(SUM(quantity), 0) as quantity
+         FROM user_card_inventory 
+         WHERE user_id = ? AND room = ?`,
+        [userId, roomDB]
+      );
 
-    if (!inventory || inventory.length === 0 || inventory[0].quantity === 0) {
-      console.log(`[Cards] ❌ No se encontraron tickets para sala ${room}`);
-      return res.status(400).json({ 
-        error: 'No tienes tickets disponibles para esta sala',
-        availableTickets: 0
-      });
+      console.log(`[Cards] 🔍 Resultado búsqueda tickets - room: ${room} (BD: ${roomDB}), userId: ${userId}`, inventory);
+
+      if (!inventory || inventory.length === 0 || inventory[0].quantity === 0) {
+        console.log(`[Cards] ❌ No se encontraron tickets para sala ${room}`);
+        return res.status(400).json({ 
+          error: 'No tienes tickets disponibles para esta sala',
+          availableTickets: 0
+        });
+      }
+
+      availableTickets = parseInt(inventory[0].quantity);
+      maxSelection = Math.min(20, availableTickets);
+      console.log(`[Cards] ✅ Tickets disponibles: ${availableTickets}`);
+    } else {
+      console.log(`[Cards] 🎁 Sala Starter - Acceso libre sin validación de tickets`);
     }
-
-    const availableTickets = parseInt(inventory[0].quantity);
-    console.log(`[Cards] ✅ Tickets disponibles: ${availableTickets}`);
 
     // Obtener total de cartones disponibles
     const [totalResult] = await pool.query(
@@ -96,7 +105,7 @@ exports.getAvailableCards = async (req, res) => {
     res.json({
       cards: formattedCards,
       availableTickets,
-      maxSelection: Math.min(20, availableTickets), // Máximo 20 o los tickets que tenga
+      maxSelection, // Ya calculado arriba según si es starter o no
       totalAvailable,
       hasMore: totalAvailable > (randomOffset + limit)
     });
