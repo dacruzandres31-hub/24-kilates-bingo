@@ -968,22 +968,6 @@ useEffect(() => {
                 {gameStatus === 'ended' && '✅ FINALIZADO'}
               </div>
             </div>
-
-            {/* Alerta de casi línea - Compacta */}
-            {almostLineCards.length > 0 && (() => {
-              const minMissing = Math.min(...almostLineCards.map(card => card.minMissing));
-              return (
-                <div className="compact-line-alert">
-                  <div className="alert-flash"></div>
-                  <span className="alert-icon-compact">⚠️</span>
-                  <span className="alert-text-compact">
-                    ¡A {minMissing} NÚMERO{minMissing > 1 ? 'S' : ''} DE LÍNEA!
-                    {almostLineCards.length > 1 && ` (${almostLineCards.length} cartones)`}
-                  </span>
-                  <div className="alert-glow"></div>
-                </div>
-              );
-            })()}
           </div>
 
           {/* Bolillero Moderno */}
@@ -1103,6 +1087,21 @@ useEffect(() => {
         </div>
         </div>
       </div>
+
+      {/* Modal de Alerta de Casi Línea - Debajo del Bolillero */}
+      {almostLineCards.length > 0 && ballsDrawn.length < 40 && (() => {
+        const minMissing = Math.min(...almostLineCards.map(card => card.minMissing));
+        return (
+          <div className="almost-line-modal">
+            <div className="almost-line-content">
+              <span className="alert-icon-modal">⚡</span>
+              <span className="alert-text-modal">
+                ¡A {minMissing} NÚMERO{minMissing > 1 ? 'S' : ''} DE LÍNEA!
+              </span>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* MITAD INFERIOR - LOS CARTONES */}
       <div className="player-cards-section">
