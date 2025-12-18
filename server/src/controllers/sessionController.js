@@ -10,11 +10,9 @@ exports.getActiveSessions = async (req, res) => {
       SELECT 
         id,
         room,
-        play_date,
         start_time,
-        end_time,
+        created_at,
         status,
-        card_price,
         current_pot_linea,
         current_pot_bingo,
         current_pot_jackpot,
@@ -22,11 +20,10 @@ exports.getActiveSessions = async (req, res) => {
         total_paid_cards,
         total_gift_cards,
         is_preventa,
-        sale_closes_at
+        updated_at
       FROM game_sessions
       WHERE status IN ('pending', 'active', 'playing')
-         OR (status = 'preventa' AND play_date >= CURDATE())
-      ORDER BY play_date ASC, start_time ASC
+      ORDER BY start_time ASC
       LIMIT 20
     `);
 
@@ -62,22 +59,19 @@ exports.getRecentSessions = async (req, res) => {
       SELECT 
         id,
         room,
-        play_date,
         start_time,
-        end_time,
+        created_at,
         status,
-        card_price,
         current_pot_linea,
         current_pot_bingo,
         current_pot_jackpot,
         total_cards_validated,
         total_paid_cards,
         total_gift_cards,
-        created_at,
         updated_at
       FROM game_sessions
       WHERE status = 'completed'
-      ORDER BY end_time DESC
+      ORDER BY updated_at DESC
       LIMIT ?
     `, [parseInt(limit)]);
 
