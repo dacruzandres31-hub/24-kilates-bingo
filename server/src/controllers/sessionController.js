@@ -2,63 +2,60 @@ const pool = require('../db');
 
 /**
  * GET /api/admin/sessions/active
- * Obtener sesiones activas y próximas
+ * Obtener sesiones organizadas por sala (4 salas)
  */
 exports.getActiveSessions = async (req, res) => {
   try {
-    // Obtener sesiones activas (solo la más reciente por sala)
-    const [activeSessions] = await pool.query(`
-      SELECT 
-        gs1.id,
-        gs1.room,
-        gs1.start_time,
-        gs1.created_at,
-        gs1.status,
-        gs1.current_pot_linea,
-        gs1.current_pot_bingo,
-        gs1.current_pot_jackpot,
-        gs1.total_cards_validated,
-        gs1.total_paid_cards,
-        gs1.total_gift_cards,
-        gs1.is_preventa,
-        gs1.updated_at
-      FROM game_sessions gs1
-      INNER JOIN (
-        SELECT room, MAX(id) as max_id
-        FROM game_sessions
-        WHERE status IN ('active', 'playing')
-        GROUP BY room
-      ) gs2 ON gs1.id = gs2.max_id
-      ORDER BY FIELD(gs1.room, 'free_starter', 'bronce', 'plata', 'oro')
-    `);
+    const rooms = ['starter', 'bronce', 'plata', 'oro'];
+    const roomsData = [];
 
-    // Obtener sesiones próximas (pending)
-    const [upcomingSessions] = await pool.query(`
-      SELECT 
-        id,
+    for (const room of rooms) {
+      // Obtener sesión activa de la sala
+      const [activeSession] = await pool.query(`
+        SELECT 
+          id,
+          room,
+          start_time,
+          created_at,
+          status,
+          current_pot_linea,
+          current_pot_bingo,
+          current_pot_jackpot,
+          total_cards_validated,
+          total_paid_cards,
+          total_gift_cards,
+          is_preventa,
+          updated_at
+        FROM game_sessions
+        WHERE room = ? AND status IN ('active', 'playing')
+        ORDER BY id DESC
+        LIMIT 1
+      `, [room]);
+
+      // Obtener próximas 10 sesiones de la sala
+      const [upcomingSessions] = await pool.query(`
+        SELECT 
+          id,
+          room,
+          start_time,
+          created_at,
+          status
+        FROM game_sessions
+        WHERE room = ? AND status = 'pending'
+        ORDER BY start_time ASC
+        LIMIT 10
+      `, [room]);
+
+      roomsData.push({
         room,
-        start_time,
-        created_at,
-        status,
-        current_pot_linea,
-        current_pot_bingo,
-        current_pot_jackpot,
-        total_cards_validated,
-        total_paid_cards,
-        total_gift_cards,
-        is_preventa,
-        updated_at
-      FROM game_sessions
-      WHERE status = 'pending'
-      ORDER BY start_time ASC
-      LIMIT 20
-    `);
+        currentSession: activeSession[0] || null,
+        upcomingSessions: upcomingSessions || []
+      });
+    }
 
     res.json({
       success: true,
-      active: activeSessions,
-      upcoming: upcomingSessions,
-      total: activeSessions.length + upcomingSessions.length
+      rooms: roomsData
     });
 
   } catch (error) {
