@@ -159,7 +159,7 @@ async function getDashboardStats(req, res) {
           current_pot_linea,
           current_pot_bingo,
           accumulated_pot,
-          total_cards_sold,
+          total_cards_validated,
           start_time,
           end_time
         FROM game_sessions 
@@ -454,7 +454,7 @@ async function getSessionStats(req, res) {
     const [sessionsResult] = await pool.query(`
       SELECT 
         COUNT(*) as total_sessions,
-        SUM(total_cards_sold) as total_cards,
+        SUM(total_cards_validated) as total_cards,
         SUM(current_pot_linea + current_pot_bingo) as total_revenue,
         AVG(TIMESTAMPDIFF(MINUTE, start_time, end_time)) as avg_duration_minutes,
         SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_sessions

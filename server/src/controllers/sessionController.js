@@ -18,8 +18,9 @@ exports.getActiveSessions = async (req, res) => {
         current_pot_linea,
         current_pot_bingo,
         current_pot_jackpot,
-        total_cards_sold,
         total_cards_validated,
+        total_paid_cards,
+        total_gift_cards,
         is_preventa,
         sale_closes_at
       FROM game_sessions
@@ -69,8 +70,9 @@ exports.getRecentSessions = async (req, res) => {
         current_pot_linea,
         current_pot_bingo,
         current_pot_jackpot,
-        total_cards_sold,
         total_cards_validated,
+        total_paid_cards,
+        total_gift_cards,
         created_at,
         updated_at
       FROM game_sessions
@@ -335,7 +337,7 @@ exports.deleteSession = async (req, res) => {
 
     // Verificar que la sesión existe y no está activa
     const [sessions] = await pool.query(
-      'SELECT status, total_cards_sold FROM game_sessions WHERE id = ?',
+      'SELECT status, total_cards_validated FROM game_sessions WHERE id = ?',
       [id]
     );
 
@@ -353,7 +355,7 @@ exports.deleteSession = async (req, res) => {
       });
     }
 
-    if (sessions[0].total_cards_sold > 0) {
+    if (sessions[0].total_cards_validated > 0) {
       return res.status(400).json({
         success: false,
         message: 'No se puede eliminar una sesión con cartones vendidos'
