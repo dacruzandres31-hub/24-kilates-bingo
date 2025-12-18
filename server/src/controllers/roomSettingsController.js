@@ -197,19 +197,30 @@ exports.resetAccumulatedPot = async (req, res) => {
 exports.getCurrentPots = async (req, res) => {
   try {
     // Obtener pozos de salas con dinero (Bronce, Plata, Oro)
+    // Obtener la sesión más reciente de cada sala
     const [moneyPots] = await pool.query(`
       SELECT 
         rs.room,
         rs.card_price,
         rs.accumulated_pot_pre40 AS jackpot,
-        COALESCE(gs.current_pot_linea, 0) AS current_pot_linea,
-        COALESCE(gs.current_pot_bingo, 0) AS current_pot_bingo,
-        COALESCE(gs.total_cards_sold, 0) AS cards_sold,
-        gs.status,
-        gs.id AS session_id
+        COALESCE(latest.current_pot_linea, 0) AS current_pot_linea,
+        COALESCE(latest.current_pot_bingo, 0) AS current_pot_bingo,
+        COALESCE(latest.total_cards_validated, 0) AS cards_sold,
+        latest.status,
+        latest.session_id
       FROM room_settings rs
-      LEFT JOIN game_sessions gs ON gs.room = rs.room 
-        AND gs.status IN ('active', 'playing', 'pending')
+      LEFT JOIN (
+        SELECT 
+          gs1.*,
+          gs1.id AS session_id
+        FROM game_sessions gs1
+        INNER JOIN (
+          SELECT room, MAX(id) AS max_id
+          FROM game_sessions
+          WHERE status IN ('active', 'playing', 'pending')
+          GROUP BY room
+        ) gs2 ON gs1.id = gs2.max_id
+      ) latest ON latest.room COLLATE utf8mb4_0900_ai_ci = rs.room COLLATE utf8mb4_0900_ai_ci
       ORDER BY FIELD(rs.room, 'bronce', 'plata', 'oro')
     `);
 
@@ -218,7 +229,7 @@ exports.getCurrentPots = async (req, res) => {
       SELECT 
         id AS session_id,
         room,
-        total_cards_sold AS cards_sold,
+        total_cards_validated AS cards_sold,
         status
       FROM game_sessions
       WHERE room = 'free_starter' 
