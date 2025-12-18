@@ -6,7 +6,34 @@ const pool = require('../db');
  */
 exports.getActiveSessions = async (req, res) => {
   try {
-    const [sessions] = await pool.query(`
+    // Obtener sesiones activas (solo la más reciente por sala)
+    const [activeSessions] = await pool.query(`
+      SELECT 
+        gs1.id,
+        gs1.room,
+        gs1.start_time,
+        gs1.created_at,
+        gs1.status,
+        gs1.current_pot_linea,
+        gs1.current_pot_bingo,
+        gs1.current_pot_jackpot,
+        gs1.total_cards_validated,
+        gs1.total_paid_cards,
+        gs1.total_gift_cards,
+        gs1.is_preventa,
+        gs1.updated_at
+      FROM game_sessions gs1
+      INNER JOIN (
+        SELECT room, MAX(id) as max_id
+        FROM game_sessions
+        WHERE status IN ('active', 'playing')
+        GROUP BY room
+      ) gs2 ON gs1.id = gs2.max_id
+      ORDER BY FIELD(gs1.room, 'free_starter', 'bronce', 'plata', 'oro')
+    `);
+
+    // Obtener sesiones próximas (pending)
+    const [upcomingSessions] = await pool.query(`
       SELECT 
         id,
         room,
@@ -22,20 +49,16 @@ exports.getActiveSessions = async (req, res) => {
         is_preventa,
         updated_at
       FROM game_sessions
-      WHERE status IN ('pending', 'active', 'playing')
+      WHERE status = 'pending'
       ORDER BY start_time ASC
       LIMIT 20
     `);
 
-    // Clasificar sesiones
-    const active = sessions.filter(s => s.status === 'active' || s.status === 'playing');
-    const upcoming = sessions.filter(s => s.status === 'pending' || s.status === 'preventa');
-
     res.json({
       success: true,
-      active,
-      upcoming,
-      total: sessions.length
+      active: activeSessions,
+      upcoming: upcomingSessions,
+      total: activeSessions.length + upcomingSessions.length
     });
 
   } catch (error) {
