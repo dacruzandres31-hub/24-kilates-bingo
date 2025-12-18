@@ -8,6 +8,7 @@ require('dotenv').config();
 
 const scheduler = require('./services/scheduler');
 const notificationService = require('./services/notificationService');
+const websocketService = require('./services/websocketService');
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const gameRoutes = require('./routes/gameRoutes');
@@ -66,6 +67,9 @@ const io = socketIo(server, {
 
 // INICIALIZAR NOTIFICATION SERVICE
 notificationService.initialize(io);
+
+// INICIALIZAR WEBSOCKET SERVICE (para pozos en vivo)
+websocketService.initialize(io);
 
 // INICIALIZAR MOTOR DE JUEGO AUTOMÁTICO
 gameAdminController.initGameEngine(io);

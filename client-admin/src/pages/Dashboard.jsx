@@ -18,6 +18,7 @@ import SessionStatusPanel from '../components/SessionStatusPanel';
 import SessionControlPanel from '../components/SessionControlPanel';
 import LiveMonitoringPanel from '../components/LiveMonitoringPanel';
 import RoomConfigPanel from '../components/RoomConfigPanel';
+import ScheduleGridPanel from '../components/ScheduleGridPanel';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 
 export default function Dashboard() {
@@ -60,6 +61,7 @@ export default function Dashboard() {
     'sesiones-control': false,
     'sesiones-live': false,
     'room-config': false,
+    'horarios-config': false,
     'alertas': false
   });
 
@@ -481,6 +483,15 @@ export default function Dashboard() {
             <section className="mb-8">
               <SuperAdminOnly>
                 <RoomConfigPanel />
+              </SuperAdminOnly>
+            </section>
+          )}
+
+          {/* Configuración de Horarios (SuperAdmin only) */}
+          {activeSections['horarios-config'] && (
+            <section className="mb-8">
+              <SuperAdminOnly>
+                <ScheduleGridPanel />
               </SuperAdminOnly>
             </section>
           )}

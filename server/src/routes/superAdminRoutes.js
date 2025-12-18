@@ -18,6 +18,7 @@ const {
 const cardInventoryController = require('../controllers/cardInventoryController');
 const sessionController = require('../controllers/sessionController');
 const roomSettingsController = require('../controllers/roomSettingsController');
+const scheduleController = require('../controllers/scheduleController');
 
 // Todas las rutas requieren autenticación de admin
 router.use(authenticateToken);
@@ -72,5 +73,13 @@ router.get('/room-settings', roomSettingsController.getRoomSettings);
 router.put('/room-settings/:room', roomSettingsController.updateRoomPrice);
 router.put('/room-settings/:room/percentages', roomSettingsController.updateRoomPercentages);
 router.post('/room-settings/:room/reset-accumulated', roomSettingsController.resetAccumulatedPot);
+
+// ========================================
+// 📅 GESTIÓN DE HORARIOS DE SORTEOS
+// Configurar, activar/desactivar horarios (SuperAdmin only)
+// ========================================
+router.post('/schedules', scheduleController.addSchedule);
+router.put('/schedules/:id/toggle', scheduleController.toggleSchedule);
+router.delete('/schedules/:id', scheduleController.deleteSchedule);
 
 module.exports = router;

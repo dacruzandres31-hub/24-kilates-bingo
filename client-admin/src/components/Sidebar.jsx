@@ -74,7 +74,8 @@ export default function Sidebar({ activeSections, onToggleSection }) {
         { id: 'sesiones-stats', name: 'Estado de Sesiones' },
         { id: 'sesiones-control', name: 'Control de Sesiones', superAdminOnly: true },
         { id: 'sesiones-live', name: 'Monitoreo en Vivo' },
-        { id: 'room-config', name: 'Configuración de Salas', superAdminOnly: true }
+        { id: 'room-config', name: 'Configuración de Salas', superAdminOnly: true },
+        { id: 'horarios-config', name: 'Configuración de Horarios', superAdminOnly: true }
       ]
     },
     {

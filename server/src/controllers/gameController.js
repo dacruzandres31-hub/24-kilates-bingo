@@ -8,6 +8,7 @@ const notificationService = require('../services/notificationService');
 const inventoryService = require('../services/inventoryService');
 const CardAnalyzer = require('../services/cardAnalyzer');
 const cardInventoryService = require('../services/cardInventoryService');
+const websocketService = require('../services/websocketService');
 
 // COMPRAR CARTÓN - Agregar a session del usuario
 exports.buyCard = async (req, res) => {
@@ -104,6 +105,9 @@ exports.buyCard = async (req, res) => {
       }
 
       await connection.query('COMMIT');
+
+      // ===== EMITIR ACTUALIZACIÓN DE POZOS EN VIVO =====
+      websocketService.emitPotsUpdate();
 
       // ===== GAMIFICACIÓN: Agregar XP al jugador =====
       try {

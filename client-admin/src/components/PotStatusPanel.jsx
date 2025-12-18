@@ -1,15 +1,80 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { DollarSign, TrendingUp, Calendar } from 'lucide-react';
+import { DollarSign, Wifi, WifiOff, Calendar } from 'lucide-react';
+import { io } from 'socket.io-client';
+import ProximosSorteosModal from './ProximosSorteosModal';
 
 export default function PotStatusPanel() {
   const [pozos, setPozos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [socketConnected, setSocketConnected] = useState(false);
+  const [socket, setSocket] = useState(null);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [selectedRoom, setSelectedRoom] = useState(null);
 
   useEffect(() => {
+    // Fetch inicial
     fetchPozos();
-    const interval = setInterval(fetchPozos, 15000); // Actualizar cada 15s
-    return () => clearInterval(interval);
+
+    // Conectar WebSocket
+    const socketInstance = io(import.meta.env.VITE_API_URL || 'http://localhost:3000', {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionAttempts: 5
+    });
+
+    socketInstance.on('connect', () => {
+      console.log('✅ Socket.IO conectado para pozos en vivo');
+      setSocketConnected(true);
+    });
+
+    socketInstance.on('disconnect', () => {
+      console.log('❌ Socket.IO desconectado');
+      setSocketConnected(false);
+    });
+
+    // Escuchar actualizaciones de pozos en tiempo real
+    socketInstance.on('pots_updated', (data) => {
+      console.log('📡 Pozos actualizados via WebSocket:', data);
+      const pozosData = data.pots.map(pot => {
+        // Manejo especial para sala Starter
+        if (pot.is_special) {
+          return {
+            room: pot.room,
+            linea: pot.current_pot_linea,
+            bingo: pot.current_pot_bingo,
+            jackpot: 0,
+            sessionId: pot.session_id,
+            status: pot.status || 'no_session',
+            cardsSold: pot.cards_sold || 0,
+            cardPrice: 0,
+            isSpecial: true
+          };
+        }
+
+        return {
+          room: pot.room,
+          linea: parseFloat(pot.current_pot_linea) || 0,
+          bingo: parseFloat(pot.current_pot_bingo) || 0,
+          jackpot: parseFloat(pot.jackpot) || 0,
+          sessionId: pot.session_id,
+          status: pot.status || 'no_session',
+          cardsSold: pot.cards_sold || 0,
+          cardPrice: parseFloat(pot.card_price) || 0,
+          isSpecial: false
+        };
+      });
+      setPozos(pozosData);
+    });
+
+    setSocket(socketInstance);
+
+    return () => {
+      if (socketInstance) {
+        socketInstance.disconnect();
+      }
+    };
   }, []);
 
   const getToken = () => localStorage.getItem('adminToken');
@@ -20,17 +85,33 @@ export default function PotStatusPanel() {
         headers: { Authorization: `Bearer ${getToken()}` }
       });
       
-      // Mapear pozos por sala (incluye salas sin sesión activa)
-      const pozosData = response.data.pots.map(pot => ({
-        room: pot.room,
-        linea: parseFloat(pot.current_pot_linea) || 0,
-        bingo: parseFloat(pot.current_pot_bingo) || 0,
-        jackpot: parseFloat(pot.jackpot) || 0,
-        sessionId: pot.session_id,
-        status: pot.status || 'no_session',
-        cardsSold: pot.cards_sold || 0,
-        cardPrice: parseFloat(pot.card_price) || 0
-      }));
+      const pozosData = response.data.pots.map(pot => {
+        if (pot.is_special) {
+          return {
+            room: pot.room,
+            linea: pot.current_pot_linea,
+            bingo: pot.current_pot_bingo,
+            jackpot: 0,
+            sessionId: pot.session_id,
+            status: pot.status || 'no_session',
+            cardsSold: pot.cards_sold || 0,
+            cardPrice: 0,
+            isSpecial: true
+          };
+        }
+
+        return {
+          room: pot.room,
+          linea: parseFloat(pot.current_pot_linea) || 0,
+          bingo: parseFloat(pot.current_pot_bingo) || 0,
+          jackpot: parseFloat(pot.jackpot) || 0,
+          sessionId: pot.session_id,
+          status: pot.status || 'no_session',
+          cardsSold: pot.cards_sold || 0,
+          cardPrice: parseFloat(pot.card_price) || 0,
+          isSpecial: false
+        };
+      });
       
       setPozos(pozosData);
       setLoading(false);
@@ -50,22 +131,32 @@ export default function PotStatusPanel() {
 
   const getRoomIcon = (room) => {
     const icons = {
+      starter: '🎁',
       bronce: '🥉',
       plata: '🥈',
-      oro: '🥇',
-      free_starter: '🎁'
+      oro: '🥇'
     };
     return icons[room] || '🎲';
   };
 
   const getRoomColor = (room) => {
     const colors = {
+      starter: 'from-purple-900/40 to-purple-800/20 border-purple-500/30',
       bronce: 'from-orange-900/40 to-orange-800/20 border-orange-500/30',
       plata: 'from-gray-600/40 to-gray-700/20 border-gray-400/30',
-      oro: 'from-yellow-600/40 to-yellow-700/20 border-yellow-400/30',
-      free_starter: 'from-purple-900/40 to-purple-800/20 border-purple-500/30'
+      oro: 'from-yellow-600/40 to-yellow-700/20 border-yellow-400/30'
     };
     return colors[room] || 'from-gray-800 to-gray-900 border-gray-700';
+  };
+
+  const getRoomName = (room) => {
+    const names = {
+      starter: 'Starter',
+      bronce: 'Bronce',
+      plata: 'Plata',
+      oro: 'Oro'
+    };
+    return names[room] || room;
   };
 
   if (loading) {
@@ -82,21 +173,6 @@ export default function PotStatusPanel() {
     );
   }
 
-  if (pozos.length === 0) {
-    return (
-      <div className="space-y-6">
-        <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-          <DollarSign className="w-8 h-8 text-green-400" />
-          Estado de Pozos
-        </h2>
-        <div className="bg-gray-800/50 rounded-xl p-12 text-center">
-          <div className="text-6xl mb-4">💰</div>
-          <p className="text-gray-400 text-lg">No hay datos de pozos disponibles</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -104,8 +180,27 @@ export default function PotStatusPanel() {
           <DollarSign className="w-8 h-8 text-green-400" />
           Estado de Pozos
         </h2>
-        <div className="text-sm text-gray-400">
-          {pozos.length} {pozos.length === 1 ? 'sala activa' : 'salas activas'}
+        <div className="flex items-center gap-4">
+          <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm ${
+            socketConnected 
+              ? 'bg-green-500/20 text-green-400' 
+              : 'bg-red-500/20 text-red-400'
+          }`}>
+            {socketConnected ? (
+              <>
+                <Wifi className="w-4 h-4" />
+                En Vivo
+              </>
+            ) : (
+              <>
+                <WifiOff className="w-4 h-4" />
+                Desconectado
+              </>
+            )}
+          </div>
+          <div className="text-sm text-gray-400">
+            4 salas
+          </div>
         </div>
       </div>
 
@@ -121,11 +216,13 @@ export default function PotStatusPanel() {
                 <span className="text-4xl">{getRoomIcon(pozo.room)}</span>
                 <div>
                   <h3 className="text-xl font-bold text-white capitalize">
-                    Sala {pozo.room}
+                    Sala {getRoomName(pozo.room)}
                   </h3>
-                  <div className="text-xs text-gray-400">
-                    Sesión #{pozo.sessionId}
-                  </div>
+                  {pozo.sessionId && (
+                    <div className="text-xs text-gray-400">
+                      Sesión #{pozo.sessionId}
+                    </div>
+                  )}
                 </div>
               </div>
               <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
@@ -141,52 +238,97 @@ export default function PotStatusPanel() {
 
             {/* Pozos */}
             <div className="space-y-3">
+              {/* LÍNEA */}
               <div className="bg-black/20 rounded-lg p-4">
                 <div className="text-sm text-gray-400 mb-1">Pozo LÍNEA</div>
                 <div className="text-2xl font-bold text-blue-400">
-                  {formatMoney(pozo.linea)}
+                  {pozo.isSpecial ? (
+                    <span className="flex items-center gap-2">
+                      🎫 {pozo.linea}
+                    </span>
+                  ) : (
+                    formatMoney(pozo.linea)
+                  )}
                 </div>
               </div>
 
+              {/* BINGO */}
               <div className="bg-black/20 rounded-lg p-4">
                 <div className="text-sm text-gray-400 mb-1">Pozo BINGO</div>
                 <div className="text-2xl font-bold text-green-400">
-                  {formatMoney(pozo.bingo)}
+                  {pozo.isSpecial ? (
+                    <span className="flex items-center gap-2">
+                      🎫 {pozo.bingo}
+                    </span>
+                  ) : (
+                    formatMoney(pozo.bingo)
+                  )}
                 </div>
               </div>
 
-              <div className="bg-black/20 rounded-lg p-4">
-                <div className="text-sm text-gray-400 mb-1">Pozo Acumulado Pre-40</div>
-                <div className="text-3xl font-bold text-yellow-400">
-                  {formatMoney(pozo.jackpot)}
+              {/* Pozo Acumulado Pre-40 (solo salas con dinero) */}
+              {!pozo.isSpecial && (
+                <div className="bg-black/20 rounded-lg p-4">
+                  <div className="text-sm text-gray-400 mb-1">Pozo Acumulado Pre-40</div>
+                  <div className="text-3xl font-bold text-yellow-400">
+                    {formatMoney(pozo.jackpot)}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Info adicional */}
-            <div className="mt-4 pt-4 border-t border-gray-700/50">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-400">Cartones vendidos</span>
-                <span className="text-white font-semibold">{pozo.cardsSold}</span>
+            <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-2 gap-4">
+              <div>
+                <div className="text-xs text-gray-400">Cartones Vendidos</div>
+                <div className="text-sm font-semibold text-white">
+                  {pozo.cardsSold}
+                </div>
               </div>
-              <div className="flex items-center justify-between text-sm mt-1">
-                <span className="text-gray-400">Precio cartón</span>
-                <span className="text-white font-semibold">{formatMoney(pozo.cardPrice)}</span>
-              </div>
+              {!pozo.isSpecial && (
+                <div>
+                  <div className="text-xs text-gray-400">Precio Cartón</div>
+                  <div className="text-sm font-semibold text-white">
+                    {formatMoney(pozo.cardPrice)}
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Total */}
-            <div className="mt-4 pt-4 border-t border-gray-700/50">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-400">Total en juego</span>
-                <span className="text-xl font-bold text-white">
-                  {formatMoney(pozo.linea + pozo.bingo + pozo.jackpot)}
-                </span>
-              </div>
+            {/* Botón Ver Próximos Sorteos */}
+            <div className="mt-4">
+              <button
+                onClick={() => {
+                  setSelectedRoom(pozo.room);
+                  setShowScheduleModal(true);
+                }}
+                className="w-full px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg flex items-center justify-center gap-2 transition-colors"
+              >
+                <Calendar className="w-4 h-4" />
+                Ver Próximos Sorteos
+              </button>
             </div>
           </div>
         ))}
       </div>
+
+      {pozos.length === 0 && (
+        <div className="bg-gray-800/50 rounded-xl p-12 text-center">
+          <div className="text-6xl mb-4">💰</div>
+          <p className="text-gray-400 text-lg">No hay datos de pozos disponibles</p>
+        </div>
+      )}
+
+      {/* Modal Próximos Sorteos */}
+      {showScheduleModal && selectedRoom && (
+        <ProximosSorteosModal
+          room={selectedRoom}
+          onClose={() => {
+            setShowScheduleModal(false);
+            setSelectedRoom(null);
+          }}
+        />
+      )}
     </div>
   );
 }

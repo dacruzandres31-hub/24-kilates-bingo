@@ -9,6 +9,7 @@
  */
 
 const pool = require('../db');
+const websocketService = require('../services/websocketService');
 
 /**
  * buyCard: Comprar cartón con Ticket (si existe) o Dinero
@@ -177,6 +178,9 @@ async function buyCard(req, res) {
       );
 
       await client.query('COMMIT');
+
+      // ===== EMITIR ACTUALIZACIÓN DE POZOS EN VIVO =====
+      websocketService.emitPotsUpdate();
 
       res.json({
         success: true,

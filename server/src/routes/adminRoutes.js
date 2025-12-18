@@ -28,6 +28,7 @@ const {
 const cardInventoryController = require('../controllers/cardInventoryController');
 const sessionController = require('../controllers/sessionController');
 const roomSettingsController = require('../controllers/roomSettingsController');
+const scheduleController = require('../controllers/scheduleController');
 
 /**
  * RUTAS DEL DASHBOARD ADMINISTRATIVO
@@ -93,5 +94,13 @@ router.get('/sessions/:id/live', authenticateToken, isAdmin, sessionController.g
 // Consulta de pozos actuales (Admin + SuperAdmin)
 // ========================================
 router.get('/room-settings/current-pots', authenticateToken, isAdmin, roomSettingsController.getCurrentPots);
+
+// ========================================
+// 📅 HORARIOS DE SORTEOS
+// Consulta de horarios y próximos sorteos (Admin + SuperAdmin)
+// ========================================
+router.get('/schedules', authenticateToken, isAdmin, scheduleController.getAllSchedules);
+router.get('/schedules/:room/next', authenticateToken, isAdmin, scheduleController.getNextDraws);
+router.get('/schedules/summary', authenticateToken, isAdmin, scheduleController.getScheduleSummary);
 
 module.exports = router;

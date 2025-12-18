@@ -192,10 +192,12 @@ exports.resetAccumulatedPot = async (req, res) => {
 /**
  * GET /api/admin/room-settings/current-pots
  * Obtener pozos actuales de todas las salas (para dashboard)
+ * Incluye sala Starter con premios especiales (tickets)
  */
 exports.getCurrentPots = async (req, res) => {
   try {
-    const [pots] = await pool.query(`
+    // Obtener pozos de salas con dinero (Bronce, Plata, Oro)
+    const [moneyPots] = await pool.query(`
       SELECT 
         rs.room,
         rs.card_price,
@@ -211,9 +213,39 @@ exports.getCurrentPots = async (req, res) => {
       ORDER BY FIELD(rs.room, 'bronce', 'plata', 'oro')
     `);
 
+    // Obtener datos de sala Starter (premios en tickets)
+    const [starterSession] = await pool.query(`
+      SELECT 
+        id AS session_id,
+        room,
+        total_cards_sold AS cards_sold,
+        status
+      FROM game_sessions
+      WHERE room = 'free_starter' 
+        AND status IN ('active', 'playing', 'pending')
+      ORDER BY created_at DESC
+      LIMIT 1
+    `);
+
+    // Construir objeto para sala Starter
+    const starterPot = {
+      room: 'starter',
+      card_price: 0, // Gratis
+      jackpot: 0, // No tiene jackpot acumulado
+      current_pot_linea: 'Ticket Bronce', // Premio especial
+      current_pot_bingo: 'Ticket Oro', // Premio especial
+      cards_sold: starterSession.length > 0 ? starterSession[0].cards_sold : 0,
+      status: starterSession.length > 0 ? starterSession[0].status : 'no_session',
+      session_id: starterSession.length > 0 ? starterSession[0].session_id : null,
+      is_special: true // Flag para frontend
+    };
+
+    // Combinar todas las salas: Starter primero, luego Bronce, Plata, Oro
+    const allPots = [starterPot, ...moneyPots];
+
     res.json({
       success: true,
-      pots
+      pots: allPots
     });
   } catch (error) {
     console.error('[RoomSettings] Error al obtener pozos:', error);
