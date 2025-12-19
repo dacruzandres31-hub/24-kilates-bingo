@@ -131,7 +131,8 @@ exports.getAllUsers = async (req, res) => {
 
     // Obtener usuarios paginados
     const [result] = await pool.query(
-      `SELECT id, username, role, parent_id, balance, created_at
+      `SELECT id, username, role, parent_id, balance, created_at,
+              is_blocked, block_reason, blocked_at, blocked_by
        FROM users
        ORDER BY created_at DESC
        LIMIT ? OFFSET ?`,
@@ -425,3 +426,246 @@ exports.getUserProfile = async (req, res) => {
     res.status(500).json({ error: 'Error obteniendo perfil' });
   }
 };
+
+// BLOCK - Bloquear usuario
+exports.blockUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { reason } = req.body;
+    const performedBy = req.user.id;
+
+    // Validar que se proporcione un motivo
+    if (!reason || reason.trim() === '') {
+      return res.status(400).json({ error: 'Debe proporcionar un motivo para el bloqueo' });
+    }
+
+    // Verificar que el usuario existe
+    const [user] = await pool.query(
+      'SELECT id, username, role, is_blocked FROM users WHERE id = ?',
+      [userId]
+    );
+
+    if (user.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    // Verificar que no esté ya bloqueado
+    if (user[0].is_blocked) {
+      return res.status(400).json({ error: 'Usuario ya está bloqueado' });
+    }
+
+    // No se puede bloquear a un SuperAdmin
+    if (user[0].role === 'superadmin') {
+      return res.status(403).json({ error: 'No se puede bloquear a un SuperAdmin' });
+    }
+
+    // Bloquear el usuario
+    await pool.query(
+      `UPDATE users 
+       SET is_blocked = TRUE, 
+           block_reason = ?, 
+           blocked_at = NOW(), 
+           blocked_by = ?
+       WHERE id = ?`,
+      [reason.trim(), performedBy, userId]
+    );
+
+    // Registrar en log de bloqueos
+    await pool.query(
+      `INSERT INTO user_blocks_log (user_id, action, reason, performed_by)
+       VALUES (?, 'block', ?, ?)`,
+      [userId, reason.trim(), performedBy]
+    );
+
+    res.json({
+      success: true,
+      message: `Usuario ${user[0].username} bloqueado exitosamente`,
+      user: {
+        id: userId,
+        username: user[0].username,
+        is_blocked: true,
+        block_reason: reason.trim(),
+        blocked_at: new Date()
+      }
+    });
+
+  } catch (error) {
+    console.error('Error bloqueando usuario:', error);
+    res.status(500).json({ error: 'Error al bloquear usuario' });
+  }
+};
+
+/**
+ * Helper: Verificar si un usuario puede desbloquear a otro
+ * - Andy (SuperAdmin) puede desbloquear a cualquiera
+ * - Si Andy bloqueó al usuario, solo Andy puede desbloquear
+ * - Puede desbloquear quien bloqueó al usuario
+ * - Puede desbloquear un agente superior en la jerarquía del usuario bloqueado
+ */
+async function canUnblockUser(performerId, performerRole, blockedUserId, blockerId) {
+  // Si el performer es quien bloqueó, puede desbloquear
+  if (performerId === blockerId) {
+    return true;
+  }
+
+  // SuperAdmin puede desbloquear a cualquiera (ya verificado antes)
+  if (performerRole === 'superadmin') {
+    return true;
+  }
+
+  // Verificar si el performer es un agente superior en la jerarquía del BLOQUEADOR (no del bloqueado)
+  // Usamos CTE recursivo para verificar toda la cadena jerárquica
+  if (performerRole === 'agente') {
+    const [result] = await pool.query(`
+      WITH RECURSIVE hierarchy AS (
+        -- Caso base: el BLOQUEADOR (quien bloqueó al usuario)
+        SELECT id, parent_id, 1 as level
+        FROM users 
+        WHERE id = ?
+        
+        UNION ALL
+        
+        -- Caso recursivo: subir por la jerarquía hasta encontrar al performer o llegar a la raíz
+        SELECT u.id, u.parent_id, h.level + 1
+        FROM users u
+        INNER JOIN hierarchy h ON u.id = h.parent_id
+        WHERE u.parent_id IS NOT NULL
+      )
+      SELECT COUNT(*) as count 
+      FROM hierarchy 
+      WHERE id = ?
+    `, [blockerId, performerId]);
+
+    return result[0].count > 0;
+  }
+
+  // Jugadores no pueden desbloquear a nadie
+  return false;
+}
+
+// UNBLOCK - Desbloquear usuario
+exports.unblockUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const performedBy = req.user.id;
+    const performedByRole = req.user.role;
+    
+    console.log('🔓 [UNBLOCK] Inicio - UserID:', userId, 'PerformedBy:', performedBy, 'Role:', performedByRole);
+
+    // Verificar que el usuario existe y está bloqueado
+    const [user] = await pool.query(
+      'SELECT id, username, is_blocked, block_reason, blocked_by FROM users WHERE id = ?',
+      [userId]
+    );
+
+    if (user.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    if (!user[0].is_blocked) {
+      return res.status(400).json({ error: 'Usuario no está bloqueado' });
+    }
+
+    // Obtener información del usuario que realiza el desbloqueo
+    const [performerInfo] = await pool.query(
+      'SELECT username FROM users WHERE id = ?',
+      [performedBy]
+    );
+    
+    console.log('🔓 [UNBLOCK] Performer:', performerInfo[0]);
+
+    const isAndy = performerInfo[0].username === 'Andy';
+    console.log('🔓 [UNBLOCK] ¿Es Andy?:', isAndy);
+
+    // REGLA 1: Andy puede desbloquear a cualquiera
+    if (isAndy) {
+      console.log('🔓 [UNBLOCK] REGLA 1: Andy puede desbloquear - PERMITIDO');
+      // Andy tiene permiso total
+    } 
+    // REGLA 2: Si Andy bloqueó al usuario, solo Andy puede desbloquearlo
+    else if (user[0].blocked_by) {
+      console.log('🔓 [UNBLOCK] Usuario fue bloqueado por ID:', user[0].blocked_by);
+      const [blockerInfo] = await pool.query(
+        'SELECT username FROM users WHERE id = ?',
+        [user[0].blocked_by]
+      );
+      
+      console.log('🔓 [UNBLOCK] Bloqueador:', blockerInfo[0]);
+
+      if (blockerInfo.length > 0 && blockerInfo[0].username === 'Andy') {
+        console.log('🔓 [UNBLOCK] REGLA 2: Bloqueado por Andy - Solo Andy puede desbloquear - DENEGADO');
+        return res.status(403).json({ 
+          error: 'Solo el SuperAdmin puede desbloquear a este usuario',
+          reason: 'Este usuario fue bloqueado por el SuperAdmin. Comunícate con tu Agente Superior para más información.',
+          blockedBy: 'SuperAdmin'
+        });
+      }
+
+      // REGLA 3: Solo puede desbloquear quien bloqueó o un superior jerárquico
+      if (user[0].blocked_by !== performedBy) {
+        console.log('🔓 [UNBLOCK] No es el mismo bloqueador, verificando jerarquía...');
+        
+        // Obtener información del bloqueador para mensaje personalizado
+        const [blocker] = await pool.query(
+          'SELECT username, role FROM users WHERE id = ?',
+          [user[0].blocked_by]
+        );
+        
+        // Verificar si el que intenta desbloquear es superior en la jerarquía del bloqueado
+        const canUnblock = await canUnblockUser(performedBy, performedByRole, userId, user[0].blocked_by);
+        console.log('🔓 [UNBLOCK] ¿Puede desbloquear?:', canUnblock);
+        
+        if (!canUnblock) {
+          // Mensaje personalizado según quién bloqueó
+          if (blocker.length > 0 && blocker[0].role === 'agente') {
+            console.log('🔓 [UNBLOCK] DENEGADO - Bloqueado por agente superior');
+            return res.status(403).json({ 
+              error: 'Este usuario fue bloqueado por un Agente Superior',
+              reason: 'Comunícate con tu superior',
+              blockedBy: blocker[0].username
+            });
+          } else {
+            return res.status(403).json({ 
+              error: 'No tienes permiso para desbloquear a este usuario',
+              reason: 'Solo puede desbloquear quien bloqueó el usuario o un superior en la jerarquía'
+            });
+          }
+        }
+      }
+    }
+
+    // Desbloquear el usuario
+    console.log('🔓 [UNBLOCK] PERMITIDO - Procediendo a desbloquear...');
+    await pool.query(
+      `UPDATE users 
+       SET is_blocked = FALSE, 
+           block_reason = NULL, 
+           blocked_at = NULL, 
+           blocked_by = NULL
+       WHERE id = ?`,
+      [userId]
+    );
+
+    // Registrar en log de bloqueos
+    await pool.query(
+      `INSERT INTO user_blocks_log (user_id, action, reason, performed_by)
+       VALUES (?, 'unblock', ?, ?)`,
+      [userId, 'Desbloqueado por administrador', performedBy]
+    );
+
+    res.json({
+      success: true,
+      message: `Usuario ${user[0].username} desbloqueado exitosamente`,
+      user: {
+        id: userId,
+        username: user[0].username,
+        is_blocked: false
+      }
+    });
+
+  } catch (error) {
+    console.error('Error desbloqueando usuario:', error);
+    res.status(500).json({ error: 'Error al desbloquear usuario' });
+  }
+};
+

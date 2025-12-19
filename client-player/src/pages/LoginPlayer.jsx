@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import '../styles/LoginPlayer.css';
+import BlockedUserModal from '../components/BlockedUserModal';
 
 export default function LoginPlayer({ onLogin }) {
   const [username, setUsername] = useState('');
@@ -8,6 +9,14 @@ export default function LoginPlayer({ onLogin }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showBlockedModal, setShowBlockedModal] = useState(false);
+  const [blockedUserRole, setBlockedUserRole] = useState('');
+
+  // Debug: Monitorear cambios en showBlockedModal
+  useEffect(() => {
+    console.log('🔍 [MODAL-STATE] showBlockedModal cambió a:', showBlockedModal);
+    console.log('🔍 [MODAL-STATE] blockedUserRole:', blockedUserRole);
+  }, [showBlockedModal, blockedUserRole]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -35,7 +44,17 @@ export default function LoginPlayer({ onLogin }) {
       
       onLogin(token, user);
     } catch (err) {
-      setError(err.response?.data?.message || 'Error de autenticación');
+      console.log('🚫 Error en login:', err.response?.status, err.response?.data);
+      // Verificar si el usuario está bloqueado
+      if (err.response?.status === 403 && err.response?.data?.blocked) {
+        console.log('🔒 Usuario bloqueado detectado:', err.response.data);
+        setBlockedUserRole(err.response.data.role || 'jugador');
+        setShowBlockedModal(true);
+        setPassword(''); // Limpiar contraseña
+        console.log('🔓 Estado modal:', { showBlockedModal: true, blockedUserRole: err.response.data.role });
+      } else {
+        setError(err.response?.data?.message || 'Error de autenticación');
+      }
       setLoading(false);
     }
   };
@@ -136,6 +155,18 @@ export default function LoginPlayer({ onLogin }) {
           </div>
         </div>
       </div>
+
+      {/* Modal de Usuario Bloqueado */}
+      {showBlockedModal && (
+        <BlockedUserModal
+          isOpen={showBlockedModal}
+          role={blockedUserRole}
+          onClose={() => {
+            setShowBlockedModal(false);
+            setPassword(''); // Limpiar contraseña al cerrar
+          }}
+        />
+      )}
     </div>
   );
 }

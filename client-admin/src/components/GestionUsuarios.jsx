@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import axios from 'axios';
+import BlockUserModal from './BlockUserModal';
+import UnblockUserModal from './UnblockUserModal';
 
 export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, onResourcesUpdate }) {
   const [usuarios, setUsuarios] = useState([]);
@@ -102,6 +104,16 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
       telefono: ''
     },
     isProcessing: false
+  });
+
+  // Estados para modales de bloqueo/desbloqueo
+  const [modalBlockUser, setModalBlockUser] = useState({
+    isOpen: false,
+    usuario: null
+  });
+  const [modalUnblockUser, setModalUnblockUser] = useState({
+    isOpen: false,
+    usuario: null
   });
 
   useEffect(() => {
@@ -474,6 +486,73 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
     if (strength <= 2) return { level: 1, text: 'Débil', color: 'text-red-500' };
     if (strength <= 3) return { level: 2, text: 'Media', color: 'text-yellow-500' };
     return { level: 3, text: 'Fuerte', color: 'text-green-500' };
+  };
+
+  // Funciones para bloqueo/desbloqueo de usuarios
+  const handleBlockUser = async (reason) => {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const { usuario } = modalBlockUser;
+
+      const response = await axios.post(
+        `/api/users/${usuario.id}/block`,
+        { reason },
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      if (response.data.success) {
+        setSuccessMessage(`🔒 Usuario ${usuario.username} bloqueado correctamente`);
+        setShowSuccessPopup(true);
+        setTimeout(() => setShowSuccessPopup(false), 3000);
+
+        // Recargar usuarios para reflejar cambio
+        await cargarUsuarios();
+
+        // Cerrar modal
+        setModalBlockUser({ isOpen: false, usuario: null });
+      }
+    } catch (error) {
+      console.error('Error bloqueando usuario:', error);
+      setErrorMessage(error.response?.data?.error || '❌ Error al bloquear el usuario');
+      setShowErrorPopup(true);
+      setTimeout(() => setShowErrorPopup(false), 3000);
+    }
+  };
+
+  const handleUnblockUser = async () => {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const { usuario } = modalUnblockUser;
+
+      const response = await axios.post(
+        `/api/users/${usuario.id}/unblock`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      if (response.data.success) {
+        setSuccessMessage(`🔓 Usuario ${usuario.username} desbloqueado correctamente`);
+        setShowSuccessPopup(true);
+        setTimeout(() => setShowSuccessPopup(false), 3000);
+
+        // Recargar usuarios para reflejar cambio
+        await cargarUsuarios();
+
+        // Cerrar modal
+        setModalUnblockUser({ isOpen: false, usuario: null });
+      }
+    } catch (error) {
+      console.error('Error desbloqueando usuario:', error);
+      const errorData = error.response?.data;
+      const errorMsg = errorData?.reason || errorData?.error || '❌ Error al desbloquear el usuario';
+      setErrorMessage(errorMsg);
+      setShowErrorPopup(true);
+      setTimeout(() => setShowErrorPopup(false), 5000);
+    }
   };
 
   const handleCrearUsuario = async () => {
@@ -1504,83 +1583,115 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                         
                         {/* Iconos de acción */}
                         <div className="flex items-center gap-1.5 ml-3">
-                          {/* Ver información */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              abrirModalInformacion(usuario);
-                            }}
-                            className="w-8 h-8 rounded-lg bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/30 flex items-center justify-center transition-all hover:scale-110"
-                            title="Ver información"
-                          >
-                            <span className="text-cyan-400 text-sm">ℹ️</span>
-                          </button>
+                          {/* Badge BLOQUEADO - solo visible si el usuario está bloqueado */}
+                          {usuario.is_blocked && (
+                            <div className="flex items-center gap-1 bg-red-900/50 border border-red-500/50 rounded-lg px-3 py-1 mr-2">
+                              <span className="text-red-400 text-xs font-bold">🔒 BLOQUEADO</span>
+                            </div>
+                          )}
 
-                          {/* Cambiar Contraseña */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setModalCambiarPassword({
-                                isOpen: true,
-                                usuario: usuario,
-                                newPassword: '',
-                                confirmPassword: '',
-                                showPassword: false,
-                                isProcessing: false
-                              });
-                            }}
-                            className="w-8 h-8 rounded-lg bg-yellow-600/20 hover:bg-yellow-600/40 border border-yellow-500/30 flex items-center justify-center transition-all hover:scale-110"
-                            title="Cambiar contraseña"
-                          >
-                            <span className="text-yellow-400 text-sm">🔑</span>
-                          </button>
+                          {/* Botones de acción - ocultos si el usuario está bloqueado */}
+                          {!usuario.is_blocked && (
+                            <>
+                              {/* Ver información */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  abrirModalInformacion(usuario);
+                                }}
+                                className="w-8 h-8 rounded-lg bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/30 flex items-center justify-center transition-all hover:scale-110"
+                                title="Ver información"
+                              >
+                                <span className="text-cyan-400 text-sm">ℹ️</span>
+                              </button>
 
-                          {/* Modificar */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setModalModificar({
-                                isOpen: true,
-                                usuario: usuario,
-                                datosPersonales: {
-                                  nombre_completo: usuario.nombre_completo || '',
-                                  documento: usuario.documento || '',
-                                  email: usuario.email || '',
-                                  telefono: usuario.telefono || ''
-                                },
-                                isProcessing: false
-                              });
-                            }}
-                            className="w-8 h-8 rounded-lg bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/30 flex items-center justify-center transition-all hover:scale-110"
-                            title="Modificar usuario"
-                          >
-                            <span className="text-blue-400 text-sm">✏️</span>
-                          </button>
+                              {/* Cambiar Contraseña */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setModalCambiarPassword({
+                                    isOpen: true,
+                                    usuario: usuario,
+                                    newPassword: '',
+                                    confirmPassword: '',
+                                    showPassword: false,
+                                    isProcessing: false
+                                  });
+                                }}
+                                className="w-8 h-8 rounded-lg bg-yellow-600/20 hover:bg-yellow-600/40 border border-yellow-500/30 flex items-center justify-center transition-all hover:scale-110"
+                                title="Cambiar contraseña"
+                              >
+                                <span className="text-yellow-400 text-sm">🔑</span>
+                              </button>
 
-                          {/* Bloquear */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              // TODO: Implementar bloqueo de usuario
-                              console.log('Bloquear usuario:', usuario.username);
-                            }}
-                            className="w-8 h-8 rounded-lg bg-red-600/20 hover:bg-red-600/40 border border-red-500/30 flex items-center justify-center transition-all hover:scale-110"
-                            title="Bloquear usuario"
-                          >
-                            <span className="text-red-400 text-sm">🔒</span>
-                          </button>
+                              {/* Modificar */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setModalModificar({
+                                    isOpen: true,
+                                    usuario: usuario,
+                                    datosPersonales: {
+                                      nombre_completo: usuario.nombre_completo || '',
+                                      documento: usuario.documento || '',
+                                      email: usuario.email || '',
+                                      telefono: usuario.telefono || ''
+                                    },
+                                    isProcessing: false
+                                  });
+                                }}
+                                className="w-8 h-8 rounded-lg bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/30 flex items-center justify-center transition-all hover:scale-110"
+                                title="Modificar usuario"
+                              >
+                                <span className="text-blue-400 text-sm">✏️</span>
+                              </button>
 
-                          {/* Ocultar */}
+                              {/* Ocultar */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  // TODO: Implementar ocultar usuario
+                                  console.log('Ocultar usuario:', usuario.username);
+                                }}
+                                className="w-8 h-8 rounded-lg bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/30 flex items-center justify-center transition-all hover:scale-110"
+                                title="Ocultar usuario"
+                              >
+                                <span className="text-purple-400 text-sm">👁️</span>
+                              </button>
+                            </>
+                          )}
+
+                          {/* Botón de Bloquear/Desbloquear - siempre visible */}
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              // TODO: Implementar ocultar usuario
-                              console.log('Ocultar usuario:', usuario.username);
+                              console.log('🔒 Click en candado - Usuario:', usuario.username, 'Bloqueado:', usuario.is_blocked);
+                              console.log('📊 Estados actuales:', { modalBlockUser, modalUnblockUser });
+                              
+                              if (usuario.is_blocked) {
+                                console.log('➡️ Abriendo modal de DESBLOQUEO');
+                                // Abrir modal de desbloqueo
+                                setModalUnblockUser({
+                                  isOpen: true,
+                                  usuario: usuario
+                                });
+                              } else {
+                                console.log('➡️ Abriendo modal de BLOQUEO');
+                                // Abrir modal de bloqueo
+                                setModalBlockUser({
+                                  isOpen: true,
+                                  usuario: usuario
+                                });
+                              }
                             }}
-                            className="w-8 h-8 rounded-lg bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/30 flex items-center justify-center transition-all hover:scale-110"
-                            title="Ocultar usuario"
+                            className={`w-8 h-8 rounded-lg ${
+                              usuario.is_blocked 
+                                ? 'bg-red-600/40 hover:bg-red-600/60 border-red-500/50' 
+                                : 'bg-red-600/20 hover:bg-red-600/40 border-red-500/30'
+                            } border flex items-center justify-center transition-all hover:scale-110`}
+                            title={usuario.is_blocked ? 'Desbloquear usuario' : 'Bloquear usuario'}
                           >
-                            <span className="text-purple-400 text-sm">👁️</span>
+                            <span className="text-red-400 text-sm">{usuario.is_blocked ? '🔒' : '🔓'}</span>
                           </button>
                         </div>
                         
@@ -2877,7 +2988,11 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
             <div className="text-3xl animate-bounce">✅</div>
             <div>
               <p className="font-bold text-lg">{successMessage}</p>
-        
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* Popup de Error - Elegante con desvanecimiento */}
       {showErrorPopup && createPortal(
@@ -2895,10 +3010,26 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
           </div>
         </div>,
         document.body
-      )}    </div>
-          </div>
-        </div>,
-        document.body
+      )}
+
+      {/* Modal de Bloqueo de Usuario */}
+      {modalBlockUser.isOpen && (
+        <BlockUserModal
+          isOpen={modalBlockUser.isOpen}
+          user={modalBlockUser.usuario}
+          onClose={() => setModalBlockUser({ isOpen: false, usuario: null })}
+          onConfirm={handleBlockUser}
+        />
+      )}
+
+      {/* Modal de Desbloqueo de Usuario */}
+      {modalUnblockUser.isOpen && (
+        <UnblockUserModal
+          isOpen={modalUnblockUser.isOpen}
+          user={modalUnblockUser.usuario}
+          onClose={() => setModalUnblockUser({ isOpen: false, usuario: null })}
+          onConfirm={handleUnblockUser}
+        />
       )}
 
       <style>{`

@@ -689,6 +689,7 @@ async function getUsersHierarchy(req, res) {
       [allUsers] = await pool.query(`
         SELECT u.id, u.username, u.role, u.parent_id, u.balance, u.created_at,
                u.nombre_completo, u.documento, u.email, u.telefono,
+               u.is_blocked, u.block_reason, u.blocked_at, u.blocked_by,
                COALESCE(SUM(CASE WHEN uci.room = 'bronce' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_bronce,
                COALESCE(SUM(CASE WHEN uci.room = 'plata' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_plata,
                COALESCE(SUM(CASE WHEN uci.room = 'oro' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_oro,
@@ -710,6 +711,7 @@ async function getUsersHierarchy(req, res) {
       const [currentUserRow] = await pool.query(`
         SELECT u.id, u.username, u.role, u.parent_id, u.balance, u.created_at,
                u.nombre_completo, u.documento, u.email, u.telefono,
+               u.is_blocked, u.block_reason, u.blocked_at, u.blocked_by,
                COALESCE(SUM(CASE WHEN uci.room = 'bronce' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_bronce,
                COALESCE(SUM(CASE WHEN uci.room = 'plata' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_plata,
                COALESCE(SUM(CASE WHEN uci.room = 'oro' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_oro,
@@ -729,7 +731,8 @@ async function getUsersHierarchy(req, res) {
         WITH RECURSIVE network AS (
           -- Caso base: hijos directos del agente actual
           SELECT id, username, role, parent_id, balance, created_at,
-                 nombre_completo, documento, email, telefono
+                 nombre_completo, documento, email, telefono,
+                 is_blocked, block_reason, blocked_at, blocked_by
           FROM users 
           WHERE parent_id = ?
           
@@ -737,7 +740,8 @@ async function getUsersHierarchy(req, res) {
           
           -- Caso recursivo: hijos de los hijos
           SELECT u.id, u.username, u.role, u.parent_id, u.balance, u.created_at,
-                 u.nombre_completo, u.documento, u.email, u.telefono
+                 u.nombre_completo, u.documento, u.email, u.telefono,
+                 u.is_blocked, u.block_reason, u.blocked_at, u.blocked_by
           FROM users u
           INNER JOIN network n ON u.parent_id = n.id
         )
@@ -752,6 +756,10 @@ async function getUsersHierarchy(req, res) {
           n.documento,
           n.email,
           n.telefono,
+          n.is_blocked,
+          n.block_reason,
+          n.blocked_at,
+          n.blocked_by,
           COALESCE(SUM(CASE WHEN uci.room = 'bronce' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_bronce,
           COALESCE(SUM(CASE WHEN uci.room = 'plata' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_plata,
           COALESCE(SUM(CASE WHEN uci.room = 'oro' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_oro,
@@ -760,7 +768,7 @@ async function getUsersHierarchy(req, res) {
           COALESCE(SUM(CASE WHEN uci.room = 'oro' AND uci.is_gift = TRUE THEN uci.quantity ELSE 0 END), 0) as gift_oro
         FROM network n
         LEFT JOIN user_card_inventory uci ON n.id = uci.user_id
-        GROUP BY n.id, n.username, n.role, n.parent_id, n.balance, n.created_at, n.nombre_completo, n.documento, n.email, n.telefono
+        GROUP BY n.id, n.username, n.role, n.parent_id, n.balance, n.created_at, n.nombre_completo, n.documento, n.email, n.telefono, n.is_blocked, n.block_reason, n.blocked_at, n.blocked_by
         ORDER BY n.id
       `, [currentUserId]);
       
