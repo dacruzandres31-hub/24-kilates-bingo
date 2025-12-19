@@ -51,6 +51,7 @@ export default function Sidebar({ activeSections, onToggleSection }) {
       title: '💰 Finanzas',
       icon: '💰',
       sections: [
+        { id: 'finanzas', name: 'Panel de Finanzas Completo' },
         { id: 'finanzas-hoy', name: 'Finanzas de Hoy' },
         { id: 'movimientos', name: 'Movimientos del Día' },
         { id: 'movimientos-recientes', name: 'Últimos Movimientos' }

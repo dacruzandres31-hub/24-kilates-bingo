@@ -60,4 +60,12 @@ router.get(
   withdrawalController.checkWithdrawalPermissions
 );
 
+// Obtener TODAS las solicitudes (admin) - para panel de administración
+router.get(
+  '/all',
+  authenticateToken,
+  isAdmin,
+  withdrawalController.getWithdrawalHistory
+);
+
 module.exports = router;

@@ -7,6 +7,7 @@ import AlertsList from '../components/AlertsList';
 import Sidebar from '../components/Sidebar';
 import EstadisticasGenerales from '../components/EstadisticasGenerales';
 import GestionUsuarios from '../components/GestionUsuarios';
+import GestionFinanzas from '../components/GestionFinanzas';
 
 import AllInventoriesPanel from '../components/AllInventoriesPanel';
 import CardMovementsHistory from '../components/CardMovementsHistory';
@@ -53,6 +54,7 @@ export default function Dashboard() {
     'card-inventory': false,
     'inventories-panel': false,
     'movements-history': false,
+    'finanzas': false, // Panel completo de finanzas
     'finanzas-hoy': false,
     'movimientos': false,
     'movimientos-recientes': false,
@@ -373,6 +375,13 @@ export default function Dashboard() {
           {activeSections['movements-history'] && (
             <section className="mb-8">
               <CardMovementsHistory />
+            </section>
+          )}
+
+          {/* Gestión de Finanzas Completa */}
+          {activeSections['finanzas'] && (
+            <section className="mb-8">
+              <GestionFinanzas />
             </section>
           )}
 

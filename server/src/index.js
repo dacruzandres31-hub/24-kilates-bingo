@@ -137,6 +137,7 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/shop', shopRoutes);
 app.use('/api/chips', chipsRoutes);
 app.use('/api/withdrawals', withdrawalRoutes);
+app.use('/api/commissions', require('./routes/commissionRoutes')); // Sistema de comisiones
 app.use('/api/winners-payment', winnersPaymentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin/gift-cards', giftCardsRoutes);
