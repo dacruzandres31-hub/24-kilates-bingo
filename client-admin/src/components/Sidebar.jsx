@@ -41,6 +41,12 @@ export default function Sidebar({ activeSections, onToggleSection }) {
       ]
     },
     {
+      id: 'usuarios',
+      title: '👥 Usuarios',
+      icon: '👥',
+      sections: []
+    },
+    {
       id: 'finanzas',
       title: '💰 Finanzas',
       icon: '💰',
@@ -49,12 +55,6 @@ export default function Sidebar({ activeSections, onToggleSection }) {
         { id: 'movimientos', name: 'Movimientos del Día' },
         { id: 'movimientos-recientes', name: 'Últimos Movimientos' }
       ]
-    },
-    {
-      id: 'usuarios',
-      title: '👥 Usuarios',
-      icon: '👥',
-      sections: []
     },
     {
       id: 'card-inventory',
