@@ -19,6 +19,7 @@ export default function ComisionesPanel() {
 
   useEffect(() => {
     fetchTopCajeros();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [periodo]);
 
   useEffect(() => {
@@ -30,18 +31,20 @@ export default function ComisionesPanel() {
   const fetchTopCajeros = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('adminToken');
 
       const { data } = await axios.get(
         `${API_URL}/api/commissions/top-cashiers?period=${periodo}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      setTopCajeros(data.data || []);
+      const cashiers = Array.isArray(data) ? data : (data.data || []);
+      setTopCajeros(cashiers);
       setError(null);
     } catch (err) {
       console.error('Error fetching top cajeros:', err);
-      setError(err.response?.data?.message || 'Error cargando ranking de cajeros');
+      setTopCajeros([]);
+      setError(err.response?.data?.message || err.response?.data?.error || 'Error cargando ranking');
     } finally {
       setLoading(false);
     }
@@ -49,16 +52,18 @@ export default function ComisionesPanel() {
 
   const fetchComisionesDetalle = async (cajeroId) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('adminToken');
 
       const { data } = await axios.get(
         `${API_URL}/api/commissions/cashier/${cajeroId}?limit=100`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      setComisionesDetalle(data.data?.commissions || []);
+      const details = data.data?.commissions || data.commissions || data || [];
+      setComisionesDetalle(Array.isArray(details) ? details : []);
     } catch (err) {
       console.error('Error fetching comisiones detalle:', err);
+      setComisionesDetalle([]);
       alert('Error cargando detalle de comisiones');
     }
   };
@@ -161,7 +166,7 @@ export default function ComisionesPanel() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {topCajeros.map((cajero, index) => (
+            {Array.isArray(topCajeros) && topCajeros.map((cajero, index) => (
               <div
                 key={cajero.cashier_id}
                 onClick={() => setCajeroSeleccionado(cajero.cashier_id)}
@@ -295,7 +300,7 @@ export default function ComisionesPanel() {
                       </tr>
                     </thead>
                     <tbody>
-                      {comisionesDetalle.map((comision) => (
+                      {Array.isArray(comisionesDetalle) && comisionesDetalle.map((comision) => (
                         <tr key={comision.id} className="border-b border-gray-800 hover:bg-gray-800/50">
                           <td className="py-3 px-4 text-gray-300 text-sm">
                             {formatDate(comision.created_at)}

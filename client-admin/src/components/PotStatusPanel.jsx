@@ -16,6 +16,11 @@ export default function PotStatusPanel() {
     // Fetch inicial
     fetchPozos();
 
+    // Auto-refresh cada 30 segundos (mismo intervalo que SessionStatusPanel)
+    const refreshInterval = setInterval(() => {
+      fetchPozos();
+    }, 30000);
+
     // Conectar WebSocket
     const socketInstance = io(import.meta.env.VITE_API_URL || 'http://localhost:3000', {
       transports: ['websocket', 'polling'],
@@ -37,40 +42,79 @@ export default function PotStatusPanel() {
     // Escuchar actualizaciones de pozos en tiempo real
     socketInstance.on('pots_updated', (data) => {
       console.log('📡 Pozos actualizados via WebSocket:', data);
-      const pozosData = data.pots.map(pot => {
-        // Manejo especial para sala Starter
-        if (pot.is_special) {
+      
+      // Si el evento incluye estructura de rooms (nueva estructura)
+      if (data.rooms) {
+        const pozosData = data.rooms.map(roomData => {
+          const { room, currentSession, prizeConfig } = roomData;
+          const isStarter = room === 'starter';
+          
+          if (isStarter) {
+            return {
+              room: room,
+              linea: prizeConfig.prize_linea || '1 Ticket para Bronce',
+              bingo: prizeConfig.prize_bingo || '1 Ticket para Oro',
+              jackpot: 0,
+              sessionId: currentSession?.id || null,
+              status: currentSession?.status || 'no_session',
+              cardsSold: currentSession?.cards_sold || 0,
+              cardPrice: 0,
+              startTime: currentSession?.start_time || null,
+              isSpecial: true
+            };
+          }
+
+          return {
+            room: room,
+            linea: parseFloat(currentSession?.current_pot_linea) || 0,
+            bingo: parseFloat(currentSession?.current_pot_bingo) || 0,
+            jackpot: parseFloat(currentSession?.current_pot_jackpot) || 0,
+            sessionId: currentSession?.id || null,
+            status: currentSession?.status || 'no_session',
+            cardsSold: currentSession?.cards_sold || 0,
+            cardPrice: parseFloat(currentSession?.card_price) || 0,
+            startTime: currentSession?.start_time || null,
+            isSpecial: false
+          };
+        });
+        setPozos(pozosData);
+      } else {
+        // Fallback: estructura antigua con array de pots
+        const pozosData = data.pots.map(pot => {
+          if (pot.is_special) {
+            return {
+              room: pot.room,
+              linea: pot.current_pot_linea,
+              bingo: pot.current_pot_bingo,
+              jackpot: 0,
+              sessionId: pot.session_id,
+              status: pot.status || 'no_session',
+              cardsSold: pot.cards_sold || 0,
+              cardPrice: 0,
+              isSpecial: true
+            };
+          }
+
           return {
             room: pot.room,
-            linea: pot.current_pot_linea,
-            bingo: pot.current_pot_bingo,
-            jackpot: 0,
+            linea: parseFloat(pot.current_pot_linea) || 0,
+            bingo: parseFloat(pot.current_pot_bingo) || 0,
+            jackpot: parseFloat(pot.jackpot) || 0,
             sessionId: pot.session_id,
             status: pot.status || 'no_session',
             cardsSold: pot.cards_sold || 0,
-            cardPrice: 0,
-            isSpecial: true
+            cardPrice: parseFloat(pot.card_price) || 0,
+            isSpecial: false
           };
-        }
-
-        return {
-          room: pot.room,
-          linea: parseFloat(pot.current_pot_linea) || 0,
-          bingo: parseFloat(pot.current_pot_bingo) || 0,
-          jackpot: parseFloat(pot.jackpot) || 0,
-          sessionId: pot.session_id,
-          status: pot.status || 'no_session',
-          cardsSold: pot.cards_sold || 0,
-          cardPrice: parseFloat(pot.card_price) || 0,
-          isSpecial: false
-        };
-      });
-      setPozos(pozosData);
+        });
+        setPozos(pozosData);
+      }
     });
 
     setSocket(socketInstance);
 
     return () => {
+      clearInterval(refreshInterval);
       if (socketInstance) {
         socketInstance.disconnect();
       }
@@ -81,34 +125,42 @@ export default function PotStatusPanel() {
 
   const fetchPozos = async () => {
     try {
-      const response = await axios.get('/api/admin/room-settings/current-pots', {
+      const response = await axios.get('/api/admin/sessions/active', {
         headers: { Authorization: `Bearer ${getToken()}` }
       });
       
-      const pozosData = response.data.pots.map(pot => {
-        if (pot.is_special) {
+      // Extraer datos de pozos desde el endpoint de sesiones activas
+      const pozosData = response.data.rooms.map(roomData => {
+        const { room, currentSession, prizeConfig } = roomData;
+        const isStarter = room === 'starter';
+        
+        if (isStarter) {
+          // Sala Starter: Premios en tickets
           return {
-            room: pot.room,
-            linea: pot.current_pot_linea,
-            bingo: pot.current_pot_bingo,
+            room: room,
+            linea: prizeConfig.prize_linea || '1 Ticket para Bronce',
+            bingo: prizeConfig.prize_bingo || '1 Ticket para Oro',
             jackpot: 0,
-            sessionId: pot.session_id,
-            status: pot.status || 'no_session',
-            cardsSold: pot.cards_sold || 0,
+            sessionId: currentSession?.id || null,
+            status: currentSession?.status || 'no_session',
+            cardsSold: currentSession?.cards_sold || 0,
             cardPrice: 0,
+            startTime: currentSession?.start_time || null,
             isSpecial: true
           };
         }
 
+        // Salas con dinero: Bronce, Plata, Oro
         return {
-          room: pot.room,
-          linea: parseFloat(pot.current_pot_linea) || 0,
-          bingo: parseFloat(pot.current_pot_bingo) || 0,
-          jackpot: parseFloat(pot.jackpot) || 0,
-          sessionId: pot.session_id,
-          status: pot.status || 'no_session',
-          cardsSold: pot.cards_sold || 0,
-          cardPrice: parseFloat(pot.card_price) || 0,
+          room: room,
+          linea: parseFloat(currentSession?.current_pot_linea) || 0,
+          bingo: parseFloat(currentSession?.current_pot_bingo) || 0,
+          jackpot: parseFloat(currentSession?.current_pot_jackpot) || 0,
+          sessionId: currentSession?.id || null,
+          status: currentSession?.status || 'no_session',
+          cardsSold: currentSession?.cards_sold || 0,
+          cardPrice: parseFloat(currentSession?.card_price) || 0,
+          startTime: currentSession?.start_time || null,
           isSpecial: false
         };
       });
@@ -157,6 +209,49 @@ export default function PotStatusPanel() {
       oro: 'Oro'
     };
     return names[room] || room;
+  };
+
+  const isStarterDrawing = (sessionStartTime) => {
+    if (!sessionStartTime) return false;
+    const now = new Date();
+    const startTime = new Date(sessionStartTime);
+    const diffMinutes = (startTime - now) / 1000 / 60;
+    
+    // Starter sortea si falta menos de 5 minutos para la hora programada
+    // o si ya pasó la hora pero no más de 10 minutos
+    return diffMinutes <= 5 && diffMinutes >= -10;
+  };
+
+  const getSessionStatusText = (pozo) => {
+    // Starter: Verificar si está sorteando según horario
+    if (pozo.room === 'starter') {
+      if (pozo.startTime && isStarterDrawing(pozo.startTime)) {
+        return 'SORTEANDO AHORA';
+      }
+      return 'HABILITADA (GRATIS)';
+    }
+    
+    // Otras salas: Estado de la sesión
+    if (pozo.status === 'playing') {
+      return 'SORTEANDO AHORA';
+    }
+    
+    // Siempre habilitadas para comprar (incluso sin sesión creada)
+    return 'HABILITADA';
+  };
+
+  const getStatusColor = (pozo) => {
+    const statusText = getSessionStatusText(pozo);
+    
+    if (statusText === 'SORTEANDO AHORA') {
+      return 'bg-red-500/20 text-red-400 animate-pulse';
+    }
+    
+    if (statusText.includes('HABILITADA')) {
+      return 'bg-green-500/20 text-green-400';
+    }
+    
+    return 'bg-gray-500/20 text-gray-400';
   };
 
   if (loading) {
@@ -225,14 +320,8 @@ export default function PotStatusPanel() {
                   )}
                 </div>
               </div>
-              <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                pozo.status === 'playing' 
-                  ? 'bg-green-500/20 text-green-400' 
-                  : pozo.status === 'active'
-                  ? 'bg-blue-500/20 text-blue-400'
-                  : 'bg-gray-500/20 text-gray-400'
-              }`}>
-                {pozo.status === 'playing' ? 'EN JUEGO' : pozo.status === 'active' ? 'ACTIVA' : 'SIN SESIÓN'}
+              <div className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(pozo)}`}>
+                {getSessionStatusText(pozo)}
               </div>
             </div>
 

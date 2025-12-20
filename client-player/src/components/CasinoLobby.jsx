@@ -53,73 +53,6 @@ const getTargetTime = (hour) => {
   return target;
 };
 
-const roomsData = [
-  {
-    id: 'starter',
-    name: 'Starter',
-    path: '/sala/starter',
-    status: 'active',
-    targetTime: getTargetTime(19),
-    description: 'Premios en tickets para canjear en la tienda.',
-    price: 'Tickets',
-    className: 'room-turquoise',
-    iconImage: giftIcon,
-    rewards: ['ticket', 'ticket', 'ticket', 'ticket'],
-    featured: false,
-  },
-  {
-    id: 'bronze',
-    name: 'Bronce',
-    path: '/sala/bronce',
-    status: 'active',
-    targetTime: getTargetTime(20),
-    description: 'La sala clásica para empezar a ganar.',
-    price: '$500',
-    pots: {
-      bingo: '$1,500',
-      line: '$150',
-      pre40: '$300',
-    },
-    className: 'room-bronze',
-    iconImage: bronzeIcon,
-    featured: false,
-  },
-  {
-    id: 'silver',
-    name: 'Plata',
-    path: '/sala/plata',
-    status: 'active',
-    targetTime: getTargetTime(21),
-    description: 'Apuestas más altas, premios más grandes.',
-    price: '$1.000',
-    pots: {
-      bingo: '$8,000',
-      line: '$800',
-      pre40: '$1,600',
-    },
-    className: 'room-silver',
-    iconImage: silverIcon,
-    featured: false,
-  },
-  {
-    id: 'gold',
-    name: 'Oro',
-    path: '/sala/oro',
-    status: 'active',
-    targetTime: getTargetTime(22),
-    description: 'La experiencia VIP con pozos millonarios.',
-    price: '$2.000',
-    pots: {
-      bingo: '$50,000',
-      line: '$5,000',
-      pre40: '$10,000',
-    },
-    className: 'room-gold',
-    iconImage: goldIcon,
-    featured: true,
-  },
-];
-
 const fakeWinners = [
   { name: 'Juanito123', amount: '$150', room: 'oro' },
   { name: 'MariaGana', amount: '$75', room: 'plata' },
@@ -134,8 +67,7 @@ const fakeWinners = [
 const RoomCard = ({ room }) => {
   const statusText = {
     active: 'Habilitada',
-    drawing: 'Sorteando',
-    soon: 'Próximamente',
+    playing: 'Sorteando',
     closed: 'Cerrada',
   };
 
@@ -284,10 +216,157 @@ const CasinoLobby = ({ user, onLogout }) => {
     efectosEnabled: audioService.efectosEnabled,
   });
 
+  // NUEVO: Estado para datos dinámicos del lobby
+  const [lobbyData, setLobbyData] = useState(null);
+  const [loadingLobby, setLoadingLobby] = useState(true);
+
   // Cargar perfil del usuario
   useEffect(() => {
     loadUserProfile();
   }, []);
+
+  // NUEVO: Cargar datos del lobby al montar componente
+  useEffect(() => {
+    loadLobbyData();
+    
+    // Actualizar cada 30 segundos para reflejar cambios en pozos
+    const interval = setInterval(loadLobbyData, 30000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  // NUEVO: Función para cargar datos del lobby desde el backend
+  const loadLobbyData = async () => {
+    try {
+      console.log('[CasinoLobby] 🔄 Cargando datos del lobby...');
+      const response = await axios.get('/api/game/lobby-data');
+      
+      if (response.data.success) {
+        console.log('[CasinoLobby] ✅ Datos del lobby recibidos:', response.data.data);
+        setLobbyData(response.data.data);
+      }
+    } catch (error) {
+      console.error('[CasinoLobby] ❌ Error al cargar datos del lobby:', error);
+    } finally {
+      setLoadingLobby(false);
+    }
+  };
+
+  // NUEVO: Función para formatear valores monetarios
+  const formatMoney = (amount) => {
+    if (typeof amount === 'string') return amount; // Para tickets (ej: "Ticket Oro")
+    
+    const num = parseFloat(amount);
+    if (isNaN(num)) return '$0';
+    
+    // Formatear con separadores de miles y decimales
+    return '$' + num.toLocaleString('es-CO', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    });
+  };
+
+  // NUEVO: Construir roomsData dinámicamente con datos del backend
+  const getRoomsData = () => {
+    const baseRooms = [
+      {
+        id: 'starter',
+        backendId: 'starter',
+        name: 'Starter',
+        path: '/sala/starter',
+        status: 'active',
+        targetTime: getTargetTime(19), // Fallback si no hay datos del backend
+        description: 'Premios en tickets para canjear en la tienda.',
+        className: 'room-turquoise',
+        iconImage: giftIcon,
+        rewards: ['ticket', 'ticket', 'ticket', 'ticket'],
+        featured: false,
+      },
+      {
+        id: 'bronze',
+        backendId: 'bronce',
+        name: 'Bronce',
+        path: '/sala/bronce',
+        status: 'active',
+        targetTime: getTargetTime(20),
+        description: 'La sala clásica para empezar a ganar.',
+        className: 'room-bronze',
+        iconImage: bronzeIcon,
+        featured: false,
+      },
+      {
+        id: 'silver',
+        backendId: 'plata',
+        name: 'Plata',
+        path: '/sala/plata',
+        status: 'active',
+        targetTime: getTargetTime(21),
+        description: 'Apuestas más altas, premios más grandes.',
+        className: 'room-silver',
+        iconImage: silverIcon,
+        featured: false,
+      },
+      {
+        id: 'gold',
+        backendId: 'oro',
+        name: 'Oro',
+        path: '/sala/oro',
+        status: 'active',
+        targetTime: getTargetTime(22),
+        description: 'La experiencia VIP con pozos millonarios.',
+        className: 'room-gold',
+        iconImage: goldIcon,
+        featured: true,
+      },
+    ];
+
+    // Si no hay datos del backend aún, retornar valores por defecto
+    if (!lobbyData) return baseRooms.map(room => ({
+      ...room,
+      price: room.id === 'starter' ? 'Tickets' : '$...',
+      pots: room.id !== 'starter' ? {
+        bingo: '$...',
+        line: '$...',
+        pre40: '$...',
+      } : undefined
+    }));
+
+    // Mapear datos del backend a cada sala usando backendId
+    return baseRooms.map(room => {
+      const roomData = lobbyData[room.backendId];
+      
+      if (!roomData) {
+        return {
+          ...room,
+          price: room.id === 'starter' ? 'Tickets' : '$...',
+          pots: room.id !== 'starter' ? {
+            bingo: '$...',
+            line: '$...',
+            pre40: '$...',
+          } : undefined
+        };
+      }
+
+      // Usar nextSession del backend si está disponible
+      const targetTime = roomData.nextSession 
+        ? new Date(roomData.nextSession)
+        : room.targetTime;
+
+      return {
+        ...room,
+        targetTime,
+        status: roomData.status || 'no_session',
+        price: room.id === 'starter' ? 'Tickets' : formatMoney(roomData.price),
+        pots: room.id !== 'starter' ? {
+          bingo: formatMoney(roomData.pots.bingo),
+          line: formatMoney(roomData.pots.line),
+          pre40: formatMoney(roomData.pots.pre40),
+        } : undefined
+      };
+    });
+  };
+
+  const roomsData = getRoomsData();
 
   const calculatePasswordStrength = (password) => {
     let strength = 0;

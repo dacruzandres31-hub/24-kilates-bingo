@@ -13,7 +13,7 @@ import SolicitudesRetiro from './SolicitudesRetiro';
 import ComisionesPanel from './ComisionesPanel';
 import ReporteIngresos from './ReporteIngresos';
 
-export default function GestionFinanzas() {
+export default function GestionFinanzas({ userData }) {
   const [activeTab, setActiveTab] = useState('movimientos');
 
   const tabs = [
@@ -53,7 +53,7 @@ export default function GestionFinanzas() {
         {/* Tab Content */}
         <div className="p-6">
           {activeTab === 'movimientos' && <MovimientosChips />}
-          {activeTab === 'retiros' && <SolicitudesRetiro />}
+          {activeTab === 'retiros' && <SolicitudesRetiro userData={userData} />}
           {activeTab === 'comisiones' && <ComisionesPanel />}
           {activeTab === 'reportes' && <ReporteIngresos />}
         </div>

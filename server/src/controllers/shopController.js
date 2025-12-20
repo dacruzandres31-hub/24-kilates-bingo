@@ -21,7 +21,7 @@ const websocketService = require('../services/websocketService');
  */
 async function buyCard(req, res) {
   try {
-    const { userId, roomType, quantity = 1 } = req.body;
+    const { userId, roomType, quantity = 1, paymentMethod } = req.body;
 
     // Validar entrada
     if (!userId || !roomType) {
@@ -51,9 +51,9 @@ async function buyCard(req, res) {
       const room = roomResult.rows[0];
       const cardCost = parseFloat(room.cost);
 
-      // ====== PASO 2: Chequeo de Ticket (Solo Sala Bronce) ======
-      if (roomType === 'bronce') {
-        console.log(`[ShopController] Verificando tickets para usuario ${userId}`);
+      // ====== PASO 2: Chequeo de Ticket (Solo si el usuario ELIGIÓ usar ticket) ======
+      if (roomType === 'bronce' && paymentMethod === 'ticket') {
+        console.log(`[ShopController] Usuario eligió pagar con ticket - verificando disponibilidad`);
 
         const ticketResult = await client.query(
           `SELECT ui.id, ui.quantity, ci.name 
@@ -123,10 +123,17 @@ async function buyCard(req, res) {
             ticketsRemaining: newQuantity,
             cardsAssigned: quantity
           });
+        } else {
+          // Usuario eligió ticket pero no tiene disponibles
+          await client.query('ROLLBACK');
+          return res.status(400).json({
+            success: false,
+            message: 'No tienes tickets disponibles. Por favor selecciona "Pagar con Balance".'
+          });
         }
       }
 
-      // ====== PASO 3: Si no tiene ticket OR room != bronce ======
+      // ====== PASO 3: Si eligió balance o no es sala bronce ======
       // Flujo normal de cobro por dinero
       console.log(`[ShopController] Procesando pago de dinero para usuario ${userId}`);
 

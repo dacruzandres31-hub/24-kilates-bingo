@@ -15,6 +15,9 @@ router.use(authMiddleware.authenticateToken);
 // Obtener cartones disponibles para seleccionar
 router.get('/available/:room', cardsController.getAvailableCards);
 
+// Obtener gift cards (yapas gratis) para paquetes
+router.get('/gift-cards/:room/:quantity', cardsController.getGiftCards);
+
 // Obtener estadísticas de cartones (pagos vs gratis) - Solo SuperAdmin
 router.get('/stats', authMiddleware.isSuperAdmin, cardsController.getCardStats);
 

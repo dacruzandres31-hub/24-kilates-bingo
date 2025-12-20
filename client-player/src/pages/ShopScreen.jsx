@@ -116,6 +116,8 @@ export default function ShopScreen() {
     setMessage('');
 
     try {
+      const paymentType = getPaymentMethod();
+      
       const response = await fetch('/api/shop/buy-card', {
         method: 'POST',
         headers: {
@@ -124,7 +126,8 @@ export default function ShopScreen() {
         },
         body: JSON.stringify({
           roomType,
-          quantity
+          quantity,
+          paymentMethod: paymentType
         })
       });
 
@@ -222,52 +225,50 @@ export default function ShopScreen() {
         </div>
 
         {/* Selector de Método de Pago */}
-        {roomType === 'bronce' && (
-          <div className="shop-section">
-            <h2>3. Método de Pago</h2>
-            <div className="payment-methods">
-              {/* Opción de Ticket */}
-              {canUseTicket() && (
-                <label className="payment-option">
-                  <input
-                    type="radio"
-                    value="ticket"
-                    checked={paymentMethod === 'ticket'}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                  />
-                  <div className="payment-content">
-                    <span className="payment-icon">🎫</span>
-                    <div className="payment-info">
-                      <span className="payment-title">Usar Ticket</span>
-                      <span className="payment-details">
-                        GRATIS - {getTicketsForRoom('bronce')[0]?.quantity || 0} disponibles
-                      </span>
-                    </div>
-                  </div>
-                </label>
-              )}
-
-              {/* Opción de Dinero */}
+        <div className="shop-section">
+          <h2>3. Método de Pago</h2>
+          <div className="payment-methods">
+            {/* Opción de Ticket (Solo Bronce) */}
+            {roomType === 'bronce' && canUseTicket() && (
               <label className="payment-option">
                 <input
                   type="radio"
-                  value="cash"
-                  checked={paymentMethod === 'cash'}
+                  value="ticket"
+                  checked={paymentMethod === 'ticket'}
                   onChange={(e) => setPaymentMethod(e.target.value)}
                 />
                 <div className="payment-content">
-                  <span className="payment-icon">💳</span>
+                  <span className="payment-icon">🎫</span>
                   <div className="payment-info">
-                    <span className="payment-title">Pagar con Dinero</span>
+                    <span className="payment-title">Usar Ticket</span>
                     <span className="payment-details">
-                      ${totalCost.toFixed(2)} (Balance: ${userBalance.toFixed(2)})
+                      GRATIS - {getTicketsForRoom('bronce')[0]?.quantity || 0} disponibles
                     </span>
                   </div>
                 </div>
               </label>
-            </div>
+            )}
+
+            {/* Opción de Dinero (Todas las salas) */}
+            <label className="payment-option">
+              <input
+                type="radio"
+                value="cash"
+                checked={paymentMethod === 'cash'}
+                onChange={(e) => setPaymentMethod(e.target.value)}
+              />
+              <div className="payment-content">
+                <span className="payment-icon">💰</span>
+                <div className="payment-info">
+                  <span className="payment-title">Pagar con Balance</span>
+                  <span className="payment-details">
+                    ${totalCost.toFixed(2)} (Balance disponible: ${userBalance.toFixed(2)})
+                  </span>
+                </div>
+              </div>
+            </label>
           </div>
-        )}
+        </div>
 
         {/* Resumen de Compra */}
         <div className="shop-section shop-summary">
@@ -322,6 +323,8 @@ export default function ShopScreen() {
             <li>Sala <strong>Plata</strong>: Premios de $50 a $200</li>
             <li>Sala <strong>Oro</strong>: Premios de $200+</li>
             <li>🎫 Los tickets se pueden usar solo en Sala Bronce</li>
+            <li>💰 Usa parte de tus premios ganados para comprar más cartones</li>
+            <li>💳 Solicita depósitos a tu agente para recargar balance</li>
             <li>Máximo 10 cartones por compra</li>
           </ul>
         </div>

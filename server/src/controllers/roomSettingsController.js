@@ -266,3 +266,177 @@ exports.getCurrentPots = async (req, res) => {
     });
   }
 };
+
+/**
+ * GET /api/game/lobby-data
+ * ENDPOINT PÚBLICO (sin autenticación)
+ * Obtener datos para el lobby del jugador: precios + pozos actuales
+ * Formato optimizado para CasinoLobby.jsx
+ */
+exports.getLobbyData = async (req, res) => {
+  try {
+    // Obtener datos de salas monetizadas (Bronce, Plata, Oro)
+    const [moneyRooms] = await pool.query(`
+      SELECT 
+        rs.room,
+        rs.card_price,
+        rs.accumulated_pot_pre40 AS current_pot_jackpot,
+        COALESCE(latest.current_pot_linea, 0) AS current_pot_linea,
+        COALESCE(latest.current_pot_bingo, 0) AS current_pot_bingo,
+        latest.status
+      FROM room_settings rs
+      LEFT JOIN (
+        SELECT 
+          gs1.*
+        FROM game_sessions gs1
+        INNER JOIN (
+          SELECT room, MAX(id) AS max_id
+          FROM game_sessions
+          WHERE status IN ('active', 'playing', 'pending')
+          GROUP BY room
+        ) gs2 ON gs1.id = gs2.max_id
+      ) latest ON latest.room COLLATE utf8mb4_0900_ai_ci = rs.room COLLATE utf8mb4_0900_ai_ci
+      WHERE rs.room IN ('bronce', 'plata', 'oro')
+      ORDER BY FIELD(rs.room, 'bronce', 'plata', 'oro')
+    `);
+
+    // Obtener horarios programados desde schedule_settings
+    const [schedules] = await pool.query(`
+      SELECT room, day_of_week, hour
+      FROM schedule_settings
+      WHERE is_active = 1
+      ORDER BY room, day_of_week, hour
+    `);
+
+    // Función para calcular el próximo sorteo basado en schedule_settings
+    const getNextScheduledTime = (roomSchedules) => {
+      const now = new Date();
+      const currentDay = now.getDay(); // 0 = Domingo, 6 = Sábado
+      const currentTime = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+
+      let nextTime = null;
+      let minDiff = Infinity;
+
+      roomSchedules.forEach(schedule => {
+        const [hour, minute, second] = schedule.hour.split(':').map(Number);
+        const scheduleTime = hour * 3600 + minute * 60 + (second || 0);
+        
+        // Calcular diferencia en días y segundos
+        let dayDiff = schedule.day_of_week - currentDay;
+        let timeDiff = scheduleTime - currentTime;
+
+        // Si es el mismo día pero la hora ya pasó, buscar en la próxima semana
+        if (dayDiff === 0 && timeDiff <= 0) {
+          dayDiff = 7;
+        }
+        
+        // Si es un día anterior de la semana, agregar días hasta la próxima semana
+        if (dayDiff < 0) {
+          dayDiff += 7;
+        }
+
+        // Calcular diferencia total en segundos
+        const totalDiff = dayDiff * 86400 + timeDiff;
+
+        if (totalDiff > 0 && totalDiff < minDiff) {
+          minDiff = totalDiff;
+          const nextDate = new Date(now);
+          nextDate.setDate(nextDate.getDate() + dayDiff);
+          nextDate.setHours(hour, minute, second || 0, 0);
+          nextTime = nextDate;
+        }
+      });
+
+      return nextTime;
+    };
+
+    // Agrupar horarios por sala
+    const schedulesByRoom = {};
+    schedules.forEach(schedule => {
+      if (!schedulesByRoom[schedule.room]) {
+        schedulesByRoom[schedule.room] = [];
+      }
+      schedulesByRoom[schedule.room].push(schedule);
+    });
+
+    // Calcular próximos sorteos para cada sala
+    const nextSessionMap = {};
+    Object.keys(schedulesByRoom).forEach(room => {
+      const nextTime = getNextScheduledTime(schedulesByRoom[room]);
+      if (nextTime) {
+        nextSessionMap[room] = nextTime.toISOString();
+      }
+    });
+
+    // Obtener status actual de la sala Starter
+    const [starterStatus] = await pool.query(`
+      SELECT status
+      FROM game_sessions
+      WHERE room = 'free_starter'
+        AND status IN ('active', 'playing', 'pending', 'waiting')
+      ORDER BY id DESC
+      LIMIT 1
+    `);
+
+    // Determinar estado de Starter según lógica de negocio
+    let starterComputedStatus = 'closed';
+    if (starterStatus.length > 0 && starterStatus[0].status === 'playing') {
+      starterComputedStatus = 'playing'; // Sorteando
+    } else if (nextSessionMap['starter']) {
+      starterComputedStatus = 'active'; // Habilitada (hay próximo sorteo programado)
+    }
+
+    // Formatear respuesta para cada sala
+    const lobbyData = {
+      starter: {
+        price: 0,
+        pots: {
+          bingo: 'Ticket Oro',
+          line: 'Ticket Bronce',
+          pre40: 'Ticket Plata'
+        },
+        status: starterComputedStatus,
+        nextSession: nextSessionMap['starter'] || null
+      }
+    };
+
+    // Agregar datos de salas monetizadas
+    moneyRooms.forEach(room => {
+      // Determinar estado correcto según lógica de negocio:
+      // - Si está 'playing' → Sorteando
+      // - Si tiene próxima sesión (pending/active) → Habilitada (se pueden comprar cartones)
+      // - Si no hay sesión → Cerrada
+      let computedStatus = 'closed';
+      
+      if (room.status === 'playing') {
+        computedStatus = 'playing'; // Sorteando
+      } else if (nextSessionMap[room.room]) {
+        computedStatus = 'active'; // Habilitada (hay próximo sorteo)
+      }
+
+      lobbyData[room.room] = {
+        price: parseFloat(room.card_price),
+        pots: {
+          bingo: parseFloat(room.current_pot_bingo) || 0,
+          line: parseFloat(room.current_pot_linea) || 0,
+          pre40: parseFloat(room.current_pot_jackpot) || 0
+        },
+        status: computedStatus,
+        nextSession: nextSessionMap[room.room] || null
+      };
+    });
+
+    console.log('[RoomSettings] 📊 Datos del lobby preparados:', JSON.stringify(lobbyData, null, 2));
+
+    res.json({
+      success: true,
+      data: lobbyData
+    });
+  } catch (error) {
+    console.error('[RoomSettings] Error al obtener datos del lobby:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener datos del lobby'
+    });
+  }
+};

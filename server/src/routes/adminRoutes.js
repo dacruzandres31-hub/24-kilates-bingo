@@ -27,6 +27,7 @@ const {
 
 const cardInventoryController = require('../controllers/cardInventoryController');
 const sessionController = require('../controllers/sessionController');
+const sessionHistoryController = require('../controllers/sessionHistoryController');
 const roomSettingsController = require('../controllers/roomSettingsController');
 const scheduleController = require('../controllers/scheduleController');
 
@@ -88,6 +89,15 @@ router.get('/cards/movements', authenticateToken, isAdmin, getMyCardMovements);
 router.get('/sessions/active', authenticateToken, isAdmin, sessionController.getActiveSessions);
 router.get('/sessions/recent', authenticateToken, isAdmin, sessionController.getRecentSessions);
 router.get('/sessions/:id/live', authenticateToken, isAdmin, sessionController.getLiveSession);
+
+// ========================================
+// 📜 HISTORIAL DE SESIONES
+// Archivo y consulta de sesiones completadas
+// ========================================
+router.post('/sessions/:id/archive', authenticateToken, isAdmin, sessionHistoryController.archiveSession);
+router.post('/sessions/archive-all', authenticateToken, isAdmin, sessionHistoryController.archiveAllCompleted);
+router.get('/sessions/history', authenticateToken, isAdmin, sessionHistoryController.getHistory);
+router.get('/sessions/history/:id', authenticateToken, isAdmin, sessionHistoryController.getHistoryDetail);
 
 // ========================================
 // 💰 POZOS Y CONFIGURACIÓN DE SALAS

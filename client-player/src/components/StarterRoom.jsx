@@ -36,16 +36,37 @@ const [cardWinningLines, setCardWinningLines] = useState({}); // {cardId: [0,1,2
   const [selectedPlayerCards, setSelectedPlayerCards] = useState([]); // Cartones seleccionados por el jugador
   const [cardsRemaining, setCardsRemaining] = useState(20); // Cartones que faltan por seleccionar
   const [showReadyModal, setShowReadyModal] = useState(false); // Modal "¡¡Todo Listo!!"
+  const [isModalClosing, setIsModalClosing] = useState(false); // Estado de animación fade-out
 
-  // Auto-cerrar modal "¡¡Todo Listo!!" después de 5 segundos
+  // Auto-cerrar modal "¡¡Todo Listo!!" después de 5 segundos con fade-out
   useEffect(() => {
     if (showReadyModal) {
-      const timer = setTimeout(() => {
+      // Después de 4.5 segundos, iniciar fade-out
+      const fadeTimer = setTimeout(() => {
+        setIsModalClosing(true);
+      }, 4500);
+      
+      // Después de 5 segundos, cerrar completamente
+      const closeTimer = setTimeout(() => {
         setShowReadyModal(false);
+        setIsModalClosing(false);
       }, 5000);
-      return () => clearTimeout(timer);
+      
+      return () => {
+        clearTimeout(fadeTimer);
+        clearTimeout(closeTimer);
+      };
     }
   }, [showReadyModal]);
+  
+  // Mostrar modal "¡¡Todo Listo!!" cuando los cartones disponibles llegan a 0
+  useEffect(() => {
+    console.log('🔍 DEBUG - cardsRemaining:', cardsRemaining, 'selectedPlayerCards:', selectedPlayerCards.length);
+    if (cardsRemaining === 0 && selectedPlayerCards.length > 0) {
+      console.log('✅ Mostrando modal Todo Listo');
+      setShowReadyModal(true);
+    }
+  }, [cardsRemaining, selectedPlayerCards.length]);
   
   // Estados para mejoras visuales
   const [toasts, setToasts] = useState([]); // Notificaciones toast
@@ -346,7 +367,7 @@ celebrationAudio.volume = 0.7;
   const playerCards = selectedPlayerCards.length > 0 ? selectedPlayerCards : [];
 
   // Handlers para selección de cartones
-  const handleCardsSelected = (reservedCards) => {
+  const handleCardsSelected = (reservedCards, remainingTicketsFromBackend) => {
     console.log('🔍 DEBUG - Cartones recibidos del backend:', reservedCards.map(c => ({
       id: c.id,
       serial: c.serial,
@@ -363,7 +384,8 @@ celebrationAudio.volume = 0.7;
       hasSerial: !!c.serial
     })));
     
-    const remaining = 20 - allCards.length;
+    // Usar el valor que viene del backend (ya descontó solo los comprados, no yapas)
+    const remaining = remainingTicketsFromBackend ?? (20 - allCards.length);
     setCardsRemaining(remaining);
     setShowCardSelection(false);
     console.log(`✅ Total de cartones: ${allCards.length}, faltan: ${remaining}`);
@@ -1277,8 +1299,8 @@ useEffect(() => {
 
       {/* Modal "¡¡Todo Listo!!" cuando se completan 20 cartones */}
       {showReadyModal && (
-        <div className="ready-modal-overlay">
-          <div className="ready-modal-content starter-modal">
+        <div className={`ready-modal-overlay ${isModalClosing ? 'fade-out' : ''}`}>
+          <div className={`ready-modal-content starter-modal ${isModalClosing ? 'fade-out' : ''}`}>
             <div className="ready-modal-icon">🎉</div>
             <h2 className="ready-modal-title">¡¡Todo Listo!!</h2>
             <p className="ready-modal-subtitle">Tienes {selectedPlayerCards.length} cartones listos para jugar</p>

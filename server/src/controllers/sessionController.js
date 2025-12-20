@@ -1,8 +1,143 @@
 const pool = require('../db');
 
 /**
+ * Helper: Calcular próximas sesiones basadas en horarios configurados
+ */
+async function calculateUpcomingSessions(room, limit = 10) {
+  const now = new Date();
+  const currentDay = now.getDay(); // 0=Domingo, 1=Lunes, ..., 6=Sábado
+  const currentHour = now.getHours();
+  const currentMinute = now.getMinutes();
+
+  // Obtener horarios configurados para esta sala
+  const [schedules] = await pool.query(`
+    SELECT day_of_week, hour
+    FROM schedule_settings
+    WHERE room = ? AND is_active = 1
+    ORDER BY day_of_week ASC, hour ASC
+  `, [room]);
+
+  if (schedules.length === 0) {
+    return [];
+  }
+
+  const upcomingSessions = [];
+  let daysChecked = 0;
+
+  // Buscar próximas 10 sesiones desde ahora
+  while (upcomingSessions.length < limit && daysChecked < 14) {
+    const checkDate = new Date(now);
+    checkDate.setDate(checkDate.getDate() + daysChecked);
+    const checkDay = checkDate.getDay();
+
+    // Filtrar horarios de este día
+    const daySchedules = schedules.filter(s => s.day_of_week === checkDay);
+
+    for (const schedule of daySchedules) {
+      const [hour, minute] = schedule.hour.split(':').map(Number);
+      const sessionTime = new Date(checkDate);
+      sessionTime.setHours(hour, minute, 0, 0);
+
+      // Solo agregar si es futuro
+      if (sessionTime > now) {
+        upcomingSessions.push({
+          id: null, // No tiene ID en BD aún
+          room,
+          start_time: sessionTime,
+          created_at: null,
+          status: 'scheduled', // Estado especial para sesiones calculadas
+          source: 'calculated' // Marca para distinguir
+        });
+
+        if (upcomingSessions.length >= limit) break;
+      }
+    }
+
+    daysChecked++;
+  }
+
+  return upcomingSessions.slice(0, limit);
+}
+
+/**
+ * Helper: Obtener configuración de premios por sala
+ */
+function getRoomPrizeConfig(room) {
+  const configs = {
+    starter: {
+      prize_linea: '1 Ticket para Bronce',
+      prize_bingo: '1 Ticket para Oro',
+      has_jackpot: false,
+      is_ticket_prize: true
+    },
+    bronce: {
+      has_jackpot: true,
+      is_ticket_prize: false
+    },
+    plata: {
+      has_jackpot: true,
+      is_ticket_prize: false
+    },
+    oro: {
+      has_jackpot: true,
+      is_ticket_prize: false
+    }
+  };
+  
+  return configs[room] || null;
+}
+
+/**
+ * Helper: Obtener o crear sesión activa para Starter
+ * Starter siempre tiene una sesión activa (cada hora)
+ */
+async function getOrCreateStarterSession() {
+  const now = new Date();
+  
+  // Buscar sesión activa existente
+  const [existingSession] = await pool.query(`
+    SELECT 
+      id, room, start_time, status,
+      total_cards_validated, total_paid_cards, total_gift_cards
+    FROM game_sessions
+    WHERE room = 'starter' 
+    AND status IN ('active', 'pending')
+    AND start_time > DATE_SUB(NOW(), INTERVAL 1 HOUR)
+    ORDER BY start_time DESC
+    LIMIT 1
+  `);
+  
+  if (existingSession.length > 0) {
+    return existingSession[0];
+  }
+  
+  // Crear nueva sesión para la próxima hora
+  const nextHour = new Date(now);
+  nextHour.setMinutes(0, 0, 0);
+  nextHour.setHours(now.getHours() + 1);
+  
+  const [result] = await pool.query(`
+    INSERT INTO game_sessions 
+    (room, start_time, status, current_pot_linea, current_pot_bingo, current_pot_jackpot)
+    VALUES ('starter', ?, 'active', 0, 0, 0)
+  `, [nextHour]);
+  
+  return {
+    id: result.insertId,
+    room: 'starter',
+    start_time: nextHour,
+    status: 'active',
+    total_cards_validated: 0,
+    total_paid_cards: 0,
+    total_gift_cards: 0
+  };
+}
+
+/**
  * GET /api/admin/sessions/active
  * Obtener sesiones organizadas por sala (4 salas)
+ * - Starter: Siempre activa (cada hora), premios de tickets
+ * - Otras: 1 sorteo diario, siempre habilitadas cuando no sortean
  */
 exports.getActiveSessions = async (req, res) => {
   try {
@@ -10,46 +145,59 @@ exports.getActiveSessions = async (req, res) => {
     const roomsData = [];
 
     for (const room of rooms) {
-      // Obtener sesión activa de la sala
-      const [activeSession] = await pool.query(`
-        SELECT 
-          id,
-          room,
-          start_time,
-          created_at,
-          status,
-          current_pot_linea,
-          current_pot_bingo,
-          current_pot_jackpot,
-          total_cards_validated,
-          total_paid_cards,
-          total_gift_cards,
-          is_preventa,
-          updated_at
-        FROM game_sessions
-        WHERE room = ? AND status IN ('active', 'playing')
-        ORDER BY id DESC
-        LIMIT 1
-      `, [room]);
+      let currentSession = null;
+      const prizeConfig = getRoomPrizeConfig(room);
+      
+      // Starter: Siempre tiene sesión activa
+      if (room === 'starter') {
+        currentSession = await getOrCreateStarterSession();
+        currentSession.prize_linea = prizeConfig.prize_linea;
+        currentSession.prize_bingo = prizeConfig.prize_bingo;
+        currentSession.has_jackpot = false;
+      } else {
+        // Otras salas: Buscar sesión activa o crear una "virtual" habilitada
+        const [activeSession] = await pool.query(`
+          SELECT 
+            id, room, start_time, status,
+            current_pot_linea, current_pot_bingo, current_pot_jackpot,
+            total_cards_validated, total_paid_cards, total_gift_cards
+          FROM game_sessions
+          WHERE room = ? AND status IN ('active', 'pending')
+          ORDER BY start_time DESC
+          LIMIT 1
+        `, [room]);
 
-      // Obtener próximas 10 sesiones de la sala
-      const [upcomingSessions] = await pool.query(`
-        SELECT 
-          id,
-          room,
-          start_time,
-          created_at,
-          status
-        FROM game_sessions
-        WHERE room = ? AND status = 'pending'
-        ORDER BY start_time ASC
-        LIMIT 10
-      `, [room]);
+        if (activeSession.length > 0) {
+          currentSession = activeSession[0];
+        } else {
+          // No hay sesión activa, crear una "virtual" para mostrar que está habilitada
+          const nextScheduled = await calculateUpcomingSessions(room, 1);
+          if (nextScheduled.length > 0) {
+            currentSession = {
+              id: null,
+              room,
+              start_time: nextScheduled[0].start_time,
+              status: 'pending',
+              current_pot_linea: 0,
+              current_pot_bingo: 0,
+              current_pot_jackpot: 0,
+              total_cards_validated: 0,
+              total_paid_cards: 0,
+              total_gift_cards: 0,
+              is_virtual: true
+            };
+          }
+        }
+      }
+
+      // Calcular próximas sesiones
+      const upcomingSessions = await calculateUpcomingSessions(room, 10);
 
       roomsData.push({
         room,
-        currentSession: activeSession[0] || null,
-        upcomingSessions: upcomingSessions || []
+        currentSession,
+        upcomingSessions: upcomingSessions.slice(0, 10),
+        prizeConfig
       });
     }
 

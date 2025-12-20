@@ -3,7 +3,7 @@
 // ============================================
 // Historial completo de movimientos de fichas con filtros
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
@@ -35,14 +35,10 @@ export default function MovimientosChips() {
     penalty: { label: 'Penalización', color: 'text-red-500', icon: '⛔' }
   };
 
-  useEffect(() => {
-    fetchMovimientos();
-  }, [filtros]);
-
-  const fetchMovimientos = async () => {
+  const fetchMovimientos = useCallback(async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('adminToken');
       
       // Construir query params
       const params = new URLSearchParams();
@@ -59,15 +55,22 @@ export default function MovimientosChips() {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      setMovimientos(data.data || []);
+      // La respuesta puede ser { success: true, data: [...] } o directamente [...]
+      const movements = Array.isArray(data) ? data : (data.data || []);
+      setMovimientos(movements);
       setError(null);
     } catch (err) {
       console.error('Error fetching movimientos:', err);
-      setError(err.response?.data?.message || 'Error cargando movimientos');
+      setMovimientos([]);
+      setError(err.response?.data?.message || err.response?.data?.error || 'Error cargando movimientos');
     } finally {
       setLoading(false);
     }
-  };
+  }, [filtros.userId, filtros.movementType, filtros.startDate, filtros.endDate, filtros.limit]);
+
+  useEffect(() => {
+    fetchMovimientos();
+  }, [fetchMovimientos]);
 
   const formatMoney = (amount) => {
     return new Intl.NumberFormat('es-AR', {
@@ -198,7 +201,7 @@ export default function MovimientosChips() {
                 </tr>
               </thead>
               <tbody>
-                {movimientos.map((mov) => {
+                {Array.isArray(movimientos) && movimientos.map((mov) => {
                   const typeInfo = movementTypes[mov.movement_type] || { 
                     label: mov.movement_type, 
                     color: 'text-gray-400',

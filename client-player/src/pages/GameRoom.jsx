@@ -9,6 +9,8 @@ import PrizeOdometer from '../components/PrizeOdometer';
 import WinnerModal from '../components/WinnerModal';
 import GlobalTicker from '../components/GlobalTicker';
 import CelebrationModal from '../components/CelebrationModal';
+import PrizeClaimModal from '../components/PrizeClaimModal';
+import LineaPrizeNotification from '../components/LineaPrizeNotification';
 import { LogOut, Home, Grid, Layers } from 'lucide-react';
 
 /**
@@ -38,6 +40,15 @@ export default function GameRoom() {
   const [celebrationData, setCelebrationData] = useState(null);
   const [showCelebration, setShowCelebration] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  
+  // Estados para modales de premios
+  const [showLineaNotification, setShowLineaNotification] = useState(false);
+  const [showPrizeClaimModal, setShowPrizeClaimModal] = useState(false);
+  const [prizeData, setPrizeData] = useState({
+    type: null, // 'LINEA', 'BINGO', 'POZO'
+    amount: 0,
+    sessionId: null
+  });
   const [equippedSkin, setEquippedSkin] = useState(null);
   const [viewMode, setViewMode] = useState('stacked'); // 'stacked' | 'single'
 
@@ -84,6 +95,27 @@ export default function GameRoom() {
 
     // Escuchar ganador detectado
     socket.on('winner_detected', (data) => {
+      // Verificar si soy yo el ganador
+      if (currentUser && data.userId === currentUser.id) {
+        const prizeType = data.type?.toUpperCase(); // 'LINEA', 'BINGO', 'POZO'
+        
+        setPrizeData({
+          type: prizeType,
+          amount: data.amount || data.prizeAmount || 0,
+          sessionId: gameState.sessionId
+        });
+
+        // Si es LÍNEA → Modal simple de notificación
+        if (prizeType === 'LINEA') {
+          setShowLineaNotification(true);
+        } 
+        // Si es BINGO o POZO → Modal con formulario de retiro
+        else if (prizeType === 'BINGO' || prizeType === 'POZO') {
+          setShowPrizeClaimModal(true);
+        }
+      }
+      
+      // Mostrar también el modal general de ganadores (para todos)
       setWinnerData(data);
       setShowWinnerModal(true);
     });
@@ -375,6 +407,23 @@ export default function GameRoom() {
           setShowCelebration(false);
           setCelebrationData(null);
         }}
+      />
+
+      {/* Línea Prize Notification - Solo notificación */}
+      <LineaPrizeNotification
+        isOpen={showLineaNotification}
+        onClose={() => setShowLineaNotification(false)}
+        prizeAmount={prizeData.amount}
+      />
+
+      {/* Prize Claim Modal - Formulario de retiro para BINGO y POZO */}
+      <PrizeClaimModal
+        isOpen={showPrizeClaimModal}
+        onClose={() => setShowPrizeClaimModal(false)}
+        prizeType={prizeData.type}
+        prizeAmount={prizeData.amount}
+        sessionId={prizeData.sessionId}
+        userBalance={currentUser?.balance || 0}
       />
 
       {/* Footer Info */}

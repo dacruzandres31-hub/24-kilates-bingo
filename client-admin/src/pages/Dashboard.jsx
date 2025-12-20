@@ -118,9 +118,9 @@ export default function Dashboard() {
       // Convertir inventario a formato de stock
       const inventory = inventoryRes.data.inventory || [];
       setCartonesStock({
-        bronce: parseInt(inventory.find(i => i.room === 'bronce')?.total_quantity || 0),
-        plata: parseInt(inventory.find(i => i.room === 'plata')?.total_quantity || 0),
-        oro: parseInt(inventory.find(i => i.room === 'oro')?.total_quantity || 0)
+        bronce: parseInt(inventory.find(i => i.room === 'bronce')?.total_cards || 0),
+        plata: parseInt(inventory.find(i => i.room === 'plata')?.total_cards || 0),
+        oro: parseInt(inventory.find(i => i.room === 'oro')?.total_cards || 0)
       });
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -381,7 +381,7 @@ export default function Dashboard() {
           {/* Gestión de Finanzas Completa */}
           {activeSections['finanzas'] && (
             <section className="mb-8">
-              <GestionFinanzas />
+              <GestionFinanzas userData={userData} />
             </section>
           )}
 

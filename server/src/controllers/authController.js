@@ -22,7 +22,7 @@ exports.login = async (req, res) => {
 
     // Buscar usuario
     const [userResult] = await pool.query(
-      'SELECT id, username, role, password_hash, balance FROM users WHERE username = ?',
+      'SELECT id, username, role, password_hash, balance, is_blocked, block_reason FROM users WHERE username = ?',
       [username]
     );
 
@@ -31,6 +31,16 @@ exports.login = async (req, res) => {
     }
 
     const user = userResult[0];
+
+    // Verificar si el usuario está bloqueado
+    if (user.is_blocked) {
+      return res.status(403).json({ 
+        error: 'Usuario bloqueado',
+        blocked: true,
+        reason: user.block_reason,
+        role: user.role
+      });
+    }
 
     // Comparar contraseña
     const passwordMatch = await bcrypt.compare(password, user.password_hash);

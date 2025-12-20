@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import BlockedUserModal from '../components/BlockedUserModal';
 
 export default function Login({ onLogin }) {
   const [username, setUsername] = useState('');
@@ -7,6 +8,8 @@ export default function Login({ onLogin }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showBlockedModal, setShowBlockedModal] = useState(false);
+  const [blockedUserRole, setBlockedUserRole] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -32,6 +35,14 @@ export default function Login({ onLogin }) {
       localStorage.setItem('adminUser', JSON.stringify(user));
       onLogin(token);
     } catch (err) {
+      // Verificar si es usuario bloqueado
+      if (err.response?.status === 403 && err.response?.data?.blocked) {
+        setBlockedUserRole(err.response.data.role);
+        setShowBlockedModal(true);
+        setLoading(false);
+        return;
+      }
+      
       setError(err.response?.data?.message || 'Error de autenticación');
       setLoading(false);
     }
@@ -127,6 +138,16 @@ export default function Login({ onLogin }) {
           </div>
         </div>
       </div>
+
+      {/* Modal de usuario bloqueado */}
+      <BlockedUserModal
+        isOpen={showBlockedModal}
+        role={blockedUserRole}
+        onClose={() => {
+          setShowBlockedModal(false);
+          setPassword('');
+        }}
+      />
     </div>
   );
 }

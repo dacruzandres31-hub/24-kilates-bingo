@@ -451,6 +451,31 @@ Incluido en documentación:
 
 ---
 
+## 🔄 ACTUALIZACIONES RECIENTES
+
+### v1.2.0 - 12/Dic/2024: Sincronización de Pozos
+
+**Feature:** Unificación de endpoints para Estado de Pozos y Estado de Sesiones
+
+**Archivos modificados:**
+- `client-admin/src/components/PotStatusPanel.jsx`
+  - Cambio de endpoint: `/room-settings/current-pots` → `/sessions/active`
+  - Handler WebSocket actualizado para estructura `rooms`
+  - Auto-refresh cada 30 segundos
+
+**Beneficios:**
+- ✅ Ambos paneles muestran datos idénticos
+- ✅ Reducción del 50% en llamadas HTTP
+- ✅ Sincronización en tiempo real garantizada
+
+**Testing:**
+- Script PowerShell: `test_sincronizacion_pozos.ps1`
+- Validación: Ambos paneles usan `/api/admin/sessions/active`
+
+**Documentación:** [SINCRONIZACION_POZOS_COMPLETE.md](./SINCRONIZACION_POZOS_COMPLETE.md)
+
+---
+
 ## 🎉 CONCLUSIÓN
 
 **Bingo 24K v1.4.0 está COMPLETO y FUNCIONAL**
@@ -479,4 +504,4 @@ Sistema enterprise-grade:
 **Creado:** 2024  
 **Versión:** 1.4.0  
 **Estado:** ✅ PRODUCTION READY (Backend + Frontend)  
-**Última Actualización:** 2025-12-11
+**Última Actualización:** 2024-12-12 (Sincronización de Pozos v1.2.0)

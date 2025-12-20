@@ -9,11 +9,14 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-export default function SolicitudesRetiro() {
+export default function SolicitudesRetiro({ userData }) {
   const [solicitudes, setSolicitudes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filtroEstado, setFiltroEstado] = useState('pending');
+  
+  // Verificar si el usuario es SuperAdmin (Andy)
+  const isSuperAdmin = userData?.role === 'superadmin';
   
   // Modal para procesar/rechazar
   const [modalAction, setModalAction] = useState({ 
@@ -29,12 +32,13 @@ export default function SolicitudesRetiro() {
 
   useEffect(() => {
     fetchSolicitudes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtroEstado]);
 
   const fetchSolicitudes = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('adminToken');
 
       let endpoint = '/api/withdrawals/all';
       const params = new URLSearchParams();
@@ -44,11 +48,13 @@ export default function SolicitudesRetiro() {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      setSolicitudes(data.data || []);
+      const requests = Array.isArray(data) ? data : (data.data || []);
+      setSolicitudes(requests);
       setError(null);
     } catch (err) {
       console.error('Error fetching solicitudes:', err);
-      setError(err.response?.data?.message || 'Error cargando solicitudes');
+      setSolicitudes([]);
+      setError(err.response?.data?.message || err.response?.data?.error || 'Error cargando solicitudes');
     } finally {
       setLoading(false);
     }
@@ -62,7 +68,7 @@ export default function SolicitudesRetiro() {
 
     try {
       setActionLoading(true);
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('adminToken');
 
       await axios.post(
         `${API_URL}/api/withdrawals/${modalAction.solicitud.id}/process`,
@@ -89,7 +95,7 @@ export default function SolicitudesRetiro() {
 
     try {
       setActionLoading(true);
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('adminToken');
 
       await axios.post(
         `${API_URL}/api/withdrawals/${modalAction.solicitud.id}/reject`,
@@ -216,12 +222,12 @@ export default function SolicitudesRetiro() {
         <>
           <div className="bg-gray-900/30 rounded-lg p-4 mb-4">
             <p className="text-gray-400">
-              📊 Total de solicitudes: <span className="text-white font-semibold">{solicitudes.length}</span>
+              📊 Total de solicitudes: <span className="text-white font-semibold">{Array.isArray(solicitudes) ? solicitudes.length : 0}</span>
             </p>
           </div>
 
           <div className="grid grid-cols-1 gap-4">
-            {solicitudes.map((solicitud) => {
+            {Array.isArray(solicitudes) && solicitudes.map((solicitud) => {
               const badge = getStatusBadge(solicitud.status);
               
               return (
@@ -279,7 +285,8 @@ export default function SolicitudesRetiro() {
                     </div>
                   )}
 
-                  {solicitud.status === 'pending' && (
+                  {/* Solo SuperAdmin puede procesar/rechazar */}
+                  {solicitud.status === 'pending' && isSuperAdmin && (
                     <div className="flex gap-3 mt-4">
                       <button
                         onClick={() => openModal('process', solicitud)}
@@ -293,6 +300,13 @@ export default function SolicitudesRetiro() {
                       >
                         ❌ Rechazar
                       </button>
+                    </div>
+                  )}
+
+                  {/* Mensaje para agentes */}
+                  {solicitud.status === 'pending' && !isSuperAdmin && (
+                    <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-4 mt-4">
+                      <p className="text-yellow-400 text-sm">⏳ Pendiente de aprobación por Andy</p>
                     </div>
                   )}
                 </div>

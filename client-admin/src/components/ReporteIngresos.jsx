@@ -21,23 +21,25 @@ export default function ReporteIngresos() {
 
   useEffect(() => {
     fetchReporte();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [periodo]);
 
   const fetchReporte = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('adminToken');
 
       const { data } = await axios.get(
         `${API_URL}/api/admin/revenue/breakdown?period=${periodo}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      setReporteData(data.data);
+      setReporte(data.data || data || null);
       setError(null);
     } catch (err) {
       console.error('Error fetching reporte:', err);
-      setError(err.response?.data?.message || 'Error cargando reporte de ingresos');
+      setReporte(null);
+      setError(err.response?.data?.message || err.response?.data?.error || 'Error cargando reporte');
     } finally {
       setLoading(false);
     }

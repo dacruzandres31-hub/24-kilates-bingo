@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { FaTicketAlt, FaLock, FaCheck, FaTimes, FaClock, FaUsers, FaArrowLeft } from 'react-icons/fa';
 import BingoCardPreview from './BingoCardPreview';
+import PackageSelectionModal from './PackageSelectionModal';
 import axios from 'axios';
 import '../styles/CardSelectionLobby.css';
 
@@ -23,12 +24,38 @@ const CardSelectionLobby = ({
   const [showExitWarning, setShowExitWarning] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [purchasedCount, setPurchasedCount] = useState(0);
+  const [showInsufficientFundsModal, setShowInsufficientFundsModal] = useState(false);
+  const [fundsError, setFundsError] = useState(null);
+  
+  // Estados para el sistema de paquetes con yapas
+  const [showPackageModal, setShowPackageModal] = useState(roomTheme === 'starter'); // Solo mostrar en Starter
+  const [selectedPackage, setSelectedPackage] = useState(null);
+  const [giftCards, setGiftCards] = useState([]); // Gift cards de yapa
 
-  useEffect(() => {
-    loadAvailableCards();
-  }, [roomTheme]);
+  // Manejar selección de paquete
+  const handlePackageSelection = async (pkg) => {
+    console.log('[CardSelection] Paquete seleccionado:', pkg);
+    setSelectedPackage(pkg);
+    setShowPackageModal(false);
+    
+    // Limpiar gift cards (ya no se cargan automáticamente)
+    setGiftCards([]);
+    
+    // El jugador debe seleccionar TODOS los cartones manualmente
+    if (pkg.total > 0) {
+      // Paquete con cantidad específica (ej: 10+4 = 14 total)
+      setMaxCards(pkg.total);
+      console.log(`[CardSelection] Paquete ${pkg.id}: debe seleccionar ${pkg.total} cartones (${pkg.buy} para comprar + ${pkg.bonus} yapas)`);
+    } else {
+      // Paquete "sin yapa" - libre hasta 20
+      const maxAllowed = Math.min(20, 20 - currentCards);
+      setMaxCards(maxAllowed);
+      console.log(`[CardSelection] Paquete sin yapa: puede elegir hasta ${maxAllowed} cartones`);
+    }
+  };
 
-  const loadAvailableCards = async () => {
+  const loadAvailableCards = useCallback(async () => {
+    setLoading(true);
     try {
       const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
       const response = await axios.get(`/api/cards/available/${roomTheme}`, {
@@ -40,9 +67,14 @@ const CardSelectionLobby = ({
       console.log('[CardSelection] Length:', response.data.cards?.length);
       
       setAvailableCards(response.data.cards || []);
-      // Ajustar maxCards descontando cartones ya en sala
-      const maxAllowed = Math.min(response.data.maxSelection || 20, 20 - currentCards);
-      setMaxCards(maxAllowed);
+      
+      // Solo ajustar maxCards si NO hay paquete seleccionado
+      // Si hay paquete, mantener el total del paquete
+      if (!selectedPackage || selectedPackage.total === 0) {
+        const maxAllowed = Math.min(response.data.maxSelection || 20, 20 - currentCards);
+        setMaxCards(maxAllowed);
+      }
+      
       setTotalAvailable(response.data.totalAvailable || 0);
       
       console.log('[CardSelection] Estado actualizado - availableCards length:', response.data.cards?.length);
@@ -55,7 +87,26 @@ const CardSelectionLobby = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [roomTheme, currentCards, selectedPackage]);
+
+  // Ejecutar carga de cartones según tipo de sala
+  useEffect(() => {
+    console.log('[CardSelection] useEffect ejecutado - roomTheme:', roomTheme, 'showPackageModal:', showPackageModal, 'selectedPackage:', selectedPackage);
+    
+    if (roomTheme !== 'starter') {
+      // Salas pagas: cargar inmediatamente
+      console.log('[CardSelection] Sala paga detected - loading cards');
+      loadAvailableCards();
+    } else if (roomTheme === 'starter' && !showPackageModal && selectedPackage) {
+      // Starter: cargar DESPUÉS de seleccionar paquete
+      console.log('[CardSelection] Starter con paquete seleccionado - loading cards');
+      loadAvailableCards();
+    } else if (roomTheme === 'starter' && showPackageModal) {
+      // Starter con modal abierto: pre-cargar para tener listos cuando cierre modal
+      console.log('[CardSelection] Starter con modal abierto - pre-loading cards');
+      loadAvailableCards();
+    }
+  }, [roomTheme, showPackageModal, selectedPackage, loadAvailableCards]);
 
   // Función para actualizar y mostrar otros 5 cartones manteniendo los seleccionados
   const handleRefreshCards = async () => {
@@ -74,10 +125,15 @@ const CardSelectionLobby = ({
           headers: { 'Authorization': `Bearer ${token}` }
         });
         
-        // Actualizar cartones disponibles Y maxCards basado en tickets y cartones en sala
+        // Actualizar cartones disponibles
         setAvailableCards(response.data.cards || []);
-        const maxAllowed = Math.min(response.data.maxSelection || 20, 20 - currentCards);
-        setMaxCards(maxAllowed);
+        
+        // Solo ajustar maxCards si NO hay paquete seleccionado
+        if (!selectedPackage || selectedPackage.total === 0) {
+          const maxAllowed = Math.min(response.data.maxSelection || 20, 20 - currentCards);
+          setMaxCards(maxAllowed);
+        }
+        
         setTotalAvailable(response.data.totalAvailable || 0);
         
         console.log('[CardSelection] Cartones actualizados. Seleccionados mantenidos:', selectedCards.length);
@@ -155,6 +211,14 @@ const CardSelectionLobby = ({
       return;
     }
 
+    // Validar cantidad EXACTA según paquete seleccionado
+    if (selectedPackage && selectedPackage.total > 0) {
+      if (selectedCards.length !== selectedPackage.total) {
+        alert(`⚠️ Debes seleccionar exactamente ${selectedPackage.total} cartones\n(${selectedPackage.buy} para comprar + ${selectedPackage.bonus} yapas)\n\nActualmente tienes: ${selectedCards.length}`);
+        return;
+      }
+    }
+
     try {
       // Mapear nombre de sala a español para backend
       const roomMap = {
@@ -165,18 +229,29 @@ const CardSelectionLobby = ({
       };
       const roomDB = roomMap[roomTheme] || roomTheme;
 
+      // Enviar TODOS los IDs de cartones juntos
+      // El backend usará packageInfo para determinar cuáles son gift
+      const allCardIds = selectedCards.map(c => c.id);
+      
       console.log('[CardSelection] Confirmando selección:', {
-        cartones: selectedCards.length,
+        total: allCardIds.length,
         roomTheme,
         roomDB,
-        cardIds: selectedCards.map(c => c.id)
+        selectedPackage,
+        allCardIds
       });
 
       const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
       const response = await axios.post('/api/cards/select', 
         {
-          cardIds: selectedCards.map(c => c.id),
-          room: roomDB  // Enviar nombre en español
+          cardIds: allCardIds,         // TODOS los cartones
+          room: roomDB,
+          packageInfo: selectedPackage ? {
+            id: selectedPackage.id,
+            buy: selectedPackage.buy,
+            bonus: selectedPackage.bonus,
+            total: selectedPackage.total
+          } : null
         },
         {
           headers: {
@@ -186,20 +261,28 @@ const CardSelectionLobby = ({
         }
       );
 
-      // Mostrar modal de éxito
-      setPurchasedCount(selectedCards.length);
+      // Mostrar modal de éxito con total (comprados + yapas)
+      setPurchasedCount(allCardIds.length);
       setShowSuccessModal(true);
 
       // Después de 3 segundos, cerrar modal y redirigir a sala
       setTimeout(() => {
         setShowSuccessModal(false);
-        onCardsSelected(response.data.cards);
+        onCardsSelected(response.data.cards, response.data.remainingTickets);
       }, 3000);
     } catch (error) {
       console.error('Error reserving cards:', error);
       console.error('Error details:', error.response?.data);
-      const errorMsg = error.response?.data?.error || 'Error seleccionando cartones';
-      alert(`❌ ${errorMsg}`);
+      
+      // Error 402: Fondos insuficientes - mostrar modal especial
+      if (error.response?.status === 402) {
+        setFundsError(error.response.data);
+        setShowInsufficientFundsModal(true);
+      } else {
+        const errorMsg = error.response?.data?.error || error.response?.data?.message || 'Error seleccionando cartones';
+        alert(`❌ ${errorMsg}`);
+      }
+      
       // Recargar lista por si algunos cartones ya fueron tomados
       loadAvailableCards();
     }
@@ -207,6 +290,7 @@ const CardSelectionLobby = ({
 
   // Manejar salida con advertencia si hay cartones reservados
   const handleExit = () => {
+    // Siempre mostrar advertencia si hay cartones seleccionados
     if (selectedCards.length > 0) {
       setShowExitWarning(true);
     } else {
@@ -301,6 +385,31 @@ const CardSelectionLobby = ({
   console.log('[CardSelection] RENDER - availableCards.length:', availableCards.length);
   console.log('[CardSelection] RENDER - loading:', loading);
   
+  // Mostrar modal de paquetes al inicio (sin early return)
+  if (showPackageModal) {
+    return (
+      <div className="package-modal-wrapper">
+        <PackageSelectionModal
+          onSelectPackage={handlePackageSelection}
+          onClose={() => setShowPackageModal(false)}
+          roomTheme={roomTheme}
+        />
+      </div>
+    );
+  }
+
+  // Mostrar loading si está cargando Y no hay cartones
+  if (loading && availableCards.length === 0) {
+    return (
+      <div className={`card-selection-lobby theme-${roomTheme}`}>
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+          <p className="loading-text">Cargando cartones disponibles...</p>
+        </div>
+      </div>
+    );
+  }
+  
   return (
     <div className={`card-selection-lobby theme-${roomTheme}`}>
       {/* Header */}
@@ -311,10 +420,16 @@ const CardSelectionLobby = ({
             <div className="header-info">
               <h2 className="header-title">Sala de Selección de Cartones</h2>
               <p className="header-subtitle">
-                {currentCards > 0 
-                  ? `Tienes ${currentCards} cartones. Selecciona hasta ${maxCards} más (Total: ${currentCards + maxCards} / 20)`
-                  : `Elige hasta ${maxCards} cartones para jugar gratis`
-                }
+                {selectedPackage && selectedPackage.bonus > 0 ? (
+                  <>
+                    Paquete: <strong>{selectedPackage.buy} para comprar + {selectedPackage.bonus} yapas gratis</strong> 
+                    {currentCards > 0 && ` (Ya tienes ${currentCards} en sala)`}
+                  </>
+                ) : currentCards > 0 ? (
+                  `Tienes ${currentCards} cartones. Selecciona hasta ${maxCards} más (Total: ${currentCards + maxCards} / 20)`
+                ) : (
+                  `Elige hasta ${maxCards} cartones para jugar gratis`
+                )}
               </p>
             </div>
           </div>
@@ -339,10 +454,17 @@ const CardSelectionLobby = ({
         {/* Contador de selección */}
         <div className="selection-counter">
           <div className="counter-content">
-            <span className="counter-label">Seleccionados:</span>
+            <span className="counter-label">
+              {selectedPackage && selectedPackage.bonus > 0 
+                ? `Selecciona ${selectedPackage.total} cartones (${selectedPackage.buy} para comprar + ${selectedPackage.bonus} yapas):` 
+                : 'Cartones seleccionados:'}
+            </span>
             <span className="counter-value">
               {selectedCards.length} / {maxCards}
             </span>
+            {selectedPackage && selectedPackage.bonus > 0 && selectedCards.length > selectedPackage.buy && (
+              <span className="counter-bonus">+ {selectedCards.length - selectedPackage.buy} yapas elegidas 🎁</span>
+            )}
           </div>
           <div className="counter-bar">
             <div 
@@ -356,11 +478,11 @@ const CardSelectionLobby = ({
       {/* Botón para actualizar cartones */}
       <div className="refresh-cards-container">
         <button 
-          className="refresh-cards-btn"
+          className={`refresh-cards-btn refresh-cards-btn-${roomTheme}`}
           onClick={handleRefreshCards}
           disabled={refreshing || loading}
         >
-          {refreshing ? '🔄 Actualizando...' : '🔄 Ver otros cartones'}
+          {refreshing ? '🔄 Actualizando...' : '💾 Reservar cartones seleccionados y Mostrar nuevos'}
         </button>
         <span className="total-available-text">
           Mostrando 5 de {totalAvailable} cartones disponibles
@@ -369,6 +491,7 @@ const CardSelectionLobby = ({
 
       {/* Grid de Cartones */}
       <div className="cards-grid">
+        {/* Cartones normales disponibles para seleccionar */}
         {availableCards.map((card) => {
           console.log('[CardSelection] Rendering card:', card.id, 'serial:', card.serial, 'numbers:', card.numbers);
           const selected = isCardSelected(card);
@@ -399,6 +522,7 @@ const CardSelectionLobby = ({
             />
           );
         })}
+
       </div>
 
       {/* Footer con acciones */}
@@ -458,11 +582,67 @@ const CardSelectionLobby = ({
           <div className={`success-modal success-modal-${roomTheme}`}>
             <div className="success-icon">✅</div>
             <h2>¡Compra Exitosa!</h2>
-            <p className="success-count">
-              {purchasedCount} cartón{purchasedCount > 1 ? 'es' : ''} confirmado{purchasedCount > 1 ? 's' : ''}
-            </p>
+            {selectedPackage && selectedPackage.bonus > 0 ? (
+              <>
+                <p className="success-count">
+                  {selectedPackage.buy} cartón{selectedPackage.buy > 1 ? 'es' : ''} comprado{selectedPackage.buy > 1 ? 's' : ''}
+                </p>
+                <p className="success-bonus">
+                  🎁 + {selectedPackage.bonus} yapa{selectedPackage.bonus > 1 ? 's' : ''} gratis
+                </p>
+                <p className="success-total">
+                  Total: {purchasedCount} cartones
+                </p>
+              </>
+            ) : (
+              <p className="success-count">
+                {purchasedCount} cartón{purchasedCount > 1 ? 'es' : ''} confirmado{purchasedCount > 1 ? 's' : ''}
+              </p>
+            )}
             <p className="success-message">Redirigiendo a la sala...</p>
             <div className="success-spinner"></div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de fondos insuficientes */}
+      {showInsufficientFundsModal && (
+        <div className="exit-warning-modal-overlay">
+          <div className="exit-warning-modal" style={{ maxWidth: '500px' }}>
+            <div className="warning-icon" style={{ fontSize: '3rem' }}>💰</div>
+            <h2>Fondos Insuficientes</h2>
+            <p style={{ marginBottom: '15px' }}>
+              No tienes suficientes tickets ni balance para seleccionar <strong>{fundsError?.cardsRequested || 0} cartones</strong>.
+            </p>
+            <div style={{ 
+              backgroundColor: 'rgba(255, 255, 255, 0.1)', 
+              padding: '15px', 
+              borderRadius: '10px',
+              marginBottom: '15px',
+              textAlign: 'left'
+            }}>
+              <p style={{ margin: '5px 0' }}>
+                💵 <strong>Costo por cartón:</strong> ${fundsError?.cardCost?.toLocaleString('es-CO') || 0}
+              </p>
+              <p style={{ margin: '5px 0' }}>
+                📊 <strong>Total necesario:</strong> ${fundsError?.required?.toLocaleString('es-CO') || 0}
+              </p>
+              <p style={{ margin: '5px 0' }}>
+                💰 <strong>Tu balance:</strong> ${fundsError?.balance?.toLocaleString('es-CO') || 0}
+              </p>
+            </div>
+            <p style={{ fontSize: '0.95rem', color: '#ffd700' }}>
+              📞 Por favor contacta a tu agente para recargar tu balance
+            </p>
+            <div className="warning-actions">
+              <button 
+                className="btn-confirm-exit" 
+                onClick={() => setShowInsufficientFundsModal(false)}
+                style={{ width: '100%' }}
+              >
+                <FaCheck /> Entendido
+              </button>
+            </div>
           </div>
         </div>
       )}

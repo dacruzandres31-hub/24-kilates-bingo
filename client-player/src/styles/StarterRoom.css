@@ -3897,12 +3897,25 @@
   animation: modal-fade-in 0.3s ease-out;
 }
 
+.ready-modal-overlay.fade-out {
+  animation: modal-fade-out 0.5s ease-in forwards;
+}
+
 @keyframes modal-fade-in {
   from {
     opacity: 0;
   }
   to {
     opacity: 1;
+  }
+}
+
+@keyframes modal-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
   }
 }
 
@@ -3923,6 +3936,10 @@
   overflow: hidden;
 }
 
+.ready-modal-content.fade-out {
+  animation: modal-scale-out 0.5s ease-in forwards;
+}
+
 @keyframes modal-scale-in {
   from {
     transform: scale(0.7) translateY(30px);
@@ -3931,6 +3948,17 @@
   to {
     transform: scale(1) translateY(0);
     opacity: 1;
+  }
+}
+
+@keyframes modal-scale-out {
+  from {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: scale(0.8) translateY(20px);
+    opacity: 0;
   }
 }
 

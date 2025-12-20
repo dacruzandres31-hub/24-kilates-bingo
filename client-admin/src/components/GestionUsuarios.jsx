@@ -130,7 +130,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
     };
     
     // Escuchar evento para abrir modal de gestión desde búsqueda rápida
-    const handleOpenManagementModal = (event) => {
+    const handleOpenManagementModal = async (event) => {
       console.log('🟢 GestionUsuarios recibió evento openUserManagementModal:', event.detail);
       const user = event.detail.user;
       // Normalizar balance a número y mantener cartones separados
@@ -144,9 +144,15 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         gift_plata: parseInt(user.gift_plata) || 0,
         gift_oro: parseInt(user.gift_oro) || 0
       };
+      
+      // Cargar gift cards del usuario desde el endpoint
+      const giftCards = await cargarGiftCards(user.id);
+      console.log('🎁 Gift cards cargados para', user.username, ':', giftCards);
+      
       setModalGestionUsuario({
         isOpen: true,
-        usuario: normalizedUser
+        usuario: normalizedUser,
+        giftCards: giftCards
       });
     };
     
@@ -763,9 +769,11 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         const usuarioActualizado = response.data.all.find(u => u.id === userId);
         if (usuarioActualizado) {
           console.log('✅ Modal actualizado - Balance anterior:', modalGestionUsuario.usuario.balance, 'Nuevo balance:', usuarioActualizado.balance);
+          const giftCards = await cargarGiftCards(userId);
           setModalGestionUsuario({
             ...modalGestionUsuario,
-            usuario: usuarioActualizado // Reemplazar TODO el objeto usuario con datos frescos
+            usuario: usuarioActualizado, // Reemplazar TODO el objeto usuario con datos frescos
+            giftCards: giftCards
           });
         }
       }
@@ -937,9 +945,11 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
           const usuarioActualizado = response.data.all.find(u => u.id === userId);
           if (usuarioActualizado) {
             console.log('✅ Modal actualizado - Balance anterior:', modalGestionUsuario.usuario.balance, 'Nuevo:', usuarioActualizado.balance);
+            const giftCards = await cargarGiftCards(userId);
             setModalGestionUsuario({
               ...modalGestionUsuario,
-              usuario: usuarioActualizado // Reemplazar TODO el objeto con datos frescos
+              usuario: usuarioActualizado, // Reemplazar TODO el objeto con datos frescos
+              giftCards: giftCards
             });
           }
         }
@@ -1073,9 +1083,11 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
           const usuarioActualizado = response.data.all.find(u => u.id === userId);
           if (usuarioActualizado) {
             console.log('✅ Modal actualizado - Cartones', sala, ':', usuarioActualizado[`cards_${sala}`]);
+            const giftCards = await cargarGiftCards(userId);
             setModalGestionUsuario({
               ...modalGestionUsuario,
-              usuario: usuarioActualizado // Reemplazar TODO el objeto
+              usuario: usuarioActualizado, // Reemplazar TODO el objeto
+              giftCards: giftCards
             });
           }
         }
@@ -1512,16 +1524,18 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                   return (
                     <div
                       key={usuario.id}
-                      onClick={() => {
+                      onClick={async () => {
                         if (usuario.is_blocked) {
                           setModalUsuarioBloqueado({
                             isOpen: true,
                             usuario: usuario
                           });
                         } else {
+                          const giftCards = await cargarGiftCards(usuario.id);
                           setModalGestionUsuario({
                             isOpen: true,
-                            usuario: usuario
+                            usuario: usuario,
+                            giftCards: giftCards
                           });
                         }
                       }}

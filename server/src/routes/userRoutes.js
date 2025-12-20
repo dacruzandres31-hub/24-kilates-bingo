@@ -13,6 +13,8 @@ const router = express.Router();
  * GET    /users                  - Listar todos (admin)
  * PUT    /users/:id              - Actualizar usuario (admin)
  * DELETE /users/:id              - Eliminar usuario (admin)
+ * POST   /users/:id/block        - Bloquear usuario (admin)
+ * POST   /users/:id/unblock      - Desbloquear usuario (admin)
  */
 
 // Todos requieren autenticación
@@ -38,5 +40,11 @@ router.put('/:userId', userController.updateUser);
 
 // Eliminar usuario
 router.delete('/:userId', userController.deleteUser);
+
+// Bloquear usuario
+router.post('/:userId/block', userController.blockUser);
+
+// Desbloquear usuario
+router.post('/:userId/unblock', userController.unblockUser);
 
 module.exports = router;

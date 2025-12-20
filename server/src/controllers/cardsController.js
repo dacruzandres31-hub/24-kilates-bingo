@@ -254,7 +254,7 @@ exports.selectCards = async (req, res) => {
   try {
     await connection.beginTransaction();
     
-    const { cardIds, room } = req.body;
+    const { cardIds, room, packageInfo } = req.body;
     const userId = req.user.id;
 
     if (!Array.isArray(cardIds) || cardIds.length === 0) {
@@ -262,14 +262,14 @@ exports.selectCards = async (req, res) => {
       return res.status(400).json({ error: 'Debes seleccionar al menos un cartón' });
     }
 
-    if (cardIds.length > 20) {
+    if (cardIds.length > 30) {
       await connection.rollback();
-      return res.status(400).json({ error: 'No puedes seleccionar más de 20 cartones' });
+      return res.status(400).json({ error: 'No puedes seleccionar más de 30 cartones' });
     }
 
     console.log(`[Cards] 🎯 Usuario ${userId} seleccionando ${cardIds.length} cartones para sala ${room}`);
 
-    // Solo validar tickets si NO es sala starter
+    // Solo validar tickets/balance si NO es sala starter
     if (room !== 'starter') {
       // Verificar tickets disponibles por tipo (pagos vs gratis)
       const [inventory] = await connection.query(
@@ -287,68 +287,143 @@ exports.selectCards = async (req, res) => {
       
       console.log(`[Cards] 📊 Tickets disponibles - Pagos: ${availablePaid}, Gratis: ${availableFree}, Total: ${totalAvailable}, Solicitados: ${cardIds.length}`);
 
+      // Si no tiene suficientes tickets, intentar usar balance
       if (totalAvailable < cardIds.length) {
-        await connection.rollback();
-        console.log(`[Cards] ❌ Tickets insuficientes - Total: ${totalAvailable}, Necesarios: ${cardIds.length}`);
-        return res.status(400).json({ 
-          error: 'No tienes suficientes tickets disponibles',
-          required: cardIds.length,
-          available: {
-            paid: availablePaid,
-            free: availableFree,
-            total: totalAvailable
-          }
-        });
-      }
-
-      // ========================================
-      // REGLA DEL 10%: Máximo 10% de cartones pueden ser gratis
-      // MODO FLEXIBLE: Si no hay suficientes pagos, usar todos los disponibles
-      // ========================================
-      const maxFree = Math.ceil(cardIds.length * 0.10); // Máximo 10% gratis (redondeado hacia arriba)
-      let actualFree = Math.min(maxFree, availableFree);
-      let needPaid = cardIds.length - actualFree;
-      let flexibleMode = false;
-
-      console.log(`[Cards] 📐 Distribución calculada - Máx gratis (10%): ${maxFree}, Gratis a usar: ${actualFree}, Pagos necesarios: ${needPaid}`);
-
-      // MODO FLEXIBLE: Si no hay suficientes pagos, usar todos los disponibles
-      if (needPaid > availablePaid) {
-        console.log(`[Cards] ⚠️ MODO FLEXIBLE activado - Pagos insuficientes (${availablePaid}/${needPaid})`);
+        console.log(`[Cards] ⚠️ Tickets insuficientes - verificando balance del usuario`);
         
-        // Usar TODOS los pagos disponibles
-        needPaid = availablePaid;
-        actualFree = cardIds.length - needPaid;
-        
-        // Verificar que haya suficientes gratis para completar
-        if (actualFree > availableFree) {
+        // Obtener costo del cartón según la sala desde room_settings
+        const [roomSettings] = await connection.query(
+          `SELECT card_price FROM room_settings WHERE room = ? LIMIT 1`,
+          [room]
+        );
+
+        if (!roomSettings || roomSettings.length === 0) {
           await connection.rollback();
-          console.log(`[Cards] ❌ Tickets insuficientes TOTALES - Necesita ${actualFree} gratis pero solo tiene ${availableFree}`);
+          connection.release();
           return res.status(400).json({ 
-            error: 'No tienes suficientes tickets disponibles',
-            required: cardIds.length,
-            available: {
-              paid: availablePaid,
-              free: availableFree,
-              total: totalAvailable
-            }
+            error: 'No se encontró configuración de precio para esta sala'
           });
         }
-        
-        flexibleMode = true;
-        const actualPercentage = Math.round(actualFree/cardIds.length*100);
-        console.log(`[Cards] 🔄 FLEXIBLE: Usará ${needPaid} pagos + ${actualFree} gratis (${actualPercentage}% gratis - EXCEDE regla 10%)`);
-      }
 
-      // Guardar distribución para usar después en el descuento
-      req.ticketDistribution = {
-        paid: needPaid,
-        free: actualFree,
-        flexibleMode
-      };
-      
-      if (!flexibleMode) {
-        console.log(`[Cards] ✅ Distribución validada - Usará ${needPaid} pagos + ${actualFree} gratis (${Math.round(actualFree/cardIds.length*100)}% gratis)`);
+        const cardCost = parseFloat(roomSettings[0].card_price);
+        const totalCost = cardCost * cardIds.length;
+
+        // Verificar balance del usuario
+        const [userData] = await connection.query(
+          `SELECT balance FROM users WHERE id = ?`,
+          [userId]
+        );
+
+        if (!userData || userData.length === 0) {
+          await connection.rollback();
+          connection.release();
+          return res.status(400).json({ 
+            error: 'Usuario no encontrado'
+          });
+        }
+
+        const userBalance = parseFloat(userData[0].balance) || 0;
+
+        console.log(`[Cards] 💰 Costo por cartón: $${cardCost}, Total: $${totalCost}, Balance usuario: $${userBalance}`);
+
+        if (userBalance < totalCost) {
+          await connection.rollback();
+          connection.release();
+          console.log(`[Cards] ❌ Balance insuficiente - Necesita: $${totalCost}, Tiene: $${userBalance}`);
+          return res.status(402).json({ 
+            error: 'insufficient_funds',
+            message: 'No tienes suficientes tickets ni balance. Por favor contacta a tu agente para recargar.',
+            required: totalCost,
+            balance: userBalance,
+            cardCost: cardCost,
+            cardsRequested: cardIds.length
+          });
+        }
+
+        // Tiene balance suficiente - cobrar y crear inventario
+        console.log(`[Cards] ✅ Cobrando $${totalCost} del balance del usuario`);
+        
+        await connection.query(
+          `UPDATE users SET balance = balance - ? WHERE id = ?`,
+          [totalCost, userId]
+        );
+
+        // Registrar movimiento de fichas
+        await connection.query(
+          `INSERT INTO chips_movements 
+           (user_id, movement_type, amount, balance_after, description, created_at)
+           VALUES (?, 'purchase', ?, ?, ?, NOW())`,
+          [userId, totalCost, userBalance - totalCost, `Compra de ${cardIds.length} cartones para sala ${room}`]
+        );
+
+        // Crear inventario de cartones pagos
+        await connection.query(
+          `INSERT INTO user_card_inventory (user_id, room, quantity, is_gift, purchase_price, created_at)
+           VALUES (?, ?, ?, 0, ?, NOW())
+           ON DUPLICATE KEY UPDATE 
+           quantity = quantity + VALUES(quantity)`,
+          [userId, room, cardIds.length, cardCost]
+        );
+
+        console.log(`[Cards] ✅ Balance cobrado y ${cardIds.length} cartones agregados al inventario como PAGOS`);
+
+        // Establecer distribución para descuento posterior
+        req.ticketDistribution = {
+          paid: cardIds.length,
+          free: 0,
+          flexibleMode: false
+        };
+      } else {
+        // Tiene suficientes tickets - aplicar regla del 10%
+        // ========================================
+        // REGLA DEL 10%: Máximo 10% de cartones pueden ser gratis
+        // MODO FLEXIBLE: Si no hay suficientes pagos, usar todos los disponibles
+        // ========================================
+        const maxFree = Math.ceil(cardIds.length * 0.10); // Máximo 10% gratis (redondeado hacia arriba)
+        let actualFree = Math.min(maxFree, availableFree);
+        let needPaid = cardIds.length - actualFree;
+        let flexibleMode = false;
+
+        console.log(`[Cards] 📐 Distribución calculada - Máx gratis (10%): ${maxFree}, Gratis a usar: ${actualFree}, Pagos necesarios: ${needPaid}`);
+
+        // MODO FLEXIBLE: Si no hay suficientes pagos, usar todos los disponibles
+        if (needPaid > availablePaid) {
+          console.log(`[Cards] ⚠️ MODO FLEXIBLE activado - Pagos insuficientes (${availablePaid}/${needPaid})`);
+          
+          // Usar TODOS los pagos disponibles
+          needPaid = availablePaid;
+          actualFree = cardIds.length - needPaid;
+          
+          // Verificar que haya suficientes gratis para completar
+          if (actualFree > availableFree) {
+            await connection.rollback();
+            console.log(`[Cards] ❌ Tickets insuficientes TOTALES - Necesita ${actualFree} gratis pero solo tiene ${availableFree}`);
+            return res.status(400).json({ 
+              error: 'No tienes suficientes tickets disponibles',
+              required: cardIds.length,
+              available: {
+                paid: availablePaid,
+                free: availableFree,
+                total: totalAvailable
+              }
+            });
+          }
+          
+          flexibleMode = true;
+          const actualPercentage = Math.round(actualFree/cardIds.length*100);
+          console.log(`[Cards] 🔄 FLEXIBLE: Usará ${needPaid} pagos + ${actualFree} gratis (${actualPercentage}% gratis - EXCEDE regla 10%)`);
+        }
+
+        // Guardar distribución para usar después en el descuento
+        req.ticketDistribution = {
+          paid: needPaid,
+          free: actualFree,
+          flexibleMode
+        };
+        
+        if (!flexibleMode) {
+          console.log(`[Cards] ✅ Distribución validada - Usará ${needPaid} pagos + ${actualFree} gratis (${Math.round(actualFree/cardIds.length*100)}% gratis)`);
+        }
       }
     } else {
       console.log('[Cards] 🎁 Sala Starter - Acceso libre, omitiendo validación de tickets');
@@ -393,13 +468,28 @@ exports.selectCards = async (req, res) => {
       });
     }
 
-    // Marcar cartones como seleccionados (definitivo)
+    // Marcar cartones como seleccionados y gift según packageInfo
+    const giftCount = packageInfo?.bonus || 0;
+    
+    // Marcar todos los cartones como seleccionados primero
     await connection.query(
       `UPDATE bingo_cards_pool
        SET status = 'selected', selected_by = ?, selected_at = NOW()
        WHERE id IN (?)`,
       [userId, cardIds]
     );
+    
+    // Si hay gifts, marcar los últimos N cartones como gifts
+    if (giftCount > 0) {
+      const giftIds = cardIds.slice(-giftCount); // Últimos N IDs son gifts
+      await connection.query(
+        `UPDATE bingo_cards_pool
+         SET is_gift = 1
+         WHERE id IN (?)`,
+        [giftIds]
+      );
+      console.log(`[Cards] 🎁 ${giftCount} cartones marcados como GIFT`);
+    }
 
     // Descontar tickets del inventario solo si NO es sala starter
     if (room !== 'starter') {
@@ -495,7 +585,9 @@ exports.selectCards = async (req, res) => {
 
     await connection.commit();
 
-    const formattedCards = selectedCards.map(card => {
+    // Determinar cuáles son gifts según packageInfo (ya declarado arriba)
+    
+    const formattedCards = selectedCards.map((card, index) => {
       // Parsear números - puede venir como JSON string o como objeto
       let numbers = card.numbers;
       if (typeof numbers === 'string') {
@@ -508,18 +600,42 @@ exports.selectCards = async (req, res) => {
         }
       }
       
+      // Los últimos N cartones son gifts (donde N = giftCount)
+      const isGift = index >= (selectedCards.length - giftCount);
+      
       return {
         id: card.id,
         serial: card.card_serial,
         numbers: numbers,
-        selectedAt: card.selected_at
+        selectedAt: card.selected_at,
+        isGift: isGift
       };
     });
 
     console.log(`[Cards] ✅ ${formattedCards.length} cartones seleccionados correctamente`);
 
     // Calcular tickets restantes según si es starter o no
-    let remainingTickets = room === 'starter' ? 20 - formattedCards.length : 0;
+    // IMPORTANTE: Solo contar cartones comprados, NO yapas/gifts
+    let remainingTickets = 0;
+    
+    if (room === 'starter') {
+      // Contar cuántos cartones comprados (no gifts) tiene el usuario hasta ahora
+      // Consultar solo los que NO tienen game_session_id (aún no asignados a partida)
+      const [purchasedCards] = await connection.query(
+        `SELECT COUNT(*) as total
+         FROM bingo_cards_pool
+         WHERE selected_by = ? 
+         AND status = 'selected' 
+         AND is_gift = 0
+         AND game_session_id IS NULL`,
+        [userId]
+      );
+      
+      const totalPurchased = purchasedCards[0]?.total || 0;
+      remainingTickets = 20 - totalPurchased;
+      
+      console.log(`[Cards] 📊 Total comprado: ${totalPurchased}, Restantes: ${remainingTickets}`);
+    }
     
     // Para salas que no son starter, obtener tickets desde BD
     if (room !== 'starter') {
@@ -550,11 +666,16 @@ exports.selectCards = async (req, res) => {
     });
 
   } catch (error) {
-    await connection.rollback();
+    if (connection) {
+      await connection.rollback();
+      connection.release();
+    }
     console.error('[Cards] ❌ Error seleccionando cartones:', error);
-    res.status(500).json({ error: 'Error al seleccionar cartones' });
-  } finally {
-    connection.release();
+    console.error('[Cards] ❌ Stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Error al seleccionar cartones',
+      details: error.message
+    });
   }
 };
 
@@ -703,4 +824,70 @@ exports.releaseCards = async (req, res) => {
   }
 };
 
-module.exports = exports;
+/**
+ * GET /api/cards/gift-cards/:room/:quantity
+ * Obtener gift cards (cartones de yapa gratis) para un paquete
+ */
+exports.getGiftCards = async (req, res) => {
+  try {
+    const { room, quantity } = req.params;
+    const userId = req.user.id;
+
+    // Mapear nombre de sala a español para BD
+    const roomDB = ROOM_MAP[room] || room;
+    const giftQuantity = parseInt(quantity) || 0;
+
+    console.log(`[Cards] 🎁 Obteniendo ${giftQuantity} gift cards para sala: ${room} (BD: ${roomDB}), usuario: ${userId}`);
+
+    if (giftQuantity === 0) {
+      return res.json({ giftCards: [] });
+    }
+
+    // Buscar gift cards disponibles en cosmetic_items
+    // Estos son los tickets de yapa (consumibles tipo 'bronce', 'plata', 'oro', 'starter')
+    const [giftCardsFromInventory] = await pool.query(
+      `SELECT id, card_serial, numbers
+       FROM bingo_cards_pool
+       WHERE room = ? AND status = 'available'
+       ORDER BY RAND()
+       LIMIT ?`,
+      [roomDB, giftQuantity]
+    );
+
+    // Parsear números
+    const formattedGiftCards = giftCardsFromInventory.map(card => {
+      let parsedNumbers;
+      
+      if (typeof card.numbers === 'string') {
+        try {
+          parsedNumbers = JSON.parse(card.numbers);
+        } catch (e) {
+          console.error(`[Cards] Error parseando gift card ${card.id}:`, e);
+          parsedNumbers = card.numbers;
+        }
+      } else {
+        parsedNumbers = card.numbers;
+      }
+
+      return {
+        id: card.id,
+        serial: card.card_serial,
+        numbers: parsedNumbers,
+        isGift: true
+      };
+    });
+
+    console.log(`[Cards] ✅ ${formattedGiftCards.length} gift cards obtenidas`);
+
+    res.json({
+      success: true,
+      giftCards: formattedGiftCards,
+      count: formattedGiftCards.length
+    });
+
+  } catch (error) {
+    console.error('[Cards] ❌ Error obteniendo gift cards:', error);
+    res.status(500).json({ error: 'Error al obtener gift cards' });
+  }
+};
+

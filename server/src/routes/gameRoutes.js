@@ -1,11 +1,13 @@
 const express = require('express');
 const gameController = require('../controllers/gameController');
+const roomSettingsController = require('../controllers/roomSettingsController');
 const authMiddleware = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
 /**
  * GAME ROUTES
+ * GET    /game/lobby-data            - Datos públicos para lobby (precios + pozos)
  * POST   /game/buy-card              - Comprar cartón
  * GET    /game/my-cards              - Obtener mis cartones
  * POST   /game/finish-session        - Terminar partida
@@ -14,7 +16,10 @@ const router = express.Router();
  * POST   /game/end-free-game         - Procesar premios Sala Starter
  */
 
-// Todos requieren autenticación
+// ENDPOINT PÚBLICO (sin autenticación)
+router.get('/lobby-data', roomSettingsController.getLobbyData);
+
+// Todos los siguientes requieren autenticación
 router.use(authMiddleware.authenticateToken);
 
 // Comprar cartón
