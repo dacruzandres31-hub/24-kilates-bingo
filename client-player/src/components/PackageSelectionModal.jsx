@@ -6,7 +6,7 @@ const PackageSelectionModal = ({ onSelectPackage, onClose, roomTheme }) => {
   const packages = [
     {
       id: 'no-bonus',
-      title: 'Elegir Cartones sin Yapa',
+      title: 'Elegir Cartones sin PLUS',
       description: 'Selecciona tus cartones normalmente',
       buy: 0,
       bonus: 0,
@@ -15,7 +15,7 @@ const PackageSelectionModal = ({ onSelectPackage, onClose, roomTheme }) => {
     },
     {
       id: '5-plus-1',
-      title: 'Elegí 5 Cartones + 1 de Yapa',
+      title: 'Elegí 5 Cartones + 1 PLUS',
       description: '¡1 Gift Card GRATIS!',
       buy: 5,
       bonus: 1,
@@ -24,7 +24,7 @@ const PackageSelectionModal = ({ onSelectPackage, onClose, roomTheme }) => {
     },
     {
       id: '10-plus-4',
-      title: 'Elegí 10 Cartones + 4 de Yapa',
+      title: 'Elegí 10 Cartones + 4 PLUS',
       description: '¡4 Gift Cards GRATIS!',
       buy: 10,
       bonus: 4,
@@ -33,7 +33,7 @@ const PackageSelectionModal = ({ onSelectPackage, onClose, roomTheme }) => {
     },
     {
       id: '20-plus-10',
-      title: 'Elegí 20 Cartones y llevate 10 de Yapa',
+      title: 'Elegí 20 Cartones y llevate 10 PLUS',
       description: '¡10 Gift Cards GRATIS! ¡MÁXIMO BENEFICIO!',
       buy: 20,
       bonus: 10,
@@ -49,8 +49,8 @@ const PackageSelectionModal = ({ onSelectPackage, onClose, roomTheme }) => {
           <FaTimes />
         </button>
         
-        <h2 className="modal-title">Selecciona tu Paquete</h2>
-        <p className="modal-subtitle">Elige cuántos cartones quieres y obtén yapas gratis</p>
+        <h2 className="modal-title">PACK BINGO PLUS</h2>
+        <p className="modal-subtitle">Elige cuántos cartones quieres y obtén gift cards PLUS gratis</p>
 
         <div className="packages-container">
           {packages.map((pkg) => (

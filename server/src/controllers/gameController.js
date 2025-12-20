@@ -291,6 +291,25 @@ exports.finishSession = async (req, res) => {
       [sessionId]
     );
 
+    // Obtener la sala de esta sesión para limpieza
+    const [sessionData] = await pool.query(
+      'SELECT room FROM game_sessions WHERE id = ?',
+      [sessionId]
+    );
+    
+    // LIMPIEZA: Eliminar cartones no asignados a ninguna sesión de esta sala
+    if (sessionData.length > 0) {
+      const room = sessionData[0].room;
+      const [cleanupResult] = await pool.query(`
+        DELETE FROM bingo_cards_pool 
+        WHERE room = ? 
+        AND status = 'selected' 
+        AND game_session_id IS NULL
+      `, [room]);
+      
+      console.log(`[GameController] 🧹 Limpieza post-finalización sala ${room}: ${cleanupResult.affectedRows} cartones huérfanos eliminados`);
+    }
+
     res.json({
       success: true,
       gameResult,
@@ -964,6 +983,16 @@ exports.claimBingo = async (req, res) => {
       `UPDATE game_sessions SET status = 'completed', updated_at = NOW() WHERE id = ?`,
       [gameSessionId]
     );
+
+    // LIMPIEZA: Eliminar cartones no asignados a ninguna sesión de esta sala
+    const [cleanupResult] = await pool.query(`
+      DELETE FROM bingo_cards_pool 
+      WHERE room = ? 
+      AND status = 'selected' 
+      AND game_session_id IS NULL
+    `, [session.room]);
+    
+    console.log(`[GameController] 🧹 Limpieza BINGO sala ${session.room}: ${cleanupResult.affectedRows} cartones huérfanos eliminados`);
 
     // 8. Emitir eventos Socket.IO
     const io = req.app.get('io');

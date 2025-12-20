@@ -43,6 +43,13 @@ class GameEngineAuto {
 
     const session = sessions[0];
 
+    // LIMPIEZA Y REGENERACIÓN: Al iniciar sorteo
+    // Eliminar cartones no usados y generar 1000 nuevos para próxima sesión
+    const cardPoolManager = require('./cardPoolManager');
+    cardPoolManager.cleanAndRegenerateForSession(session.room).catch(err => {
+      console.error('[GameEngine] Error en limpieza/regeneración al iniciar:', err);
+    });
+
     // Estado del juego
     const gameState = {
       sessionId: gameSessionId,
@@ -440,6 +447,19 @@ class GameEngineAuto {
       'UPDATE game_sessions SET status = ? WHERE id = ?',
       [status, gameSessionId]
     );
+
+    // LIMPIEZA: Eliminar cartones no asignados a ninguna sesión de esta sala
+    // Esto se ejecuta cuando finaliza cada sorteo
+    if (gameState.room) {
+      const [cleanupResult] = await pool.query(`
+        DELETE FROM bingo_cards_pool 
+        WHERE room = ? 
+        AND status = 'selected' 
+        AND game_session_id IS NULL
+      `, [gameState.room]);
+      
+      console.log(`[GameEngine] 🧹 Limpieza post-sorteo sala ${gameState.room}: ${cleanupResult.affectedRows} cartones huérfanos eliminados`);
+    }
 
     console.log(`[GameEngine] 🏁 Juego ${gameSessionId} terminado`);
 

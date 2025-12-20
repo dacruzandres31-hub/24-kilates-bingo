@@ -139,10 +139,25 @@ async function archiveSession(gameSessionId) {
     // Marcar sesión como archivada
     await pool.query('UPDATE game_sessions SET archived = 1 WHERE id = ?', [gameSessionId]);
 
+    // LIMPIEZA: Eliminar cartones no asignados a ninguna sesión de esta sala
+    // Esto limpia los cartones "huérfanos" que quedaron de compras anteriores
+    const [cleanupResult] = await pool.query(`
+      DELETE FROM bingo_cards_pool 
+      WHERE room = ? 
+      AND status = 'selected' 
+      AND game_session_id IS NULL
+    `, [session.room]);
+
+    console.log(`[SessionHistory] 🧹 Limpieza automática sala ${session.room}: ${cleanupResult.affectedRows} cartones huérfanos eliminados`);
+
     return {
       success: true,
       message: 'Sesión archivada exitosamente',
       history_id: result.insertId,
+      cleanup: {
+        room: session.room,
+        cards_cleaned: cleanupResult.affectedRows
+      },
       archived_data: {
         session_id: gameSessionId,
         room: session.room,

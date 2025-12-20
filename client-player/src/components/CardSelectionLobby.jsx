@@ -16,7 +16,7 @@ const CardSelectionLobby = ({
   const [availableCards, setAvailableCards] = useState([]);
   const [selectedCards, setSelectedCards] = useState([]);
   const [maxCards, setMaxCards] = useState(20);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Cambiado a false - solo cargar DESPUÉS de seleccionar paquete
   const [playersOnline, setPlayersOnline] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -27,10 +27,10 @@ const CardSelectionLobby = ({
   const [showInsufficientFundsModal, setShowInsufficientFundsModal] = useState(false);
   const [fundsError, setFundsError] = useState(null);
   
-  // Estados para el sistema de paquetes con yapas
-  const [showPackageModal, setShowPackageModal] = useState(roomTheme === 'starter'); // Solo mostrar en Starter
+  // Estados para el sistema de paquetes PLUS
+  const [showPackageModal, setShowPackageModal] = useState(true); // Mostrar en todas las salas
   const [selectedPackage, setSelectedPackage] = useState(null);
-  const [giftCards, setGiftCards] = useState([]); // Gift cards de yapa
+  const [giftCards, setGiftCards] = useState([]); // Gift cards PLUS
 
   // Manejar selección de paquete
   const handlePackageSelection = async (pkg) => {
@@ -45,9 +45,9 @@ const CardSelectionLobby = ({
     if (pkg.total > 0) {
       // Paquete con cantidad específica (ej: 10+4 = 14 total)
       setMaxCards(pkg.total);
-      console.log(`[CardSelection] Paquete ${pkg.id}: debe seleccionar ${pkg.total} cartones (${pkg.buy} para comprar + ${pkg.bonus} yapas)`);
+      console.log(`[CardSelection] Paquete ${pkg.id}: debe seleccionar ${pkg.total} cartones (${pkg.buy} para comprar + ${pkg.bonus} PLUS)`);
     } else {
-      // Paquete "sin yapa" - libre hasta 20
+      // Paquete "sin PLUS" - libre hasta 20
       const maxAllowed = Math.min(20, 20 - currentCards);
       setMaxCards(maxAllowed);
       console.log(`[CardSelection] Paquete sin yapa: puede elegir hasta ${maxAllowed} cartones`);
@@ -89,23 +89,16 @@ const CardSelectionLobby = ({
     }
   }, [roomTheme, currentCards, selectedPackage]);
 
-  // Ejecutar carga de cartones según tipo de sala
+  // Ejecutar carga de cartones después de selección de paquete
   useEffect(() => {
     console.log('[CardSelection] useEffect ejecutado - roomTheme:', roomTheme, 'showPackageModal:', showPackageModal, 'selectedPackage:', selectedPackage);
     
-    if (roomTheme !== 'starter') {
-      // Salas pagas: cargar inmediatamente
-      console.log('[CardSelection] Sala paga detected - loading cards');
-      loadAvailableCards();
-    } else if (roomTheme === 'starter' && !showPackageModal && selectedPackage) {
-      // Starter: cargar DESPUÉS de seleccionar paquete
-      console.log('[CardSelection] Starter con paquete seleccionado - loading cards');
-      loadAvailableCards();
-    } else if (roomTheme === 'starter' && showPackageModal) {
-      // Starter con modal abierto: pre-cargar para tener listos cuando cierre modal
-      console.log('[CardSelection] Starter con modal abierto - pre-loading cards');
+    // SOLO cargar cartones después de seleccionar paquete (modal cerrado)
+    if (!showPackageModal && selectedPackage) {
+      console.log('[CardSelection] Paquete PLUS seleccionado - cargando cartones disponibles');
       loadAvailableCards();
     }
+    // NO cargar cartones si el modal está abierto (evita el spinner infinito)
   }, [roomTheme, showPackageModal, selectedPackage, loadAvailableCards]);
 
   // Función para actualizar y mostrar otros 5 cartones manteniendo los seleccionados
@@ -214,7 +207,7 @@ const CardSelectionLobby = ({
     // Validar cantidad EXACTA según paquete seleccionado
     if (selectedPackage && selectedPackage.total > 0) {
       if (selectedCards.length !== selectedPackage.total) {
-        alert(`⚠️ Debes seleccionar exactamente ${selectedPackage.total} cartones\n(${selectedPackage.buy} para comprar + ${selectedPackage.bonus} yapas)\n\nActualmente tienes: ${selectedCards.length}`);
+        alert(`⚠️ Debes seleccionar exactamente ${selectedPackage.total} cartones\n(${selectedPackage.buy} para comprar + ${selectedPackage.bonus} PLUS)\n\nActualmente tienes: ${selectedCards.length}`);
         return;
       }
     }
@@ -261,11 +254,11 @@ const CardSelectionLobby = ({
         }
       );
 
-      // Mostrar modal de éxito con total (comprados + yapas)
+      // Mostrar modal de éxito con total (comprados + PLUS)
       setPurchasedCount(allCardIds.length);
       setShowSuccessModal(true);
 
-      // Después de 3 segundos, cerrar modal y redirigir a sala
+      // Después de 3 segundos, ir a la sala con los cartones seleccionados
       setTimeout(() => {
         setShowSuccessModal(false);
         onCardsSelected(response.data.cards, response.data.remainingTickets);
@@ -422,7 +415,7 @@ const CardSelectionLobby = ({
               <p className="header-subtitle">
                 {selectedPackage && selectedPackage.bonus > 0 ? (
                   <>
-                    Paquete: <strong>{selectedPackage.buy} para comprar + {selectedPackage.bonus} yapas gratis</strong> 
+                    Paquete: <strong>{selectedPackage.buy} para comprar + {selectedPackage.bonus} PLUS gratis</strong> 
                     {currentCards > 0 && ` (Ya tienes ${currentCards} en sala)`}
                   </>
                 ) : currentCards > 0 ? (
@@ -588,7 +581,7 @@ const CardSelectionLobby = ({
                   {selectedPackage.buy} cartón{selectedPackage.buy > 1 ? 'es' : ''} comprado{selectedPackage.buy > 1 ? 's' : ''}
                 </p>
                 <p className="success-bonus">
-                  🎁 + {selectedPackage.bonus} yapa{selectedPackage.bonus > 1 ? 's' : ''} gratis
+                  🎁 + {selectedPackage.bonus} PLUS{selectedPackage.bonus > 1 ? '' : ''} gratis
                 </p>
                 <p className="success-total">
                   Total: {purchasedCount} cartones

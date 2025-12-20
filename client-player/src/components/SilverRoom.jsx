@@ -334,7 +334,7 @@ celebrationAudio.volume = 0.7;
   const playerCards = selectedPlayerCards.length > 0 ? selectedPlayerCards : [];
 
   // Handlers para selección de cartones
-  const handleCardsSelected = (reservedCards) => {
+  const handleCardsSelected = (reservedCards, remainingTicketsFromBackend) => {
     console.log('🔍 DEBUG - Cartones recibidos del backend:', reservedCards.map(c => ({
       id: c.id,
       serial: c.serial,
@@ -351,7 +351,8 @@ celebrationAudio.volume = 0.7;
       hasSerial: !!c.serial
     })));
     
-    const remaining = 20 - allCards.length;
+    // Usar el valor que viene del backend (ya descontó solo los comprados, no PLUS)
+    const remaining = remainingTicketsFromBackend ?? (20 - allCards.length);
     setCardsRemaining(remaining);
     setShowCardSelection(false);
     console.log(`✅ Total de cartones: ${allCards.length}, faltan: ${remaining}`);

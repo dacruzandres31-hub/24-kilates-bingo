@@ -209,6 +209,14 @@ const startServer = async () => {
     // Cargar pools de cartones existentes desde BD
     await loadExistingPools();
 
+    // INICIALIZAR CARD POOL MANAGER
+    // Verificar y generar cartones iniciales para todas las salas
+    console.log('🎫 Inicializando Card Pool Manager...');
+    const cardPoolManager = require('./services/cardPoolManager');
+    const initResults = await cardPoolManager.initializeAllRooms();
+    console.log('✅ Card Pool Manager inicializado:', initResults);
+    console.log('');
+
     // Iniciar scheduler
     scheduler.start();
 
