@@ -128,6 +128,7 @@ io.on('connection', (socket) => {
 // RUTAS API
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/activity-history', require('./routes/activityHistoryRoutes')); // Historial del jugador
 app.use('/api/cards', cardsRoutes); // Pool de cartones
 app.use('/api/game/starter', starterRoomRoutes); // DEBE IR ANTES de /api/game
 app.use('/api/game', gameRoutes);

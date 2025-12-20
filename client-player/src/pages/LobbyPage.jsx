@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Gamepad2, LogOut, Settings, User, Key } from 'lucide-react';
+import { Gamepad2, LogOut, Settings, User, Key, FileText } from 'lucide-react';
+import PlayerActivityHistory from '../components/PlayerActivityHistory';
 import '../styles/LobbyPage.css';
 
 export default function LobbyPage() {
@@ -12,6 +13,7 @@ export default function LobbyPage() {
   const [loading, setLoading] = useState(true);
   const [freeRewards, setFreeRewards] = useState(0);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showActivityHistory, setShowActivityHistory] = useState(false);
 
   useEffect(() => {
     // Obtener usuario actual
@@ -132,6 +134,13 @@ export default function LobbyPage() {
             </button>
             {showProfileMenu && (
               <div className="profile-dropdown">
+                <button className="dropdown-item" onClick={() => {
+                  setShowProfileMenu(false);
+                  setShowActivityHistory(true);
+                }}>
+                  <FileText size={16} />
+                  <span>Mi Historial</span>
+                </button>
                 <button className="dropdown-item" onClick={() => {
                   setShowProfileMenu(false);
                   // TODO: Abrir modal cambiar contraseña
@@ -365,6 +374,11 @@ export default function LobbyPage() {
         <p>🎰 24K Bingo - Plataforma oficial de bingo online</p>
         <p className="small">Juega responsablemente | Términos y condiciones</p>
       </div>
+
+      {/* Activity History Modal */}
+      {showActivityHistory && (
+        <PlayerActivityHistory onClose={() => setShowActivityHistory(false)} />
+      )}
     </div>
   );
 }
