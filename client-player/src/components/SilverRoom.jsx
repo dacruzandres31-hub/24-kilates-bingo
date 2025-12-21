@@ -493,8 +493,13 @@ celebrationAudio.volume = 0.7;
     setWinnerCards(cardsWithWinningLines);
     setLineCelebrated(true);
     
-    // 1. PRIMERO: Anunciar línea ganadora
-    voiceService.speak('Felicitaciones, Ganaste Línea');
+    // Limpiar alertas de "casi línea" porque ya se ganó
+    setAlmostLineCards([]);
+    
+    // 1. PRIMERO: Anunciar línea ganadora (con delay para asegurar que se escuche)
+    setTimeout(() => {
+      voiceService.speak('Felicitaciones, Ganaste Línea');
+    }, 300);
     
     // 2. Reproducir efectos de festejo
     celebrationAudio.currentTime = 0;
@@ -506,14 +511,18 @@ celebrationAudio.volume = 0.7;
     // 4. Toast de celebración
     addToast('🎉', '¡LÍNEA!', 'Has completado una línea', 8000);
     
-    // 5. Pausar sorteo (esto anuncia "Sorteo Pausado" automáticamente)
+    // 5. Pausar sorteo (pero NO anunciar "Sorteo Pausado" - se anunciará al reanudar)
     if (gameStatus === 'active') {
       setGameStatus('waiting');
       const timeout = setTimeout(() => {
-        setGameStatus('active');
-        setWinnerCards([]);
-        setHighlightedLine(null);
-      }, 20000);
+        // Anunciar continuación a BINGO antes de reanudar
+        voiceService.speak('Continuamos hasta Bingo');
+        setTimeout(() => {
+          setGameStatus('active');
+          setWinnerCards([]);
+          setHighlightedLine(null);
+        }, 2000); // Esperar 2 segundos para que termine el anuncio
+      }, 18000); // 18 segundos + 2 del anuncio = 20 segundos total
       setPauseTimeout(timeout);
     }
     
@@ -541,12 +550,17 @@ useEffect(() => {
       voiceService.announceSorteoIniciado();
       addToast('🎲', '¡Sorteo iniciado!', 'Buena suerte');
     } else if (gameStatus === 'waiting' && previousGameStatus === 'active') {
-      voiceService.announceSorteoPausado();
+      // NO anunciar "Sorteo Pausado" si hay línea celebrada (ya se anunció "Felicitaciones")
+      if (!lineCelebrated) {
+        voiceService.announceSorteoPausado();
+      }
       // Detener sonido de bolillero
       audioService.stopBolilleroGirando();
       // Restaurar volumen de música al 100%
       audioService.restoreMusicVolume();
-      addToast('⏸️', 'Sorteo pausado', 'Esperando...');
+      if (!lineCelebrated) {
+        addToast('⏸️', 'Sorteo pausado', 'Esperando...');
+      }
     } else if (gameStatus === 'active' && previousGameStatus === 'paused') {
       voiceService.announceSorteoReiniciado();
       // Reiniciar sonido de bolillero

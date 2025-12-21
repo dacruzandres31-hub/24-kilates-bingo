@@ -606,109 +606,6 @@
 }
 
 /* ========================================
-   CARTÓN GANADOR - Display en Modal
-   ======================================== */
-
-.winning-card-display {
-  width: 100%;
-  max-width: 400px;
-  margin: 20px auto;
-  background: rgba(30, 41, 59, 0.6);
-  border-radius: 16px;
-  padding: 16px;
-  border: 2px solid rgba(16, 185, 129, 0.3);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-}
-
-.bingo-header-labels {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.bingo-letter {
-  text-align: center;
-  font-size: 24px;
-  font-weight: 900;
-  color: #10b981;
-  text-shadow: 0 2px 8px rgba(16, 185, 129, 0.6);
-}
-
-.winning-card-grid {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 8px;
-}
-
-.card-cell {
-  aspect-ratio: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(15, 23, 42, 0.8);
-  border: 2px solid rgba(100, 116, 139, 0.4);
-  border-radius: 8px;
-  font-size: 20px;
-  font-weight: 700;
-  color: #cbd5e1;
-  transition: all 0.3s ease;
-}
-
-.card-cell.free-cell {
-  background: linear-gradient(135deg, #fbbf24, #f59e0b);
-  color: white;
-  font-size: 28px;
-  border-color: #fbbf24;
-  box-shadow: 0 4px 16px rgba(251, 191, 36, 0.4);
-}
-
-.card-cell.winning-number {
-  background: linear-gradient(135deg, #10b981, #059669);
-  color: white;
-  border-color: #10b981;
-  box-shadow: 0 0 20px rgba(16, 185, 129, 0.8);
-  transform: scale(1.05);
-  animation: winningPulse 1.5s infinite;
-}
-
-@keyframes winningPulse {
-  0%, 100% {
-    box-shadow: 0 0 20px rgba(16, 185, 129, 0.8);
-  }
-  50% {
-    box-shadow: 0 0 30px rgba(16, 185, 129, 1);
-  }
-}
-
-@media (max-width: 480px) {
-  .winning-card-display {
-    max-width: 100%;
-    padding: 12px;
-  }
-
-  .bingo-letter {
-    font-size: 20px;
-  }
-
-  .card-cell {
-    font-size: 16px;
-  }
-
-  .card-cell.free-cell {
-    font-size: 22px;
-  }
-
-  .winning-card-grid {
-    gap: 6px;
-  }
-
-  .bingo-header-labels {
-    gap: 6px;
-  }
-}
-
-/* ========================================
    WINNING CARD CONTAINER FOR LINE MODAL (NEW)
    ======================================== */
 
@@ -738,6 +635,7 @@
   transform: scale(1.1);
 }
 
+/* Animar específicamente la línea ganadora con efecto dorado pulsante */
 .winning-card-container-line .card-cell.winning-line {
   animation: line-pulse-glow 1.5s ease-in-out infinite, line-shine 2s linear infinite;
   background: linear-gradient(
