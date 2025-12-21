@@ -368,6 +368,12 @@ exports.getLobbyData = async (req, res) => {
       }
     });
 
+    // Obtener configuración de premios de Starter
+    const [starterConfig] = await pool.query(`
+      SELECT prizes_linea, ticket_room_linea, prizes_bingo, ticket_room_bingo
+      FROM v_starter_config
+    `);
+
     // Obtener status actual de la sala Starter
     const [starterStatus] = await pool.query(`
       SELECT status
@@ -386,14 +392,27 @@ exports.getLobbyData = async (req, res) => {
       starterComputedStatus = 'active'; // Habilitada (hay próximo sorteo programado)
     }
 
+    // Usar premios de la configuración o valores por defecto
+    const starterPrizes = starterConfig.length > 0 ? starterConfig[0] : {
+      prizes_linea: 2,
+      ticket_room_linea: 'bronce',
+      prizes_bingo: 5,
+      ticket_room_bingo: 'oro'
+    };
+
     // Formatear respuesta para cada sala
     const lobbyData = {
       starter: {
         price: 0,
-        pots: {
-          bingo: 'Ticket Oro',
-          line: 'Ticket Bronce',
-          pre40: 'Ticket Plata'
+        prizes: {
+          line: {
+            quantity: starterPrizes.prizes_linea,
+            room: starterPrizes.ticket_room_linea
+          },
+          bingo: {
+            quantity: starterPrizes.prizes_bingo,
+            room: starterPrizes.ticket_room_bingo
+          }
         },
         status: starterComputedStatus,
         nextSession: nextSessionMap['starter'] || null

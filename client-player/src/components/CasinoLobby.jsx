@@ -154,12 +154,29 @@ const RoomCard = ({ room }) => {
           </div>
         ) : (
           <div className="starter-rewards">
-             <div className="price-label">Premios</div>
-            <div className="rewards-icons">
-              {room.rewards.map((reward, index) => (
-                <FaGift key={index} className="reward-icon" />
-              ))}
-            </div>
+            <div className="price-label">Premios</div>
+            {room.prizes ? (
+              <div className="rewards-details">
+                <div className="reward-item">
+                  <span className="reward-label">Línea:</span>
+                  <span className="reward-value">
+                    {room.prizes.line.quantity}x 🎫 {room.prizes.line.room === 'bronce' ? '🥉' : room.prizes.line.room === 'plata' ? '🥈' : '🥇'}
+                  </span>
+                </div>
+                <div className="reward-item">
+                  <span className="reward-label">Bingo:</span>
+                  <span className="reward-value">
+                    {room.prizes.bingo.quantity}x 🎫 {room.prizes.bingo.room === 'bronce' ? '🥉' : room.prizes.bingo.room === 'plata' ? '🥈' : '🥇'}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="rewards-icons">
+                {room.rewards.map((reward, index) => (
+                  <FaGift key={index} className="reward-icon" />
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -359,6 +376,7 @@ const CasinoLobby = ({ user, onLogout }) => {
         targetTime,
         status: roomData.status || 'no_session',
         price: room.id === 'starter' ? 'Tickets' : formatMoney(roomData.price),
+        prizes: room.id === 'starter' ? roomData.prizes : undefined,
         pots: room.id !== 'starter' ? {
           bingo: formatMoney(roomData.pots.bingo),
           line: formatMoney(roomData.pots.line),

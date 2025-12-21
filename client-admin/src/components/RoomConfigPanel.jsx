@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { DollarSign, TrendingUp, Settings, RefreshCw, Percent } from 'lucide-react';
+import StarterConfigCard from './StarterConfigCard';
 
 export default function RoomConfigPanel() {
   const [settings, setSettings] = useState([]);
@@ -151,6 +152,10 @@ export default function RoomConfigPanel() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Tarjeta de Sala Starter */}
+        <StarterConfigCard />
+
+        {/* Salas con dinero (Bronce, Plata, Oro) */}
         {settings.map(setting => (
           <div
             key={setting.room}

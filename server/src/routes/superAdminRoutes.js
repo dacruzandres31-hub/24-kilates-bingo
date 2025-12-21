@@ -18,6 +18,7 @@ const {
 const cardInventoryController = require('../controllers/cardInventoryController');
 const sessionController = require('../controllers/sessionController');
 const roomSettingsController = require('../controllers/roomSettingsController');
+const starterConfigController = require('../controllers/starterConfigController');
 const scheduleController = require('../controllers/scheduleController');
 
 // Todas las rutas requieren autenticación de admin
@@ -73,6 +74,13 @@ router.get('/room-settings', roomSettingsController.getRoomSettings);
 router.put('/room-settings/:room', roomSettingsController.updateRoomPrice);
 router.put('/room-settings/:room/percentages', roomSettingsController.updateRoomPercentages);
 router.post('/room-settings/:room/reset-accumulated', roomSettingsController.resetAccumulatedPot);
+
+// ========================================
+// 🎁 CONFIGURACIÓN DE SALA STARTER
+// Configurar premios en tickets (Línea y Bingo)
+// ========================================
+router.get('/starter-config', starterConfigController.getStarterConfig);
+router.put('/starter-config', starterConfigController.updateStarterPrizes);
 
 // ========================================
 // 📅 GESTIÓN DE HORARIOS DE SORTEOS

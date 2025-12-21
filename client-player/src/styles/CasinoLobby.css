@@ -1161,6 +1161,38 @@
   justify-content: center;
 }
 
+.rewards-details {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reward-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  border: 1px solid rgba(0, 245, 212, 0.2);
+}
+
+.reward-label {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+}
+
+.reward-value {
+  font-size: 1rem;
+  color: #00F5D4;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .rewards-icons {
   display: flex;
   justify-content: center;
