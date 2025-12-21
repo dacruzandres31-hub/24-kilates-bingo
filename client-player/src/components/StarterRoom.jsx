@@ -519,11 +519,12 @@ celebrationAudio.volume = 0.7;
 
   setAlmostLineCards(cardsAlmostThere);
 
-  // Mostrar celebración si hay nuevos ganadores y no se festejó la línea
+  // Mostrar celebración si hay NUEVOS ganadores y no se festejó la línea
+  // IMPORTANTE: Solo si cardsWithWinningLines.length > winnerCards.length (evita loop infinito)
   if (
+    cardsWithWinningLines.length > 0 &&
     cardsWithWinningLines.length > winnerCards.length &&
-    !lineCelebrated &&
-    cardsWithWinningLines.length > 0
+    !lineCelebrated
   ) {
     setWinnerCards(cardsWithWinningLines);
     setLineCelebrated(true);
@@ -556,10 +557,11 @@ celebrationAudio.volume = 0.7;
         // Anunciar continuación a BINGO antes de reanudar
         voiceService.speak('Continuamos hasta Bingo');
         setTimeout(() => {
-          setGameStatus('active');
+          // ORDEN IMPORTANTE: Limpiar ganadores PRIMERO, luego resetear flag
           setWinnerCards([]);
           setHighlightedLine(null);
-          setLineCelebrated(false); // RESETEAR para que vuelvan a anunciarse los números
+          setLineCelebrated(false); // RESETEAR después de limpiar ganadores
+          setGameStatus('active');
         }, 2000); // Esperar 2 segundos para que termine el anuncio
       }, 18000); // 18 segundos + 2 del anuncio = 20 segundos total
       setPauseTimeout(timeout);

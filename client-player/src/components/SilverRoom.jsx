@@ -521,10 +521,11 @@ celebrationAudio.volume = 0.7;
         // Anunciar continuación a BINGO antes de reanudar
         voiceService.speak('Continuamos hasta Bingo');
         setTimeout(() => {
-          setGameStatus('active');
+          // ORDEN IMPORTANTE: Limpiar ganadores PRIMERO, luego resetear flag
           setWinnerCards([]);
           setHighlightedLine(null);
-          setLineCelebrated(false); // RESETEAR para que vuelvan a anunciarse los números
+          setLineCelebrated(false); // RESETEAR después de limpiar ganadores
+          setGameStatus('active');
         }, 2000); // Esperar 2 segundos para que termine el anuncio
       }, 18000); // 18 segundos + 2 del anuncio = 20 segundos total
       setPauseTimeout(timeout);

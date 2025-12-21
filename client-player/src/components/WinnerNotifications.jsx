@@ -541,7 +541,7 @@ function LineWinnerInfoModal({ winnerData, onClose }) {
           selected={false}
           onClick={null}
           showSerial={true}
-          drawnNumbers={winningNumbers} // Números sorteados para marcarlos
+          drawnNumbers={[]} // NO marcar números - dejar fondo claro para mejor visualización
           winningLines={getWinningLines()} // Filas ganadoras
           lineType={lineType} // Tipo de línea para resaltar
         />
