@@ -123,7 +123,16 @@ export default function LobbyPage() {
             </div>
           </div>
         </div>
-        <div className="user-actions">
+        <div className="user-actions" style={{border: '2px solid red'}}>
+          <button
+            className="btn-profile btn-history"
+            onClick={() => setShowActivityHistory(true)}
+            title="Ver mi historial de actividad"
+            style={{display: 'flex', background: 'green'}}
+          >
+            <FileText size={20} />
+            <span>Mi Historial</span>
+          </button>
           <div className="profile-menu-container">
             <button
               className="btn-profile"
@@ -134,13 +143,6 @@ export default function LobbyPage() {
             </button>
             {showProfileMenu && (
               <div className="profile-dropdown">
-                <button className="dropdown-item" onClick={() => {
-                  setShowProfileMenu(false);
-                  setShowActivityHistory(true);
-                }}>
-                  <FileText size={16} />
-                  <span>Mi Historial</span>
-                </button>
                 <button className="dropdown-item" onClick={() => {
                   setShowProfileMenu(false);
                   // TODO: Abrir modal cambiar contraseña

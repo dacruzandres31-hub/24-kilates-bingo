@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const activityHistoryController = require('../controllers/activityHistoryController');
-const authMiddleware = require('../middleware/authMiddleware');
+const { authenticateToken } = require('../middleware/authMiddleware');
 
 // Todas las rutas requieren autenticación
-router.use(authMiddleware);
+router.use(authenticateToken);
 
 /**
  * GET /api/activity-history

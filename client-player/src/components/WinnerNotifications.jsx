@@ -28,6 +28,8 @@ export default function WinnerNotifications({ socket, currentUser }) {
   const [showConfetti, setShowConfetti] = useState(false);
   const [showParticles, setShowParticles] = useState(false);
   const [particleLineType, setParticleLineType] = useState('horizontal');
+  const [showLineInfoModal, setShowLineInfoModal] = useState(false);
+  const [lineWinnerData, setLineWinnerData] = useState(null);
   const notificationIdRef = useRef(0);
 
   useEffect(() => {
@@ -36,16 +38,19 @@ export default function WinnerNotifications({ socket, currentUser }) {
     // Escuchar ganador de línea
     socket.on('line_winner', (data) => {
       console.log('[WinnerNotifications] Line winner:', data);
+      
+      const isMe = currentUser && data.username === currentUser.username;
+      
       addNotification({
         type: 'line',
-        username: data.username,
+        username: data.username || data.winner?.username,
         prize: data.prizeAmount,
         lineType: data.lineType,
-        isMe: currentUser && data.username === currentUser.username
+        isMe: isMe
       });
 
       // Si soy yo, efectos especiales
-      if (currentUser && data.username === currentUser.username) {
+      if (isMe) {
         // Vibrar dispositivo
         if ('vibrate' in navigator) {
           navigator.vibrate([200, 100, 200]);
@@ -55,6 +60,19 @@ export default function WinnerNotifications({ socket, currentUser }) {
         setParticleLineType(data.lineType || 'horizontal');
         setShowParticles(true);
         setTimeout(() => setShowParticles(false), 1600);
+      } else {
+        // Si NO soy yo, mostrar modal informativo con cartón ganador
+        setLineWinnerData({
+          username: data.username || data.winner?.username,
+          lineType: data.lineType,
+          winningCard: data.winningCard // { numbers: [[...]], winningNumbers: [...] }
+        });
+        setShowLineInfoModal(true);
+        
+        // Auto-cerrar después de 6 segundos (más tiempo para ver el cartón)
+        setTimeout(() => {
+          setShowLineInfoModal(false);
+        }, 6000);
       }
     });
 
@@ -202,6 +220,14 @@ export default function WinnerNotifications({ socket, currentUser }) {
             setWinnerInfo(null);
           }}
           onSubmit={handleSubmitWithdrawal}
+        />
+      )}
+
+      {/* Modal informativo de línea ganada (para NO ganadores) */}
+      {showLineInfoModal && lineWinnerData && (
+        <LineWinnerInfoModal
+          winnerData={lineWinnerData}
+          onClose={() => setShowLineInfoModal(false)}
         />
       )}
     </>
@@ -418,6 +444,87 @@ function PaymentFormModal({ winnerInfo, onClose, onSubmit }) {
               ⏱️ Tu pago será procesado en 20 minutos
             </p>
           </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Componente: Modal informativo de línea ganada (para jugadores que NO ganaron)
+function LineWinnerInfoModal({ winnerData, onClose }) {
+  const { username, lineType, winningCard } = winnerData;
+  
+  const getLineTypeText = () => {
+    if (!lineType) return 'Línea';
+    if (lineType.includes('horizontal')) return 'Horizontal';
+    if (lineType.includes('vertical')) return 'Vertical';
+    if (lineType.includes('diagonal')) return 'Diagonal';
+    return lineType;
+  };
+
+  // Renderizar el cartón ganador con números destacados
+  const renderWinningCard = () => {
+    if (!winningCard || !winningCard.numbers) return null;
+
+    const { numbers, winningNumbers = [] } = winningCard;
+
+    return (
+      <div className="winning-card-display">
+        <div className="bingo-header-labels">
+          {['B', 'I', 'N', 'G', 'O'].map((letter, idx) => (
+            <div key={idx} className="bingo-letter">{letter}</div>
+          ))}
+        </div>
+        <div className="winning-card-grid">
+          {numbers.map((row, rowIdx) => (
+            row.map((num, colIdx) => {
+              const isFree = rowIdx === 2 && colIdx === 2;
+              const isWinning = winningNumbers.includes(num) || (isFree && winningNumbers.includes('FREE'));
+              
+              return (
+                <div 
+                  key={`${rowIdx}-${colIdx}`} 
+                  className={`card-cell ${isFree ? 'free-cell' : ''} ${isWinning ? 'winning-number' : ''}`}
+                >
+                  {isFree ? '★' : num}
+                </div>
+              );
+            })
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="line-winner-info-overlay" onClick={onClose}>
+      <div className="line-winner-info-modal" onClick={(e) => e.stopPropagation()}>
+        <button className="btn-close-modal" onClick={onClose}>
+          <X size={20} />
+        </button>
+
+        <div className="line-winner-content">
+          <div className="line-winner-icon">
+            <Sparkles size={48} className="icon-sparkles" />
+          </div>
+
+          <h2 className="line-winner-title">¡Línea Ganada!</h2>
+
+          <div className="line-winner-details">
+            <p className="winner-username">{username}</p>
+            <p className="winner-description">ganó la línea {getLineTypeText()}</p>
+          </div>
+
+          {/* Mostrar cartón ganador si está disponible */}
+          {renderWinningCard()}
+
+          <div className="continue-message">
+            <p>Continuamos a <strong>BINGO</strong></p>
+          </div>
+
+          <button className="btn-continue" onClick={onClose}>
+            Continuar
+          </button>
         </div>
       </div>
     </div>

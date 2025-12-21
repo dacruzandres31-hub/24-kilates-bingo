@@ -5,6 +5,7 @@ import axios from 'axios';
 import '../styles/CasinoLobby.css';
 import '../styles/Countdown.css';
 import Countdown from './Countdown';
+import PlayerActivityHistory from './PlayerActivityHistory';
 import { FaClock, FaUsers, FaMoneyBillWave, FaTrophy, FaStar, FaGlassCheers, FaGift, FaHeadset, FaTicketAlt, FaEye, FaEyeSlash, FaMusic, FaVolumeUp, FaVolumeMute, FaUser, FaKey, FaSignOutAlt } from 'react-icons/fa';
 import logo from '../assets/logo.png';
 import giftIcon from '../assets/Gift_icon.png';
@@ -197,6 +198,7 @@ const CasinoLobby = ({ user, onLogout }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [userData, setUserData] = useState(null);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showActivityHistory, setShowActivityHistory] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
@@ -490,6 +492,13 @@ const CasinoLobby = ({ user, onLogout }) => {
           </div>
         </div>
         <div className="user-actions">
+          <button
+            className="btn-profile btn-history"
+            onClick={() => setShowActivityHistory(true)}
+          >
+            <FaStar />
+            <span>Mi Historial</span>
+          </button>
           <div className="profile-menu-container">
             <button
               className="btn-profile"
@@ -855,6 +864,11 @@ const CasinoLobby = ({ user, onLogout }) => {
           </div>
         </div>,
         document.body
+      )}
+
+      {/* Activity History Modal */}
+      {showActivityHistory && (
+        <PlayerActivityHistory onClose={() => setShowActivityHistory(false)} />
       )}
     </div>
   );

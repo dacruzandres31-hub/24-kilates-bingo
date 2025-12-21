@@ -245,19 +245,34 @@ class BingoCardGenerator {
   }
 
   /**
-   * Genera serial único global: 24K-[SALA][TIMESTAMP_BASE36]-[COUNTER]
-   * Ejemplo: 24K-S1A2B3C4D-000001
-   * Garantiza unicidad incluso con múltiples servidores y reinicios
+   * Genera serial único global: SALA-YYYYMMDD-NNNNNN
+   * Ejemplo: STA-20251220-000001 (Starter)
+   *          BRO-20251220-000045 (Bronce)
+   * Garantiza legibilidad y trazabilidad por fecha
    */
   generateUniqueSerial(globalCounter, roomLetter, timestamp) {
-    // Timestamp en base36 (más compacto)
-    const tsBase36 = timestamp.toString(36).toUpperCase().slice(-8);
+    // Mapeo de letra de sala a prefijo
+    const roomPrefixes = {
+      'S': 'STA',  // Starter
+      'B': 'BRO',  // Bronce (Bronze)
+      'P': 'PLA',  // Plata (Silver)
+      'O': 'ORO'   // Oro (Gold)
+    };
     
-    // Contador con 6 dígitos (soporta hasta 999,999 cartones)
+    const prefix = roomPrefixes[roomLetter] || 'XXX';
+    
+    // Fecha en formato YYYYMMDD
+    const date = new Date(timestamp);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateStr = `${year}${month}${day}`;
+    
+    // Contador con 6 dígitos (soporta hasta 999,999 cartones por día)
     const counterStr = String(globalCounter).padStart(6, '0');
     
-    // Formato: 24K-[SALA][TIMESTAMP]-[COUNTER]
-    return `24K-${roomLetter}${tsBase36}-${counterStr}`;
+    // Formato: SALA-YYYYMMDD-NNNNNN
+    return `${prefix}-${dateStr}-${counterStr}`;
   }
 
   /**

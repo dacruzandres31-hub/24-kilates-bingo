@@ -8,6 +8,7 @@
  */
 
 const pool = require('../db');
+const BingoCardGenerator = require('../utils/cardGenerator');
 
 class CardPoolManager {
   constructor() {
@@ -17,63 +18,97 @@ class CardPoolManager {
   }
 
   /**
-   * Genera un cartón aleatorio de bingo (3 filas x 5 columnas)
-   * @returns {Array} Matriz 3x5 con números del cartón
+   * Genera un cartón aleatorio de bingo (3 filas x 9 columnas)
+   * Cada fila tiene 5 números y 4 espacios vacíos (null)
+   * @returns {Array} Matriz 3x9 con números del cartón
    */
   generateBingoCard() {
-    const card = [];
-    const ranges = [
-      [1, 15],   // Columna B
-      [16, 30],  // Columna I
-      [31, 45],  // Columna N
-      [46, 60],  // Columna G
-      [61, 75]   // Columna O
-    ];
-
-    // Generar 3 filas
-    for (let row = 0; row < 3; row++) {
-      const cardRow = [];
-      
-      // Generar 5 columnas
-      for (let col = 0; col < 5; col++) {
-        const [min, max] = ranges[col];
-        const usedInColumn = card
-          .map(r => r[col])
-          .filter(n => n !== undefined);
-        
-        let number;
-        do {
-          number = Math.floor(Math.random() * (max - min + 1)) + min;
-        } while (usedInColumn.includes(number));
-        
-        cardRow.push(number);
-      }
-      
-      card.push(cardRow);
-    }
-
-    return card;
+    return BingoCardGenerator.generateCard();
   }
 
   /**
    * Genera un serial único para el cartón
-   * Formato: ROOM-TIMESTAMP-RANDOM
+   * Formato: SALA-YYYYMMDD-NNNNNNNN-L (8 dígitos + letra A-Z)
+   * Ejemplo: STA-20251220-00000454-A
+   * Capacidad: 26 series × 100M = 2,600 millones de cartones por sala
    * @param {string} room - Nombre de la sala
+   * @param {number} index - Índice secuencial del cartón
+   * @param {number} startFrom - Número inicial para continuar secuencia
    * @returns {string} Serial único
    */
-  generateSerial(room) {
+  generateSerial(room, index, startFrom = 0) {
     const roomPrefix = {
-      'free_starter': 'STR',
+      'starter': 'STA',
       'bronce': 'BRO',
       'plata': 'PLA',
       'oro': 'ORO'
     };
     
     const prefix = roomPrefix[room] || 'XXX';
-    const timestamp = Date.now().toString(36).toUpperCase();
-    const random = Math.random().toString(36).substring(2, 8).toUpperCase();
     
-    return `${prefix}-${timestamp}-${random}`;
+    // Fecha en formato YYYYMMDD
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const dateStr = `${year}${month}${day}`;
+    
+    // Número total global (para calcular letra y número)
+    const totalNumber = startFrom + index;
+    
+    // Calcular letra (A-Z): cada 100M cartones cambia la letra
+    const letterIndex = Math.floor(totalNumber / 100000000);
+    const letter = String.fromCharCode(65 + (letterIndex % 26)); // 65 = 'A'
+    
+    // Número secuencial de 8 dígitos dentro de la serie actual
+    const sequential = String(totalNumber % 100000000).padStart(8, '0');
+    
+    return `${prefix}-${dateStr}-${sequential}-${letter}`;
+  }
+
+  /**
+   * Obtiene el último número serial usado para una sala (sin importar la fecha)
+   * Esto garantiza numeración continua sin reinicio entre días
+   * Parsea formato: SALA-YYYYMMDD-NNNNNNNN-L
+   * @param {string} room - Nombre de la sala
+   * @returns {Promise<number>} Último número secuencial global usado
+   */
+  async getLastSerialNumber(room) {
+    const roomPrefix = {
+      'starter': 'STA',
+      'bronce': 'BRO',
+      'plata': 'PLA',
+      'oro': 'ORO'
+    };
+    
+    const prefix = roomPrefix[room] || 'XXX';
+    
+    // Buscar el último serial de esta sala sin importar la fecha
+    const pattern = `${prefix}-%`;
+    
+    const [rows] = await pool.query(`
+      SELECT card_serial 
+      FROM bingo_cards_pool 
+      WHERE card_serial LIKE ?
+      ORDER BY card_serial DESC 
+      LIMIT 1
+    `, [pattern]);
+    
+    if (rows.length === 0) {
+      return 0; // No hay cartones previos, empezar desde 0
+    }
+    
+    // Extraer número y letra del serial: SALA-YYYYMMDD-NNNNNNNN-L
+    const lastSerial = rows[0].card_serial;
+    const parts = lastSerial.split('-');
+    const numberPart = parseInt(parts[2], 10);
+    const letterPart = parts[3] || 'A'; // Si no tiene letra, asumir 'A'
+    
+    // Calcular número global: (letra × 100M) + número
+    const letterIndex = letterPart.charCodeAt(0) - 65; // 'A' = 0, 'B' = 1, etc.
+    const globalNumber = (letterIndex * 100000000) + numberPart;
+    
+    return globalNumber + 1; // Retornar el siguiente número para continuar la secuencia
   }
 
   /**
@@ -110,11 +145,15 @@ class CardPoolManager {
     try {
       console.log(`[CardPoolManager] 🎫 Generando ${quantity} cartones para sala ${room}...`);
       
+      // Obtener el último número serial usado para continuar la secuencia
+      const startFrom = await this.getLastSerialNumber(room);
+      console.log(`[CardPoolManager] 📍 Continuando numeración desde: ${startFrom}`);
+      
       const cardsToInsert = [];
       
       for (let i = 0; i < quantity; i++) {
         const cardData = this.generateBingoCard();
-        const serial = this.generateSerial(room);
+        const serial = this.generateSerial(room, i, startFrom);
         
         cardsToInsert.push({
           room,
@@ -131,11 +170,11 @@ class CardPoolManager {
         const chunk = cardsToInsert.slice(i, i + CHUNK_SIZE);
         
         const values = chunk.map(card => 
-          `('${card.room}', '${card.serial}', '${card.data}', 'available')`
+          `('${card.serial}', '${card.room}', '${card.data}', 'available')`
         ).join(',');
         
         await pool.query(`
-          INSERT INTO bingo_cards_pool (room, serial, card_data, status) 
+          INSERT INTO bingo_cards_pool (card_serial, room, numbers, status) 
           VALUES ${values}
         `);
         
@@ -210,7 +249,7 @@ class CardPoolManager {
    * @returns {Promise<object>} Resultado de la inicialización
    */
   async initializeAllRooms() {
-    const rooms = ['free_starter', 'bronce', 'plata', 'oro'];
+    const rooms = ['starter', 'bronce', 'plata', 'oro'];
     const results = {};
 
     for (const room of rooms) {

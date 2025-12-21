@@ -17,36 +17,25 @@ const pool = require('../db');
 exports.getActivityHistory = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { type, limit = 50, offset = 0 } = req.query;
+    console.log('[ActivityHistory] Obteniendo historial para usuario:', userId);
 
-    const history = {};
+    const history = {
+      cards: [],
+      prizes: [],
+      movements: [],
+      summary: {
+        totalCards: 0,
+        totalPrizes: 0,
+        totalWinnings: 0
+      }
+    };
 
-    // 1. MOVIMIENTOS DE TICKETS (Compras al agente)
-    if (!type || type === 'tickets') {
-      const [ticketsMovements] = await pool.query(`
-        SELECT 
-          id,
-          movement_type,
-          room,
-          quantity,
-          created_at,
-          description
-        FROM tickets_movements
-        WHERE user_id = ?
-        ORDER BY created_at DESC
-        LIMIT ? OFFSET ?
-      `, [userId, parseInt(limit), parseInt(offset)]);
-
-      history.ticketsMovements = ticketsMovements;
-    }
-
-    // 2. CARTONES CANJEADOS (Para sorteos)
-    if (!type || type === 'cards') {
-      const [cardsExchanged] = await pool.query(`
+    // 1. CARTONES JUGADOS
+    try {
+      const [cardsPlayed] = await pool.query(`
         SELECT 
           cp.id,
-          cp.serial,
-          cp.card_data,
+          cp.card_serial as serial,
           cp.room,
           cp.is_gift,
           cp.selected_at,
@@ -57,148 +46,63 @@ exports.getActivityHistory = async (req, res) => {
         LEFT JOIN game_sessions gs ON cp.game_session_id = gs.id
         WHERE cp.selected_by = ?
         ORDER BY cp.selected_at DESC
-        LIMIT ? OFFSET ?
-      `, [userId, parseInt(limit), parseInt(offset)]);
+        LIMIT 50
+      `, [userId]);
 
-      // Parsear card_data JSON
-      history.cardsExchanged = cardsExchanged.map(card => ({
-        ...card,
-        card_data: card.card_data ? JSON.parse(card.card_data) : null
-      }));
+      history.cards = cardsPlayed;
+      history.summary.totalCards = cardsPlayed.length;
+    } catch (err) {
+      console.error('[ActivityHistory] Error en cartones:', err.message);
     }
 
-    // 3. SORTEOS EN LOS QUE PARTICIPÓ
-    if (!type || type === 'sessions') {
-      const [participatedSessions] = await pool.query(`
-        SELECT DISTINCT
-          sh.id as history_id,
-          sh.game_session_id,
-          sh.room,
-          sh.draw_date,
-          sh.draw_time,
-          sh.winner_linea_username,
-          sh.winner_bingo_username,
-          sh.linea_ball_number,
-          sh.linea_ball_index,
-          sh.bingo_ball_number,
-          sh.bingo_ball_index,
-          sh.ball_sequence,
-          sh.prize_linea,
-          sh.prize_bingo,
-          sh.total_cards,
-          (SELECT COUNT(*) FROM bingo_cards_pool 
-           WHERE selected_by = ? AND game_session_id = sh.game_session_id) as my_cards_count
-        FROM session_history sh
-        WHERE EXISTS (
-          SELECT 1 FROM bingo_cards_pool cp
-          WHERE cp.game_session_id = sh.game_session_id
-          AND cp.selected_by = ?
-        )
-        ORDER BY sh.draw_date DESC, sh.draw_time DESC
-        LIMIT ? OFFSET ?
-      `, [userId, userId, parseInt(limit), parseInt(offset)]);
-
-      // Parsear ball_sequence JSON
-      history.participatedSessions = participatedSessions.map(session => ({
-        ...session,
-        ball_sequence: session.ball_sequence ? JSON.parse(session.ball_sequence) : [],
-        is_winner_linea: session.winner_linea_username === req.user.username,
-        is_winner_bingo: session.winner_bingo_username === req.user.username
-      }));
-    }
-
-    // 4. PREMIOS GANADOS
-    if (!type || type === 'prizes') {
-      const [prizesWon] = await pool.query(`
+    // 2. PREMIOS GANADOS
+    try {
+      const [prizes] = await pool.query(`
         SELECT 
           gw.id,
           gw.game_session_id,
           gw.prize_type,
           gw.prize_amount,
           gw.payment_status,
-          gw.payment_method,
-          gw.payment_details,
           gw.claimed_at,
           gw.paid_at,
           gs.room,
-          gs.start_time as session_date,
-          cp.serial as card_serial
+          gs.start_time as session_date
         FROM game_winners gw
         INNER JOIN game_sessions gs ON gw.game_session_id = gs.id
-        LEFT JOIN bingo_cards_pool cp ON gw.card_id = cp.id
         WHERE gw.user_id = ?
         ORDER BY gw.claimed_at DESC
-        LIMIT ? OFFSET ?
-      `, [userId, parseInt(limit), parseInt(offset)]);
+        LIMIT 50
+      `, [userId]);
 
-      history.prizesWon = prizesWon.map(prize => ({
-        ...prize,
-        payment_details: prize.payment_details ? JSON.parse(prize.payment_details) : null
-      }));
+      history.prizes = prizes;
+      history.summary.totalPrizes = prizes.length;
+      history.summary.totalWinnings = prizes.reduce((sum, p) => sum + parseFloat(p.prize_amount || 0), 0);
+    } catch (err) {
+      console.error('[ActivityHistory] Error en premios:', err.message);
     }
 
-    // 5. SOLICITUDES DE RETIRO
-    if (!type || type === 'withdrawals') {
-      const [withdrawals] = await pool.query(`
-        SELECT 
-          id,
-          amount,
-          payment_method,
-          payment_details,
-          status,
-          created_at,
-          processed_at,
-          processed_by,
-          notes
-        FROM withdrawal_requests
-        WHERE user_id = ?
-        ORDER BY created_at DESC
-        LIMIT ? OFFSET ?
-      `, [userId, parseInt(limit), parseInt(offset)]);
-
-      history.withdrawals = withdrawals.map(w => ({
-        ...w,
-        payment_details: w.payment_details ? JSON.parse(w.payment_details) : null
-      }));
-    }
-
-    // 6. MOVIMIENTOS DE BALANCE (Chips/Dinero)
-    if (!type || type === 'balance') {
-      const [balanceMovements] = await pool.query(`
+    // 3. MOVIMIENTOS DE FICHAS
+    try {
+      const [movements] = await pool.query(`
         SELECT 
           id,
           movement_type,
           amount,
-          balance_before,
-          balance_after,
           description,
           created_at
         FROM chips_movements
         WHERE user_id = ?
         ORDER BY created_at DESC
-        LIMIT ? OFFSET ?
-      `, [userId, parseInt(limit), parseInt(offset)]);
+        LIMIT 50
+      `, [userId]);
 
-      history.balanceMovements = balanceMovements;
+      history.movements = movements;
+    } catch (err) {
+      console.error('[ActivityHistory] Error en movimientos:', err.message);
     }
 
-    // 7. RESUMEN ESTADÍSTICO
-    if (!type) {
-      const [summary] = await pool.query(`
-        SELECT 
-          (SELECT COUNT(*) FROM tickets_movements WHERE user_id = ?) as total_ticket_purchases,
-          (SELECT COUNT(*) FROM bingo_cards_pool WHERE selected_by = ?) as total_cards_used,
-          (SELECT COUNT(DISTINCT game_session_id) FROM bingo_cards_pool 
-           WHERE selected_by = ? AND game_session_id IS NOT NULL) as sessions_played,
-          (SELECT COUNT(*) FROM game_winners WHERE user_id = ?) as prizes_won,
-          (SELECT COALESCE(SUM(prize_amount), 0) FROM game_winners 
-           WHERE user_id = ? AND payment_status = 'paid') as total_prizes_paid,
-          (SELECT COUNT(*) FROM withdrawal_requests 
-           WHERE user_id = ? AND status = 'approved') as withdrawals_approved
-      `, [userId, userId, userId, userId, userId, userId]);
-
-      history.summary = summary[0];
-    }
+    console.log('[ActivityHistory] Historial completo para usuario', userId);
 
     res.json({
       success: true,

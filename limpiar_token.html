@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Limpiando sesión...</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: white;
+        }
+        .container {
+            text-align: center;
+            padding: 40px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        h1 {
+            margin: 0 0 20px 0;
+            font-size: 2em;
+            background: linear-gradient(135deg, #FFD700, #FFA500);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(255, 215, 0, 0.3);
+            border-top-color: #FFD700;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        p {
+            font-size: 1.1em;
+            color: rgba(255, 255, 255, 0.8);
+        }
+        .success {
+            color: #10B981;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧹 Limpiando Sesión</h1>
+        <div class="spinner"></div>
+        <p id="status">Eliminando token expirado...</p>
+        <p class="success" id="redirect" style="display: none;">✓ Listo! Redirigiendo al login...</p>
+    </div>
+
+    <script>
+        // Esperar 500ms para que se vea la animación
+        setTimeout(() => {
+            // Limpiar TODO el localStorage
+            localStorage.clear();
+            
+            // Limpiar también sessionStorage por si acaso
+            sessionStorage.clear();
+            
+            // Mostrar mensaje de éxito
+            document.getElementById('status').style.display = 'none';
+            document.getElementById('redirect').style.display = 'block';
+            
+            // Redirigir al login después de 1 segundo
+            setTimeout(() => {
+                window.location.href = 'http://localhost:5173/login';
+            }, 1000);
+        }, 500);
+    </script>
+</body>
+</html>

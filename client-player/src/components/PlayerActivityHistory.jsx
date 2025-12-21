@@ -16,15 +16,34 @@ const PlayerActivityHistory = ({ onClose }) => {
   const loadHistory = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
+      // Buscar token en ambas ubicaciones (playerToken es el correcto)
+      const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
+      
+      // Si no hay token, mostrar error y no intentar cargar
+      if (!token) {
+        setError('Sesión expirada. Por favor, cierra sesión y vuelve a iniciar sesión.');
+        setLoading(false);
+        return;
+      }
+      
+      console.log('🔍 Cargando historial desde:', `${import.meta.env.VITE_API_URL}/activity-history`);
+      console.log('🔑 Token encontrado:', token ? 'Sí' : 'No');
       const response = await axios.get(`${import.meta.env.VITE_API_URL}/activity-history`, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      console.log('✅ Historial cargado:', response.data);
       setHistory(response.data.history);
       setError(null);
     } catch (err) {
-      console.error('Error cargando historial:', err);
-      setError('Error al cargar el historial');
+      console.error('❌ Error cargando historial:', err);
+      console.error('Response:', err.response);
+      
+      // Si es 401, token expirado - mostrar mensaje sin redirigir
+      if (err.response?.status === 401) {
+        setError('Tu sesión ha expirado. Por favor, cierra sesión y vuelve a iniciar sesión desde el menú de Perfil.');
+      } else {
+        setError(err.response?.data?.error || err.message || 'Error al cargar el historial');
+      }
     } finally {
       setLoading(false);
     }
@@ -32,7 +51,7 @@ const PlayerActivityHistory = ({ onClose }) => {
 
   const loadSessionDetails = async (sessionId) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
       const response = await axios.get(
         `${import.meta.env.VITE_API_URL}/activity-history/session/${sessionId}`,
         { headers: { Authorization: `Bearer ${token}` } }

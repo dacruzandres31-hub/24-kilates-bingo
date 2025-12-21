@@ -11,8 +11,9 @@
  * @param {Object} winner - { id, username }
  * @param {Number} prizeAmount - Monto del premio
  * @param {String} lineType - Tipo de línea ganada
+ * @param {Object} winningCard - Datos del cartón ganador (opcional)
  */
-function notifyLineWinner(io, roomId, winner, prizeAmount, lineType) {
+function notifyLineWinner(io, roomId, winner, prizeAmount, lineType, winningCard = null) {
   // Broadcast a TODOS los jugadores de la sala
   io.to(`room_${roomId}`).emit('line_winner', {
     winner: {
@@ -21,6 +22,7 @@ function notifyLineWinner(io, roomId, winner, prizeAmount, lineType) {
     },
     prizeAmount: prizeAmount,
     lineType: lineType,
+    winningCard: winningCard, // { numbers: [[...]], winningNumbers: [...] }
     timestamp: new Date()
   });
 

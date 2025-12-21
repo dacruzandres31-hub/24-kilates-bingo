@@ -381,12 +381,33 @@ class GameEngineAuto {
 
       console.log(`   → ${winner.username}: $${prizePerWinner.toFixed(2)} (${winner.lineType})`);
 
+      // Obtener datos completos del cartón ganador
+      const [cardRows] = await pool.query(
+        'SELECT numbers, grid_data FROM bingo_cards_pool WHERE id = ?',
+        [winner.cardId]
+      );
+
+      let cardNumbers = null;
+      if (cardRows.length > 0) {
+        const card = cardRows[0];
+        if (card.numbers) {
+          cardNumbers = typeof card.numbers === 'string' ? JSON.parse(card.numbers) : card.numbers;
+        } else if (card.grid_data) {
+          const gridData = typeof card.grid_data === 'string' ? JSON.parse(card.grid_data) : card.grid_data;
+          cardNumbers = this.convertGridDataToMatrix(gridData);
+        }
+      }
+
       notifyLineWinner(
         this.io,
         gameState.roomId,
         { id: winner.userId, username: winner.username },
         prizePerWinner,
-        winner.lineType
+        winner.lineType,
+        cardNumbers ? {
+          numbers: cardNumbers,
+          winningNumbers: winner.winningNumbers
+        } : null
       );
     }
 
