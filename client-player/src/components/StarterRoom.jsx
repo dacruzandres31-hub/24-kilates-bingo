@@ -21,6 +21,7 @@ export default function StarterRoom({ onLogout }) {
   const [floatingBalls, setFloatingBalls] = useState([]);
   const [almostLineCards, setAlmostLineCards] = useState([]); // Cartones a 2 bolillas de línea
   const [expandedCard, setExpandedCard] = useState(null); // Cartón expandido actualmente
+  const [canCloseExpandedCard, setCanCloseExpandedCard] = useState(true); // Controla si se puede cerrar el cartón expandido
   const [lastHitCard, setLastHitCard] = useState(null); // Último cartón con acierto
   const [winnerCards, setWinnerCards] = useState([]); // Cartones ganadores con línea completa
   const [showVoiceSelector, setShowVoiceSelector] = useState(false); // Selector de voz
@@ -59,14 +60,14 @@ const [cardWinningLines, setCardWinningLines] = useState({}); // {cardId: [0,1,2
     }
   }, [showReadyModal]);
   
-  // Mostrar modal "¡¡Todo Listo!!" cuando los cartones disponibles llegan a 0
+  // Mostrar modal "¡¡Todo Listo!!" solo cuando tenga 20 cartones (máximo permitido)
   useEffect(() => {
     console.log('🔍 DEBUG - cardsRemaining:', cardsRemaining, 'selectedPlayerCards:', selectedPlayerCards.length);
-    if (cardsRemaining === 0 && selectedPlayerCards.length > 0) {
-      console.log('✅ Mostrando modal Todo Listo');
+    if (selectedPlayerCards.length >= 20) {
+      console.log('✅ Mostrando modal Todo Listo - tiene 20 cartones');
       setShowReadyModal(true);
     }
-  }, [cardsRemaining, selectedPlayerCards.length]);
+  }, [selectedPlayerCards.length]);
   
   // Estados para mejoras visuales
   const [toasts, setToasts] = useState([]); // Notificaciones toast
@@ -384,14 +385,14 @@ celebrationAudio.volume = 0.7;
       hasSerial: !!c.serial
     })));
     
-    // Usar el valor que viene del backend (ya descontó solo los comprados, no yapas)
-    const remaining = remainingTicketsFromBackend ?? (20 - allCards.length);
+    // Calcular cuántos cartones faltan basado en el total que tiene (máx 20)
+    const remaining = Math.max(0, 20 - allCards.length);
     setCardsRemaining(remaining);
     setShowCardSelection(false);
-    console.log(`✅ Total de cartones: ${allCards.length}, faltan: ${remaining}`);
+    console.log(`✅ Total de cartones: ${allCards.length}, faltan: ${remaining}, tickets backend: ${remainingTicketsFromBackend}`);
     
     // Si se completaron los 20 cartones, mostrar modal "¡¡Todo Listo!!"
-    if (allCards.length === 20) {
+    if (allCards.length >= 20) {
       setShowReadyModal(true);
     }
   };
@@ -415,8 +416,10 @@ celebrationAudio.volume = 0.7;
   // Expandir cartón (por click o por acierto)
   const expandCard = (cardId) => {
     setExpandedCard(cardId);
+    setCanCloseExpandedCard(false); // Bloquear cierre manual durante tiempo programado
     setTimeout(() => {
       setExpandedCard(null);
+      setCanCloseExpandedCard(true); // Restablecer después de cerrar
     }, 3500); // 3.5 segundos expandido
   };
 
@@ -1139,7 +1142,7 @@ useEffect(() => {
                 >
                   {!isExpanded && (
                     <>
-                      <div className="compact-card-serial">{cardSerial}</div>
+                      <div className="compact-card-serial" style={{ fontSize: '0.5rem', letterSpacing: '-0.4px', fontWeight: 700 }}>{cardSerial}</div>
                       <div className="compact-card-progress">
                         {Array.from({ length: 15 }).map((_, i) => (
                           <div 
@@ -1161,7 +1164,7 @@ useEffect(() => {
 
           {/* Cartón expandido en el centro */}
           {expandedCard && (
-            <div className="expanded-card-overlay" onClick={() => setExpandedCard(null)}>
+            <div className="expanded-card-overlay" onClick={() => canCloseExpandedCard && setExpandedCard(null)}>
               <div className="expanded-card-container" onClick={(e) => e.stopPropagation()}>
                 {playerCards
                   .filter(card => card.id === expandedCard)
@@ -1182,7 +1185,8 @@ useEffect(() => {
                   ))}
                 <button 
                   className="close-expanded-btn"
-                  onClick={() => setExpandedCard(null)}
+                  onClick={() => canCloseExpandedCard && setExpandedCard(null)}
+                  style={{ opacity: canCloseExpandedCard ? 1 : 0.3, cursor: canCloseExpandedCard ? 'pointer' : 'not-allowed' }}
                 >
                   ✕
                 </button>

@@ -204,10 +204,18 @@ const CardSelectionLobby = ({
       return;
     }
 
-    // Validar cantidad EXACTA según paquete seleccionado
+    // Validar cantidad EXACTA según paquete seleccionado (solo si tiene yapa)
     if (selectedPackage && selectedPackage.total > 0) {
       if (selectedCards.length !== selectedPackage.total) {
         alert(`⚠️ Debes seleccionar exactamente ${selectedPackage.total} cartones\n(${selectedPackage.buy} para comprar + ${selectedPackage.bonus} PLUS)\n\nActualmente tienes: ${selectedCards.length}`);
+        return;
+      }
+    }
+    
+    // Si es paquete sin yapa (total=0), permitir cualquier cantidad de 1 a maxCards
+    if (selectedPackage && selectedPackage.total === 0) {
+      if (selectedCards.length > maxCards) {
+        alert(`⚠️ Puedes seleccionar hasta ${maxCards} cartones\n\nActualmente tienes: ${selectedCards.length}`);
         return;
       }
     }
@@ -386,6 +394,7 @@ const CardSelectionLobby = ({
           onSelectPackage={handlePackageSelection}
           onClose={() => setShowPackageModal(false)}
           roomTheme={roomTheme}
+          currentCards={currentCards}
         />
       </div>
     );

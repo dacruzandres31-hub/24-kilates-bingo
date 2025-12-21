@@ -151,9 +151,13 @@ const BingoCardPreview = ({
               background: colors.primary,
               color: '#ffffff',
               fontSize: '1.1rem',
-              fontWeight: '800',
+              fontWeight: '700',
               opacity: '1',
-              textShadow: '1px 1px 3px rgba(0, 0, 0, 0.7)'
+              textShadow: '1px 1px 2px rgba(0, 0, 0, 0.7)',
+              letterSpacing: '-0.2px',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis'
             }}
           >
             {card.card_serial}

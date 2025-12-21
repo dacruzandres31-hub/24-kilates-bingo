@@ -21,6 +21,7 @@ export default function SilverRoom({ onLogout }) {
   const [floatingBalls, setFloatingBalls] = useState([]);
   const [almostLineCards, setAlmostLineCards] = useState([]); // Cartones a 2 bolillas de línea
   const [expandedCard, setExpandedCard] = useState(null); // Cartón expandido actualmente
+  const [canCloseExpandedCard, setCanCloseExpandedCard] = useState(true); // Controla si se puede cerrar el cartón expandido
   const [lastHitCard, setLastHitCard] = useState(null); // Último cartón con acierto
   const [winnerCards, setWinnerCards] = useState([]); // Cartones ganadores con línea completa
   const [showVoiceSelector, setShowVoiceSelector] = useState(false); // Selector de voz
@@ -382,8 +383,10 @@ celebrationAudio.volume = 0.7;
   // Expandir cartón (por click o por acierto)
   const expandCard = (cardId) => {
     setExpandedCard(cardId);
+    setCanCloseExpandedCard(false); // Bloquear cierre manual durante tiempo programado
     setTimeout(() => {
       setExpandedCard(null);
+      setCanCloseExpandedCard(true); // Restablecer después de cerrar
     }, 3500); // 3.5 segundos expandido
   };
 
@@ -1160,7 +1163,7 @@ useEffect(() => {
                 >
                   {!isExpanded && (
                     <>
-                      <div className="compact-card-serial">{cardSerial}</div>
+                      <div className="compact-card-serial" style={{ fontSize: '0.5rem', letterSpacing: '-0.4px', fontWeight: 700 }}>{cardSerial}</div>
                       <div className="compact-card-progress">
                         {Array.from({ length: 15 }).map((_, i) => (
                           <div 
@@ -1182,7 +1185,7 @@ useEffect(() => {
 
           {/* Cartón expandido en el centro */}
           {expandedCard && (
-            <div className="expanded-card-overlay" onClick={() => setExpandedCard(null)}>
+            <div className="expanded-card-overlay" onClick={() => canCloseExpandedCard && setExpandedCard(null)}>
               <div className="expanded-card-container" onClick={(e) => e.stopPropagation()}>
                 {playerCards
                   .filter(card => card.id === expandedCard)
@@ -1203,7 +1206,8 @@ useEffect(() => {
                   ))}
                 <button 
                   className="close-expanded-btn"
-                  onClick={() => setExpandedCard(null)}
+                  onClick={() => canCloseExpandedCard && setExpandedCard(null)}
+                  style={{ opacity: canCloseExpandedCard ? 1 : 0.3, cursor: canCloseExpandedCard ? 'pointer' : 'not-allowed' }}
                 >
                   ✕
                 </button>
