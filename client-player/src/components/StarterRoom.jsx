@@ -536,15 +536,17 @@ celebrationAudio.volume = 0.7;
       voiceService.speak('Felicitaciones, Ganaste Línea');
     }, 300);
     
-    // 2. Reproducir efectos de festejo
-    celebrationAudio.currentTime = 0;
-    celebrationAudio.play();
+    // 2. Toast de celebración (sin sonido)
+    addToast('🎉', '¡LÍNEA!', 'Has completado una línea', 8000);
     
     // 3. Activar confeti
     triggerConfetti();
     
-    // 4. Toast de celebración
-    addToast('🎉', '¡LÍNEA!', 'Has completado una línea', 8000);
+    // 4. DESPUÉS DE LA VOZ: Reproducir aplausos (1 segundo después para no interferir)
+    setTimeout(() => {
+      celebrationAudio.currentTime = 0;
+      celebrationAudio.play();
+    }, 1000);
     
     // 5. Pausar sorteo (pero NO anunciar "Sorteo Pausado" - se anunciará al reanudar)
     if (gameStatus === 'active') {

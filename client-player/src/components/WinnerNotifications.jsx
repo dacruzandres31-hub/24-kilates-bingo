@@ -67,8 +67,7 @@ export default function WinnerNotifications({ socket, currentUser }) {
         // Vibrar dispositivo
         if ('vibrate' in navigator) {
           navigator.vibrate([200, 100, 200]);
-        }, // { numbers: [[...]], winningNumbers: [...], serial }
-          room: getCurrentRoom() // Detectar sala actual
+        }
         
         // Mostrar partículas
         setParticleLineType(data.lineType || 'horizontal');
@@ -79,7 +78,8 @@ export default function WinnerNotifications({ socket, currentUser }) {
         setLineWinnerData({
           username: data.username || data.winner?.username,
           lineType: data.lineType,
-          winningCard: data.winningCard // { numbers: [[...]], winningNumbers: [...] }
+          winningCard: data.winningCard, // { numbers: [[...]], winningNumbers: [...], serial }
+          room: getCurrentRoom() // Detectar sala actual para colores correctos
         });
         setShowLineInfoModal(true);
         
@@ -505,6 +505,12 @@ function LineWinnerInfoModal({ winnerData, onClose }) {
 
     const { numbers, winningNumbers = [], serial } = winningCard;
     
+    console.log('[LineWinnerInfoModal] Renderizando cartón:');
+    console.log('  - numbers:', numbers);
+    console.log('  - winningNumbers:', winningNumbers);
+    console.log('  - lineType:', lineType);
+    console.log('  - room:', room);
+    
     // Preparar datos del cartón para BingoCardPreview
     const cardData = {
       card_serial: serial || 'LÍNEA-GANADORA',
@@ -519,9 +525,9 @@ function LineWinnerInfoModal({ winnerData, onClose }) {
           selected={false}
           onClick={null}
           showSerial={true}
-          drawnNumbers={winningNumbers}
-          winningLines={getWinningLines()}
-          lineType={lineType}
+          drawnNumbers={winningNumbers} // Números sorteados para marcarlos
+          winningLines={getWinningLines()} // Filas ganadoras
+          lineType={lineType} // Tipo de línea para resaltar
         />
       </div>
     );
