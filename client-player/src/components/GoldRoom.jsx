@@ -400,7 +400,7 @@ celebrationAudio.volume = 0.7;
 
   // Detectar cuando un número coincide con un cartón
   useEffect(() => {
-    if (ballsDrawn.length > 0) {
+    if (ballsDrawn.length > 0 && !lineCelebrated) { // No expandir si hay festejo de línea
       const latestBall = ballsDrawn[ballsDrawn.length - 1];
       
       // Buscar cartones que tienen este número
@@ -500,19 +500,21 @@ celebrationAudio.volume = 0.7;
   ) {
     setWinnerCards(cardsWithWinningLines);
     setLineCelebrated(true);
-    // Anunciar línea ganadora
+    
+    // 1. PRIMERO: Anunciar línea ganadora
     voiceService.speak('Felicitaciones, Ganaste Línea');
-    // Reproducir efectos de festejo
+    
+    // 2. Reproducir efectos de festejo
     celebrationAudio.currentTime = 0;
     celebrationAudio.play();
     
-    // Activar confeti
+    // 3. Activar confeti
     triggerConfetti();
     
-    // Toast de celebración
+    // 4. Toast de celebración
     addToast('🎉', '¡LÍNEA!', 'Has completado una línea', 8000);
     
-    // Pausar sorteo 20 segundos y cerrar modal automáticamente
+    // 5. Pausar sorteo (esto anuncia "Sorteo Pausado" automáticamente)
     if (gameStatus === 'active') {
       setGameStatus('waiting');
       const timeout = setTimeout(() => {
@@ -522,7 +524,8 @@ celebrationAudio.volume = 0.7;
       }, 20000);
       setPauseTimeout(timeout);
     }
-    // Resaltar la línea ganadora (primera del primer cartón)
+    
+    // 6. Resaltar la línea ganadora (primera del primer cartón)
     if (cardsWithWinningLines[0]?.lines?.length > 0) {
       setHighlightedLine(cardsWithWinningLines[0].lines[0].numbers);
     }
@@ -562,7 +565,7 @@ useEffect(() => {
 
   // Anunciar número cantado
   useEffect(() => {
-    if (ballsDrawn.length > 0) {
+    if (ballsDrawn.length > 0 && !lineCelebrated) { // No anunciar si hay festejo de línea
       const lastDrawnBall = ballsDrawn[ballsDrawn.length - 1];
       
       // Anunciar el número con voz
