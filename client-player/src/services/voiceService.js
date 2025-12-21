@@ -127,7 +127,7 @@ class VoiceService {
    * Anunciar línea ganadora
    */
   announceLinea() {
-    this.speak('¡Línea!', { rate: 0.85, pitch: 1.3, volume: 1.0 });
+    this.speak('Felicitaciones, Ganaste Línea', { rate: 0.9, pitch: 1.2, volume: 1.0 });
   }
 
   /**

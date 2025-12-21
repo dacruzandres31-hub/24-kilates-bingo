@@ -493,7 +493,7 @@ celebrationAudio.volume = 0.7;
     setWinnerCards(cardsWithWinningLines);
     setLineCelebrated(true);
     // Anunciar línea ganadora
-    voiceService.speak('Ganaste Línea');
+    voiceService.speak('Felicitaciones, Ganaste Línea');
     // Reproducir efectos de festejo
     celebrationAudio.currentTime = 0;
     celebrationAudio.play();

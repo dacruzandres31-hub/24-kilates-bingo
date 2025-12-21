@@ -8,7 +8,7 @@ import '../styles/BingoCardPreview.css';
  * - Números en celdas claras
  * - Espacios vacíos en color de sala
  * - Marcado automático de números sorteados
- * - Resaltado de líneas ganadoras
+ * - Resaltado de líneas ganadoras con animación intermitente
  */
 const BingoCardPreview = ({ 
   card, 
@@ -17,7 +17,8 @@ const BingoCardPreview = ({
   onClick, 
   showSerial = true,
   drawnNumbers = [],  // Números ya sorteados
-  winningLines = []   // Líneas ganadoras (ej: [0, 1, 2] para filas)
+  winningLines = [],  // Líneas ganadoras (ej: [0, 1, 2] para filas)
+  lineType = null     // Tipo de línea: 'horizontal_0', 'vertical_3', 'diagonal_main'
 }) => {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [animatingNumbers, setAnimatingNumbers] = useState([]);
@@ -124,8 +125,30 @@ const BingoCardPreview = ({
 
   // Función para verificar si una celda es parte de una línea ganadora
   const isWinningCell = (rowIdx, colIdx) => {
-    // Verificar si la fila está en winningLines
-    return winningLines.includes(rowIdx);
+    // Líneas horizontales
+    if (winningLines.includes(rowIdx)) {
+      return true;
+    }
+    
+    // Líneas verticales
+    if (lineType && lineType.includes('vertical')) {
+      const colMatch = lineType.match(/vertical_(\d+)/);
+      if (colMatch && parseInt(colMatch[1]) === colIdx) {
+        return true;
+      }
+    }
+    
+    // Línea diagonal principal (top-left a bottom-right)
+    if (lineType === 'diagonal_main' && rowIdx === colIdx) {
+      return true;
+    }
+    
+    // Línea diagonal secundaria (top-right a bottom-left)
+    if (lineType === 'diagonal_anti' && rowIdx + colIdx === 2) {
+      return true;
+    }
+    
+    return false;
   };
 
   return (

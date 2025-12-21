@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Trophy, DollarSign, X, Sparkles } from 'lucide-react';
 import ConfettiEffect from './ConfettiEffect';
 import ParticleEffect from './ParticleEffect';
+import BingoCardPreview from './BingoCardPreview';
 import '../styles/WinnerNotifications.css';
 
 /**
@@ -22,6 +24,7 @@ import '../styles/WinnerNotifications.css';
  */
 
 export default function WinnerNotifications({ socket, currentUser }) {
+  const location = useLocation();
   const [notifications, setNotifications] = useState([]);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [winnerInfo, setWinnerInfo] = useState(null);
@@ -31,6 +34,16 @@ export default function WinnerNotifications({ socket, currentUser }) {
   const [showLineInfoModal, setShowLineInfoModal] = useState(false);
   const [lineWinnerData, setLineWinnerData] = useState(null);
   const notificationIdRef = useRef(0);
+
+  // Detectar la sala actual desde la URL
+  const getCurrentRoom = () => {
+    const pathname = location.pathname;
+    if (pathname.includes('/starter')) return 'starter';
+    if (pathname.includes('/bronze')) return 'bronze';
+    if (pathname.includes('/silver')) return 'silver';
+    if (pathname.includes('/gold')) return 'gold';
+    return 'starter'; // default
+  };
 
   useEffect(() => {
     if (!socket) return;
@@ -54,7 +67,8 @@ export default function WinnerNotifications({ socket, currentUser }) {
         // Vibrar dispositivo
         if ('vibrate' in navigator) {
           navigator.vibrate([200, 100, 200]);
-        }
+        }, // { numbers: [[...]], winningNumbers: [...], serial }
+          room: getCurrentRoom() // Detectar sala actual
         
         // Mostrar partículas
         setParticleLineType(data.lineType || 'horizontal');
@@ -452,7 +466,7 @@ function PaymentFormModal({ winnerInfo, onClose, onSubmit }) {
 
 // Componente: Modal informativo de línea ganada (para jugadores que NO ganaron)
 function LineWinnerInfoModal({ winnerData, onClose }) {
-  const { username, lineType, winningCard } = winnerData;
+  const { username, lineType, winningCard, room = 'starter' } = winnerData;
   
   const getLineTypeText = () => {
     if (!lineType) return 'Línea';
@@ -462,36 +476,53 @@ function LineWinnerInfoModal({ winnerData, onClose }) {
     return lineType;
   };
 
-  // Renderizar el cartón ganador con números destacados
+  // Determinar qué filas son ganadoras según el tipo de línea
+  const getWinningLines = () => {
+    if (!lineType) return [];
+    
+    // Para líneas horizontales, extraer el índice de la fila
+    if (lineType.includes('horizontal')) {
+      const match = lineType.match(/horizontal_(\d+)/);
+      if (match) return [parseInt(match[1])];
+    }
+    
+    // Para líneas verticales, devolvemos todas las filas (resaltaremos la columna con CSS)
+    if (lineType.includes('vertical')) {
+      return []; // Manejado con clase especial
+    }
+    
+    // Para diagonales, devolvemos todas las filas
+    if (lineType.includes('diagonal')) {
+      return []; // Manejado con clase especial
+    }
+    
+    return [];
+  };
+
+  // Renderizar el cartón ganador usando BingoCardPreview
   const renderWinningCard = () => {
     if (!winningCard || !winningCard.numbers) return null;
 
-    const { numbers, winningNumbers = [] } = winningCard;
+    const { numbers, winningNumbers = [], serial } = winningCard;
+    
+    // Preparar datos del cartón para BingoCardPreview
+    const cardData = {
+      card_serial: serial || 'LÍNEA-GANADORA',
+      numbers: numbers
+    };
 
     return (
-      <div className="winning-card-display">
-        <div className="bingo-header-labels">
-          {['B', 'I', 'N', 'G', 'O'].map((letter, idx) => (
-            <div key={idx} className="bingo-letter">{letter}</div>
-          ))}
-        </div>
-        <div className="winning-card-grid">
-          {numbers.map((row, rowIdx) => (
-            row.map((num, colIdx) => {
-              const isFree = rowIdx === 2 && colIdx === 2;
-              const isWinning = winningNumbers.includes(num) || (isFree && winningNumbers.includes('FREE'));
-              
-              return (
-                <div 
-                  key={`${rowIdx}-${colIdx}`} 
-                  className={`card-cell ${isFree ? 'free-cell' : ''} ${isWinning ? 'winning-number' : ''}`}
-                >
-                  {isFree ? '★' : num}
-                </div>
-              );
-            })
-          ))}
-        </div>
+      <div className="winning-card-container-line">
+        <BingoCardPreview
+          card={cardData}
+          room={room}
+          selected={false}
+          onClick={null}
+          showSerial={true}
+          drawnNumbers={winningNumbers}
+          winningLines={getWinningLines()}
+          lineType={lineType}
+        />
       </div>
     );
   };
@@ -515,7 +546,7 @@ function LineWinnerInfoModal({ winnerData, onClose }) {
             <p className="winner-description">ganó la línea {getLineTypeText()}</p>
           </div>
 
-          {/* Mostrar cartón ganador si está disponible */}
+          {/* Mostrar cartón ganador con formato de sala */}
           {renderWinningCard()}
 
           <div className="continue-message">
