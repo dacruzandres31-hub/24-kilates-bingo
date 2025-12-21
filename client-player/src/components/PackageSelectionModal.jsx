@@ -1,5 +1,6 @@
 import React from 'react';
 import { FaGift, FaTimes } from 'react-icons/fa';
+import uiSoundService from '../services/uiSoundService';
 import '../styles/PackageSelectionModal.css';
 
 const PackageSelectionModal = ({ onSelectPackage, onClose, roomTheme, currentCards = 0 }) => {
@@ -81,7 +82,10 @@ const PackageSelectionModal = ({ onSelectPackage, onClose, roomTheme, currentCar
               <button
                 key={pkg.id}
                 className={`package-option animation-level-${pkg.animationLevel} ${isDisabled ? 'disabled' : ''}`}
-                onClick={() => !isDisabled && onSelectPackage(pkg)}
+                onClick={() => {
+                  uiSoundService.playClick();
+                  !isDisabled && onSelectPackage(pkg);
+                }}
                 disabled={isDisabled}
                 title={isDisabled ? disabledReason : ''}
               >

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { FaTicketAlt, FaLock, FaCheck, FaTimes, FaClock, FaUsers, FaArrowLeft } from 'react-icons/fa';
 import BingoCardPreview from './BingoCardPreview';
 import PackageSelectionModal from './PackageSelectionModal';
+import uiSoundService from '../services/uiSoundService';
 import axios from 'axios';
 import '../styles/CardSelectionLobby.css';
 
@@ -104,6 +105,9 @@ const CardSelectionLobby = ({
 
   // Función para actualizar y mostrar otros 5 cartones manteniendo los seleccionados
   const handleRefreshCards = async () => {
+    // Reproducir sonido de clic
+    uiSoundService.playClick();
+
     if (selectedCards.length === 0) {
       // Si no hay selección, solo recarga
       setRefreshing(true);
@@ -142,6 +146,9 @@ const CardSelectionLobby = ({
 
   const handleCardToggle = async (card) => {
     if (card.status === 'reserved') return; // Ya reservado por otro jugador
+
+    // Reproducir sonido de clic
+    uiSoundService.playClick();
 
     const isSelected = selectedCards.find(c => c.id === card.id);
     
@@ -200,6 +207,9 @@ const CardSelectionLobby = ({
   };
 
   const handleConfirmSelection = async () => {
+    // Reproducir sonido de clic
+    uiSoundService.playClick();
+
     if (selectedCards.length === 0) {
       alert('⚠️ Debes seleccionar al menos 1 cartón');
       return;
@@ -292,6 +302,9 @@ const CardSelectionLobby = ({
 
   // Manejar salida con advertencia si hay cartones reservados
   const handleExit = () => {
+    // Reproducir sonido de clic
+    uiSoundService.playClick();
+    
     // Siempre mostrar advertencia si hay cartones seleccionados
     if (selectedCards.length > 0) {
       setShowExitWarning(true);

@@ -532,6 +532,7 @@ celebrationAudio.volume = 0.7;
           setGameStatus('active');
           setWinnerCards([]);
           setHighlightedLine(null);
+          setLineCelebrated(false); // RESETEAR para que vuelvan a anunciarse los números
         }, 2000); // Esperar 2 segundos para que termine el anuncio
       }, 18000); // 18 segundos + 2 del anuncio = 20 segundos total
       setPauseTimeout(timeout);
