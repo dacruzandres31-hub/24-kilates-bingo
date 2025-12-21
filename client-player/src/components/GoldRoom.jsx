@@ -1194,7 +1194,7 @@ useEffect(() => {
                 >
                   {!isExpanded && (
                     <>
-                      <div className="compact-card-serial" style={{ fontSize: '0.5rem', letterSpacing: '-0.4px', fontWeight: 700 }}>{cardSerial}</div>
+                      <div className="compact-card-serial" style={{ fontSize: '1.5rem', letterSpacing: '-0.1px', fontWeight: 700 }}>{cardSerial}</div>
                       <div className="compact-card-progress">
                         {Array.from({ length: 15 }).map((_, i) => (
                           <div 

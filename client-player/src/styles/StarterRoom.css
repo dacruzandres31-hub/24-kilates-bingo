@@ -2496,18 +2496,18 @@
 }
 
 .compact-card-serial {
-  font-size: 0.5rem !important;
+  font-size: 1.5rem !important;
   font-weight: 700;
   color: #ff00ff;
   text-align: center;
-  letter-spacing: -0.4px;
+  letter-spacing: -0.1px;
   text-shadow: 0 0 8px rgba(255, 0, 255, 0.9),
                0 0 15px rgba(255, 0, 255, 0.6);
   position: absolute;
   z-index: 2;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%) scale(0.85);
+  transform: translate(-50%, -50%);
   width: 100%;
   padding: 0 1px;
   line-height: 1;
@@ -2584,7 +2584,18 @@
 }
 
 .compact-card-count {
-  display: none;
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #00ffff;
+  text-shadow: 0 0 8px rgba(0, 255, 255, 0.9),
+               0 0 15px rgba(0, 255, 255, 0.6);
+  z-index: 3;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 2px 5px;
+  border-radius: 4px;
 }
 
 /* ============================================

@@ -99,7 +99,8 @@ const CardSelectionLobby = ({
       loadAvailableCards();
     }
     // NO cargar cartones si el modal está abierto (evita el spinner infinito)
-  }, [roomTheme, showPackageModal, selectedPackage, loadAvailableCards]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomTheme, showPackageModal, selectedPackage]); // loadAvailableCards omitido intencionalmente para evitar loop
 
   // Función para actualizar y mostrar otros 5 cartones manteniendo los seleccionados
   const handleRefreshCards = async () => {
