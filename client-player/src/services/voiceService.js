@@ -77,8 +77,11 @@ class VoiceService {
   speak(text, options = {}) {
     if (!this.enabled || !this.synth) return;
 
-    // Cancelar cualquier anuncio anterior
-    this.synth.cancel();
+    // NO cancelar anuncios anteriores si estamos en medio de uno importante
+    // Solo cancelar si no hay nada hablando actualmente
+    if (!this.synth.speaking) {
+      this.synth.cancel();
+    }
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.voice = this.voice;
@@ -89,6 +92,14 @@ class VoiceService {
 
     utterance.onerror = (event) => {
       console.error('❌ Error en síntesis de voz:', event.error);
+    };
+
+    utterance.onstart = () => {
+      console.log('[VoiceService] 🎤 Hablando:', text);
+    };
+
+    utterance.onend = () => {
+      console.log('[VoiceService] ✅ Terminó:', text);
     };
 
     this.synth.speak(utterance);

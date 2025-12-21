@@ -501,15 +501,31 @@ function LineWinnerInfoModal({ winnerData, onClose }) {
 
   // Renderizar el cartón ganador usando BingoCardPreview
   const renderWinningCard = () => {
-    if (!winningCard || !winningCard.numbers) return null;
+    if (!winningCard || !winningCard.numbers) {
+      console.error('[LineWinnerInfoModal] ERROR: No hay datos del cartón');
+      console.log('  - winningCard:', winningCard);
+      return null;
+    }
 
     const { numbers, winningNumbers = [], serial } = winningCard;
     
-    console.log('[LineWinnerInfoModal] Renderizando cartón:');
-    console.log('  - numbers:', numbers);
-    console.log('  - winningNumbers:', winningNumbers);
-    console.log('  - lineType:', lineType);
-    console.log('  - room:', room);
+    console.log('[LineWinnerInfoModal] 🃏 Renderizando cartón ganador:');
+    console.log('  ✅ numbers:', numbers);
+    console.log('  ✅ numbers type:', typeof numbers, 'isArray:', Array.isArray(numbers));
+    console.log('  ✅ winningNumbers:', winningNumbers);
+    console.log('  ✅ lineType:', lineType);
+    console.log('  ✅ room:', room);
+    console.log('  ✅ serial:', serial);
+    
+    // Validar estructura del cartón
+    if (!Array.isArray(numbers)) {
+      console.error('[LineWinnerInfoModal] ERROR: numbers no es un array');
+      return null;
+    }
+    
+    if (numbers.length !== 3) {
+      console.error('[LineWinnerInfoModal] ERROR: numbers debe tener 3 filas, tiene:', numbers.length);
+    }
     
     // Preparar datos del cartón para BingoCardPreview
     const cardData = {

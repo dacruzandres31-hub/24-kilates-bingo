@@ -531,10 +531,11 @@ celebrationAudio.volume = 0.7;
     // Limpiar alertas de "casi línea" porque ya se ganó
     setAlmostLineCards([]);
     
-    // 1. PRIMERO: Anunciar línea ganadora (con delay para asegurar que se escuche)
+    // 1. PRIMERO: Anunciar línea ganadora INMEDIATAMENTE (100ms para dar tiempo a que se active el audio)
     setTimeout(() => {
-      voiceService.speak('Felicitaciones, Ganaste Línea');
-    }, 300);
+      console.log('[StarterRoom] 🎶 Reproduciendo voz: Felicitaciones, Ganaste Línea');
+      voiceService.speak('Felicitaciones, Ganaste Línea', { volume: 1.0, rate: 0.9 });
+    }, 100);
     
     // 2. Toast de celebración (sin sonido)
     addToast('🎉', '¡LÍNEA!', 'Has completado una línea', 8000);
@@ -542,11 +543,11 @@ celebrationAudio.volume = 0.7;
     // 3. Activar confeti
     triggerConfetti();
     
-    // 4. DESPUÉS DE LA VOZ: Reproducir aplausos (1 segundo después para no interferir)
+    // 4. DESPUÉS DE LA VOZ: Reproducir aplausos (1.5 segundos después para no interferir)
     setTimeout(() => {
       celebrationAudio.currentTime = 0;
       celebrationAudio.play();
-    }, 1000);
+    }, 1500);
     
     // 5. Pausar sorteo (pero NO anunciar "Sorteo Pausado" - se anunciará al reanudar)
     if (gameStatus === 'active') {
