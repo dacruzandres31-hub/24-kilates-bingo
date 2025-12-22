@@ -269,6 +269,58 @@ if (ballIndex > 40) {
 
 Rastreado via clave foránea `game_sessions.jackpot_source_id`.
 
+## Sistema de Celebración de Línea (v2.0 - Diciembre 2024)
+
+**Componentes Clave**:
+
+1. **Modal Rediseñado**: Usa `BingoCardPreview` (mismo componente de la grilla 6x5) en lugar de renderizado custom
+2. **Anti-Loop Definitivo**: Array `celebratedCardIds` que rastrea cartones ya festejados - NO se resetea durante el juego
+3. **Texto Pulsante**: `<h1 className="felicitaciones-pulse">` con animación `pulse-glow` dorada
+4. **Timing**: 100ms voz → 1.5s aplausos → 18s pausa → 2s "Continuamos hasta Bingo" → resume
+
+**Implementación en las 4 salas** (Starter, Bronze, Silver, Gold):
+
+```javascript
+// State Management
+const [celebratedCardIds, setCelebratedCardIds] = useState([]); // IDs ya festejados
+const [lineCelebrated, setLineCelebrated] = useState(false); // Flag actual
+
+// Detección de línea
+const newWinners = cardsWithWinningLines.filter(card => 
+  !celebratedCardIds.includes(card.cardId) // ← Filtro anti-loop
+);
+
+if (newWinners.length > 0 && !lineCelebrated) {
+  const winnerCard = newWinners[0];
+  setWinnerCards([winnerCard]);
+  setLineCelebrated(true);
+  setCelebratedCardIds([...celebratedCardIds, winnerCard.cardId]); // ← Marcar festejado
+}
+
+// Modal JSX
+{winnerCards.length > 0 && (
+  <div className="winner-celebration-overlay">
+    <div className="celebration-content">
+      <h1 className="felicitaciones-pulse">¡Felicitaciones!</h1>
+      <div className="celebration-subtitle">Ganaste Línea con el cartón {winnerCards[0].cardSerial}</div>
+      <div className="celebration-card-display">
+        <BingoCardPreview
+          card={{ card_serial: winnerCards[0].cardSerial, numbers: winnerCards[0].card.numbers }}
+          room="starter" // o "bronce", "plata", "oro"
+          drawnNumbers={ballsDrawn.map(b => b.number)}
+          winningLines={cardWinningLines[winnerCards[0].cardId] || []}
+        />
+      </div>
+    </div>
+  </div>
+)}
+```
+
+**CSS Crítico**:
+- `.felicitaciones-pulse`: Animación scale(1 → 1.05) + glow dorado cada 1.5s
+- `.celebration-card-display`: Reutiliza estilos de BingoCardPreview, números marcados correctos
+- `.confetti`: Caída animada con rotación aleatoria
+
 ## Errores Comunes a Evitar
 
 1. **No gestionar manualmente las salas de Socket.IO**: Usa `notificationService.initialize(io)` y `gameAdminController.initGameEngine(io)` - ellos manejan los joins a salas
@@ -277,6 +329,7 @@ Rastreado via clave foránea `game_sessions.jackpot_source_id`.
 4. **Las migraciones son aditivas**: Nunca modificar `schema.sql` directamente - crear nuevos archivos de migración
 5. **El frontend usa Vite**: HMR puede no reflejar cambios en `.env` - reiniciar dev server
 6. **MySQL 8.0+**: Usar `AUTO_INCREMENT` para IDs, `JSON` para datos estructurados, soporte para CTEs recursivos con `WITH RECURSIVE`
+7. **Celebración de Línea**: NUNCA resetear `celebratedCardIds` durante el juego - solo al iniciar nueva sesión. Usar filtro en lugar de comparación de longitudes
 
 ## Índice de Documentación
 

@@ -24,11 +24,12 @@ export default function StarterRoom({ onLogout }) {
   const [canCloseExpandedCard, setCanCloseExpandedCard] = useState(true); // Controla si se puede cerrar el cartón expandido
   const [lastHitCard, setLastHitCard] = useState(null); // Último cartón con acierto
   const [winnerCards, setWinnerCards] = useState([]); // Cartones ganadores con línea completa
+  const [celebratedCardIds, setCelebratedCardIds] = useState([]); // IDs de cartones ya festejados (previene loop)
+  const [lineCelebrated, setLineCelebrated] = useState(false); // Flag de festejo activo
   const [showVoiceSelector, setShowVoiceSelector] = useState(false); // Selector de voz
   const [availableVoices, setAvailableVoices] = useState([]); // Voces disponibles
   const [currentVoice, setCurrentVoice] = useState(null); // Voz actual
   const [audioStatus, setAudioStatus] = useState({ musicEnabled: true, efectosEnabled: true }); // Estado UI audio
-const [lineCelebrated, setLineCelebrated] = useState(false); // ¿Ya se festejó la línea?
 const [pauseTimeout, setPauseTimeout] = useState(null); // Controlar pausa automática
 const [highlightedLine, setHighlightedLine] = useState(null); // Línea a resaltar
 const [cardWinningLines, setCardWinningLines] = useState({}); // {cardId: [0,1,2]} líneas ganadoras por cartón
@@ -519,15 +520,19 @@ celebrationAudio.volume = 0.7;
 
   setAlmostLineCards(cardsAlmostThere);
 
-  // Mostrar celebración si hay NUEVOS ganadores y no se festejó la línea
-  // IMPORTANTE: Solo si cardsWithWinningLines.length > winnerCards.length (evita loop infinito)
-  if (
-    cardsWithWinningLines.length > 0 &&
-    cardsWithWinningLines.length > winnerCards.length &&
-    !lineCelebrated
-  ) {
-    setWinnerCards(cardsWithWinningLines);
+  // Mostrar celebración si hay NUEVOS ganadores que NO han sido festejados
+  // ANTI-LOOP: Verificar que el cartón NO esté en celebratedCardIds
+  const newWinners = cardsWithWinningLines.filter(card => 
+    !celebratedCardIds.includes(card.cardId)
+  );
+  
+  if (newWinners.length > 0 && !lineCelebrated) {
+    // Tomar el primer cartón ganador nuevo
+    const winnerCard = newWinners[0];
+    
+    setWinnerCards([winnerCard]); // Solo el nuevo ganador
     setLineCelebrated(true);
+    setCelebratedCardIds([...celebratedCardIds, winnerCard.cardId]); // Marcar como festejado
     
     // Limpiar alertas de "casi línea" porque ya se ganó
     setAlmostLineCards([]);
@@ -557,10 +562,10 @@ celebrationAudio.volume = 0.7;
         // Anunciar continuación a BINGO antes de reanudar
         voiceService.speak('Continuamos hasta Bingo');
         setTimeout(() => {
-          // ORDEN IMPORTANTE: Limpiar ganadores PRIMERO, luego resetear flag
-          setWinnerCards([]);
+          // Solo resetear el flag de celebración activa
+          // NO limpiar celebratedCardIds ni winnerCards - mantener historial
           setHighlightedLine(null);
-          setLineCelebrated(false); // RESETEAR después de limpiar ganadores
+          setLineCelebrated(false);
           setGameStatus('active');
         }, 2000); // Esperar 2 segundos para que termine el anuncio
       }, 18000); // 18 segundos + 2 del anuncio = 20 segundos total
@@ -744,47 +749,34 @@ useEffect(() => {
             onLogout={onLogout}
           />
 
-          {/* CELEBRACIÓN DE LÍNEA GANADORA */}
+          {/* CELEBRACIÓN DE LÍNEA GANADORA - Usa el cartón de la grilla con números marcados */}
           {winnerCards.length > 0 && (
   <div className="winner-celebration-overlay">
     <div className="celebration-content">
-      <div className="celebration-title">🎉 ¡LÍNEA! 🎉</div>
-      <div className="celebration-message">
-        {winnerCards.length === 1 
-          ? `¡Ganaste con el cartón ${winnerCards[0].cardSerial}!`
-          : `¡${winnerCards.length} cartones ganadores!`}
-      </div>
-      {/* Mostrar cartón completo y línea resaltada */}
+      {/* Título pulsante */}
+      <h1 className="felicitaciones-pulse">¡Felicitaciones!</h1>
+      <div className="celebration-subtitle">Ganaste Línea con el cartón {winnerCards[0].cardSerial}</div>
+      
+      {/* Cartón usando BingoCardPreview IGUAL que el expandido */}
       {winnerCards[0] && (
-        <div className="celebration-card-expanded">
-          <div className="card-header">
-            <span className="card-number">N° Serie: {winnerCards[0].cardSerial}</span>
-          </div>
-          <div className="card-grid card-grid-90">
-            {winnerCards[0].card.numbers.map((row, rowIdx) => (
-              <div key={rowIdx} className="card-row">
-                {row.map((num, colIdx) => {
-                  const isEmpty = num === null || num === undefined;
-                  const isLineCell = highlightedLine && highlightedLine.includes(num);
-                  return (
-                    <div
-                      key={colIdx}
-                      className={`card-cell ${isEmpty ? 'empty' : ''} ${isLineCell ? 'highlighted-line' : ''}`}
-                    >
-                      {isEmpty ? (
-                        <span className="empty-space"></span>
-                      ) : (
-                        <span className="cell-number">{num}</span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
+        <div className="celebration-card-display">
+          <BingoCardPreview
+            card={{
+              card_serial: winnerCards[0].cardSerial,
+              numbers: winnerCards[0].card.numbers
+            }}
+            room="starter"
+            selected={false}
+            onClick={null}
+            showSerial={true}
+            drawnNumbers={ballsDrawn.map(b => b.number)}
+            winningLines={cardWinningLines[winnerCards[0].cardId] || []}
+          />
         </div>
       )}
     </div>
+    
+    {/* Confetti animado */}
     <div className="confetti-container">
       {Array.from({ length: 50 }).map((_, i) => (
         <div 

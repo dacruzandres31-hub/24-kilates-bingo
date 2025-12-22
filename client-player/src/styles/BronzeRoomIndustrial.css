@@ -3963,3 +3963,249 @@
 .bronze-modal .ready-modal-countdown-label {
   color: #ff8c00 !important;
 }
+
+/* ============================================
+   FESTEJO DE LÍNEA - Usando cartón de grilla 6x5
+   ============================================ */
+
+.winner-celebration-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.95);
+  backdrop-filter: blur(10px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fade-in 0.3s ease-out;
+}
+
+.celebration-content {
+  text-align: center;
+  position: relative;
+  z-index: 10000;
+  max-width: 90vw;
+  animation: bounce-in 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes bounce-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Título "Felicitaciones" con pulso */
+.felicitaciones-pulse {
+  font-size: 4rem;
+  font-weight: 900;
+  color: #ffd700;
+  text-shadow: 
+    0 0 20px rgba(255, 215, 0, 1),
+    0 0 40px rgba(255, 215, 0, 0.8),
+    0 0 60px rgba(255, 215, 0, 0.6);
+  margin-bottom: 1rem;
+  animation: pulse-glow 1.5s ease-in-out infinite;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    transform: scale(1);
+    text-shadow: 
+      0 0 20px rgba(255, 215, 0, 1),
+      0 0 40px rgba(255, 215, 0, 0.8),
+      0 0 60px rgba(255, 215, 0, 0.6);
+  }
+  50% {
+    transform: scale(1.05);
+    text-shadow: 
+      0 0 30px rgba(255, 215, 0, 1),
+      0 0 60px rgba(255, 215, 0, 1),
+      0 0 90px rgba(255, 215, 0, 0.8);
+  }
+}
+
+.celebration-subtitle {
+  font-size: 1.8rem;
+  color: #d4a574;
+  margin-bottom: 2rem;
+  text-shadow: 0 0 15px rgba(212, 165, 116, 0.8);
+  font-weight: 600;
+}
+
+/* Contenedor del cartón en el festejo */
+.celebration-card-display {
+  display: flex;
+  justify-content: center;
+  margin-top: 2rem;
+  filter: drop-shadow(0 0 30px rgba(255, 215, 0, 0.8));
+}
+
+/* Confetti (ya existe pero agregamos más partículas) */
+.confetti-container {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+}
+
+.confetti {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  animation: confetti-fall 3s linear infinite;
+  top: -10px;
+}
+
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(-10px) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+/* Responsivo */
+@media (max-width: 768px) {
+  .felicitaciones-pulse {
+    font-size: 2.5rem;
+  }
+  
+  .celebration-subtitle {
+    font-size: 1.3rem;
+  }
+}
+
+
+/* ============================================
+   FESTEJO DE L�NEA - Usando cart�n de grilla 6x5
+   ============================================ */
+
+.winner-celebration-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.95);
+  backdrop-filter: blur(10px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fade-in 0.3s ease-out;
+}
+
+.celebration-content {
+  text-align: center;
+  position: relative;
+  z-index: 10000;
+  max-width: 90vw;
+  animation: bounce-in 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes bounce-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.felicitaciones-pulse {
+  font-size: 4rem;
+  font-weight: 900;
+  color: #ffd700;
+  text-shadow: 
+    0 0 20px rgba(255, 215, 0, 1),
+    0 0 40px rgba(255, 215, 0, 0.8),
+    0 0 60px rgba(255, 215, 0, 0.6);
+  margin-bottom: 1rem;
+  animation: pulse-glow 1.5s ease-in-out infinite;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    transform: scale(1);
+    text-shadow: 
+      0 0 20px rgba(255, 215, 0, 1),
+      0 0 40px rgba(255, 215, 0, 0.8),
+      0 0 60px rgba(255, 215, 0, 0.6);
+  }
+  50% {
+    transform: scale(1.05);
+    text-shadow: 
+      0 0 30px rgba(255, 215, 0, 1),
+      0 0 60px rgba(255, 215, 0, 1),
+      0 0 90px rgba(255, 215, 0, 0.8);
+  }
+}
+
+.celebration-subtitle {
+  font-size: 1.8rem;
+  color: #d4a574;
+  margin-bottom: 2rem;
+  text-shadow: 0 0 15px rgba(212, 165, 116, 0.8);
+  font-weight: 600;
+}
+
+.celebration-card-display {
+  display: flex;
+  justify-content: center;
+  margin-top: 2rem;
+  filter: drop-shadow(0 0 30px rgba(255, 215, 0, 0.8));
+}
+
+.confetti-container {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+}
+
+.confetti {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  animation: confetti-fall 3s linear infinite;
+  top: -10px;
+}
+
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(-10px) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .felicitaciones-pulse {
+    font-size: 2.5rem;
+  }
+  
+  .celebration-subtitle {
+    font-size: 1.3rem;
+  }
+}
+
