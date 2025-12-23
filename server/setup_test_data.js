@@ -19,7 +19,7 @@ async function setupTestData() {
     console.log(`Session ID: ${sessionId}`);
 
     // 2. Usar siempre el usuario admin para simplificar
-    const [adminUsers] = await conn.query(`SELECT id, username FROM users WHERE username = 'admin' LIMIT 1`);
+    const [adminUsers] = await conn.query(`SELECT id, username FROM users WHERE username = 'Andy' LIMIT 1`);
     if (adminUsers.length === 0) {
       throw new Error('Usuario admin no encontrado');
     }
@@ -36,7 +36,7 @@ async function setupTestData() {
       "G": [46, 50, 55, 58, 60],     // G: 46-60
       "O": [61, 65, 70, 72, 75]      // O: 61-75
     };
-    
+
     const [cardResult] = await conn.query(
       `INSERT INTO bingo_cards (user_id, session_id, grid_data, status, price)
        VALUES (?, ?, ?, 'active', 100)`,
@@ -49,11 +49,11 @@ async function setupTestData() {
     // 4. Insertar números cantados para completar PRIMERA FILA HORIZONTAL
     // Primera fila = gridData.B[0], gridData.I[0], gridData.N[0], gridData.G[0], gridData.O[0]
     const numbers = [
-      {num: 1, letter: 'B', order: 1},
-      {num: 16, letter: 'I', order: 2},
-      {num: 31, letter: 'N', order: 3},
-      {num: 46, letter: 'G', order: 4},
-      {num: 61, letter: 'O', order: 5}
+      { num: 1, letter: 'B', order: 1 },
+      { num: 16, letter: 'I', order: 2 },
+      { num: 31, letter: 'N', order: 3 },
+      { num: 46, letter: 'G', order: 4 },
+      { num: 61, letter: 'O', order: 5 }
     ];
 
     for (const n of numbers) {

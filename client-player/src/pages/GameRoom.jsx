@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import confetti from 'canvas-confetti';
 import { useSocket } from '../hooks/useSocket';
+import { useHaptic } from '../hooks/useHaptic';
 import BallDraw from '../components/BallDraw';
 import BingoCard from '../components/BingoCard';
 import StackedBingoCards from '../components/StackedBingoCards';
@@ -22,6 +24,7 @@ export default function GameRoom() {
   const navigate = useNavigate();
   const { roomType } = useParams();
   const socket = useSocket();
+  const { trigger: triggerHaptic } = useHaptic();
 
   const [gameState, setGameState] = useState({
     drawnNumbers: [],
@@ -40,7 +43,7 @@ export default function GameRoom() {
   const [celebrationData, setCelebrationData] = useState(null);
   const [showCelebration, setShowCelebration] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
-  
+
   // Estados para modales de premios
   const [showLineaNotification, setShowLineaNotification] = useState(false);
   const [showPrizeClaimModal, setShowPrizeClaimModal] = useState(false);
@@ -71,6 +74,7 @@ export default function GameRoom() {
 
     // Escuchar número sorteado
     socket.on('number_drawn', (data) => {
+      triggerHaptic('light'); // Vibration on ball draw
       setGameState(prev => ({
         ...prev,
         drawnNumbers: [...prev.drawnNumbers, data.number],
@@ -98,7 +102,7 @@ export default function GameRoom() {
       // Verificar si soy yo el ganador
       if (currentUser && data.userId === currentUser.id) {
         const prizeType = data.type?.toUpperCase(); // 'LINEA', 'BINGO', 'POZO'
-        
+
         setPrizeData({
           type: prizeType,
           amount: data.amount || data.prizeAmount || 0,
@@ -107,17 +111,57 @@ export default function GameRoom() {
 
         // Si es LÍNEA → Modal simple de notificación
         if (prizeType === 'LINEA') {
+          triggerHaptic('success');
+
+          // Encontrar el cartón ganador para mostrarlo
+          const winnerCardId = data.cardId; // Asegurarse que el backend mande cardId
+          const winnerCard = myCards.find(c => c.id === winnerCardId);
+
+          if (winnerCard) {
+            // Decorar con números marcados
+            winnerCard.markedNumbers = new Set(gameState.drawnNumbers);
+            setPrizeData(prev => ({ ...prev, winningCard }));
+          }
+
           setShowLineaNotification(true);
-        } 
+        }
         // Si es BINGO o POZO → Modal con formulario de retiro
         else if (prizeType === 'BINGO' || prizeType === 'POZO') {
+          triggerHaptic('celebrate');
           setShowPrizeClaimModal(true);
+          // CELEBRATION!
+          confetti({
+            particleCount: 150,
+            spread: 70,
+            origin: { y: 0.6 }
+          });
+        }
+      } else {
+        // Si gana OTRO, también celebrar BINGO
+        const prizeType = data.type?.toUpperCase();
+        if (prizeType === 'BINGO' || prizeType === 'POZO') {
+          confetti({
+            particleCount: 100,
+            spread: 100,
+            origin: { y: 0.6 },
+            colors: ['#bb0000', '#ffffff']
+          });
         }
       }
-      
+
       // Mostrar también el modal general de ganadores (para todos)
-      setWinnerData(data);
-      setShowWinnerModal(true);
+      // EXCEPTO si soy yo Y es línea (porque ya muestro la notificación especial)
+      // Si soy yo Y es línea -> mostrar SÓLO notificación especial
+      // Si soy yo Y es bingo -> mostrar SÓLO claim modal
+      // Si es otro -> mostrar WinnerModal
+
+      const isMe = currentUser && data.userId === currentUser.id;
+      const isLine = data.type?.toUpperCase() === 'LINEA';
+
+      if (!isMe || !isLine) {
+        setWinnerData(data);
+        setShowWinnerModal(true);
+      }
     });
 
     // Escuchar cascada de jackpot
@@ -164,7 +208,7 @@ export default function GameRoom() {
       });
 
       if (!response.ok) throw new Error('Error en reclamación');
-      
+
       const data = await response.json();
       console.log('Premio reclamado:', data);
     } catch (error) {
@@ -180,7 +224,7 @@ export default function GameRoom() {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
       if (!response.ok) return;
-      
+
       const data = await response.json();
       if (data.equipped && data.equipped.card_skin) {
         setEquippedSkin(data.equipped.card_skin);
@@ -193,7 +237,7 @@ export default function GameRoom() {
   // Aplicar estilos dinámicos del skin al cartón
   const getSkinStyles = () => {
     if (!equippedSkin) return {};
-    
+
     const styles = {};
     if (equippedSkin.color_hex) {
       styles['--card-primary-color'] = equippedSkin.color_hex;
@@ -216,7 +260,7 @@ export default function GameRoom() {
             <h1 className="text-3xl font-black text-white">🎰 SALA {roomType?.toUpperCase()}</h1>
             <p className="text-cyan-100 text-sm mt-1">Sesión activa - {gameState.drawnNumbers.length} bolillas sorteadas</p>
           </div>
-          
+
           <div className="flex gap-3">
             <button
               onClick={() => navigate('/lobby')}
@@ -241,9 +285,9 @@ export default function GameRoom() {
 
       {/* Main Game Area */}
       <div className="max-w-7xl mx-auto space-y-6">
-        
+
         {/* Prize Odometer */}
-        <PrizeOdometer 
+        <PrizeOdometer
           potBingo={gameState.potBingo}
           potLinea={gameState.potLinea}
           potJackpot={gameState.potJackpot}
@@ -252,7 +296,7 @@ export default function GameRoom() {
 
         {/* Game Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
+
           {/* Bolillero - 2 columnas en desktop */}
           <div className="lg:col-span-2">
             <BallDraw
@@ -266,28 +310,26 @@ export default function GameRoom() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold text-white">🎟️ Mis Cartones</h2>
-              
+
               {/* Toggle View Mode */}
               {myCards.length > 1 && (
                 <div className="flex gap-2">
                   <button
                     onClick={() => setViewMode('stacked')}
-                    className={`p-2 rounded-lg transition-all ${
-                      viewMode === 'stacked'
-                        ? 'bg-cyan-600 text-white'
-                        : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
-                    }`}
+                    className={`p-2 rounded-lg transition-all ${viewMode === 'stacked'
+                      ? 'bg-cyan-600 text-white'
+                      : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                      }`}
                     title="Vista Apilada"
                   >
                     <Layers size={20} />
                   </button>
                   <button
                     onClick={() => setViewMode('single')}
-                    className={`p-2 rounded-lg transition-all ${
-                      viewMode === 'single'
-                        ? 'bg-cyan-600 text-white'
-                        : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
-                    }`}
+                    className={`p-2 rounded-lg transition-all ${viewMode === 'single'
+                      ? 'bg-cyan-600 text-white'
+                      : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                      }`}
                     title="Vista Lista"
                   >
                     <Grid size={20} />
@@ -295,7 +337,7 @@ export default function GameRoom() {
                 </div>
               )}
             </div>
-            
+
             {myCards.length > 0 ? (
               viewMode === 'stacked' && myCards.length > 1 ? (
                 // Vista Apilada Inteligente
@@ -353,7 +395,7 @@ export default function GameRoom() {
               🎯 Cartón #{selectedCard.serialNumber}
             </h2>
             <div className="bg-slate-900 rounded-lg p-4 overflow-x-auto">
-              <BingoCard 
+              <BingoCard
                 gridNumbers={selectedCard.gridNumbers}
                 markedNumbers={new Set(gameState.drawnNumbers)}
                 showNumbers={true}
@@ -414,6 +456,7 @@ export default function GameRoom() {
         isOpen={showLineaNotification}
         onClose={() => setShowLineaNotification(false)}
         prizeAmount={prizeData.amount}
+        winningCard={prizeData.winningCard}
       />
 
       {/* Prize Claim Modal - Formulario de retiro para BINGO y POZO */}

@@ -14,7 +14,8 @@ if ($setupOutput -match "SUCCESS") {
     $sessionId = [regex]::Match($setupOutput, "Session ID: (\d+)").Groups[1].Value
     $cardId = [regex]::Match($setupOutput, "Card ID: (\d+)").Groups[1].Value
     Write-Host "  Session: $sessionId, Card: $cardId" -ForegroundColor Gray
-} else {
+}
+else {
     Write-Host " FAIL" -ForegroundColor Red
     Write-Host $setupOutput
     exit 1
@@ -24,14 +25,15 @@ if ($setupOutput -match "SUCCESS") {
 Write-Host "[2/5] Login admin..." -NoNewline
 try {
     $loginBody = @{
-        username = "admin"
-        password = "admin123"
+        username = "Andy"
+        password = "Tasso2025"
     } | ConvertTo-Json
     
     $response = Invoke-RestMethod -Method POST -Uri "$baseUrl/api/auth/login" -Body $loginBody -ContentType "application/json"
     $token = $response.token
     Write-Host " OK" -ForegroundColor Green
-} catch {
+}
+catch {
     Write-Host " FAIL" -ForegroundColor Red
     exit 1
 }
@@ -45,7 +47,7 @@ try {
     
     $startBody = @{
         gameSessionId = [int]$sessionId
-        drawInterval = 2000
+        drawInterval  = 2000
         pauseOnWinner = 1000
     } | ConvertTo-Json
     
@@ -54,11 +56,13 @@ try {
     if ($result.success) {
         Write-Host " OK" -ForegroundColor Green
         Write-Host "  Sorteo iniciado - Sala: $($result.roomId)" -ForegroundColor Yellow
-    } else {
+    }
+    else {
         Write-Host " FAIL" -ForegroundColor Red
         exit 1
     }
-} catch {
+}
+catch {
     Write-Host " FAIL" -ForegroundColor Red
     Write-Host "  Error: $($_.Exception.Message)" -ForegroundColor Yellow
     exit 1
@@ -93,7 +97,8 @@ try {
             }
         }
     }
-} catch {
+}
+catch {
     Write-Host " FAIL" -ForegroundColor Red
 }
 

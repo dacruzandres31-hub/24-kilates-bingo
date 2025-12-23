@@ -11,11 +11,12 @@
  * 7. Al terminar → muestra formularios de pago
  */
 const pool = require('../db');
-const { 
-  notifyLineWinner, 
-  notifyBingoWinner, 
-  showPaymentForms 
+const {
+  notifyLineWinner,
+  notifyBingoWinner,
+  showPaymentForms
 } = require('../socket/winnerEvents');
+const metricsService = require('./metricsService'); // Add import
 
 class GameEngineAuto {
   constructor(io) {
@@ -90,8 +91,8 @@ class GameEngineAuto {
     }, drawInterval);
 
     console.log(`[GameEngine] 🎮 Juego ${gameSessionId} iniciado (sala: ${session.room})`);
-    
-    this.io.to(`room_${session.room}`).emit('game_started', {
+
+    this.io.to(`game_${session.room}`).emit('game_started', {
       gameSessionId,
       drawInterval,
       totalBalls: 75
@@ -139,13 +140,14 @@ class GameEngineAuto {
     console.log(`[GameEngine] 🎱 ${ballLetter}-${ballNumber} (#${drawOrder})`);
 
     // Emitir a todos los jugadores
-    this.io.to(`room_${gameState.roomId}`).emit('ball_drawn', {
+    this.io.to(`game_${gameState.roomId}`).emit('ball_drawn', {
       gameSessionId,
       ballNumber,
       ballLetter,
       drawOrder,
       totalDrawn: gameState.ballsDrawn.length
     });
+    metricsService.increment('eventsEmitted');
 
     // VALIDAR AUTOMÁTICAMENTE TODOS LOS CARTONES
     await this.validateAllCards(gameSessionId, pauseOnWinner);
@@ -207,6 +209,7 @@ class GameEngineAuto {
       }
     } catch (error) {
       console.error('[GameEngine] Error emitiendo reordenamiento:', error);
+      metricsService.recordError('GameEngine.emitCardsReordering', error);
     }
   }
 
@@ -255,7 +258,7 @@ class GameEngineAuto {
 
         // Verificar si tiene alguna línea horizontal completa
         const lineResult = this.checkHorizontalLines(cardNumbers, calledNumbers);
-        
+
         if (lineResult.hasLine) {
           gameState.lineWinnersThisBall.push({
             cardId: card.id,
@@ -271,7 +274,7 @@ class GameEngineAuto {
       if (gameState.lineWinnersThisBall.length > 0) {
         await this.payLineWinners(gameSessionId, gameState.lineWinnersThisBall);
         gameState.lineWinnersPaid = true;
-        
+
         // PAUSAR para celebrar
         gameState.isPaused = true;
         setTimeout(() => {
@@ -297,7 +300,7 @@ class GameEngineAuto {
         }
 
         const bingoResult = this.validateBingo(cardNumbers, calledNumbers);
-        
+
         if (bingoResult.isValid) {
           gameState.bingoWinnersThisBall.push({
             cardId: card.id,
@@ -336,7 +339,7 @@ class GameEngineAuto {
 
       for (let col = 0; col < 5; col++) {
         const number = cardNumbers[line.row][col];
-        
+
         if (line.row === 2 && col === 2) {
           winningNumbers.push('FREE');
         } else if (calledNumbers.includes(number)) {
@@ -370,7 +373,7 @@ class GameEngineAuto {
     const gameState = this.activeGames.get(gameSessionId);
 
     console.log(`[GameEngine] 🎉 LÍNEA COMPLETADA - ${winners.length} ganador(es)`);
-    
+
     for (const winner of winners) {
       await pool.query(
         `INSERT INTO game_winners 
@@ -427,7 +430,7 @@ class GameEngineAuto {
     const gameState = this.activeGames.get(gameSessionId);
 
     console.log(`[GameEngine] 🎊 BINGO COMPLETADO - ${winners.length} ganador(es)`);
-    
+
     for (const winner of winners) {
       await pool.query(
         `INSERT INTO game_winners 
@@ -478,13 +481,13 @@ class GameEngineAuto {
         AND status = 'selected' 
         AND game_session_id IS NULL
       `, [gameState.room]);
-      
+
       console.log(`[GameEngine] 🧹 Limpieza post-sorteo sala ${gameState.room}: ${cleanupResult.affectedRows} cartones huérfanos eliminados`);
     }
 
     console.log(`[GameEngine] 🏁 Juego ${gameSessionId} terminado`);
 
-    this.io.to(`room_${gameState.roomId}`).emit('game_ended', {
+    this.io.to(`game_${gameState.roomId}`).emit('game_ended', {
       gameSessionId,
       status,
       totalBallsDrawn: gameState.ballsDrawn.length
@@ -593,19 +596,19 @@ class GameEngineAuto {
 
   getLinePositions(lineType) {
     switch (lineType) {
-      case 'horizontal_1': return [[0,0],[0,1],[0,2],[0,3],[0,4]];
-      case 'horizontal_2': return [[1,0],[1,1],[1,2],[1,3],[1,4]];
-      case 'horizontal_3': return [[2,0],[2,1],[2,2],[2,3],[2,4]];
-      case 'horizontal_4': return [[3,0],[3,1],[3,2],[3,3],[3,4]];
-      case 'horizontal_5': return [[4,0],[4,1],[4,2],[4,3],[4,4]];
-      case 'vertical_1': return [[0,0],[1,0],[2,0],[3,0],[4,0]];
-      case 'vertical_2': return [[0,1],[1,1],[2,1],[3,1],[4,1]];
-      case 'vertical_3': return [[0,2],[1,2],[2,2],[3,2],[4,2]];
-      case 'vertical_4': return [[0,3],[1,3],[2,3],[3,3],[4,3]];
-      case 'vertical_5': return [[0,4],[1,4],[2,4],[3,4],[4,4]];
-      case 'diagonal_1': return [[0,0],[1,1],[2,2],[3,3],[4,4]];
-      case 'diagonal_2': return [[0,4],[1,3],[2,2],[3,1],[4,0]];
-      case 'four_corners': return [[0,0],[0,4],[4,0],[4,4]];
+      case 'horizontal_1': return [[0, 0], [0, 1], [0, 2], [0, 3], [0, 4]];
+      case 'horizontal_2': return [[1, 0], [1, 1], [1, 2], [1, 3], [1, 4]];
+      case 'horizontal_3': return [[2, 0], [2, 1], [2, 2], [2, 3], [2, 4]];
+      case 'horizontal_4': return [[3, 0], [3, 1], [3, 2], [3, 3], [3, 4]];
+      case 'horizontal_5': return [[4, 0], [4, 1], [4, 2], [4, 3], [4, 4]];
+      case 'vertical_1': return [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0]];
+      case 'vertical_2': return [[0, 1], [1, 1], [2, 1], [3, 1], [4, 1]];
+      case 'vertical_3': return [[0, 2], [1, 2], [2, 2], [3, 2], [4, 2]];
+      case 'vertical_4': return [[0, 3], [1, 3], [2, 3], [3, 3], [4, 3]];
+      case 'vertical_5': return [[0, 4], [1, 4], [2, 4], [3, 4], [4, 4]];
+      case 'diagonal_1': return [[0, 0], [1, 1], [2, 2], [3, 3], [4, 4]];
+      case 'diagonal_2': return [[0, 4], [1, 3], [2, 2], [3, 1], [4, 0]];
+      case 'four_corners': return [[0, 0], [0, 4], [4, 0], [4, 4]];
       default: return [];
     }
   }
@@ -637,7 +640,7 @@ class GameEngineAuto {
       return matrix;
     }
 
-    return [[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]];
+    return [[0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]];
   }
 
   async getGameWinners(gameSessionId) {

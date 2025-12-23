@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { 
-  authenticateToken, 
-  isAdmin 
+const {
+  authenticateToken,
+  isAdmin
 } = require('../middleware/authMiddleware');
 const {
   getAdminProfile,
@@ -112,5 +112,16 @@ router.get('/room-settings/current-pots', authenticateToken, isAdmin, roomSettin
 router.get('/schedules', authenticateToken, isAdmin, scheduleController.getAllSchedules);
 router.get('/schedules/:room/next', authenticateToken, isAdmin, scheduleController.getNextDraws);
 router.get('/schedules/summary', authenticateToken, isAdmin, scheduleController.getScheduleSummary);
+
+const metricsService = require('../services/metricsService'); // Add import
+
+// ... (existing routes)
+
+// ========================================
+// 📊 SYSTEM METRICS
+// ========================================
+router.get('/metrics', authenticateToken, isAdmin, (req, res) => {
+  res.json(metricsService.getMetrics());
+});
 
 module.exports = router;

@@ -30,13 +30,13 @@ class CardPoolService {
       SET counter = LAST_INSERT_ID(counter + ?)
       WHERE id = 1
     `;
-    
+
     await db.query(query, [quantity]);
-    
+
     // Obtener el valor ANTES del incremento
     const [rows] = await db.query('SELECT LAST_INSERT_ID() as counter');
     const newCounter = rows[0].counter;
-    
+
     // El rango asignado es: [newCounter - quantity, newCounter)
     return newCounter - quantity;
   }
@@ -51,7 +51,7 @@ class CardPoolService {
     // PRIMERO: Verificar si ya existen cartones en BD
     const checkQuery = 'SELECT COUNT(*) as count FROM card_pool WHERE session_id = ?';
     const [checkRows] = await db.query(checkQuery, [sessionId]);
-    
+
     if (checkRows[0].count > 0) {
       console.log(`ℹ️ Ya existen ${checkRows[0].count} cartones para sesión ${sessionId}, cargando desde BD...`);
       await this.loadPoolFromDB(sessionId);
@@ -59,7 +59,7 @@ class CardPoolService {
     }
 
     console.log(`🎫 Generando ${totalCards} cartones NUEVOS para sesión ${sessionId}...`);
-    
+
     const roomLetters = {
       starter: 'S',
       bronze: 'B',
@@ -72,8 +72,8 @@ class CardPoolService {
     console.log(`🔢 Contador global asignado: ${counterStart} - ${counterStart + totalCards - 1}`);
 
     const cards = this.generator.generateCardBatch(
-      totalCards, 
-      sessionId, 
+      totalCards,
+      sessionId,
       roomLetters[roomType] || 'S',
       counterStart // Pasar contador inicial
     );
@@ -133,7 +133,7 @@ class CardPoolService {
    */
   async getAvailableCards(sessionId, userId, excludeUserCards = false) {
     const pool = this.pools.get(sessionId);
-    
+
     if (!pool) {
       // Intentar cargar desde BD
       await this.loadPoolFromDB(sessionId);
@@ -141,10 +141,10 @@ class CardPoolService {
     }
 
     const availableCards = [];
-    
+
     pool.cards.forEach(card => {
       const reservation = pool.reservations.get(card.id);
-      
+
       if (!reservation) {
         // Disponible
         availableCards.push({
@@ -182,7 +182,7 @@ class CardPoolService {
    */
   async reserveCards(sessionId, userId, cardIds) {
     const pool = this.pools.get(sessionId);
-    
+
     if (!pool) {
       throw new Error('Pool de cartones no encontrado');
     }
@@ -199,7 +199,7 @@ class CardPoolService {
     // Verificar límite de 20 cartones por usuario
     const userReservations = Array.from(pool.reservations.values())
       .filter(r => r.userId === userId);
-    
+
     if (userReservations.length + cardIds.length > 20) {
       throw new Error('Solo puedes reservar hasta 20 cartones por sesión');
     }
@@ -210,14 +210,14 @@ class CardPoolService {
     // Intentar reservar cada cartón
     for (const cardId of cardIds) {
       const card = pool.cards.get(cardId);
-      
+
       if (!card) {
         errors.push({ cardId, error: 'Cartón no existe' });
         continue;
       }
 
       const existingReservation = pool.reservations.get(cardId);
-      
+
       if (existingReservation && existingReservation.userId !== userId) {
         errors.push({ cardId, error: 'Cartón ya reservado por otro jugador' });
         continue;
@@ -270,7 +270,7 @@ class CardPoolService {
     if (cards.length === 0) return;
 
     const cardIds = cards.map(c => c.id);
-    
+
     const query = `
       UPDATE card_pool 
       SET status = 'reserved', reserved_by = ?, reserved_at = NOW()
@@ -279,11 +279,11 @@ class CardPoolService {
 
     try {
       const [result] = await db.query(query, [userId, cardIds, sessionId]);
-      
+
       if (result.affectedRows !== cards.length) {
         throw new Error(`Solo ${result.affectedRows}/${cards.length} cartones fueron reservados. Puede que algunos ya estén ocupados.`);
       }
-      
+
       console.log(`💾 ${result.affectedRows} cartones reservados en BD para usuario ${userId}`);
     } catch (error) {
       console.error('❌ Error actualizando reservas en BD:', error.message);
@@ -296,14 +296,14 @@ class CardPoolService {
    */
   async loadPoolFromDB(sessionId) {
     const query = `
-      SELECT id, session_id, serial, numbers, status, reserved_by
+      SELECT id, session_id, serial, numbers, status, reserved_by, is_gift
       FROM card_pool
       WHERE session_id = ?
     `;
 
     try {
       const [rows] = await db.query(query, [sessionId]);
-      
+
       const cards = new Map();
       const reservations = new Map();
 
@@ -319,7 +319,8 @@ class CardPoolService {
           serial: row.serial,
           numbers: typeof row.numbers === 'string' ? JSON.parse(row.numbers) : row.numbers,
           sessionId: row.session_id,
-          status: row.status
+          status: row.status,
+          isGift: !!row.is_gift // Convert 1/0 to boolean
         };
 
         cards.set(card.id, card);
@@ -333,7 +334,7 @@ class CardPoolService {
       });
 
       this.pools.set(sessionId, { cards, reservations, roomType: 'starter' });
-      
+
       console.log(`✅ Pool cargado desde BD: ${cards.size} cartones`);
     } catch (error) {
       console.error('❌ Error cargando pool desde BD:', error);
@@ -364,7 +365,7 @@ class CardPoolService {
    */
   getTimeWindowStatus(sessionId) {
     const window = this.timeWindows.get(sessionId);
-    
+
     if (!window) return 'open'; // Sin restricciones si no hay ventana configurada
 
     const now = Date.now();

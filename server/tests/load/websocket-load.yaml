@@ -1,0 +1,28 @@
+config:
+  target: "http://localhost:3001"
+  phases:
+    - duration: 60
+      arrivalRate: 5
+      rampTo: 10
+      name: "Warm up"
+    - duration: 60
+      arrivalRate: 10
+      name: "Sustained load"
+  engines:
+    socketio: {}
+
+scenarios:
+  - name: "Player joins and listens"
+    engine: "socketio"
+    flow:
+      - emit:
+          channel: "join_game"
+          data: 
+             userId: 1
+             room: "bronce"
+      - think: 5
+      - emit:
+          channel: "join_personal_room"
+          data:
+             userId: 1
+      - think: 60 

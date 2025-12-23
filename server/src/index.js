@@ -30,7 +30,7 @@ const cardPoolService = require('./services/cardPoolService');
 const db = require('./db');
 
 // CONFIGURACIÓN INICIAL
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
 // EXPRESS APP
@@ -77,46 +77,20 @@ gameAdminController.initGameEngine(io);
 // Almacenar instancia de Socket.IO en app para acceso desde controllers
 app.set('io', io);
 
+const metricsService = require('./services/metricsService'); // Add import
+
+// ...
+
 // SOCKET.IO - Event handlers
 io.on('connection', (socket) => {
+  metricsService.increment('activeConnections');
+  metricsService.increment('totalConnections');
   console.log(`[Socket.IO] Cliente conectado: ${socket.id}`);
 
-  // Join a room personal del usuario
-  socket.on('join_personal_room', (data) => {
-    const { userId } = data;
-    if (userId) {
-      socket.join(`user_${userId}`);
-      console.log(`[Socket.IO] Usuario ${userId} joined personal room: user_${userId}`);
-    }
-  });
-
-  // Eventos del juego
-  socket.on('join_game', (data) => {
-    console.log(`[Socket.IO] Join game: ${data.userId} en sala ${data.room}`);
-    socket.join(`game_${data.room}`);
-  });
-
-  socket.on('number_drawn', (data) => {
-    console.log(`[Socket.IO] Número sorteado: ${data.number}`);
-    io.to(`game_${data.room}`).emit('number_drawn', data);
-  });
-
-  socket.on('winner_detected', (data) => {
-    console.log(`[Socket.IO] Ganador detectado: ${data.userId}`);
-    io.to(`game_${data.room}`).emit('winner_detected', data);
-  });
-
-  socket.on('pot_update', (data) => {
-    console.log(`[Socket.IO] Actualización de pots`);
-    io.emit('pot_update', data);
-  });
-
-  socket.on('cascade_transfer', (data) => {
-    console.log(`[Socket.IO] Cascada de jackpot transferida`);
-    io.emit('cascade_transfer', data);
-  });
+  // ... (existing code)
 
   socket.on('disconnect', () => {
+    metricsService.increment('activeConnections', -1);
     console.log(`[Socket.IO] Cliente desconectado: ${socket.id}`);
   });
 
@@ -172,7 +146,7 @@ app.use((req, res) => {
 async function loadExistingPools() {
   try {
     console.log('🎫 Cargando pools de cartones desde BD...');
-    
+
     // Buscar sesiones recientes de Starter con cartones
     const [sessions] = await db.query(`
       SELECT DISTINCT cp.session_id, COUNT(*) as card_count
@@ -248,16 +222,16 @@ let isShuttingDown = false;
 process.on('SIGTERM', async () => {
   if (isShuttingDown) return;
   isShuttingDown = true;
-  
+
   console.log('\n📛 SIGTERM recibido, apagando servidor...');
-  
+
   try {
     await scheduler.stop();
     server.close(() => {
       console.log('✅ Servidor apagado correctamente');
       process.exit(0);
     });
-    
+
     // Forzar salida después de 10 segundos
     setTimeout(() => {
       console.log('⏱️ Tiempo agotado, forzando salida...');
@@ -272,16 +246,16 @@ process.on('SIGTERM', async () => {
 process.on('SIGINT', async () => {
   if (isShuttingDown) return;
   isShuttingDown = true;
-  
+
   console.log('\n📛 SIGINT recibido (Ctrl+C), apagando servidor...');
-  
+
   try {
     await scheduler.stop();
     server.close(() => {
       console.log('✅ Servidor apagado correctamente');
       process.exit(0);
     });
-    
+
     // Forzar salida después de 10 segundos
     setTimeout(() => {
       console.log('⏱️ Tiempo agotado, forzando salida...');

@@ -12,8 +12,8 @@ Write-Host ""
 # Login
 Write-Host "[1/2] Login..." -NoNewline
 $loginData = @{
-    username = "admin"
-    password = "admin123"
+    username = "Andy"
+    password = "Tasso2025"
 } | ConvertTo-Json
 
 try {
