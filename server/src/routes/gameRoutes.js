@@ -46,6 +46,9 @@ router.get('/sessions/:sessionId', gameController.getSessionStatus);
 // Sesiones activas
 router.get('/sessions', gameController.getActiveSessions);
 
+// Estado de la sala (siguiente sorteo, sorteando)
+router.get('/room-status/:room', gameController.getRoomStatus);
+
 // NUEVO: Cantar línea en salas monetizadas
 router.post('/claim-line', gameController.claimLine);
 

@@ -156,7 +156,7 @@ const ModernBallMachine = ({
                             className="main-ball"
                             style={{ '--ball-color': ballColor }}
                         >
-                            {currentBall.number}
+                            <span className="ball-number">{currentBall.number}</span>
                         </div>
                     </div>
                 )}

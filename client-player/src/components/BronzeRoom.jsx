@@ -10,6 +10,7 @@ import CardSelectionLobby from './CardSelectionLobby';
 import BingoCardPreview from './BingoCardPreview';
 import Countdown from './Countdown';
 import ModernBallMachine from './ModernBallMachine';
+import RecentBallsPanel from './RecentBallsPanel';
 
 export default function BronzeRoom({ onLogout }) {
   const { sessionId } = useParams();
@@ -39,6 +40,8 @@ export default function BronzeRoom({ onLogout }) {
   const [selectedPlayerCards, setSelectedPlayerCards] = useState([]); // Cartones seleccionados por el jugador
   const [cardsRemaining, setCardsRemaining] = useState(20); // Cartones que faltan por seleccionar
   const [showReadyModal, setShowReadyModal] = useState(false); // Modal "¡¡Todo Listo!!"
+  const [timeRemaining, setTimeRemaining] = useState(null);
+  const [nextDrawTime, setNextDrawTime] = useState(null);
 
   // Auto-cerrar modal "¡¡Todo Listo!!" después de 5 segundos
   useEffect(() => {
@@ -73,8 +76,9 @@ export default function BronzeRoom({ onLogout }) {
   // Verificar cartones existentes del jugador al montar
   const checkExistingCards = async () => {
     try {
+      const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
       const response = await fetch(`/api/cards/my-selected/bronze`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        headers: { 'Authorization': `Bearer ${token}` }
       });
 
       if (response.ok) {
@@ -112,9 +116,45 @@ export default function BronzeRoom({ onLogout }) {
     }
   };
 
+  // Cargar estado de la sala (siguiente sorteo)
+  const loadRoomStatus = async () => {
+    try {
+      const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
+      const response = await fetch(`/api/game/room-status/bronze`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.nextDraw) {
+          const drawDate = new Date(data.nextDraw);
+          setNextDrawTime(drawDate);
+          const seconds = Math.max(0, Math.floor((drawDate - new Date()) / 1000));
+          setTimeRemaining(seconds);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading room status:', error);
+    }
+  };
+
+  // Efecto para actualizar el contador cada segundo
+  useEffect(() => {
+    let interval = null;
+    if (nextDrawTime) {
+      interval = setInterval(() => {
+        const seconds = Math.max(0, Math.floor((nextDrawTime - new Date()) / 1000));
+        setTimeRemaining(seconds);
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [nextDrawTime]);
+
   // Verificar cartones existentes del jugador al montar
   useEffect(() => {
     checkExistingCards();
+    loadRoomStatus();
   }, [sessionId]);
 
   // Generar número de serie del cartón: DDMMYY-S0001
@@ -311,6 +351,7 @@ export default function BronzeRoom({ onLogout }) {
 
         const newBall = {
           number,
+          color: getBallColor(number),
           drawOrder: ballsDrawn.length + 1,
           timestamp: Date.now()
         };
@@ -405,6 +446,7 @@ export default function BronzeRoom({ onLogout }) {
 
     // Solo mostrar modal "Todo Listo" si ya tiene los 20 cartones (pagos)
     if (remaining === 0) {
+      loadRoomStatus(); // Refrescar hora antes de mostrar
       setShowReadyModal(true);
     }
 
@@ -446,7 +488,7 @@ export default function BronzeRoom({ onLogout }) {
       // Buscar cartones que tienen este número
       playerCards.forEach(card => {
         const hasNumber = card.numbers.flat().includes(latestBall.number);
-        if (hasNumber && expandedCard !== card.id) {
+        if (hasNumber && expandedCard !== card.id && !lineCelebrated) {
           setLastHitCard(card.id);
           expandCard(card.id);
         }
@@ -571,13 +613,15 @@ export default function BronzeRoom({ onLogout }) {
       if (gameStatus === 'active') {
         setGameStatus('waiting');
         const timeout = setTimeout(() => {
-          // Anunciar continuación a BINGO antes de reanudar
+          // Desaparecer festejo de línea e información relacionada JUSTO antes del anuncio
+          setWinnerCards([]);
+          setHighlightedLine(null);
+          setLineCelebrated(false);
+
+          // Anunciar continuación a BINGO
           voiceService.speak('Continuamos hasta Bingo');
+
           setTimeout(() => {
-            // ORDEN IMPORTANTE: Limpiar ganadores PRIMERO, luego resetear flag
-            setWinnerCards([]);
-            setHighlightedLine(null);
-            setLineCelebrated(false); // RESETEAR después de limpiar ganadores
             setGameStatus('active');
           }, 2000); // Esperar 2 segundos para que termine el anuncio
         }, 18000); // 18 segundos + 2 del anuncio = 20 segundos total
@@ -769,7 +813,7 @@ export default function BronzeRoom({ onLogout }) {
 
                 {/* Cartón usando BingoCardPreview IGUAL que el expandido */}
                 {winnerCards[0] && (
-                  <div className="celebration-card-display">
+                  <div className="celebration-card-display" style={{ transform: 'scale(1.5)', marginTop: '40px' }}>
                     <BingoCardPreview
                       card={{
                         card_serial: winnerCards[0].cardSerial,
@@ -1111,26 +1155,8 @@ export default function BronzeRoom({ onLogout }) {
                 waitingButtonImage={selectCardsButton}
               />
 
-              {/* Últimas 5 bolas */}
-              {ballsDrawn.length > 0 && (
-                <div className="recent-balls-bar">
-                  <span className="recent-label">ÚLTIMAS:</span>
-                  <div className="recent-balls-list">
-                    {ballsDrawn.slice(-5).reverse().map((ball, index) => (
-                      <div
-                        key={`${ball.number}-${index}`}
-                        className="recent-ball-chip"
-                        style={{
-                          backgroundColor: getBallColor(ball.number),
-                          boxShadow: `0 0 15px ${getBallColor(ball.number)}`
-                        }}
-                      >
-                        <span className="ball-number">{ball.number}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* Últimas 5 bolas - COMPONENTE NUEVO (75px) */}
+              <RecentBallsPanel balls={ballsDrawn} getBallColor={getBallColor} />
             </div>
           </div>
 
@@ -1399,18 +1425,11 @@ export default function BronzeRoom({ onLogout }) {
                   <p className="ready-modal-subtitle">Tienes {selectedPlayerCards.length} cartones listos para jugar</p>
                   <div className="ready-modal-countdown">
                     <p className="ready-modal-countdown-label">Próximo Sorteo en:</p>
-                    <Countdown targetDate={(() => {
-                      const today = new Date();
-                      const drawTime = new Date(today);
-                      drawTime.setHours(20, 0, 0, 0);
-
-                      // Si ya pasó las 20:00 hoy, programar para mañana
-                      if (today > drawTime) {
-                        drawTime.setDate(drawTime.getDate() + 1);
-                      }
-
-                      return drawTime;
-                    })()} />
+                    {nextDrawTime ? (
+                      <Countdown targetDate={nextDrawTime} />
+                    ) : (
+                      <p className="loading-countdown">Calculando...</p>
+                    )}
                   </div>
                 </div>
               </div>

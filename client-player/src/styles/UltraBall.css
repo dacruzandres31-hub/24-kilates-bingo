@@ -1,0 +1,80 @@
+/* 
+   ULTRA 3D BALL STYLE - NUCLEAR OPTION 
+   Unique class name to bypass ANY legacy conflicts 
+*/
+
+.ultra-3d-ball {
+    /* Dimensions & Layout */
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 40px !important;
+    min-height: 40px !important;
+    border-radius: 50% !important;
+    position: relative !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    overflow: hidden !important;
+    /* Clips the shine to the circle */
+
+    /* Typography */
+    font-family: 'Roboto', sans-serif !important;
+    font-weight: 900 !important;
+    font-size: 1.2rem !important;
+    color: #111 !important;
+    /* Dark text strictly */
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.7) !important;
+
+    /* Background & 3D Effects - SEPARATED for Robustness */
+    background-color: var(--ball-color, #ffd700) !important;
+    /* Default to gold if variable fails */
+    background-image: radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.4) 0%, transparent 50%) !important;
+
+    /* Shadows */
+    box-shadow:
+        inset -3px -3px 8px rgba(0, 0, 0, 0.5),
+        /* Deep shadow bottom-right */
+        inset 3px 3px 8px rgba(255, 255, 255, 0.4),
+        /* Highlight top-left */
+        0 4px 6px rgba(0, 0, 0, 0.3) !important;
+    /* Drop shadow */
+
+    /* Layering */
+    z-index: 10 !important;
+    transition: transform 0.2s ease !important;
+}
+
+/* White Center "Shine" / "Label" */
+.ultra-3d-ball::before {
+    content: '' !important;
+    display: block !important;
+    position: absolute !important;
+
+    /* Centering */
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+
+    /* Size - 70% of ball */
+    width: 70% !important;
+    height: 70% !important;
+
+    /* Appearance */
+    background-color: #ffffff !important;
+    border-radius: 50% !important;
+
+    /* Inner depth */
+    box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.3) !important;
+
+    /* Layering - BELOW text (z-index 5) but ABOVE background */
+    z-index: 5 !important;
+}
+
+/* The Number Text Span */
+.ultra-3d-ball .ball-number {
+    position: relative !important;
+    z-index: 10 !important;
+    /* STRICTLY HIGHER than ::before (5) */
+    display: block !important;
+    line-height: 1 !important;
+}

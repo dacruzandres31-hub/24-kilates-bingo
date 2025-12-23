@@ -9,6 +9,7 @@ const inventoryService = require('../services/inventoryService');
 const CardAnalyzer = require('../services/cardAnalyzer');
 const cardInventoryService = require('../services/cardInventoryService');
 const websocketService = require('../services/websocketService');
+const drawScheduleService = require('../services/drawScheduleService');
 
 // COMPRAR CARTÓN - Agregar a session del usuario
 exports.buyCard = async (req, res) => {
@@ -112,7 +113,7 @@ exports.buyCard = async (req, res) => {
       // ===== GAMIFICACIÓN: Agregar XP al jugador =====
       try {
         const xpResult = await gamificationEngine.addXPToPlayer(userId, card.price);
-        
+
         // Registrar compra en sala para misión "Explorador"
         if (user.role === 'jugador') {
           await questManager.recordRoomPlay(userId, roomType);
@@ -296,7 +297,7 @@ exports.finishSession = async (req, res) => {
       'SELECT room FROM game_sessions WHERE id = ?',
       [sessionId]
     );
-    
+
     // LIMPIEZA: Eliminar cartones no asignados a ninguna sesión de esta sala
     if (sessionData.length > 0) {
       const room = sessionData[0].room;
@@ -306,7 +307,7 @@ exports.finishSession = async (req, res) => {
         AND status = 'selected' 
         AND game_session_id IS NULL
       `, [room]);
-      
+
       console.log(`[GameController] 🧹 Limpieza post-finalización sala ${room}: ${cleanupResult.affectedRows} cartones huérfanos eliminados`);
     }
 
@@ -340,6 +341,33 @@ exports.getSessionStatus = async (req, res) => {
   } catch (error) {
     console.error('Get session status error:', error);
     res.status(500).json({ error: 'Error obteniendo estado de sesión' });
+  }
+};
+
+// OBTENER ESTADO DE LA SALA (Siguiente sorteo, estado sorteando)
+exports.getRoomStatus = async (req, res) => {
+  try {
+    const { room } = req.params;
+
+    // Mapear nombres de sala si es necesario
+    const roomMap = {
+      'bronze': 'bronce',
+      'silver': 'plata',
+      'gold': 'oro',
+      'starter': 'starter'
+    };
+    const roomDB = roomMap[room] || room;
+
+    const status = await drawScheduleService.getNextDraw(roomDB);
+
+    res.json({
+      success: true,
+      room: roomDB,
+      ...status
+    });
+  } catch (error) {
+    console.error('Get room status error:', error);
+    res.status(500).json({ error: 'Error obteniendo estado de la sala' });
   }
 };
 
@@ -623,7 +651,7 @@ exports.end_free_game = async (req, res) => {
         let legendaryName = null;
         if (legendaryResult.length > 0) {
           const legendary = legendaryResult[0];
-          
+
           await connection.query(
             `INSERT INTO user_inventory (user_id, item_id, equipped, is_consumable_type)
              VALUES (?, ?, FALSE, FALSE)
@@ -702,9 +730,9 @@ exports.end_free_game = async (req, res) => {
     }
   } catch (error) {
     console.error('❌ Error en end_free_game:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: error.message 
+    res.status(500).json({
+      success: false,
+      message: error.message
     });
   }
 };
@@ -719,17 +747,17 @@ exports.claimLine = async (req, res) => {
 
     // Validar parámetros
     if (!gameSessionId || !cardId || !lineType) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Parámetros requeridos: gameSessionId, cardId, lineType' 
+      return res.status(400).json({
+        success: false,
+        message: 'Parámetros requeridos: gameSessionId, cardId, lineType'
       });
     }
 
     const validLineTypes = ['horizontal_1', 'horizontal_2', 'horizontal_3', 'vertical_1', 'vertical_2', 'vertical_3', 'vertical_4', 'vertical_5', 'diagonal_1', 'diagonal_2', 'four_corners'];
     if (!validLineTypes.includes(lineType)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: `lineType inválido. Opciones: ${validLineTypes.join(', ')}` 
+      return res.status(400).json({
+        success: false,
+        message: `lineType inválido. Opciones: ${validLineTypes.join(', ')}`
       });
     }
 
@@ -748,19 +776,19 @@ exports.claimLine = async (req, res) => {
     // Solo permitir en salas monetizadas (Bronce, Plata, Oro)
     const monetizedRooms = ['Bronce', 'Plata', 'Oro'];
     const isMonetized = monetizedRooms.includes(session.room);
-    
+
     if (!isMonetized) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Solo se puede cantar línea en salas monetizadas (Bronce, Plata, Oro)' 
+      return res.status(400).json({
+        success: false,
+        message: 'Solo se puede cantar línea en salas monetizadas (Bronce, Plata, Oro)'
       });
     }
 
     // Verificar que la sesión esté activa
     if (session.status !== 'active') {
-      return res.status(400).json({ 
-        success: false, 
-        message: `Sesión no está activa (estado actual: ${session.status})` 
+      return res.status(400).json({
+        success: false,
+        message: `Sesión no está activa (estado actual: ${session.status})`
       });
     }
 
@@ -772,9 +800,9 @@ exports.claimLine = async (req, res) => {
     );
 
     if (cards.length === 0) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Cartón no encontrado o no pertenece al usuario' 
+      return res.status(404).json({
+        success: false,
+        message: 'Cartón no encontrado o no pertenece al usuario'
       });
     }
 
@@ -805,9 +833,9 @@ exports.claimLine = async (req, res) => {
     const validation = validateLine(cardNumbers, calledNumbers, lineType);
 
     if (!validation.isValid) {
-      return res.status(400).json({ 
-        success: false, 
-        message: validation.message || 'Línea inválida - verifica los números' 
+      return res.status(400).json({
+        success: false,
+        message: validation.message || 'Línea inválida - verifica los números'
       });
     }
 
@@ -820,9 +848,9 @@ exports.claimLine = async (req, res) => {
     );
 
     if (existing.length > 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Ya cantaste esta línea' 
+      return res.status(400).json({
+        success: false,
+        message: 'Ya cantaste esta línea'
       });
     }
 
@@ -838,20 +866,20 @@ exports.claimLine = async (req, res) => {
 
     // 7. Emitir eventos Socket.IO
     const io = req.app.get('io');
-    const winner = { 
-      id: userId, 
-      username: req.user.username 
+    const winner = {
+      id: userId,
+      username: req.user.username
     };
 
     const { notifyLineWinner } = require('../socket/winnerEvents');
     notifyLineWinner(io, session.room_id, winner, prizeAmount, lineType);
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       prizeAmount,
       lineType,
       winningNumbers: validation.winningNumbers,
-      message: `¡Línea ${lineType} válida! Ganaste $${prizeAmount.toLocaleString()}` 
+      message: `¡Línea ${lineType} válida! Ganaste $${prizeAmount.toLocaleString()}`
     });
 
   } catch (error) {
@@ -870,9 +898,9 @@ exports.claimBingo = async (req, res) => {
 
     // Validar parámetros
     if (!gameSessionId || !cardId) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Parámetros requeridos: gameSessionId, cardId' 
+      return res.status(400).json({
+        success: false,
+        message: 'Parámetros requeridos: gameSessionId, cardId'
       });
     }
 
@@ -891,19 +919,19 @@ exports.claimBingo = async (req, res) => {
     // Solo permitir en salas monetizadas (Bronce, Plata, Oro)
     const monetizedRooms = ['Bronce', 'Plata', 'Oro'];
     const isMonetized = monetizedRooms.includes(session.room);
-    
+
     if (!isMonetized) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Solo se puede cantar BINGO en salas monetizadas' 
+      return res.status(400).json({
+        success: false,
+        message: 'Solo se puede cantar BINGO en salas monetizadas'
       });
     }
 
     // Verificar que la sesión esté activa
     if (session.status !== 'active') {
-      return res.status(400).json({ 
-        success: false, 
-        message: `Sesión no está activa (estado actual: ${session.status})` 
+      return res.status(400).json({
+        success: false,
+        message: `Sesión no está activa (estado actual: ${session.status})`
       });
     }
 
@@ -915,9 +943,9 @@ exports.claimBingo = async (req, res) => {
     );
 
     if (cards.length === 0) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Cartón no encontrado o no pertenece al usuario' 
+      return res.status(404).json({
+        success: false,
+        message: 'Cartón no encontrado o no pertenece al usuario'
       });
     }
 
@@ -948,9 +976,9 @@ exports.claimBingo = async (req, res) => {
     const validation = validateBingo(cardNumbers, calledNumbers);
 
     if (!validation.isValid) {
-      return res.status(400).json({ 
-        success: false, 
-        message: validation.message || 'BINGO inválido - faltan números' 
+      return res.status(400).json({
+        success: false,
+        message: validation.message || 'BINGO inválido - faltan números'
       });
     }
 
@@ -962,9 +990,9 @@ exports.claimBingo = async (req, res) => {
     );
 
     if (existing.length > 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Ya cantaste BINGO con este cartón' 
+      return res.status(400).json({
+        success: false,
+        message: 'Ya cantaste BINGO con este cartón'
       });
     }
 
@@ -991,18 +1019,18 @@ exports.claimBingo = async (req, res) => {
       AND status = 'selected' 
       AND game_session_id IS NULL
     `, [session.room]);
-    
+
     console.log(`[GameController] 🧹 Limpieza BINGO sala ${session.room}: ${cleanupResult.affectedRows} cartones huérfanos eliminados`);
 
     // 8. Emitir eventos Socket.IO
     const io = req.app.get('io');
-    const winner = { 
-      id: userId, 
-      username: req.user.username 
+    const winner = {
+      id: userId,
+      username: req.user.username
     };
 
     const { notifyBingoWinner, showPaymentForms } = require('../socket/winnerEvents');
-    
+
     // Notificar BINGO ganador
     notifyBingoWinner(io, session.room_id, winner, prizeAmount, gameSessionId);
 
@@ -1012,12 +1040,12 @@ exports.claimBingo = async (req, res) => {
       showPaymentForms(io, gameSessionId, winners);
     }, 5000); // Esperar 5 segundos antes de mostrar formularios
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       prizeAmount,
       winningNumbers: validation.winningNumbers,
       gameEnded: true,
-      message: `¡BINGO! Ganaste $${prizeAmount.toLocaleString()}` 
+      message: `¡BINGO! Ganaste $${prizeAmount.toLocaleString()}`
     });
 
   } catch (error) {
@@ -1039,47 +1067,47 @@ exports.claimBingo = async (req, res) => {
  */
 function validateLine(cardNumbers, calledNumbers, lineType) {
   const positions = [];
-  
+
   // Definir posiciones según tipo de línea
-  switch(lineType) {
+  switch (lineType) {
     case 'horizontal_1':
-      positions.push([0,0], [0,1], [0,2], [0,3], [0,4]);
+      positions.push([0, 0], [0, 1], [0, 2], [0, 3], [0, 4]);
       break;
     case 'horizontal_2':
-      positions.push([1,0], [1,1], [1,2], [1,3], [1,4]);
+      positions.push([1, 0], [1, 1], [1, 2], [1, 3], [1, 4]);
       break;
     case 'horizontal_3':
-      positions.push([2,0], [2,1], [2,2], [2,3], [2,4]);
+      positions.push([2, 0], [2, 1], [2, 2], [2, 3], [2, 4]);
       break;
     case 'horizontal_4':
-      positions.push([3,0], [3,1], [3,2], [3,3], [3,4]);
+      positions.push([3, 0], [3, 1], [3, 2], [3, 3], [3, 4]);
       break;
     case 'horizontal_5':
-      positions.push([4,0], [4,1], [4,2], [4,3], [4,4]);
+      positions.push([4, 0], [4, 1], [4, 2], [4, 3], [4, 4]);
       break;
     case 'vertical_1':
-      positions.push([0,0], [1,0], [2,0], [3,0], [4,0]);
+      positions.push([0, 0], [1, 0], [2, 0], [3, 0], [4, 0]);
       break;
     case 'vertical_2':
-      positions.push([0,1], [1,1], [2,1], [3,1], [4,1]);
+      positions.push([0, 1], [1, 1], [2, 1], [3, 1], [4, 1]);
       break;
     case 'vertical_3':
-      positions.push([0,2], [1,2], [2,2], [3,2], [4,2]);
+      positions.push([0, 2], [1, 2], [2, 2], [3, 2], [4, 2]);
       break;
     case 'vertical_4':
-      positions.push([0,3], [1,3], [2,3], [3,3], [4,3]);
+      positions.push([0, 3], [1, 3], [2, 3], [3, 3], [4, 3]);
       break;
     case 'vertical_5':
-      positions.push([0,4], [1,4], [2,4], [3,4], [4,4]);
+      positions.push([0, 4], [1, 4], [2, 4], [3, 4], [4, 4]);
       break;
     case 'diagonal_1':
-      positions.push([0,0], [1,1], [2,2], [3,3], [4,4]);
+      positions.push([0, 0], [1, 1], [2, 2], [3, 3], [4, 4]);
       break;
     case 'diagonal_2':
-      positions.push([0,4], [1,3], [2,2], [3,1], [4,0]);
+      positions.push([0, 4], [1, 3], [2, 2], [3, 1], [4, 0]);
       break;
     case 'four_corners':
-      positions.push([0,0], [0,4], [4,0], [4,4]);
+      positions.push([0, 0], [0, 4], [4, 0], [4, 4]);
       break;
     default:
       return { isValid: false, message: 'Tipo de línea no reconocido' };
@@ -1091,7 +1119,7 @@ function validateLine(cardNumbers, calledNumbers, lineType) {
 
   for (const [row, col] of positions) {
     const number = cardNumbers[row][col];
-    
+
     // El centro (2,2) es FREE - siempre cuenta
     if (row === 2 && col === 2) {
       winningNumbers.push('FREE');
@@ -1111,8 +1139,8 @@ function validateLine(cardNumbers, calledNumbers, lineType) {
     isValid,
     winningNumbers,
     missingNumbers,
-    message: isValid 
-      ? `Línea ${lineType} válida` 
+    message: isValid
+      ? `Línea ${lineType} válida`
       : `Faltan números: ${missingNumbers.join(', ')}`
   };
 }
@@ -1154,8 +1182,8 @@ function validateBingo(cardNumbers, calledNumbers) {
     missingNumbers,
     totalMarked: winningNumbers.length,
     totalNeeded: 24, // 25 casillas - 1 FREE
-    message: isValid 
-      ? 'BINGO completo' 
+    message: isValid
+      ? 'BINGO completo'
       : `Faltan ${missingNumbers.length} números: ${missingNumbers.slice(0, 5).join(', ')}${missingNumbers.length > 5 ? '...' : ''}`
   };
 }
@@ -1310,9 +1338,9 @@ exports.getMyCardsAnalysis = async (req, res) => {
 
   } catch (error) {
     console.error('[GameController] Error en análisis de cartones:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: error.message 
+    res.status(500).json({
+      success: false,
+      message: error.message
     });
   }
 };

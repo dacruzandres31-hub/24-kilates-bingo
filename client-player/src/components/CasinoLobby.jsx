@@ -26,7 +26,7 @@ const preloadImages = () => {
     { key: 'gold', src: goldIcon },
     { key: 'background', src: lobbyBackground }
   ];
-  
+
   images.forEach(({ key, src }) => {
     if (!imageCache[key]) {
       const img = new Image();
@@ -106,9 +106,9 @@ const RoomCard = ({ room }) => {
         )}
 
         <div className="room-icon">
-          <img 
-            src={room.iconImage} 
-            alt={room.name} 
+          <img
+            src={room.iconImage}
+            alt={room.name}
             className="room-icon-img"
             loading="eager"
             decoding="async"
@@ -228,7 +228,7 @@ const CasinoLobby = ({ user, onLogout }) => {
     confirm: false
   });
   const [passwordStrength, setPasswordStrength] = useState({ level: 0, text: '', color: '' });
-  
+
   // Estado de audio
   const [audioStatus, setAudioStatus] = useState({
     musicEnabled: audioService.enabled,
@@ -247,10 +247,10 @@ const CasinoLobby = ({ user, onLogout }) => {
   // NUEVO: Cargar datos del lobby al montar componente
   useEffect(() => {
     loadLobbyData();
-    
+
     // Actualizar cada 30 segundos para reflejar cambios en pozos
     const interval = setInterval(loadLobbyData, 30000);
-    
+
     return () => clearInterval(interval);
   }, []);
 
@@ -258,8 +258,11 @@ const CasinoLobby = ({ user, onLogout }) => {
   const loadLobbyData = async () => {
     try {
       console.log('[CasinoLobby] 🔄 Cargando datos del lobby...');
-      const response = await axios.get('/api/game/lobby-data');
-      
+      const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
+      const response = await axios.get('/api/game/lobby-data', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
       if (response.data.success) {
         console.log('[CasinoLobby] ✅ Datos del lobby recibidos:', response.data.data);
         setLobbyData(response.data.data);
@@ -274,10 +277,10 @@ const CasinoLobby = ({ user, onLogout }) => {
   // NUEVO: Función para formatear valores monetarios
   const formatMoney = (amount) => {
     if (typeof amount === 'string') return amount; // Para tickets (ej: "Ticket Oro")
-    
+
     const num = parseFloat(amount);
     if (isNaN(num)) return '$0';
-    
+
     // Formatear con separadores de miles y decimales
     return '$' + num.toLocaleString('es-CO', {
       minimumFractionDigits: 0,
@@ -353,7 +356,7 @@ const CasinoLobby = ({ user, onLogout }) => {
     // Mapear datos del backend a cada sala usando backendId
     return baseRooms.map(room => {
       const roomData = lobbyData[room.backendId];
-      
+
       if (!roomData) {
         return {
           ...room,
@@ -367,7 +370,7 @@ const CasinoLobby = ({ user, onLogout }) => {
       }
 
       // Usar nextSession del backend si está disponible
-      const targetTime = roomData.nextSession 
+      const targetTime = roomData.nextSession
         ? new Date(roomData.nextSession)
         : room.targetTime;
 
@@ -395,7 +398,7 @@ const CasinoLobby = ({ user, onLogout }) => {
     if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
     if (/[0-9]/.test(password)) strength++;
     if (/[^a-zA-Z0-9]/.test(password)) strength++;
-    
+
     if (strength <= 2) return { level: 1, text: 'Débil', color: 'text-red-500' };
     if (strength <= 3) return { level: 2, text: 'Media', color: 'text-yellow-500' };
     return { level: 3, text: 'Fuerte', color: 'text-green-500' };
@@ -403,17 +406,17 @@ const CasinoLobby = ({ user, onLogout }) => {
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
-    
+
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       alert('❌ Las contraseñas no coinciden');
       return;
     }
-    
+
     if (passwordData.newPassword.length < 6) {
       alert('❌ La contraseña debe tener al menos 6 caracteres');
       return;
     }
-    
+
     try {
       const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
       await axios.post('/api/auth/change-password', {
@@ -422,7 +425,7 @@ const CasinoLobby = ({ user, onLogout }) => {
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
+
       alert('✅ Contraseña cambiada exitosamente');
       setShowChangePasswordModal(false);
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
@@ -435,18 +438,18 @@ const CasinoLobby = ({ user, onLogout }) => {
     try {
       console.log('[CasinoLobby] 🔄 Cargando perfil de usuario...');
       const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
-      
+
       if (!token) {
         console.warn('[CasinoLobby] ⚠️ No hay token disponible');
         return;
       }
-      
+
       console.log('[CasinoLobby] 🔑 Token:', token.substring(0, 20) + '...');
-      
+
       const response = await axios.get('/api/users/profile', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      
+
       console.log('[CasinoLobby] ✅ Datos recibidos:', response.data);
       setUserData(response.data);
     } catch (error) {
@@ -476,7 +479,7 @@ const CasinoLobby = ({ user, onLogout }) => {
   // Audio del lobby - una sola vez con primer click
   useEffect(() => {
     let activated = false;
-    
+
     const handleClick = () => {
       if (!activated) {
         activated = true;
@@ -486,7 +489,7 @@ const CasinoLobby = ({ user, onLogout }) => {
     };
 
     document.addEventListener('click', handleClick);
-    
+
     return () => {
       document.removeEventListener('click', handleClick);
     };
@@ -569,9 +572,9 @@ const CasinoLobby = ({ user, onLogout }) => {
         {/* Logo Central */}
         <div className="logo-container">
           <div className="logo-shine"></div>
-          <img 
-            src={logo} 
-            alt="Bingo 24 Kilates" 
+          <img
+            src={logo}
+            alt="Bingo 24 Kilates"
             className="logo-image"
             loading="eager"
             decoding="async"

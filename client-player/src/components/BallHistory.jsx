@@ -50,7 +50,7 @@ export default function BallHistory({ balls }) {
         {letters.map(letter => (
           <div key={letter} className="history-column">
             {/* Encabezado de columna */}
-            <div 
+            <div
               className="column-header"
               style={{ backgroundColor: getBallColor(letter) }}
             >
@@ -87,18 +87,18 @@ export default function BallHistory({ balls }) {
         ))}
       </div>
 
-      {/* Últimas 5 bolas (horizontal) */}
+      {/* Últimas 6 bolas (horizontal) */}
       {balls.length > 0 && (
-        <div className="recent-balls">
-          <span className="recent-label">Últimas 5:</span>
+        <div className="recent-balls-bar">
+          <span className="recent-label">ÚLTIMAS:</span>
           <div className="recent-balls-list">
-            {balls.slice(-5).map((ball, index) => (
+            {balls.slice(-6).reverse().map((ball, index) => (
               <div
-                key={`${ball.letter}-${ball.number}-${index}`}
-                className="recent-ball"
-                style={{ backgroundColor: getBallColor(ball.letter) }}
+                key={`recent-${index}`}
+                className="main-ball mini"
+                style={{ '--ball-color': getBallColor(ball.letter) }}
               >
-                {ball.letter}-{ball.number}
+                <span className="ball-number">{ball.number}</span>
               </div>
             ))}
           </div>

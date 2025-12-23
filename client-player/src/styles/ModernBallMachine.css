@@ -148,45 +148,159 @@
 /* La bola física 3D */
 .main-ball {
   width: 150px;
-  /* Reducido de 120px */
   height: 150px;
-  /* Reducido de 120px */
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #fff 5%, var(--ball-color) 40%, #000 100%);
+  position: relative;
+  background: radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.2) 0%, transparent 50%),
+    var(--ball-color);
   box-shadow:
-    0 10px 20px rgba(0, 0, 0, 0.6),
-    inset -10px -10px 20px rgba(0, 0, 0, 0.5);
+    inset -10px -10px 20px rgba(0, 0, 0, 0.4),
+    inset 10px 10px 20px rgba(255, 255, 255, 0.3),
+    0 10px 20px rgba(0, 0, 0, 0.5);
 
   display: flex;
   align-items: center;
   justify-content: center;
 
   font-size: 4.5rem;
-  /* Reducido de 3.5rem */
   font-weight: 900;
-  color: #fff;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  color: #333;
+  /* Color oscuro para el número sobre blanco */
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
   font-family: 'Roboto', sans-serif;
+  z-index: 35;
 
   /* Animación de entrada "pop" */
   animation: ballPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-/* Círculo blanco interior donde va el número */
+/* Círculo blanco interior donde va el número - FIJO */
 .main-ball::before {
   content: '';
   position: absolute;
-  width: 60%;
-  height: 60%;
-  background: rgba(255, 255, 255, 0.9);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 70%;
+  height: 70%;
+  background: #ffffff;
+  /* BLANCO PURO */
   border-radius: 50%;
-  z-index: -1;
-  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.2);
+  z-index: 1;
+  /* Estar sobre el fondo del padre */
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.2);
 }
 
-.main-ball {
-  color: #333;
-  /* El número en negro (o gris oscuro) para contraste con fondo blanco */
+.main-ball .ball-content,
+.main-ball .ball-number {
+  position: relative;
+  z-index: 5;
+  /* Estar sobre el círculo blanco */
+  background: transparent !important;
+  /* Importante: Sin fondo amarillo */
+}
+
+/* Contenedor de últimas bolas - Estándar para todas las salas */
+.recent-balls-bar {
+  margin-top: 8px !important;
+  /* Menos margen */
+  padding: 6px 10px !important;
+  /* Padding más compacto */
+  background: rgba(0, 0, 0, 0.6) !important;
+  /* Fondo más oscuro para contraste */
+  border-radius: 20px !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  display: flex !important;
+  flex-direction: row !important;
+  /* Asegurar fila */
+  align-items: center !important;
+  justify-content: flex-start !important;
+  /* Alinear a la izquierda (después del label) */
+  gap: 10px !important;
+  width: auto !important;
+  /* Auto para ajustar al contenido o 100% según container */
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  align-self: center !important;
+  /* Centrarse en su padre flex */
+}
+
+.recent-label {
+  font-weight: 800 !important;
+  color: #fbcb0a !important;
+  /* Color dorado para resaltar */
+  font-size: 0.8rem !important;
+  letter-spacing: 0.5px !important;
+  white-space: nowrap !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8) !important;
+  margin-right: 5px !important;
+}
+
+.recent-balls-list {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 6px !important;
+  /* Espacio reducido entre bolas */
+  flex-wrap: nowrap !important;
+  /* NO envolver */
+  overflow: visible !important;
+}
+
+/* Clase reutilizable para que los chips de últimas bolas se vean como la bola principal */
+.bingo-ball-chip,
+div.recent-balls-list .bingo-ball-chip {
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  border-radius: 50% !important;
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-weight: 900 !important;
+  font-size: 1.2rem !important;
+  color: #333 !important;
+  background: radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.2) 0%, transparent 50%),
+    var(--ball-color) !important;
+  box-shadow:
+    inset -3px -3px 6px rgba(0, 0, 0, 0.4),
+    inset 3px 3px 6px rgba(255, 255, 255, 0.3),
+    0 4px 8px rgba(0, 0, 0, 0.4) !important;
+  transition: transform 0.2s ease;
+  overflow: hidden !important;
+  z-index: 10 !important;
+  /* Mantiene el stacking context */
+}
+
+.bingo-ball-chip::before,
+div.recent-balls-list .bingo-ball-chip::before {
+  content: '' !important;
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  width: 70% !important;
+  height: 70% !important;
+  background: #ffffff !important;
+  border-radius: 50% !important;
+  z-index: 1 !important;
+  /* SOBRE el fondo para ser visible */
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+  display: block !important;
+}
+
+.bingo-ball-chip .ball-number,
+div.recent-balls-list .bingo-ball-chip .ball-number {
+  position: relative !important;
+  z-index: 10 !important;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.5) !important;
+  line-height: 1 !important;
+  color: #333 !important;
+  font-family: 'Roboto', sans-serif !important;
+  display: block !important;
+  font-size: 1rem !important;
 }
 
 @keyframes ballPop {
@@ -234,4 +348,89 @@
     height: 100px;
     font-size: 3rem;
   }
+}
+
+/* =========================================
+   ESTRATEGIA "MINI MAIN BALL" - 32px
+   ========================================= */
+.main-ball.mini {
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  min-height: 32px !important;
+  font-size: 0.9rem !important;
+  margin: 0 !important;
+  box-shadow:
+    inset -2px -2px 4px rgba(0, 0, 0, 0.4),
+    inset 2px 2px 4px rgba(255, 255, 255, 0.3),
+    0 2px 4px rgba(0, 0, 0, 0.4) !important;
+  animation: miniPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.main-ball.mini .ball-number {
+  font-size: 0.8rem !important;
+  z-index: 10 !important;
+  position: relative !important;
+  color: #111 !important;
+  text-shadow: 0 0.5px 0.5px rgba(255, 255, 255, 0.8) !important;
+}
+
+.main-ball.mini::before {
+  width: 70% !important;
+  height: 70% !important;
+  z-index: 1 !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* =========================================
+   CLONE OF MAIN BALL FOR RECENT PANEL (60px)
+   ========================================= */
+.recent-ball-clone {
+  width: 60px !important;
+  height: 60px !important;
+  border-radius: 50% !important;
+  position: relative !important;
+  /* Exact main-ball gradient */
+  background: radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.2) 0%, transparent 50%),
+    var(--ball-color) !important;
+  box-shadow:
+    inset -4px -4px 8px rgba(0, 0, 0, 0.4),
+    inset 4px 4px 8px rgba(255, 255, 255, 0.3),
+    0 4px 8px rgba(0, 0, 0, 0.5) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-family: 'Roboto', sans-serif !important;
+  z-index: 10 !important;
+  border: none !important;
+  /* Ensure no border leaks from other styles */
+}
+
+/* White center for clone - Reduced to 55% to make the colored border appear wider/thicker */
+/* White center using EXPLICIT DIV for reliability */
+.ball-inner-white {
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  width: 50% !important;
+  /* Smaller size = Thicker border */
+  height: 50% !important;
+  background: #ffffff !important;
+  /* Pure White */
+  border-radius: 50% !important;
+  z-index: 2 !important;
+  /* Above background */
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.25) !important;
+  pointer-events: none;
+}
+
+/* Update number z-index to be above the white div */
+.recent-ball-clone .ball-number {
+  position: relative !important;
+  z-index: 5 !important;
+  font-size: 1.6rem !important;
+  font-weight: 900 !important;
+  color: #111 !important;
+  text-shadow: none !important;
 }

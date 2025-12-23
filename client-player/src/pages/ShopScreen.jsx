@@ -117,7 +117,7 @@ export default function ShopScreen() {
 
     try {
       const paymentType = getPaymentMethod();
-      
+
       const response = await fetch('/api/shop/buy-card', {
         method: 'POST',
         headers: {
@@ -136,11 +136,11 @@ export default function ShopScreen() {
       if (data.success) {
         setMessage(data.message);
         setMessageType('success');
-        
+
         // Recargar datos
         loadTickets();
         loadUserBalance();
-        
+
         // Limpiar formulario
         setTimeout(() => {
           setQuantity(1);
@@ -279,7 +279,7 @@ export default function ShopScreen() {
           </div>
           <div className="summary-item">
             <span>Cantidad</span>
-            <span className="summary-value">{quantity} cartón{quantity !== 1 ? 'es' : ''}</span>
+            <span className="summary-value">{quantity} {quantity !== 1 ? 'cartones' : 'cartón'}</span>
           </div>
           <div className="summary-item">
             <span>Precio Unitario</span>
@@ -312,7 +312,7 @@ export default function ShopScreen() {
           onClick={handleBuyCard}
           disabled={loading || !canBuy}
         >
-          {loading ? 'Procesando...' : `Comprar ${quantity} Cartón${quantity !== 1 ? 'es' : ''}`}
+          {loading ? 'Procesando...' : `Comprar ${quantity} ${quantity !== 1 ? 'Cartones' : 'Cartón'}`}
         </button>
 
         {/* Información Adicional */}

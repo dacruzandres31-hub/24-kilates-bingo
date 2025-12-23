@@ -10,6 +10,7 @@ import CardSelectionLobby from './CardSelectionLobby';
 import BingoCardPreview from './BingoCardPreview';
 import Countdown from './Countdown';
 import ModernBallMachine from './ModernBallMachine';
+import RecentBallsPanel from './RecentBallsPanel';
 
 export default function StarterRoom({ onLogout }) {
   const { sessionId } = useParams();
@@ -40,6 +41,8 @@ export default function StarterRoom({ onLogout }) {
   const [cardsRemaining, setCardsRemaining] = useState(20); // Cartones que faltan por seleccionar
   const [showReadyModal, setShowReadyModal] = useState(false); // Modal "¡¡Todo Listo!!"
   const [isModalClosing, setIsModalClosing] = useState(false); // Estado de animación fade-out
+  const [timeRemaining, setTimeRemaining] = useState(null);
+  const [nextDrawTime, setNextDrawTime] = useState(null);
 
   // Auto-cerrar modal "¡¡Todo Listo!!" después de 5 segundos con fade-out
   useEffect(() => {
@@ -95,8 +98,9 @@ export default function StarterRoom({ onLogout }) {
   useEffect(() => {
     const checkExistingCards = async () => {
       try {
+        const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
         const response = await fetch(`/api/game/starter/my-cards/${sessionId || 'starter_default'}`, {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+          headers: { 'Authorization': `Bearer ${token}` }
         });
 
         if (response.ok) {
@@ -127,7 +131,43 @@ export default function StarterRoom({ onLogout }) {
     };
 
     checkExistingCards();
+    loadRoomStatus();
   }, [sessionId]);
+
+  // Cargar estado de la sala (siguiente sorteo)
+  const loadRoomStatus = async () => {
+    try {
+      const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
+      const response = await fetch(`/api/game/room-status/starter`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.nextDraw) {
+          const drawDate = new Date(data.nextDraw);
+          setNextDrawTime(drawDate);
+          const seconds = Math.max(0, Math.floor((drawDate - new Date()) / 1000));
+          setTimeRemaining(seconds);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading room status:', error);
+    }
+  };
+
+  // Efecto para actualizar el contador cada segundo
+  useEffect(() => {
+    let interval = null;
+    if (nextDrawTime) {
+      interval = setInterval(() => {
+        const seconds = Math.max(0, Math.floor((nextDrawTime - new Date()) / 1000));
+        setTimeRemaining(seconds);
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [nextDrawTime]);
 
   // Generar número de serie del cartón: DDMMYY-S0001
   const generateCardSerial = (cardIndex, roomLetter = 'S') => {
@@ -288,6 +328,7 @@ export default function StarterRoom({ onLogout }) {
 
         const newBall = {
           number,
+          color: getBallColor(number),
           drawOrder: ballsDrawn.length + 1,
           timestamp: Date.now()
         };
@@ -401,6 +442,7 @@ export default function StarterRoom({ onLogout }) {
 
     // Si se completaron los 20 cartones, mostrar modal "¡¡Todo Listo!!"
     if (allCards.length >= 20) {
+      loadRoomStatus(); // Refrescar hora antes de mostrar
       setShowReadyModal(true);
     }
   };
@@ -439,7 +481,7 @@ export default function StarterRoom({ onLogout }) {
       // Buscar cartones que tienen este número
       playerCards.forEach(card => {
         const hasNumber = card.numbers.flat().includes(latestBall.number);
-        if (hasNumber && expandedCard !== card.id) {
+        if (hasNumber && expandedCard !== card.id && !lineCelebrated) {
           setLastHitCard(card.id);
           expandCard(card.id);
         }
@@ -566,13 +608,15 @@ export default function StarterRoom({ onLogout }) {
       if (gameStatus === 'active') {
         setGameStatus('waiting');
         const timeout = setTimeout(() => {
-          // Anunciar continuación a BINGO antes de reanudar
+          // Desaparecer festejo de línea e información relacionada JUSTO antes del anuncio
+          setWinnerCards([]);
+          setHighlightedLine(null);
+          setLineCelebrated(false);
+
+          // Anunciar continuación a BINGO
           voiceService.speak('Continuamos hasta Bingo');
+
           setTimeout(() => {
-            // Solo resetear el flag de celebración activa
-            // NO limpiar celebratedCardIds ni winnerCards - mantener historial
-            setHighlightedLine(null);
-            setLineCelebrated(false);
             setGameStatus('active');
           }, 2000); // Esperar 2 segundos para que termine el anuncio
         }, 18000); // 18 segundos + 2 del anuncio = 20 segundos total
@@ -766,7 +810,7 @@ export default function StarterRoom({ onLogout }) {
 
                 {/* Cartón usando BingoCardPreview IGUAL que el expandido */}
                 {winnerCards[0] && (
-                  <div className="celebration-card-display">
+                  <div className="celebration-card-display" style={{ transform: 'scale(1.5)', marginTop: '40px' }}>
                     <BingoCardPreview
                       card={{
                         card_serial: winnerCards[0].cardSerial,
@@ -1004,26 +1048,8 @@ export default function StarterRoom({ onLogout }) {
                 waitingButtonImage={selectCardsButton}
               />
 
-              {/* Últimas 5 bolas */}
-              {ballsDrawn.length > 0 && (
-                <div className="recent-balls-bar">
-                  <span className="recent-label">ÚLTIMAS:</span>
-                  <div className="recent-balls-list">
-                    {ballsDrawn.slice(-5).reverse().map((ball, index) => (
-                      <div
-                        key={`${ball.number}-${index}`}
-                        className="recent-ball-chip"
-                        style={{
-                          backgroundColor: getBallColor(ball.number),
-                          boxShadow: `0 0 15px ${getBallColor(ball.number)}`
-                        }}
-                      >
-                        <span className="ball-number">{ball.number}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* Últimas 5 bolas - COMPONENTE NUEVO (60px) */}
+              <RecentBallsPanel balls={ballsDrawn} getBallColor={getBallColor} />
             </div>
 
           </div>
@@ -1132,26 +1158,8 @@ export default function StarterRoom({ onLogout }) {
                   </div>
                 </div>
               )}
-              {/* Últimas 5 bolas */}
-              {ballsDrawn.length > 0 && (
-                <div className="recent-balls-bar">
-                  <span className="recent-label">ÚLTIMAS:</span>
-                  <div className="recent-balls-list">
-                    {ballsDrawn.slice(-5).reverse().map((ball, index) => (
-                      <div
-                        key={`${ball.number}-${index}`}
-                        className="recent-ball-chip"
-                        style={{
-                          backgroundColor: getBallColor(ball.number),
-                          animationDelay: `${index * 0.1}s`
-                        }}
-                      >
-                        {ball.number}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* Últimas 5 bolas - COMPONENTE NUEVO (75px) */}
+
             </div>
           </div>
 
@@ -1269,18 +1277,11 @@ export default function StarterRoom({ onLogout }) {
                 <p className="ready-modal-subtitle">Tienes {selectedPlayerCards.length} cartones listos para jugar</p>
                 <div className="ready-modal-countdown">
                   <p className="ready-modal-countdown-label">Próximo Sorteo en:</p>
-                  <Countdown targetDate={(() => {
-                    const today = new Date();
-                    const drawTime = new Date(today);
-                    drawTime.setHours(19, 0, 0, 0);
-
-                    // Si ya pasó las 19:00 hoy, programar para mañana
-                    if (today > drawTime) {
-                      drawTime.setDate(drawTime.getDate() + 1);
-                    }
-
-                    return drawTime;
-                  })()} />
+                  {nextDrawTime ? (
+                    <Countdown targetDate={nextDrawTime} />
+                  ) : (
+                    <p className="loading-countdown">Calculando...</p>
+                  )}
                 </div>
               </div>
             </div>
