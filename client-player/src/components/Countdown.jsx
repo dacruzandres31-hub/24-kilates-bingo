@@ -34,22 +34,30 @@ const Countdown = ({ targetDate }) => {
       <div className={`countdown-label-text ${!hasTimeLeft ? 'drawing' : ''}`}>
         {hasTimeLeft ? 'Próximo sorteo en...' : 'SORTEANDO'}
       </div>
-      <div className="countdown-timer">
-        <div className="countdown-segment">
-          <span className="countdown-number">{String(timeLeft.H || 0).padStart(2, '0')}</span>
-          <span className="countdown-label">H</span>
+      {hasTimeLeft ? (
+        <div className="countdown-timer">
+          <div className="countdown-segment">
+            <span className="countdown-number">{String(timeLeft.H || 0).padStart(2, '0')}</span>
+            <span className="countdown-label">H</span>
+          </div>
+          <span className="countdown-separator">:</span>
+          <div className="countdown-segment">
+            <span className="countdown-number">{String(timeLeft.M || 0).padStart(2, '0')}</span>
+            <span className="countdown-label">M</span>
+          </div>
+          <span className="countdown-separator">:</span>
+          <div className="countdown-segment">
+            <span className="countdown-number">{String(timeLeft.S || 0).padStart(2, '0')}</span>
+            <span className="countdown-label">S</span>
+          </div>
         </div>
-        <span className="countdown-separator">:</span>
-        <div className="countdown-segment">
-          <span className="countdown-number">{String(timeLeft.M || 0).padStart(2, '0')}</span>
-          <span className="countdown-label">M</span>
+      ) : (
+        <div className="countdown-timer drawing-pulse">
+          <div className="countdown-segment full-width">
+            <span className="countdown-number text-large">INICIANDO</span>
+          </div>
         </div>
-        <span className="countdown-separator">:</span>
-        <div className="countdown-segment">
-          <span className="countdown-number">{String(timeLeft.S || 0).padStart(2, '0')}</span>
-          <span className="countdown-label">S</span>
-        </div>
-      </div>
+      )}
     </div>
   );
 };

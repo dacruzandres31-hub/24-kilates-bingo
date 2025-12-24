@@ -22,6 +22,7 @@ export default function SilverRoom({ onLogout }) {
   const [currentBall, setCurrentBall] = useState(null);
   const [floatingBalls, setFloatingBalls] = useState([]);
   const [almostLineCards, setAlmostLineCards] = useState([]); // Cartones a 2 bolillas de línea
+  const [almostBingoCards, setAlmostBingoCards] = useState([]); // Cartones a 1-2 números de Bingo
   const [expandedCard, setExpandedCard] = useState(null); // Cartón expandido actualmente
   const [canCloseExpandedCard, setCanCloseExpandedCard] = useState(true); // Controla si se puede cerrar el cartón expandido
   const [lastHitCard, setLastHitCard] = useState(null); // Último cartón con acierto
@@ -528,8 +529,31 @@ export default function SilverRoom({ onLogout }) {
       }
     });
 
-    setAlmostLineCards(cardsAlmostThere);
+    // Check Bingo Status
+    const cardsAlmostBingo = [];
+    playerCards.forEach(card => {
+      const markedCount = getCardProgress(card);
+      const missingForBingo = 15 - markedCount;
+      if (missingForBingo <= 2) {
+        cardsAlmostBingo.push({
+          cardId: card.id,
+          minMissing: missingForBingo
+        });
+      }
+    });
+    setAlmostBingoCards(cardsAlmostBingo);
+
+    // Only update Almost Line if Line hasn't been won yet
+    const hasLineBeenWonGlobal = celebratedCardIds.length > 0 || lineCelebrated;
+    if (!hasLineBeenWonGlobal) {
+      setAlmostLineCards(cardsAlmostThere);
+    } else {
+      setAlmostLineCards([]); // Clear Line alerts once Line is won
+    }
+
     setCardWinningLines(newCardWinningLines); // Actualizar líneas ganadoras
+
+    // removed redundant setAlmostLineCards call
 
     // Mostrar celebración si hay NUEVOS ganadores que NO han sido festejados
     // ANTI-LOOP: Verificar que el cartón NO esté en celebratedCardIds
@@ -537,7 +561,11 @@ export default function SilverRoom({ onLogout }) {
       !celebratedCardIds.includes(card.cardId)
     );
 
-    if (newWinners.length > 0 && !lineCelebrated) {
+    // FIX: Line can only be won ONCE per game session.
+    // If celebratedCardIds has any entries, it means Line was already won by someone.
+    const hasLineBeenWon = celebratedCardIds.length > 0;
+
+    if (newWinners.length > 0 && !lineCelebrated && !hasLineBeenWon) {
       // Tomar el primer cartón ganador nuevo
       const winnerCard = newWinners[0];
 
@@ -1079,18 +1107,69 @@ export default function SilverRoom({ onLogout }) {
               </div>
 
               {/* Modal de Alerta de Casi Línea - Al lado del título */}
-              {almostLineCards.length > 0 && ballsDrawn.length < 40 && (() => {
-                const minMissing = Math.min(...almostLineCards.map(card => card.minMissing));
-                return (
-                  <div className="almost-line-modal">
-                    <div className="almost-line-content">
-                      <span className="alert-icon-modal">⚡</span>
-                      <span className="alert-text-modal">
-                        ¡A {minMissing} NÚMERO{minMissing > 1 ? 'S' : ''} DE LÍNEA!
-                      </span>
+              {/* Modal de Alerta de Casi Línea / Casi Bingo - Al lado del título */}
+              {/* Notificaciones de Estado (Casi Línea / Casi Bingo) */}
+              {(() => {
+                const hasLineBeenWon = celebratedCardIds.length > 0 || lineCelebrated;
+
+                // PRIORIDAD 0: ALERTA DE POZO (Solo antes de la bola 40 y si no hay línea)
+                // "Posibilidades de Pozo Pre-40"
+                if (!hasLineBeenWon && ballsDrawn.length < 40 && ballsDrawn.length > 5) {
+                  return (
+                    <div className="almost-line-modal pozo-alert" style={{
+                      top: '15%',
+                      opacity: 0.9,
+                      transform: 'scale(0.8)',
+                      pointerEvents: 'none'
+                    }}>
+                      <div className="almost-line-content" style={{
+                        background: 'linear-gradient(135deg, #C0C0C0, #808080)',
+                        color: '#fff',
+                        borderColor: '#505050',
+                        boxShadow: '0 0 15px rgba(192, 192, 192, 0.6)'
+                      }}>
+                        <span className="alert-icon-modal">🏆</span>
+                        <span className="alert-text-modal">
+                          ¡POZO DISPONIBLE! (Pre-40)
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                );
+                  );
+                }
+
+                // PRIORIDAD 1: ALERTA DE BINGO (Solo si ya se ganó la línea)
+                if (hasLineBeenWon && almostBingoCards.length > 0 && ballsDrawn.length < 90) {
+                  const minMissing = Math.min(...almostBingoCards.map(c => c.minMissing));
+                  return (
+                    <div className="almost-line-modal almost-bingo-modal">
+                      <div className="almost-line-content" style={{ borderColor: '#ff00ff', background: 'linear-gradient(135deg, rgba(255, 0, 255, 0.95), rgba(75, 0, 130, 0.95))' }}>
+                        <span className="alert-icon-modal">💎</span>
+                        <span className="alert-text-modal">
+                          ¡A {minMissing} NÚMERO{minMissing > 1 ? 'S' : ''} DE BINGO!
+                        </span>
+                      </div>
+                    </div>
+                  );
+                }
+
+                // PRIORIDAD 2: ALERTA DE LÍNEA (Restaurada y Mejorada)
+                // Solo si NO se ha ganado línea aún. Y SE QUEDA hasta que se gane.
+                if (!hasLineBeenWon && !lineCelebrated && almostLineCards.length > 0) {
+                  const minMissing = Math.min(...almostLineCards.map(card => card.minMissing));
+                  const count = almostLineCards.length;
+                  return (
+                    <div className="almost-line-modal">
+                      <div className="almost-line-content">
+                        <span className="alert-icon-modal">⚡</span>
+                        <span className="alert-text-modal">
+                          {count > 1 ? `¡${count} CARTONES A ` : '¡A '}
+                          {minMissing} NÚMERO{minMissing > 1 ? 'S' : ''} DE LÍNEA!
+                        </span>
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
               })()}
 
               <div className="cards-count">{playerCards.length} cartones</div>

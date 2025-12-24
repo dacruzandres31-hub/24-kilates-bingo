@@ -22,6 +22,7 @@ export default function StarterRoom({ onLogout }) {
   const [currentBall, setCurrentBall] = useState(null);
   const [floatingBalls, setFloatingBalls] = useState([]);
   const [almostLineCards, setAlmostLineCards] = useState([]); // Cartones a 2 bolillas de línea
+  const [almostBingoCards, setAlmostBingoCards] = useState([]); // Cartones a 1-2 números de Bingo
   const [expandedCard, setExpandedCard] = useState(null); // Cartón expandido actualmente
   const [canCloseExpandedCard, setCanCloseExpandedCard] = useState(true); // Controla si se puede cerrar el cartón expandido
   const [lastHitCard, setLastHitCard] = useState(null); // Último cartón con acierto
@@ -314,22 +315,37 @@ export default function StarterRoom({ onLogout }) {
     };
   }, []);
 
-  // Simulación de sorteo BINGO 90 (reemplazar con Socket.IO en producción)
+  // Ref para mantener referencia actualizada de ballsDrawn sin reiniciar el intervalo
+  const ballsDrawnRef = React.useRef(ballsDrawn);
+
+  useEffect(() => {
+    ballsDrawnRef.current = ballsDrawn;
+  }, [ballsDrawn]);
+
+  // Simulación de sorteo BINGO 90 (Optimizado para mantener velocidad constante)
   useEffect(() => {
     if (gameStatus === 'active') {
       const drawTimer = setInterval(() => {
-        // Generar número del 1 al 90
-        const number = Math.floor(Math.random() * 90) + 1;
+        const currentBalls = ballsDrawnRef.current;
 
-        // Evitar duplicados
-        if (ballsDrawn.some(b => b.number === number)) {
-          return;
-        }
+        // Generar número del 1 al 90
+        let number;
+        let attempts = 0;
+        do {
+          number = Math.floor(Math.random() * 90) + 1;
+          attempts++;
+        } while (currentBalls.some(b => b.number === number) && attempts < 200);
+
+        // Si ya salieron todas (o casi todas), detener
+        if (currentBalls.length >= 90 || attempts >= 200) return;
+
+        // Evitar duplicados (doble check)
+        if (currentBalls.some(b => b.number === number)) return;
 
         const newBall = {
           number,
           color: getBallColor(number),
-          drawOrder: ballsDrawn.length + 1,
+          drawOrder: currentBalls.length + 1,
           timestamp: Date.now()
         };
 
@@ -338,11 +354,11 @@ export default function StarterRoom({ onLogout }) {
           setBallsDrawn(prev => [...prev, newBall]);
           setCurrentBall(null);
         }, 3000);
-      }, 5000);
+      }, 8000); // 8 segundos FIJOS entre bola y bola (Ajustado +3s)
 
       return () => clearInterval(drawTimer);
     }
-  }, [gameStatus, ballsDrawn]);
+  }, [gameStatus]); // Dependencia ÚNICA: gameStatus. NO ballsDrawn.
 
   // Actualizar contadores de columna cuando cambian las bolas
   useEffect(() => {
@@ -371,6 +387,7 @@ export default function StarterRoom({ onLogout }) {
       setPreviousGameStatus(gameStatus);
 
       if (gameStatus === 'active') {
+        setShowReadyModal(false); // Close Ready Modal immediately
         addToast('🎮', 'JUEGO INICIADO', 'El sorteo ha comenzado');
         audioService.startBolilleroGirando();
       } else if (gameStatus === 'ended') {
@@ -417,7 +434,7 @@ export default function StarterRoom({ onLogout }) {
   const playerCards = selectedPlayerCards.length > 0 ? selectedPlayerCards : [];
 
   // Handlers para selección de cartones
-  const handleCardsSelected = (reservedCards, remainingTicketsFromBackend) => {
+  const handleCardsSelected = async (reservedCards, remainingTicketsFromBackend) => {
     console.log('🔍 DEBUG - Cartones recibidos del backend:', reservedCards.map(c => ({
       id: c.id,
       serial: c.serial,
@@ -442,7 +459,8 @@ export default function StarterRoom({ onLogout }) {
 
     // Si se completaron los 20 cartones, mostrar modal "¡¡Todo Listo!!"
     if (allCards.length >= 20) {
-      loadRoomStatus(); // Refrescar hora antes de mostrar
+      // FIX: Esperar a que se actualice la hora del sorteo antes de mostrar
+      await loadRoomStatus();
       setShowReadyModal(true);
     }
   };
@@ -465,6 +483,9 @@ export default function StarterRoom({ onLogout }) {
 
   // Expandir cartón (por click o por acierto)
   const expandCard = (cardId) => {
+    // BLOQUEO: No expandir si hay celebración activa o modal de ganador
+    if (celebrationMode || winnerCards.length > 0) return;
+
     setExpandedCard(cardId);
     setCanCloseExpandedCard(false); // Bloquear cierre manual durante tiempo programado
     setTimeout(() => {
@@ -564,10 +585,31 @@ export default function StarterRoom({ onLogout }) {
       }
     });
 
-    setAlmostLineCards(cardsAlmostThere);
+    // Check Bingo Status
+    const cardsAlmostBingo = [];
+    playerCards.forEach(card => {
+      const markedCount = getCardProgress(card);
+      const missingForBingo = 15 - markedCount;
+      if (missingForBingo <= 2) {
+        cardsAlmostBingo.push({
+          cardId: card.id,
+          minMissing: missingForBingo
+        });
+      }
+    });
+    setAlmostBingoCards(cardsAlmostBingo);
+
+    // Only update Almost Line if Line hasn't been won yet
+    const hasLineBeenWonGlobal = celebratedCardIds.length > 0 || lineCelebrated;
+    if (!hasLineBeenWonGlobal) {
+      setAlmostLineCards(cardsAlmostThere);
+    } else {
+      setAlmostLineCards([]); // Clear Line alerts once Line is won
+    }
+
     setCardWinningLines(newCardWinningLines); // Actualizar líneas ganadoras
 
-    setAlmostLineCards(cardsAlmostThere);
+    // removed redundant setAlmostLineCards call
 
     // Mostrar celebración si hay NUEVOS ganadores que NO han sido festejados
     // ANTI-LOOP: Verificar que el cartón NO esté en celebratedCardIds
@@ -575,7 +617,11 @@ export default function StarterRoom({ onLogout }) {
       !celebratedCardIds.includes(card.cardId)
     );
 
-    if (newWinners.length > 0 && !lineCelebrated) {
+    // FIX: Line can only be won ONCE per game session.
+    // If celebratedCardIds has any entries, it means Line was already won by someone.
+    const hasLineBeenWon = celebratedCardIds.length > 0;
+
+    if (newWinners.length > 0 && !lineCelebrated && !hasLineBeenWon) {
       // Tomar el primer cartón ganador nuevo
       const winnerCard = newWinners[0];
 
@@ -768,14 +814,7 @@ export default function StarterRoom({ onLogout }) {
         </div>
       )}
 
-      {/* Contador Pre-40 (Posibilidad de Pozo) */}
-      {gameStatus === 'active' && ballsDrawn.length < 40 && (
-        <div className={`pre40-counter ${ballsDrawn.length >= 39 ? 'spin-exit' : ''}`}>
-          <div className="pre40-title">🎰 Posibilidad de Pozo Pre-40</div>
-          <div className="pre40-value">{40 - ballsDrawn.length}</div>
-          <div className="pre40-label">Bolas restantes</div>
-        </div>
-      )}
+
 
       {/* Sala de selección de cartones (overlay sobre la sala) */}
       {showCardSelection && (
@@ -821,7 +860,11 @@ export default function StarterRoom({ onLogout }) {
                       onClick={null}
                       showSerial={true}
                       drawnNumbers={ballsDrawn.map(b => b.number)}
-                      winningLines={cardWinningLines[winnerCards[0].cardId] || []}
+                      winningLines={
+                        cardWinningLines[winnerCards[0].cardId] && cardWinningLines[winnerCards[0].cardId].length > 0
+                          ? [cardWinningLines[winnerCards[0].cardId][0]] // FIX: SÓLO mostrar la PRIMERA línea ganadora como dorada
+                          : []
+                      }
                     />
                   </div>
                 )}
@@ -1062,19 +1105,43 @@ export default function StarterRoom({ onLogout }) {
                 <span>MIS CARTONES</span>
               </div>
 
-              {/* Modal de Alerta de Casi Línea - Al lado del título */}
-              {almostLineCards.length > 0 && ballsDrawn.length < 40 && (() => {
-                const minMissing = Math.min(...almostLineCards.map(card => card.minMissing));
-                return (
-                  <div className="almost-line-modal">
-                    <div className="almost-line-content">
-                      <span className="alert-icon-modal">⚡</span>
-                      <span className="alert-text-modal">
-                        ¡A {minMissing} NÚMERO{minMissing > 1 ? 'S' : ''} DE LÍNEA!
-                      </span>
+              {/* Notificaciones de Estado (Casi Línea / Casi Bingo) */}
+              {(() => {
+                const hasLineBeenWon = celebratedCardIds.length > 0 || lineCelebrated;
+
+                // PRIORIDAD 1: ALERTA DE BINGO (Solo si ya se ganó la línea)
+                if (hasLineBeenWon && almostBingoCards.length > 0 && ballsDrawn.length < 90) {
+                  const minMissing = Math.min(...almostBingoCards.map(c => c.minMissing));
+                  return (
+                    <div className="almost-line-modal almost-bingo-modal">
+                      <div className="almost-line-content">
+                        <span className="alert-icon-modal">💎</span>
+                        <span className="alert-text-modal">
+                          ¡A {minMissing} NÚMERO{minMissing > 1 ? 'S' : ''} DE BINGO!
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                );
+                  );
+                }
+
+                // PRIORIDAD 2: ALERTA DE LÍNEA (Restaurada y Mejorada)
+                // Solo si NO se ha ganado línea aún. Y SE QUEDA hasta que se gane.
+                if (!hasLineBeenWon && !lineCelebrated && almostLineCards.length > 0) {
+                  const minMissing = Math.min(...almostLineCards.map(card => card.minMissing));
+                  const count = almostLineCards.length;
+                  return (
+                    <div className="almost-line-modal">
+                      <div className="almost-line-content">
+                        <span className="alert-icon-modal">⚡</span>
+                        <span className="alert-text-modal">
+                          {count > 1 ? `¡${count} CARTONES A ` : '¡A '}
+                          {minMissing} NÚMERO{minMissing > 1 ? 'S' : ''} DE LÍNEA!
+                        </span>
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
               })()}
 
               <div className="cards-count">{playerCards.length} cartones</div>
@@ -1083,6 +1150,12 @@ export default function StarterRoom({ onLogout }) {
             <div className="cards-grid-container">
               {/* Grid compacto 6x5 = 30 cartones */}
               <div className="cards-compact-grid">
+                {/* SAFEGUARD: Mensaje si no hay cartones (aunque no debería pasar si hay length > 0) */}
+                {playerCards.length === 0 && (
+                  <div style={{ color: '#fff', textAlign: 'center', padding: '20px' }}>
+                    No hay cartones visibles.
+                  </div>
+                )}
                 {playerCards.map((card, index) => {
                   const cardSerial = card.serial || generateCardSerial(index);
 

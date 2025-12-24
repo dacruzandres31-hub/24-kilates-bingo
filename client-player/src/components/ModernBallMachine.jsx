@@ -81,72 +81,77 @@ const ModernBallMachine = ({
                     Button is always active if game hasn't started. */}
                 {/* Waiting State / Card Selection */}
                 {/* Visible until GAME STARTS (isActive=true). Fades out using CSS class. */}
+                {/* Waiting State / Card Selection */}
+                {/* Visible until GAME STARTS (isActive=true). Fades out using CSS class. */}
                 <div
                     className={`current-ball-stage overlay-layer ${isActive ? 'fade-out' : ''}`}
                     style={{ width: '100%', height: '100%', zIndex: 20 }}
                 >
-                    {cardsRemaining > 0 ? (
-                        <div
-                            className="waiting-pulse"
-                            onClick={!isActive ? onSelectCards : undefined}
-                            style={{
-                                cursor: isActive ? 'default' : 'pointer',
-                                width: '100%',
-                                height: '100%',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                position: 'relative'
-                            }}
-                        >
-                            {waitingButtonImage ? (
-                                <>
-                                    <img
-                                        src={waitingButtonImage}
-                                        alt="Comprar Cartones"
-                                        style={{
-                                            width: '100%',
-                                            height: '100%',
-                                            objectFit: 'contain',
-                                            filter: 'drop-shadow(0 0 15px rgba(255,255,255,0.4))',
-                                            transition: 'transform 0.2s ease',
-                                            transform: 'scale(1.3)'
-                                        }}
-                                        className="hover-scale"
-                                    />
-                                    {/* Overlay Counter */}
-                                    <div style={{
-                                        position: 'absolute',
-                                        bottom: '25%',
-                                        left: '50%',
-                                        transform: 'translateX(-50%)',
-                                        backgroundColor: 'rgba(0,0,0,0.8)',
-                                        color: '#fff',
-                                        padding: '4px 12px',
-                                        borderRadius: '12px',
-                                        fontSize: '1em',
-                                        fontWeight: 'bold',
-                                        border: '1px solid rgba(255,255,255,0.5)',
-                                        whiteSpace: 'nowrap',
-                                        zIndex: 25,
-                                        boxShadow: '0 2px 4px rgba(0,0,0,0.5)'
-                                    }}>
-                                        {cardsRemaining} DISPONIBLES
-                                    </div>
-                                </>
-                            ) : (
-                                <>
-                                    COMPRAR<br />
-                                    <span style={{ fontSize: '1.2em' }}>({cardsRemaining} RESTANTES)</span>
-                                </>
-                            )}
-                        </div>
-                    ) : (
-                        <div className="waiting-pulse">
-                            ESPERANDO<br />SORTEO...
-                        </div>
-                    )}
+                    <div
+                        className="waiting-pulse"
+                        onClick={(!isActive && cardsRemaining > 0) ? onSelectCards : undefined}
+                        style={{
+                            cursor: (!isActive && cardsRemaining > 0) ? 'pointer' : 'default',
+                            width: '100%',
+                            height: '100%',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            position: 'relative'
+                        }}
+                    >
+                        {waitingButtonImage ? (
+                            <>
+                                <img
+                                    src={waitingButtonImage}
+                                    alt="Comprar Cartones"
+                                    style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        objectFit: 'contain',
+                                        filter: 'drop-shadow(0 0 15px rgba(255,255,255,0.4))',
+                                        transition: 'transform 0.2s ease',
+                                        transform: 'scale(1.3)',
+                                        opacity: cardsRemaining > 0 ? 1 : 0.8 // Slightly dim if waiting
+                                    }}
+                                    className={cardsRemaining > 0 ? "hover-scale" : ""}
+                                />
+                                {/* Overlay Counter / Status */}
+                                <div style={{
+                                    position: 'absolute',
+                                    bottom: '25%',
+                                    left: '50%',
+                                    transform: 'translateX(-50%)',
+                                    backgroundColor: 'rgba(0,0,0,0.8)',
+                                    color: '#fff',
+                                    padding: '4px 12px',
+                                    borderRadius: '12px',
+                                    fontSize: '1em',
+                                    fontWeight: 'bold',
+                                    border: '1px solid rgba(255,255,255,0.5)',
+                                    whiteSpace: 'nowrap',
+                                    zIndex: 25,
+                                    boxShadow: '0 2px 4px rgba(0,0,0,0.5)'
+                                }}>
+                                    {cardsRemaining > 0 ? `${cardsRemaining} DISPONIBLES` : 'ESPERANDO EL SORTEO'}
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                {cardsRemaining > 0 ? (
+                                    <>
+                                        COMPRAR<br />
+                                        <span style={{ fontSize: '1.2em' }}>({cardsRemaining} RESTANTES)</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        ESPERANDO<br />EL SORTEO
+                                    </>
+                                )}
+                            </>
+                        )}
+                    </div>
                 </div>
 
                 {/* Active Ball Display (Popped out) */}
