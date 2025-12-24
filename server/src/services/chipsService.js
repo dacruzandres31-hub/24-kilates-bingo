@@ -14,7 +14,7 @@ const pool = require('../db');
 const MoneyMath = require('../utils/moneyMath');
 
 class ChipsService {
-  
+
   // ============================================
   // DEPÓSITO DE FICHAS (Manual - Admin/Cajero)
   // ============================================
@@ -24,7 +24,7 @@ class ChipsService {
     }
 
     const connection = await pool.getConnection();
-    
+
     try {
       // ⚠️ PUNTO CLAVE #3: TRANSACCIÓN ATÓMICA
       // Si falla cualquier paso, TODO se revierte (ROLLBACK)
@@ -104,12 +104,12 @@ class ChipsService {
       throw new Error('Datos bancarios incompletos');
     }
 
-    if (cbu.length !== 22) {
-      throw new Error('CBU inválido. Debe tener 22 dígitos');
-    }
+    // if (cbu.length !== 22) {
+    //   throw new Error('CBU inválido. Debe tener 22 dígitos');
+    // }
 
     const connection = await pool.getConnection();
-    
+
     try {
       await connection.query('START TRANSACTION');
 
@@ -123,22 +123,51 @@ class ChipsService {
         throw new Error('Usuario no encontrado');
       }
 
-      const balance = parseFloat(users[0].balance);
+      // ⚠️ PUNTO CLAVE #1: MATEMÁTICAS PRECISAS
+      const balanceDecimal = MoneyMath.decimal(users[0].balance);
+      const amountDecimal = MoneyMath.decimal(amount);
 
-      if (balance < amount) {
-        throw new Error(`Fondos insuficientes. Balance: ${balance}, Solicitado: ${amount}`);
+      if (balanceDecimal.lessThan(amountDecimal)) {
+        throw new Error(`Fondos insuficientes. Balance: ${MoneyMath.toString(balanceDecimal)}, Solicitado: ${MoneyMath.toString(amountDecimal)}`);
       }
 
       if (amount < 100) {
         throw new Error('El monto mínimo de retiro es 100 fichas');
       }
 
-      // Crear solicitud de retiro
+      const balanceAfter = balanceDecimal.minus(amountDecimal);
+
+      // 1. DEBITAR BALANCE INMEDIATAMENTE
+      await connection.query(
+        'UPDATE users SET balance = ? WHERE id = ?',
+        [MoneyMath.toNumber(balanceAfter), userId]
+      );
+
+      // 2. REGISTRAR MOVIMIENTO (WITHDRAWAL_HOLD)
+      // Usamos 'withdrawal' pero queda asociado a la request pending
+      const [movementResult] = await connection.query(
+        `INSERT INTO chips_movements 
+        (user_id, movement_type, amount, balance_before, balance_after, 
+         reason, metadata, created_at)
+        VALUES (?, 'withdrawal', ?, ?, ?, ?, ?, NOW())`,
+        [
+          userId,
+          MoneyMath.toNumber(amountDecimal.negated()), // Negativo
+          MoneyMath.toNumber(balanceDecimal),
+          MoneyMath.toNumber(balanceAfter),
+          'Solicitud de Retiro (Hold)',
+          JSON.stringify({ cbu, bankAccountHolder, status: 'pending' })
+        ]
+      );
+
+      const chipsMovementId = movementResult.insertId;
+
+      // 3. CREAR SOLICITUD DE RETIRO
       const [result] = await connection.query(
         `INSERT INTO withdrawal_requests 
-        (user_id, amount, bank_account_holder, cbu, bank_name, account_type, status, requested_at)
-        VALUES (?, ?, ?, ?, ?, ?, 'pending', NOW())`,
-        [userId, amount, bankAccountHolder, cbu, bankName, accountType]
+        (user_id, amount, bank_account_holder, cbu, bank_name, account_type, status, requested_at, chips_movement_id)
+        VALUES (?, ?, ?, ?, ?, ?, 'pending', NOW(), ?)`,
+        [userId, amount, bankAccountHolder, cbu, bankName, accountType, chipsMovementId]
       );
 
       await connection.query('COMMIT');
@@ -165,7 +194,7 @@ class ChipsService {
   // ============================================
   static async processWithdrawalRequest(withdrawalRequestId, processorId, processorRole, transferReceipt = null) {
     const connection = await pool.getConnection();
-    
+
     try {
       await connection.query('START TRANSACTION');
 
@@ -203,80 +232,33 @@ class ChipsService {
         );
       }
 
-      // Obtener balance actual
-      const [users] = await connection.query(
+      // YA NO DEBITAMOS AQUÍ (Se debitó al solicitar)
+      // Solo actualizamos el estado de la solicitud a 'completed'
+
+      await connection.query(
+        `UPDATE withdrawal_requests 
+         SET status = 'completed', 
+             processed_at = NOW(), 
+             processed_by = ?,
+             transfer_receipt = ?
+         WHERE id = ?`,
+        [processorId, transferReceipt, withdrawalRequestId]
+      );
+
+      // Obtener el balance actual del usuario para el reporte
+      const [userBalance] = await connection.query(
         'SELECT balance FROM users WHERE id = ?',
         [userId]
       );
 
-      // ⚠️ PUNTO CLAVE #1: Usar MoneyMath para precisión
-      const balanceBefore = MoneyMath.decimal(users[0].balance);
-      const amountDecimal = MoneyMath.decimal(amount);
-
-      if (MoneyMath.isLessThan(balanceBefore, amountDecimal)) {
-        throw new Error(
-          `Fondos insuficientes. Balance: ${MoneyMath.toString(balanceBefore)}, ` +
-          `Requerido: ${MoneyMath.toString(amountDecimal)}`
-        );
-      }
-
-      const balanceAfter = balanceBefore.minus(amountDecimal);
-
-      // Registrar movimiento de fichas
-      const [movementResult] = await connection.query(
-        `INSERT INTO chips_movements 
-        (user_id, movement_type, amount, balance_before, balance_after, 
-         admin_id, reason, metadata, created_at)
-        VALUES (?, 'withdrawal', ?, ?, ?, ?, ?, ?, NOW())`,
-        [
-          userId,
-          MoneyMath.toNumber(amountDecimal.negated()), // Negativo para retiro
-          MoneyMath.toNumber(balanceBefore),
-          MoneyMath.toNumber(balanceAfter),
-          processorId,
-          `Retiro procesado - CBU: ${request.cbu}`,
-          JSON.stringify({
-            withdrawal_request_id: withdrawalRequestId,
-            processor_role: processorRole,
-            cbu: request.cbu,
-            bank_account_holder: request.bank_account_holder
-          })
-        ]
-      );
-
-      const chipsMovementId = movementResult.insertId;
-
-      // Actualizar solicitud de retiro
-      await connection.query(
-        `UPDATE withdrawal_requests 
-        SET status = 'completed', 
-            processed_at = NOW(), 
-            completed_at = NOW(),
-            processed_by = ?,
-            processor_role = ?,
-            chips_movement_id = ?,
-            transfer_receipt = ?
-        WHERE id = ?`,
-        [processorId, processorRole, chipsMovementId, transferReceipt, withdrawalRequestId]
-      );
-
-      // Debitar fichas del usuario
-      await connection.query(
-        'UPDATE users SET balance = ? WHERE id = ?',
-        [MoneyMath.toNumber(balanceAfter), userId]
-      );
-
-      // ⚠️ PUNTO CLAVE #3: COMMIT - Todo o nada
       await connection.query('COMMIT');
 
       return {
         success: true,
         withdrawalRequestId,
-        chipsMovementId,
         userId,
-        amount: MoneyMath.toNumber(amountDecimal),
-        balanceBefore: MoneyMath.toNumber(balanceBefore),
-        balanceAfter: MoneyMath.toNumber(balanceAfter),
+        amount,
+        currentBalance: parseFloat(userBalance[0].balance),
         processorRole,
         timestamp: new Date()
       };
@@ -295,18 +277,55 @@ class ChipsService {
   // ============================================
   static async rejectWithdrawalRequest(withdrawalRequestId, processorId, rejectionReason) {
     const connection = await pool.getConnection();
-    
+
     try {
       await connection.query('START TRANSACTION');
 
-      const [result] = await connection.query(
+      const [withdrawalReqs] = await connection.query(
+        'SELECT user_id, amount FROM withdrawal_requests WHERE id = ? AND status = \'pending\'',
+        [withdrawalRequestId]
+      );
+
+      if (withdrawalReqs.length === 0) {
+        throw new Error('Solicitud no encontrada o ya procesada');
+      }
+
+      const { user_id: userId, amount } = withdrawalReqs[0];
+
+      // 1. ACTUALIZAR ESTADO A REJECTED
+      await connection.query(
         `UPDATE withdrawal_requests 
         SET status = 'rejected',
             processed_at = NOW(),
             processed_by = ?,
             rejection_reason = ?
-        WHERE id = ? AND status = 'pending'`,
+        WHERE id = ?`,
         [processorId, rejectionReason, withdrawalRequestId]
+      );
+
+      // 2. DEVOLVER EL DINERO (REFUND)
+      const [users] = await connection.query('SELECT balance FROM users WHERE id = ?', [userId]);
+      const balanceBefore = MoneyMath.decimal(users[0].balance);
+      const amountDecimal = MoneyMath.decimal(amount);
+      const balanceAfter = balanceBefore.plus(amountDecimal);
+
+      await connection.query('UPDATE users SET balance = ? WHERE id = ?', [MoneyMath.toNumber(balanceAfter), userId]);
+
+      // 3. REGISTRAR MOVIMIENTO (REFUND)
+      await connection.query(
+        `INSERT INTO chips_movements 
+          (user_id, movement_type, amount, balance_before, balance_after, 
+           admin_id, reason, metadata, created_at)
+          VALUES (?, 'refund', ?, ?, ?, ?, ?, ?, NOW())`,
+        [
+          userId,
+          MoneyMath.toNumber(amountDecimal),
+          MoneyMath.toNumber(balanceBefore),
+          MoneyMath.toNumber(balanceAfter),
+          processorId,
+          `Reintegro por rechazo de retiro #${withdrawalRequestId}: ${rejectionReason}`,
+          JSON.stringify({ withdrawal_request_id: withdrawalRequestId })
+        ]
       );
 
       if (result.affectedRows === 0) {
@@ -427,7 +446,7 @@ class ChipsService {
     }
 
     const connection = await pool.getConnection();
-    
+
     try {
       await connection.query('START TRANSACTION');
 
@@ -540,7 +559,7 @@ class ChipsService {
     }
 
     const connection = await pool.getConnection();
-    
+
     try {
       await connection.query('START TRANSACTION');
 
@@ -610,7 +629,7 @@ class ChipsService {
   // ============================================
   static async recordGameMovement(userId, amount, gameSessionId, movementType, reason) {
     const connection = await pool.getConnection();
-    
+
     try {
       // ⚠️ PUNTO CLAVE #3: TRANSACCIÓN ATÓMICA
       await connection.query('START TRANSACTION');
@@ -729,7 +748,7 @@ class ChipsService {
   // ============================================
   static async auditUserBalance(userId) {
     const connection = await pool.getConnection();
-    
+
     try {
       // Obtener balance actual del usuario
       const [users] = await connection.query(

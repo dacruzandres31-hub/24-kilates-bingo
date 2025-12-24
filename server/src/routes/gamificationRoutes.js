@@ -68,6 +68,18 @@ router.get('/agent/:agentId/stats', authMiddleware.authenticateToken, gamificati
  */
 router.get('/agent/:agentId/achievements', authMiddleware.authenticateToken, gamificationController.getAgentAchievements);
 
+/**
+ * GET /api/gamification/achievements
+ * Obtener logros del jugador actual
+ */
+router.get('/achievements', authMiddleware.authenticateToken, gamificationController.getPlayerAchievements);
+
+/**
+ * POST /api/gamification/claim-streak
+ * Reclamar premio de racha
+ */
+router.post('/claim-streak', authMiddleware.authenticateToken, gamificationController.claimStreakReward);
+
 // ========== RUTAS ADMIN ==========
 
 /**
@@ -83,5 +95,22 @@ router.post('/admin/initialize-player', authMiddleware.authenticateToken, gamifi
  * Body: { agentId, achievementType }
  */
 router.post('/admin/unlock-achievement', authMiddleware.authenticateToken, gamificationController.unlockAchievementAdmin);
+
+/**
+ * GET /api/gamification/admin/stats
+ * [SUPERADMIN] Estadísticas globales
+ */
+router.get('/admin/stats', authMiddleware.authenticateToken, gamificationController.getGlobalGamificationStats);
+
+/**
+ * GET /api/gamification/admin/player/:userId
+ * [SUPERADMIN] Detalles gamificación jugador
+ */
+router.get('/admin/player/:userId', authMiddleware.authenticateToken, gamificationController.getPlayerGamificationDetails);
+
+
+// Fortune Wheel
+router.post('/wheel/spin', authMiddleware.authenticateToken, gamificationController.spinWheel);
+router.get('/wheel/status', authMiddleware.authenticateToken, gamificationController.getWheelStatus);
 
 module.exports = router;

@@ -1,0 +1,396 @@
+.wheel-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.95);
+    backdrop-filter: blur(10px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+
+.wheel-modal {
+    /* Minimal container, mostly for controls below */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    padding-top: 20px;
+}
+
+.wheel-title {
+    color: #ffcc00;
+    /* Bright Gold */
+    font-family: 'Cinzel', serif;
+    font-size: 3rem;
+    margin: 0 0 20px 0;
+    text-transform: uppercase;
+    text-shadow: 0 0 20px rgba(255, 204, 0, 0.6);
+    letter-spacing: 4px;
+    position: absolute;
+    top: 20px;
+    width: 100%;
+    text-align: center;
+    z-index: 100;
+}
+
+.close-btn {
+    position: absolute;
+    top: 30px;
+    right: 30px;
+    background: rgba(255, 255, 255, 0.1);
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    border: 2px solid white;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+    z-index: 200;
+    transition: all 0.3s;
+}
+
+.close-btn:hover {
+    background: white;
+    color: black;
+    transform: rotate(90deg);
+}
+
+/* ================= WHEEL CONTAINER (HUGE) ================= */
+.wheel-container {
+    position: relative;
+    /* Make it fill most of the screen */
+    width: min(85vw, 85vh);
+    height: min(85vw, 85vh);
+    margin-top: 60px;
+    /* Space for title */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Outer Lights Ring */
+.wheel-container::before {
+    content: '';
+    position: absolute;
+    top: -20px;
+    left: -20px;
+    right: -20px;
+    bottom: -20px;
+    border-radius: 50%;
+    background: #333;
+    border: 6px solid #d4af37;
+    box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
+    z-index: -2;
+}
+
+/* Blinking Lights Effect (Dashed Border Trick) */
+.wheel-shadow {
+    position: absolute;
+    top: -10px;
+    left: -10px;
+    right: -10px;
+    bottom: -10px;
+    border-radius: 50%;
+    border: 4px dashed #fff;
+    z-index: -1;
+    opacity: 0.5;
+    animation: lights-rotate 20s linear infinite;
+}
+
+@keyframes lights-rotate {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.wheel {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 8px solid #d4af37;
+    position: relative;
+    overflow: hidden;
+    box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.8);
+    /* 
+    12 SLICES MATCHING BACKEND 
+    0: $100k (Red)
+    1,2,3: Bronze (Bronze)
+    4: $50k (Orange)
+    5,6,7: Silver (Silver)
+    8: $5k (Gold)
+    9,10: Gold (Gold)
+    11: Bronze (Bronze)
+  */
+    background: conic-gradient(from 0deg,
+            #e74c3c 0deg 30deg,
+            #cd7f32 30deg 60deg,
+            #a05a2c 60deg 90deg,
+            #cd7f32 90deg 120deg,
+            #e67e22 120deg 150deg,
+            #bdc3c7 150deg 180deg,
+            #95a5a6 180deg 210deg,
+            #bdc3c7 210deg 240deg,
+            #f1c40f 240deg 270deg,
+            #f39c12 270deg 300deg,
+            #f1c40f 300deg 330deg,
+            #a05a2c 330deg 360deg);
+}
+
+.wheel-center {
+    position: absolute;
+    width: 15%;
+    /* Responsive size */
+    height: 15%;
+    background: radial-gradient(circle at 30% 30%, #fff, #d4af37);
+    border-radius: 50%;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border: 4px solid #b8860b;
+}
+
+.wheel-center-inner {
+    width: 40%;
+    height: 40%;
+    background: #222;
+    border-radius: 50%;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.pointer {
+    position: absolute;
+    top: -40px;
+    /* Stick out more */
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60px;
+    height: 80px;
+    background: #c0392b;
+    clip-path: polygon(50% 100%, 0 0, 100% 0);
+    z-index: 20;
+    filter: drop-shadow(0 5px 5px rgba(0, 0, 0, 0.7));
+}
+
+.pointer::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 10%;
+    right: 10%;
+    height: 20px;
+    background: #e74c3c;
+}
+
+/* ================= SEGMENT TEXT ================= */
+.segment {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 50%;
+    height: 1px;
+    /* Minimal height to serve as axis */
+    /* JS rotation handles placement */
+    transform-origin: left center;
+    /* CRITICAL: Pivot around the wheel center */
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.segment-label {
+    position: absolute;
+    right: 10px;
+    /* Closer to edge */
+    top: 50%;
+    /* CRITICAL FIX: Ensure it starts from center */
+    transform: translateY(-50%);
+    transform-origin: center right;
+    line-height: 1;
+    /* Prevent line-height shifts */
+
+    font-weight: 900;
+    font-size: max(2rem, 3.5vh);
+    color: #fff;
+    text-shadow: 2px 2px 0 #000, -1px -1px 0 #000;
+    white-space: nowrap;
+    text-align: right;
+    width: 60%;
+    /* Wider to allow text to flow comfortably */
+}
+
+.money-icon {
+    font-size: 1.4em;
+    margin-right: 8px;
+    filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.5));
+}
+
+/* Special styling for Big Prizes */
+.segment[data-type="cash"] .segment-label {
+    color: #fff;
+    /* White text for max contrast on dark red/orange */
+    font-size: max(3rem, 5vh);
+    /* DOUBLED from ~1.5rem */
+    /* MAXIMIZED size */
+    text-shadow: 0 0 10px rgba(0, 0, 0, 1), 3px 3px 0 #000;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+/* ================= CONTROLS ================= */
+.wheel-controls {
+    position: absolute;
+    bottom: 5vh;
+    z-index: 50;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    flex-direction: column;
+    align-items: center;
+}
+
+.spin-btn {
+    background: linear-gradient(to bottom, #f1c40f, #b8860b);
+    border: 3px solid #fff;
+    padding: 20px 80px;
+    font-size: 2rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    color: #000;
+    border-radius: 60px;
+    cursor: pointer;
+    box-shadow: 0 0 30px rgba(241, 196, 15, 0.6);
+    transition: all 0.2s;
+    animation: pulse-btn 2s infinite;
+}
+
+.spin-btn:active {
+    transform: scale(0.95);
+}
+
+@keyframes pulse-btn {
+    0% {
+        box-shadow: 0 0 20px rgba(241, 196, 15, 0.6);
+        transform: scale(1);
+    }
+
+    50% {
+        box-shadow: 0 0 40px rgba(241, 196, 15, 0.9);
+        transform: scale(1.05);
+    }
+
+    100% {
+        box-shadow: 0 0 20px rgba(241, 196, 15, 0.6);
+        transform: scale(1);
+    }
+}
+
+
+.back-lobby-btn {
+    margin-top: 20px;
+    background: transparent;
+    border: 2px solid #d4af37;
+    color: #d4af37;
+    padding: 12px 30px;
+    font-size: 1.2rem;
+    font-weight: bold;
+    border-radius: 30px;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.back-lobby-btn:hover {
+    background: #d4af37;
+    color: #000;
+    box-shadow: 0 0 15px rgba(212, 175, 55, 0.5);
+}
+
+.prize-reveal {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    position: absolute;
+    bottom: 15%;
+    /* Gradient background for cheerfulness */
+    background: linear-gradient(135deg, rgba(44, 62, 80, 0.95), rgba(0, 0, 0, 0.95));
+    border: 4px solid #f1c40f;
+    box-shadow: 0 0 50px rgba(241, 196, 15, 0.6), inset 0 0 20px rgba(241, 196, 15, 0.3);
+    padding: 40px;
+    border-radius: 25px;
+    z-index: 300;
+    transform: scale(1.1);
+    text-align: center;
+    backdrop-filter: blur(10px);
+}
+
+.prize-reveal h3 {
+    color: #f1c40f;
+    font-size: 3rem;
+    /* Huge header */
+    margin: 0;
+    text-shadow: 0 0 20px rgba(241, 196, 15, 0.8), 2px 2px 0 #000;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    animation: pulse-gold 1s infinite alternate;
+}
+
+.prize-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    font-size: 2.2rem;
+    /* Much larger prize text */
+    font-weight: 800;
+    text-align: center;
+    line-height: 1.2;
+    margin: 10px 0;
+}
+
+.prize-content span {
+    /* Gradient text for maximum "party" vibe */
+    background: linear-gradient(to bottom, #ffffff, #dfe6e9);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: #fff;
+    /* Fallback */
+    text-shadow: 0 0 15px rgba(255, 255, 255, 0.5), 2px 2px 4px #000;
+}
+
+.gift-icon {
+    font-size: 3.5rem;
+    color: #e67e22;
+    /* Vibrant orange/gold */
+    filter: drop-shadow(0 0 10px rgba(230, 126, 34, 0.8));
+    animation: bounce 1s infinite;
+}
+
+@keyframes bounce {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-10px);
+    }
+}

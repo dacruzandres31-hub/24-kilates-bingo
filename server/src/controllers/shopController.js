@@ -21,7 +21,9 @@ const websocketService = require('../services/websocketService');
  */
 async function buyCard(req, res) {
   try {
-    const { userId, roomType, quantity = 1, paymentMethod } = req.body;
+    const { roomType, quantity = 1, paymentMethod } = req.body;
+    const userId = req.user ? req.user.id : req.body.userId;
+    console.log(`[ShopController] buyCard request: Room=${roomType}, User=${userId}`);
 
     // Validar entrada
     if (!userId || !roomType) {
@@ -31,18 +33,19 @@ async function buyCard(req, res) {
       });
     }
 
-    const client = await pool.connect();
+    const client = await pool.getConnection();
     try {
-      await client.query('BEGIN');
+      await client.beginTransaction();
 
       // ====== PASO 1: Validar room ======
-      const roomResult = await client.query(
+      const [roomRows] = await client.query(
         `SELECT * FROM game_sessions 
-         WHERE room = $1 AND status = 'pending'
+         WHERE room = ? AND status = 'pending'
          ORDER BY start_time DESC 
          LIMIT 1`,
         [roomType]
       );
+      const roomResult = { rows: roomRows };
 
       if (roomResult.rows.length === 0) {
         throw new Error(`No hay sesión activa para room: ${roomType}`);
@@ -55,40 +58,41 @@ async function buyCard(req, res) {
       if (roomType === 'bronce' && paymentMethod === 'ticket') {
         console.log(`[ShopController] Usuario eligió pagar con ticket - verificando disponibilidad`);
 
-        const ticketResult = await client.query(
+        const [ticketRows] = await client.query(
           `SELECT ui.id, ui.quantity, ci.name 
            FROM user_inventory ui
            JOIN cosmetic_items ci ON ui.item_id = ci.id
-           WHERE ui.user_id = $1
+           WHERE ui.user_id = ?
            AND ci.ticket_room = 'bronce'
            AND ci.type = 'ticket'
            AND ui.quantity > 0
            LIMIT 1`,
           [userId]
         );
+        const ticketResult = { rows: ticketRows };
 
         if (ticketResult.rows.length > 0) {
           // ✅ USUARIO TIENE TICKET - USAR TICKET
           console.log(`✅ Usuario ${userId} tiene ticket disponible`);
-          
+
           const ticketInventoryId = ticketResult.rows[0].id;
           const currentQuantity = ticketResult.rows[0].quantity;
           const ticketName = ticketResult.rows[0].name;
 
           // Restar 1 al ticket
           const newQuantity = currentQuantity - 1;
-          
+
           if (newQuantity === 0) {
             // Si llega a 0, eliminar del inventario
             await client.query(
-              `DELETE FROM user_inventory WHERE id = $1`,
+              `DELETE FROM user_inventory WHERE id = ?`,
               [ticketInventoryId]
             );
             console.log(`[ShopController] Ticket eliminado (cantidad = 0)`);
           } else {
             // Si quedan más, actualizar cantidad
             await client.query(
-              `UPDATE user_inventory SET quantity = $1 WHERE id = $2`,
+              `UPDATE user_inventory SET quantity = ? WHERE id = ?`,
               [newQuantity, ticketInventoryId]
             );
             console.log(`[ShopController] Tickets restantes: ${newQuantity}`);
@@ -97,11 +101,11 @@ async function buyCard(req, res) {
           // Asignar cartones gratis
           for (let i = 0; i < quantity; i++) {
             const gridNumbers = generateBingoGrid();
-            
+
             await client.query(
               `INSERT INTO daily_stock_cards 
-               (room, serial_number, grid_numbers, play_date, status, price)
-               VALUES ($1, $2, $3, $4, 'available', 0.00)`,
+               (room, serial_number, grid_numbers, play_date, play_time, status, price)
+               VALUES (?, ?, ?, ?, '10:00:00', 'available', 0.00)`,
               [roomType, `TICKET_${Date.now()}_${i}`, JSON.stringify(gridNumbers), new Date().toISOString().split('T')[0]]
             );
           }
@@ -109,12 +113,12 @@ async function buyCard(req, res) {
           // Log de transacción
           await client.query(
             `INSERT INTO audit_revenue 
-             (user_id, room, amount, card_count, transaction_type, details)
-             VALUES ($1, $2, 0.00, $3, 'ticket_redemption', $4)`,
-            [userId, roomType, quantity, `Canjeado con ${ticketName}. Tickets restantes: ${newQuantity}`]
+             (player_id, room, amount, card_count, transaction_type, details)
+             VALUES (?, ?, 0.00, ?, 'ticket_redemption', ?)`,
+            [userId, roomType, quantity, JSON.stringify({ message: `Canjeado con ${ticketName}. Tickets restantes: ${newQuantity}` })]
           );
 
-          await client.query('COMMIT');
+          await client.commit();
 
           return res.json({
             success: true,
@@ -125,7 +129,7 @@ async function buyCard(req, res) {
           });
         } else {
           // Usuario eligió ticket pero no tiene disponibles
-          await client.query('ROLLBACK');
+          await client.rollback();
           return res.status(400).json({
             success: false,
             message: 'No tienes tickets disponibles. Por favor selecciona "Pagar con Balance".'
@@ -137,10 +141,11 @@ async function buyCard(req, res) {
       // Flujo normal de cobro por dinero
       console.log(`[ShopController] Procesando pago de dinero para usuario ${userId}`);
 
-      const userResult = await client.query(
-        `SELECT balance FROM users WHERE id = $1`,
+      const [userRows] = await client.query(
+        `SELECT balance FROM users WHERE id = ?`,
         [userId]
       );
+      const userResult = { rows: userRows };
 
       if (userResult.rows.length === 0) {
         throw new Error('Usuario no encontrado');
@@ -151,7 +156,7 @@ async function buyCard(req, res) {
 
       // Validar balance
       if (userBalance < totalCost) {
-        await client.query('ROLLBACK');
+        await client.rollback();
         return res.status(400).json({
           success: false,
           message: `Balance insuficiente. Necesitas $${totalCost.toFixed(2)}, tienes $${userBalance.toFixed(2)}`
@@ -160,18 +165,18 @@ async function buyCard(req, res) {
 
       // Descontar del balance
       await client.query(
-        `UPDATE users SET balance = balance - $1 WHERE id = $2`,
+        `UPDATE users SET balance = balance - ? WHERE id = ?`,
         [totalCost, userId]
       );
 
       // Asignar cartones
       for (let i = 0; i < quantity; i++) {
         const gridNumbers = generateBingoGrid();
-        
+
         await client.query(
           `INSERT INTO daily_stock_cards 
-           (room, serial_number, grid_numbers, play_date, status, price)
-           VALUES ($1, $2, $3, $4, 'available', $5)`,
+           (room, serial_number, grid_numbers, play_date, play_time, status, price)
+           VALUES (?, ?, ?, ?, '10:00:00', 'available', ?)`,
           [roomType, `PAID_${Date.now()}_${i}`, JSON.stringify(gridNumbers), new Date().toISOString().split('T')[0], cardCost]
         );
       }
@@ -179,12 +184,27 @@ async function buyCard(req, res) {
       // Log de transacción
       await client.query(
         `INSERT INTO audit_revenue 
-         (user_id, room, amount, card_count, transaction_type)
-         VALUES ($1, $2, $3, $4, 'card_purchase')`,
+         (player_id, room, amount, card_count, transaction_type)
+         VALUES (?, ?, ?, ?, 'card_purchase')`,
         [userId, roomType, totalCost, quantity]
       );
 
-      await client.query('COMMIT');
+      // AGREGAR XP Y VERIFICAR LEVEL UP
+      const xpResult = await gamificationEngine.addXPToPlayer(userId, totalCost);
+      let gamificationResult = null;
+
+      if (xpResult.leveledUp) {
+        gamificationResult = {
+          leveledUp: true,
+          newLevel: xpResult.newLevel,
+          rewards: xpResult.rewards
+        };
+      }
+
+      // TRIGGER ACHIEVEMENT: HIGH_ROLLER (Magnate)
+      await gamificationEngine.triggerAchievement(userId, 'HIGH_ROLLER', quantity);
+
+      await client.commit();
 
       // ===== EMITIR ACTUALIZACIÓN DE POZOS EN VIVO =====
       websocketService.emitPotsUpdate();
@@ -194,11 +214,14 @@ async function buyCard(req, res) {
         message: `${quantity} cartón(es) comprado(s) por $${totalCost.toFixed(2)}`,
         paymentMethod: 'cash',
         newBalance: userBalance - totalCost,
-        cardsAssigned: quantity
+        cardsAssigned: quantity,
+        room: roomType,
+        gamification: gamificationResult
       });
 
+
     } catch (error) {
-      await client.query('ROLLBACK');
+      await client.rollback();
       throw error;
     } finally {
       client.release();
@@ -219,22 +242,22 @@ async function getUserTickets(req, res) {
   try {
     const { userId } = req.params;
 
-    const result = await pool.query(
+    const [rows] = await pool.query(
       `SELECT ci.id, ci.name, ci.ticket_room, ci.rarity, ui.quantity
        FROM user_inventory ui
        JOIN cosmetic_items ci ON ui.item_id = ci.id
-       WHERE ui.user_id = $1
+       WHERE ui.user_id = ?
        AND ci.type = 'ticket'
        AND ui.quantity > 0
        ORDER BY ci.rarity DESC, ci.name ASC`,
       [userId]
     );
 
-    const totalTickets = result.rows.reduce((sum, t) => sum + t.quantity, 0);
+    const totalTickets = rows.reduce((sum, t) => sum + t.quantity, 0);
 
     res.json({
       success: true,
-      tickets: result.rows,
+      tickets: rows,
       total: totalTickets
     });
   } catch (error) {
@@ -261,33 +284,33 @@ async function consumeTicket(req, res) {
       });
     }
 
-    const client = await pool.connect();
+    const client = await pool.getConnection();
     try {
-      await client.query('BEGIN');
+      await client.beginTransaction();
 
       // Buscar ticket
-      const ticketResult = await client.query(
+      const [ticketRows] = await client.query(
         `SELECT ui.id, ui.quantity FROM user_inventory ui
          JOIN cosmetic_items ci ON ui.item_id = ci.id
-         WHERE ui.user_id = $1
-         AND ci.ticket_room = $2
+         WHERE ui.user_id = ?
+         AND ci.ticket_room = ?
          AND ci.type = 'ticket'
          LIMIT 1`,
         [userId, ticketType]
       );
 
-      if (ticketResult.rows.length === 0 || ticketResult.rows[0].quantity === 0) {
+      if (ticketRows.length === 0 || ticketRows[0].quantity === 0) {
         throw new Error(`No tienes tickets disponibles de tipo: ${ticketType}`);
       }
 
-      const inventoryId = ticketResult.rows[0].id;
-      const newQuantity = ticketResult.rows[0].quantity - 1;
+      const inventoryId = ticketRows[0].id;
+      const newQuantity = ticketRows[0].quantity - 1;
 
       if (newQuantity === 0) {
-        await client.query('DELETE FROM user_inventory WHERE id = $1', [inventoryId]);
+        await client.query('DELETE FROM user_inventory WHERE id = ?', [inventoryId]);
       } else {
         await client.query(
-          'UPDATE user_inventory SET quantity = $1 WHERE id = $2',
+          'UPDATE user_inventory SET quantity = ? WHERE id = ?',
           [newQuantity, inventoryId]
         );
       }
@@ -295,11 +318,11 @@ async function consumeTicket(req, res) {
       // Log
       await client.query(
         `INSERT INTO game_events (user_id, event_type, details)
-         VALUES ($1, 'ticket_consumed', $2)`,
+         VALUES (?, 'ticket_consumed', ?)`,
         [userId, JSON.stringify({ ticketType, remainingTickets: newQuantity })]
       );
 
-      await client.query('COMMIT');
+      await client.commit();
 
       res.json({
         success: true,
@@ -308,7 +331,7 @@ async function consumeTicket(req, res) {
       });
 
     } catch (error) {
-      await client.query('ROLLBACK');
+      await client.rollback();
       throw error;
     } finally {
       client.release();
@@ -337,18 +360,18 @@ async function consumeTicket(req, res) {
 function generateBingoGrid() {
   const ranges = [[1, 15], [16, 30], [31, 45], [46, 60], [61, 75]];
   const grid = [];
-  
+
   for (let col = 0; col < 5; col++) {
     const column = [];
     const [min, max] = ranges[col];
     const numbers = Array.from({ length: max - min + 1 }, (_, i) => min + i);
-    
+
     // Fisher-Yates shuffle
     for (let i = numbers.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [numbers[i], numbers[j]] = [numbers[j], numbers[i]];
     }
-    
+
     for (let row = 0; row < 5; row++) {
       if (col === 2 && row === 2) {
         column.push(0); // FREE

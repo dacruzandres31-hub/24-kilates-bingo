@@ -5,7 +5,7 @@
 const express = require('express');
 const router = express.Router();
 const withdrawalController = require('../controllers/withdrawalController');
-const { authenticateToken, isAdmin, isCajeroOrAdmin } = require('../middleware/authMiddleware');
+const { authenticateToken, isAndy } = require('../middleware/authMiddleware');
 
 // ============================================
 // RUTAS JUGADOR
@@ -33,38 +33,38 @@ router.get(
 );
 
 // ============================================
-// RUTAS ADMIN/CAJERO
+// RUTAS ADMIN/CAJERO (Exclusivo Andy)
 // ============================================
 
-// Procesar solicitud de retiro (cajero o superadmin)
+// Procesar solicitud de retiro (Andy Only)
 router.post(
   '/:withdrawalRequestId/process',
   authenticateToken,
-  isCajeroOrAdmin,
+  isAndy,
   withdrawalController.processWithdrawalRequest
 );
 
-// Rechazar solicitud de retiro (admin)
+// Rechazar solicitud de retiro (Andy Only)
 router.post(
   '/:withdrawalRequestId/reject',
   authenticateToken,
-  isAdmin,
+  isAndy,
   withdrawalController.rejectWithdrawalRequest
 );
 
-// Verificar permisos para procesar retiro (útil para UI)
+// Verificar permisos (Andy Only)
 router.get(
   '/:withdrawalRequestId/check-permissions',
   authenticateToken,
-  isCajeroOrAdmin,
+  isAndy,
   withdrawalController.checkWithdrawalPermissions
 );
 
-// Obtener TODAS las solicitudes (admin) - para panel de administración
+// Obtener TODAS las solicitudes (Andy Only)
 router.get(
   '/all',
   authenticateToken,
-  isAdmin,
+  isAndy,
   withdrawalController.getWithdrawalHistory
 );
 

@@ -10,14 +10,30 @@ const ChipsService = require('../services/chipsService');
 exports.createWithdrawalRequest = async (req, res) => {
   try {
     const userId = req.user.id; // Usuario autenticado
-    const { amount, bankAccountHolder, cbu, bankName, accountType } = req.body;
+    let { amount, bankAccountHolder, cbu, bankName, accountType, notes, method } = req.body;
 
     console.log('[DEBUG] createWithdrawalRequest - userId:', userId, 'amount:', amount);
+
+    // ADAPTADOR PARA FRONTEND SIMPLIFICADO
+    // Si viene 'notes' pero no 'cbu', usamos 'notes' como el identificador de destino (CBU/Alias)
+    if (!cbu && notes) {
+      cbu = notes;
+    }
+
+    // Si no viene titular, usamos 'Usuario' o el nombre del metodo
+    if (!bankAccountHolder) {
+      bankAccountHolder = 'Consultar Notas/Perfil';
+    }
+
+    // Si viene 'method' (cbu/alias) lo usamos como bankName
+    if (!bankName && method) {
+      bankName = method.toUpperCase();
+    }
 
     if (!amount || !bankAccountHolder || !cbu) {
       return res.status(400).json({
         success: false,
-        message: 'Datos incompletos: amount, bankAccountHolder y cbu son requeridos'
+        message: 'Datos incompletos: amount y datos de cuenta (CBU/Alias) son requeridos'
       });
     }
 
@@ -209,7 +225,7 @@ exports.checkWithdrawalPermissions = async (req, res) => {
     const processorRole = req.user.role;
 
     const connection = require('../db');
-    
+
     // Obtener solicitud de retiro
     const [requests] = await connection.query(
       'SELECT * FROM withdrawal_requests WHERE id = ?',
@@ -234,8 +250,8 @@ exports.checkWithdrawalPermissions = async (req, res) => {
     const minutes = minutesData[0].minutes;
 
     // Determinar permisos
-    const canProcess = processorRole === 'superadmin' || 
-                      (processorRole === 'cajero' && minutes < 20);
+    const canProcess = processorRole === 'superadmin' ||
+      (processorRole === 'cajero' && minutes < 20);
 
     res.json({
       success: true,
@@ -246,7 +262,7 @@ exports.checkWithdrawalPermissions = async (req, res) => {
         minutesSinceCredit: minutes,
         processorRole,
         canProcess,
-        reason: canProcess 
+        reason: canProcess
           ? 'Tiene permisos para procesar este retiro'
           : `Requiere superadmin. Han pasado ${minutes} minutos desde la última acreditación.`
       }

@@ -1,9 +1,11 @@
 const pool = require('../db');
-const { 
-  notifyLineWinner, 
-  notifyBingoWinner, 
-  showPaymentForms 
+const {
+  notifyLineWinner,
+  notifyBingoWinner,
+  showPaymentForms
 } = require('../socket/winnerEvents');
+const gamificationEngine = require('./gamification_engine');
+const ChipsService = require('./chipsService');
 
 /**
  * GAME ENGINE - Motor de Sorteo Automático y Validación de Cartones
@@ -63,7 +65,7 @@ class GameEngine {
       );
 
       const cards = cardsResult;
-      
+
       // Validar estructura de cartones antes de empezar
       for (const card of cards) {
         if (!isValidCard(card)) {
@@ -88,7 +90,7 @@ class GameEngine {
         if (!lineaWinnerFound && lineWinners.length > 0) {
           for (const winner of lineWinners) {
             const lineaPrize = session.current_pot_linea;
-            
+
             // Acreditar fichas al ganador automáticamente
             await ChipsService.recordGameMovement(
               winner.userId,
@@ -97,13 +99,20 @@ class GameEngine {
               'win',
               `Premio LÍNEA - Sesión ${sessionId} - Bolea ${currentBall}`
             );
-            
+
+            // TRIGGER ACHIEVEMENT: FIRST_WIN (Primera Victoria)
+            try {
+              await gamificationEngine.triggerAchievement(winner.userId, 'FIRST_WIN', 1);
+            } catch (e) {
+              console.error('Achievement trigger error:', e);
+            }
+
             // Marcar cartón como ya ganó línea
             await pool.query(
               'UPDATE daily_stock_cards SET already_won_line = true WHERE id = ?',
               [winner.cardId]
             );
-            
+
             winners.push({
               userId: winner.userId,
               cardId: winner.cardId,
@@ -120,7 +129,7 @@ class GameEngine {
           for (const winner of bingoWinners) {
             const bingoPrize = session.current_pot_bingo;
             const isJackpot = currentBall > 40;
-            
+
             // Acreditar fichas al ganador automáticamente
             await ChipsService.recordGameMovement(
               winner.userId,
@@ -129,7 +138,18 @@ class GameEngine {
               'win',
               `Premio BINGO${isJackpot ? ' JACKPOT' : ''} - Sesión ${sessionId} - Bolea ${currentBall}`
             );
-            
+
+            // TRIGGER ACHIEVEMENT: FIRST_WIN & BINGO_KING
+            try {
+              await gamificationEngine.triggerAchievement(winner.userId, 'FIRST_WIN', 1);
+              await gamificationEngine.triggerAchievement(winner.userId, 'BINGO_KING', 1);
+              if (isJackpot) {
+                await gamificationEngine.triggerAchievement(winner.userId, 'JACKPOT_MASTER', 1);
+              }
+            } catch (e) {
+              console.error('Achievement trigger error:', e);
+            }
+
             winners.push({
               userId: winner.userId,
               cardId: winner.cardId,
@@ -138,7 +158,7 @@ class GameEngine {
               boleaNumber: currentBall,
               isJackpot
             });
-            
+
             // Remover cartón ganador del pool
             const cardIndex = cards.findIndex(c => c.cardId === winner.cardId);
             if (cardIndex !== -1) {
@@ -198,7 +218,7 @@ class GameEngine {
   // - Los números están ordenados ascendentemente por columna
   static generateValidCard() {
     const card = Array(3).fill(null).map(() => Array(9).fill(null));
-    
+
     const columnRanges = [
       [1, 9],    // Columna 1
       [10, 19],  // Columna 2
@@ -215,13 +235,13 @@ class GameEngine {
     // Necesitamos distribuir exactamente 15 números en 9 columnas
     const numbersPerColumn = Array(9).fill(0);
     let totalNumbers = 0;
-    
+
     // Asegurar que cada columna tenga al menos 1 número si es posible
     for (let col = 0; col < 9 && totalNumbers < 15; col++) {
       numbersPerColumn[col] = 1;
       totalNumbers++;
     }
-    
+
     // Distribuir los 6 números restantes (15 - 9 = 6) aleatoriamente
     while (totalNumbers < 15) {
       const col = Math.floor(Math.random() * 9);
@@ -238,7 +258,7 @@ class GameEngine {
 
       const [min, max] = columnRanges[col];
       const columnNumbers = [];
-      
+
       // Generar números únicos para esta columna
       while (columnNumbers.length < count) {
         const num = Math.floor(Math.random() * (max - min + 1)) + min;
@@ -246,23 +266,23 @@ class GameEngine {
           columnNumbers.push(num);
         }
       }
-      
+
       // Ordenar los números de menor a mayor
       columnNumbers.sort((a, b) => a - b);
-      
+
       // Decidir en qué filas colocar estos números
       const availableRows = [0, 1, 2];
       const selectedRows = [];
-      
+
       for (let i = 0; i < count; i++) {
         const rowIndex = Math.floor(Math.random() * availableRows.length);
         selectedRows.push(availableRows[rowIndex]);
         availableRows.splice(rowIndex, 1);
       }
-      
+
       // Ordenar las filas para mantener orden ascendente
       selectedRows.sort((a, b) => a - b);
-      
+
       // Colocar los números en las filas seleccionadas
       for (let i = 0; i < count; i++) {
         card[selectedRows[i]][col] = columnNumbers[i];
@@ -272,7 +292,7 @@ class GameEngine {
     // Paso 3: Validar que cada fila tenga exactamente 5 números
     for (let row = 0; row < 3; row++) {
       const numbersInRow = card[row].filter(n => n !== null).length;
-      
+
       if (numbersInRow !== 5) {
         // Si no tiene 5 números, intentar rebalancear
         // Por simplicidad, regeneramos el cartón
@@ -309,11 +329,11 @@ class GameEngine {
         availableNumbers.push(i);
       }
     }
-    
+
     if (availableNumbers.length === 0) {
       throw new Error('No hay más bolillas disponibles');
     }
-    
+
     const randomIndex = Math.floor(Math.random() * availableNumbers.length);
     return availableNumbers[randomIndex];
   }

@@ -19,14 +19,14 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
     plata: 0,
     oro: 0
   });
-  
+
   // Estado para el modal de gestión de usuario
   const [modalGestionUsuario, setModalGestionUsuario] = useState({
     isOpen: false,
     usuario: null,
     giftCards: { bronce: 0, plata: 0, oro: 0 } // Cartones de regalo
   });
-  
+
   // Estado para modal de confirmación de operaciones
   const [modalConfirmacion, setModalConfirmacion] = useState({
     isOpen: false,
@@ -37,7 +37,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
     isProcessing: false, // Prevenir múltiples clicks
     isGift: false // Indica si es operación de gift cards
   });
-  
+
   // Estados para el modal de dinero
   const [modalDinero, setModalDinero] = useState({
     isOpen: false,
@@ -71,7 +71,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
   });
   const [showPasswordCreate, setShowPasswordCreate] = useState(false);
   const [passwordStrengthCreate, setPasswordStrengthCreate] = useState({ level: 0, text: '', color: '' });
-  
+
   // Estado para modal de información del usuario
   const [modalInformacion, setModalInformacion] = useState({
     isOpen: false,
@@ -122,13 +122,13 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
 
   useEffect(() => {
     cargarUsuarios();
-    
+
     // Escuchar evento del Dashboard para abrir modal de creación
     const handleOpenCreateModal = (event) => {
       console.log('🟢 GestionUsuarios recibió evento openCreateUserModal:', event.detail);
       abrirModalCrearUsuario(event.detail.role);
     };
-    
+
     // Escuchar evento para abrir modal de gestión desde búsqueda rápida
     const handleOpenManagementModal = async (event) => {
       console.log('🟢 GestionUsuarios recibió evento openUserManagementModal:', event.detail);
@@ -144,22 +144,22 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         gift_plata: parseInt(user.gift_plata) || 0,
         gift_oro: parseInt(user.gift_oro) || 0
       };
-      
+
       // Cargar gift cards del usuario desde el endpoint
       const giftCards = await cargarGiftCards(user.id);
       console.log('🎁 Gift cards cargados para', user.username, ':', giftCards);
-      
+
       setModalGestionUsuario({
         isOpen: true,
         usuario: normalizedUser,
         giftCards: giftCards
       });
     };
-    
+
     console.log('🟡 GestionUsuarios montado - registrando listeners');
     window.addEventListener('openCreateUserModal', handleOpenCreateModal);
     window.addEventListener('openUserManagementModal', handleOpenManagementModal);
-    
+
     return () => {
       console.log('🔴 GestionUsuarios desmontado - removiendo listeners');
       window.removeEventListener('openCreateUserModal', handleOpenCreateModal);
@@ -173,7 +173,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
       const response = await axios.get('/api/admin/users/hierarchy', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
+
       // Normalizar datos: convertir balance a número y mantener cartones separados
       const normalizedUsers = (response.data.all || []).map(user => ({
         ...user,
@@ -185,11 +185,11 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         gift_plata: parseInt(user.gift_plata) || 0,
         gift_oro: parseInt(user.gift_oro) || 0
       }));
-      
+
       setArbolJerarquico(response.data.tree || []);
       setUsuarios(normalizedUsers);
       setAllUsersHierarchy(normalizedUsers); // Guardar TODOS para búsqueda
-      
+
       // Guardar información del usuario actual (dueño del panel)
       if (response.data.currentUser) {
         // Buscar el usuario completo con balance en la lista
@@ -204,15 +204,15 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
           gift_plata: currentUserComplete?.gift_plata || 0,
           gift_oro: currentUserComplete?.gift_oro || 0
         };
-        
+
         setCurrentUser(updatedUser);
-        
+
         // Actualizar recursos compartidos con el Dashboard
         // Para agentes: sumar normales + regalo, para SuperAdmin: solo normales
         if (onResourcesUpdate) {
           const role = response.data.currentUser.role;
           onResourcesUpdate(updatedUser, {
-            bronce: role === 'agente' 
+            bronce: role === 'agente'
               ? (updatedUser.cards_bronce || 0) + (updatedUser.gift_bronce || 0)
               : updatedUser.cards_bronce || 0,
             plata: role === 'agente'
@@ -223,7 +223,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
               : updatedUser.cards_oro || 0
           });
         }
-        
+
         // Si es superadmin o agente principal, seleccionarlo automáticamente
         if (response.data.currentUser.role === 'superadmin' || response.data.currentUser.role === 'agente') {
           setAgenteSeleccionado({
@@ -244,7 +244,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
   const obtenerRedCompleta = (agenteId, todosLosUsuarios) => {
     const red = [];
     const hijosDirectos = todosLosUsuarios.filter(u => u.parent_id === agenteId);
-    
+
     hijosDirectos.forEach(hijo => {
       red.push(hijo);
       // Recursivamente obtener la red de los sub-agentes
@@ -253,7 +253,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         red.push(...subRed);
       }
     });
-    
+
     return red;
   };
 
@@ -265,7 +265,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
 
     // Obtener TODA la red del agente (hijos + descendientes)
     const redCompleta = obtenerRedCompleta(agenteId, todosLosUsuarios);
-    
+
     // Ordenar: primero agentes, luego jugadores, AMBOS alfabéticamente
     const ordenados = redCompleta.sort((a, b) => {
       if (a.role === 'agente' && b.role !== 'agente') return -1;
@@ -317,43 +317,53 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
   // Función para abrir modal de información
   const abrirModalInformacion = async (usuario) => {
     try {
-      // Construir estructura jerárquica desde el panel hasta el usuario
+      // 1. Construir estructura jerárquica (código existente...)
       const estructura = [];
       let currentId = usuario.parent_id;
-      
-      // Buscar en toda la jerarquía
       const todosUsuarios = allUsersHierarchy.length > 0 ? allUsersHierarchy : usuarios;
-      
-      // Construir camino desde arriba (panel) hasta el usuario
+
       while (currentId) {
         const parent = todosUsuarios.find(u => u.id === currentId);
         if (parent) {
-          estructura.unshift(parent.username); // Agregar al inicio
+          estructura.unshift(parent.username);
           currentId = parent.parent_id;
         } else {
           break;
         }
       }
-      
-      // Agregar el usuario actual al final
       estructura.push(usuario.username);
-      
-      // Encontrar padre directo
+
       const parent = todosUsuarios.find(u => u.id === usuario.parent_id);
-      
-      // Contar agentes y jugadores directos (hijos)
       const hijosDirectos = todosUsuarios.filter(u => u.parent_id === usuario.id);
       const agentesCount = hijosDirectos.filter(u => u.role === 'agente' || u.role === 'superadmin').length;
       const jugadoresCount = hijosDirectos.filter(u => u.role === 'jugador').length;
-      
+
+      // 2. Fetch Gamification Stats (solo si es jugador)
+      let gamificationStats = null;
+      if (usuario.role === 'jugador') {
+        try {
+          const token = localStorage.getItem('adminToken');
+          const res = await axios.get(`/api/gamification/admin/player/${usuario.id}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (res.data.success) {
+            gamificationStats = res.data.stats;
+          }
+        } catch (err) {
+          console.error('Error fetching player gamification details', err);
+        }
+      }
+
       setModalInformacion({
         isOpen: true,
         usuario: usuario,
         estructura: estructura,
         agentesCount: agentesCount,
         jugadoresCount: jugadoresCount,
-        parent: parent
+        parent: parent,
+        gamificationStats: gamificationStats // Datos nuevos
       });
+
     } catch (error) {
       console.error('Error abriendo modal de información:', error);
     }
@@ -404,7 +414,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         setSuccessMessage(`✅ Contraseña de ${usuario.username} actualizada correctamente`);
         setShowSuccessPopup(true);
         setTimeout(() => setShowSuccessPopup(false), 3000);
-        
+
         // Cerrar modal
         setModalCambiarPassword({
           isOpen: false,
@@ -445,22 +455,22 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         setSuccessMessage(`✅ Datos de ${usuario.username} actualizados correctamente`);
         setShowSuccessPopup(true);
         setTimeout(() => setShowSuccessPopup(false), 3000);
-        
+
         // Recargar jerarquía para actualizar datos
         const hierarchyResponse = await axios.get('/api/admin/users/hierarchy', {
           headers: { Authorization: `Bearer ${token}` }
         });
-        
+
         if (hierarchyResponse.data.success) {
           const allUsers = hierarchyResponse.data.all || [];
           setAllUsersHierarchy(allUsers);
-          
+
           // Actualizar usuarios del agente si hay uno seleccionado
           if (agenteSeleccionado) {
             cargarUsuariosDelAgente(agenteSeleccionado.id, allUsers);
           }
         }
-        
+
         // Cerrar modal
         setModalModificar({
           isOpen: false,
@@ -485,14 +495,14 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
 
   const calculatePasswordStrength = (password) => {
     if (!password) return { level: 0, text: '', color: '' };
-    
+
     let strength = 0;
     if (password.length >= 6) strength++;
     if (password.length >= 10) strength++;
     if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
     if (/[0-9]/.test(password)) strength++;
     if (/[^a-zA-Z0-9]/.test(password)) strength++;
-    
+
     if (strength <= 2) return { level: 1, text: 'Débil', color: 'text-red-500' };
     if (strength <= 3) return { level: 2, text: 'Media', color: 'text-yellow-500' };
     return { level: 3, text: 'Fuerte', color: 'text-green-500' };
@@ -573,13 +583,13 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
       alert('❌ Usuario y contraseña son obligatorios');
       return;
     }
-    
+
     try {
       const token = localStorage.getItem('adminToken');
-      
+
       // Solo superadmin puede seleccionar parent_id, otros usuarios siempre crean hijos directos
-      const parentId = currentUser.role === 'superadmin' && agenteSeleccionado 
-        ? agenteSeleccionado.id 
+      const parentId = currentUser.role === 'superadmin' && agenteSeleccionado
+        ? agenteSeleccionado.id
         : currentUser.id;
 
       const userData = {
@@ -601,31 +611,31 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
       // Mostrar popup de éxito
       setSuccessMessage(`${tipoUsuario.toUpperCase()} "${datosIngreso.username}" creado exitosamente`);
       setShowSuccessPopup(true);
-      
+
       // Desvanecer popup después de 3 segundos
       setTimeout(() => {
         setShowSuccessPopup(false);
       }, 3000);
-      
+
       // Cerrar modal después de 500ms
       setTimeout(() => {
         setModalCrearUsuario({ ...modalCrearUsuario, isOpen: false });
       }, 500);
-      
+
       // Recargar jerarquía completa
       const hierarchyResponse = await axios.get('/api/admin/users/hierarchy', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
+
       setArbolJerarquico(hierarchyResponse.data.tree || []);
       setUsuarios(hierarchyResponse.data.all || []);
       setAllUsersHierarchy(hierarchyResponse.data.all || []); // Actualizar búsqueda global
-      
+
       // Actualizar lista de usuarios del agente seleccionado
       if (agenteSeleccionado) {
         cargarUsuariosDelAgente(agenteSeleccionado.id, hierarchyResponse.data.all || []);
       }
-      
+
       // Expandir nodo del parent donde se creó el usuario
       if (userData.parent_id) {
         setNodosExpandidos(prev => new Set([...prev, userData.parent_id]));
@@ -639,6 +649,36 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
     }
   };
 
+  const handleGrantAchievement = async (userId, username) => {
+    // Lista rápida de logros comunes para referencia
+    const code = prompt(`Ingresa el CÓDIGO del logro a otorgar a ${username}:\n\nEjemplos:\n- first_win\n- high_roller\n- early_bird\n- night_owl\n- bingo_master\n- social_butterfly`);
+
+    if (!code) return;
+
+    try {
+      const token = localStorage.getItem('adminToken');
+      const response = await axios.post('/api/gamification/admin/unlock-achievement', {
+        userId: userId,
+        achievementType: code
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (response.data.success) {
+        setSuccessMessage(`✅ Logro "${code}" otorgado correctamente`);
+        setShowSuccessPopup(true);
+        setTimeout(() => setShowSuccessPopup(false), 3000);
+
+        // Recargar datos si el modal de info está abierto
+        if (modalInformacion.isOpen && modalInformacion.usuario?.id === userId) {
+          abrirModalInformacion(modalInformacion.usuario); // Recargar
+        }
+      }
+    } catch (error) {
+      alert('❌ Error al otorgar logro: ' + (error.response?.data?.error || error.message));
+    }
+  };
+
   const handleCargarCartones = async (userId, sala, cantidad) => {
     // Validar antes de descargar
     if (cantidad < 0) {
@@ -646,7 +686,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
       if (!usuario) return;
 
       const cartonesActuales = usuario[`cards_${sala}`] || 0;
-      
+
       if (cartonesActuales <= 0) {
         alert(`❌ El usuario no tiene cartones de ${sala.toUpperCase()} para descargar`);
         return;
@@ -679,7 +719,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
     if (!usuario) return;
 
     const buttonRect = event.currentTarget.getBoundingClientRect();
-    
+
     setModalDinero({
       isOpen: true,
       tipo: 'cargar',
@@ -749,7 +789,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
 
       // Cerrar modal de dinero
       setModalDinero({ isOpen: false, tipo: null, userId: null, username: '', saldoActual: 0, monto: '', buttonPosition: null });
-      
+
       // Mostrar popup de éxito
       setShowSuccessPopup(true);
       setTimeout(() => setShowSuccessPopup(false), 2000);
@@ -758,12 +798,12 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
       const response = await axios.get('/api/admin/users/hierarchy', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
+
       // Actualizar lista de usuarios
       setUsuarios(response.data.all || []);
       setArbolJerarquico(response.data.tree || []);
       setAllUsersHierarchy(response.data.all || []); // Actualizar búsqueda global
-      
+
       // CRÍTICO: Actualizar el modal de gestión si está abierto para el mismo usuario
       if (modalGestionUsuario.isOpen && modalGestionUsuario.usuario?.id === userId) {
         const usuarioActualizado = response.data.all.find(u => u.id === userId);
@@ -777,7 +817,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
           });
         }
       }
-      
+
       // Actualizar usuarios del agente seleccionado
       if (agenteSeleccionado) {
         cargarUsuariosDelAgente(agenteSeleccionado.id, response.data.all || []);
@@ -794,7 +834,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
       console.log('⏳ Operación ya en proceso, ignorando click...');
       return;
     }
-    
+
     const { tipo, sala, cantidad, userId } = modalConfirmacion;
     const cantidadNum = parseInt(cantidad);
 
@@ -804,11 +844,11 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
       alert('❌ Debes ingresar una cantidad válida');
       return;
     }
-    
+
     // LIMPIAR mensaje de éxito anterior (evitar que se quede pegado)
     setSuccessMessage('');
     setShowSuccessPopup(false);
-    
+
     // Bloquear múltiples ejecuciones
     setModalConfirmacion(prev => ({ ...prev, isProcessing: true }));
 
@@ -818,7 +858,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
       // SUPERADMIN: Agregar balance sin límites
       if (tipo === 'superadmin-add-balance') {
         console.log('💎 Agregando balance SuperAdmin:', cantidadNum);
-        
+
         await axios.post('/api/admin/users/add-balance', {
           userId: userId,
           amount: cantidadNum
@@ -846,7 +886,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
       // SUPERADMIN: Agregar cartones sin límites (acreditación directa, no transferencia)
       if (tipo === 'superadmin-add-cards') {
         console.log('💎 Agregando cartones SuperAdmin:', { sala, cantidad: cantidadNum });
-        
+
         // Usar endpoint de acreditación SuperAdmin (sin límites)
         await axios.post('/api/superadmin/cards/credit', {
           user_id: userId,
@@ -894,27 +934,27 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
             return;
           }
         }
-        
+
         // Validar recursos disponibles para DESCARGAR dinero (usuario tiene suficiente saldo)
         if (tipo === 'dinero-descargar') {
           // Usar datos del modal de gestión en lugar de buscar en array
           const usuario = modalGestionUsuario.usuario;
-          console.log('💸 Validando descarga:', { 
-            usuario: usuario ? { id: usuario.id, username: usuario.username, balance: usuario.balance } : null, 
-            userId, 
-            cantidadNum 
+          console.log('💸 Validando descarga:', {
+            usuario: usuario ? { id: usuario.id, username: usuario.username, balance: usuario.balance } : null,
+            userId,
+            cantidadNum
           });
-          
+
           if (!usuario || usuario.id !== userId) {
             console.error('❌ Usuario no coincide o no encontrado');
             setModalConfirmacion(prev => ({ ...prev, isProcessing: false }));
             alert('❌ Usuario no encontrado');
             return;
           }
-          
+
           const saldoUsuario = parseFloat(usuario.balance) || 0;
           console.log('💰 Saldo del usuario:', saldoUsuario, 'Intentando descargar:', cantidadNum);
-          
+
           if (cantidadNum > saldoUsuario) {
             setModalConfirmacion(prev => ({ ...prev, isProcessing: false }));
             alert(`❌ El usuario no tiene suficiente saldo para descargar.\nSaldo del usuario: $${Math.floor(saldoUsuario).toLocaleString('es-CO')}\nIntentaste descargar: $${cantidadNum.toLocaleString('es-CO')}`);
@@ -929,17 +969,17 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         }, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        
+
         // Recargar usuarios y actualizar modal con datos frescos
         const response = await axios.get('/api/admin/users/hierarchy', {
           headers: { Authorization: `Bearer ${token}` }
         });
-        
+
         // Actualizar lista de usuarios
         setUsuarios(response.data.all || []);
         setArbolJerarquico(response.data.tree || []);
         setAllUsersHierarchy(response.data.all || []); // Actualizar búsqueda global
-        
+
         // CRÍTICO: Actualizar el modal de gestión si está abierto con el usuario completo
         if (modalGestionUsuario.isOpen && modalGestionUsuario.usuario?.id === userId) {
           const usuarioActualizado = response.data.all.find(u => u.id === userId);
@@ -953,12 +993,12 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
             });
           }
         }
-        
+
         // Actualizar usuarios del agente seleccionado
         if (agenteSeleccionado) {
           cargarUsuariosDelAgente(agenteSeleccionado.id, response.data.all || []);
         }
-        
+
         // DESPUÉS de recargar, actualizar recursos del admin si cargó/descargó a otro usuario
         if (tipo === 'dinero-cargar' && userId !== currentUser.id && onResourcesUpdate) {
           const newAdminBalance = (currentUser.balance || 0) - cantidadNum;
@@ -966,7 +1006,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
           setCurrentUser(newUserData);
           onResourcesUpdate(newUserData, null);
         }
-        
+
         if (tipo === 'dinero-descargar' && userId !== currentUser.id && onResourcesUpdate) {
           const newAdminBalance = (currentUser.balance || 0) + cantidadNum;
           const newUserData = { ...currentUser, balance: newAdminBalance };
@@ -977,7 +1017,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         // OPERACIONES DE GIFT CARDS
         const isAdd = tipo === 'gift-agregar';
         const endpoint = isAdd ? '/api/admin/gift-cards/add' : '/api/admin/gift-cards/remove';
-        
+
         // Validar para quitar
         if (!isAdd) {
           const giftCardsActuales = modalGestionUsuario.giftCards?.[sala] || 0;
@@ -987,7 +1027,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
             return;
           }
         }
-        
+
         await axios.post(endpoint, {
           userId: userId,
           room: sala,
@@ -999,16 +1039,16 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
 
         // Recargar gift cards y actualizar modal completo
         const giftCards = await cargarGiftCards(userId);
-        
+
         // Recargar usuarios completos
         const response = await axios.get('/api/admin/users/hierarchy', {
           headers: { Authorization: `Bearer ${token}` }
         });
-        
+
         setUsuarios(response.data.all || []);
         setArbolJerarquico(response.data.tree || []);
         setAllUsersHierarchy(response.data.all || []); // Actualizar búsqueda global
-        
+
         // Actualizar modal con usuario completo + gift cards
         if (modalGestionUsuario.isOpen && modalGestionUsuario.usuario?.id === userId) {
           const usuarioActualizado = response.data.all.find(u => u.id === userId);
@@ -1021,7 +1061,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
             });
           }
         }
-        
+
         // Actualizar usuarios del agente seleccionado
         if (agenteSeleccionado) {
           cargarUsuariosDelAgente(agenteSeleccionado.id, response.data.all || []);
@@ -1036,22 +1076,22 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
             alert('❌ Usuario no encontrado');
             return;
           }
-          
+
           const cartonesActuales = parseInt(usuario[`cards_${sala}`]) || 0;
           console.log('🎫 Validando quitar cartones:', { sala, cartonesActuales, cantidadNum });
-          
+
           if (cantidadNum > cartonesActuales) {
             setModalConfirmacion(prev => ({ ...prev, isProcessing: false }));
             alert(`❌ El usuario solo tiene ${cartonesActuales} cartón(es) de ${sala.toUpperCase()}.\nNo se pueden quitar ${cantidadNum} cartones.`);
             return;
           }
         }
-        
+
         // Operación de cartones (agregar o quitar)
         const cantidadFinal = (tipo === 'cartones-agregar' ? 1 : -1) * cantidadNum;
-        
+
         console.log('📤 Enviando request add-cards:', { userId, room: sala, quantity: cantidadFinal });
-        
+
         const cardsResponse = await axios.post('/api/admin/users/add-cards', {
           userId: userId,
           room: sala,
@@ -1059,25 +1099,25 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         }, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        
+
         console.log('✅ Respuesta add-cards:', cardsResponse.data);
 
         // Recargar usuarios y actualizar modal con datos frescos
         const response = await axios.get('/api/admin/users/hierarchy', {
           headers: { Authorization: `Bearer ${token}` }
         });
-        
+
         // Actualizar lista de usuarios Y árbol jerárquico
         setUsuarios(response.data.all || []);
         setArbolJerarquico(response.data.tree || []);
         setAllUsersHierarchy(response.data.all || []); // Actualizar búsqueda global
-        
+
         // CRÍTICO: Actualizar currentUser con datos frescos para cálculos posteriores
         const currentUserFresco = response.data.all.find(u => u.id === currentUser.id);
         if (currentUserFresco) {
           setCurrentUser(currentUserFresco);
         }
-        
+
         // CRÍTICO: Actualizar el modal con el usuario completo
         if (modalGestionUsuario.isOpen && modalGestionUsuario.usuario?.id === userId) {
           const usuarioActualizado = response.data.all.find(u => u.id === userId);
@@ -1091,12 +1131,12 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
             });
           }
         }
-        
+
         // Actualizar vista del agente seleccionado
         if (agenteSeleccionado) {
           cargarUsuariosDelAgente(agenteSeleccionado.id, response.data.all || []);
         }
-        
+
         // DESPUÉS de recargar, actualizar recursos del admin si transfirió cartones a otro usuario
         if (tipo === 'cartones-agregar' && userId !== currentUser.id && onResourcesUpdate && currentUserFresco) {
           // Usar datos frescos del admin para mostrar en panel
@@ -1113,7 +1153,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
           };
           onResourcesUpdate(null, newAdminCards);
         }
-        
+
         if (tipo === 'cartones-quitar' && userId !== currentUser.id && onResourcesUpdate && currentUserFresco) {
           // Usar datos frescos del admin para mostrar en panel
           const newAdminCards = {
@@ -1129,7 +1169,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
           };
           onResourcesUpdate(null, newAdminCards);
         }
-        
+
         // Si es el usuario actual, actualizar recursos compartidos con Dashboard
         if (userId === currentUser.id && onResourcesUpdate) {
           try {
@@ -1165,10 +1205,10 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
           }
         }
       }
-      
+
       // Cerrar modal y resetear estado
       setModalConfirmacion({ isOpen: false, tipo: '', sala: '', cantidad: '', userId: null, isProcessing: false, isGift: false });
-      
+
     } catch (error) {
       console.error('❌ Error en ejecutarOperacion:', error);
       console.error('📋 Detalles del error:', {
@@ -1181,7 +1221,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         userId
       });
       setModalConfirmacion(prev => ({ ...prev, isProcessing: false }));
-      
+
       const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message || 'Error desconocido';
       setErrorMessage(`Error en operación: ${errorMsg}`);
       setShowErrorPopup(true);
@@ -1219,7 +1259,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
     const tieneHijosFlag = tieneHijos(nodo.id);
     const tieneSubAgentesFlag = tieneSubAgentes(nodo.id);
     const estaExpandido = nodosExpandidos.has(nodo.id);
-    
+
     // Iconos según rol
     const iconoRole = {
       'superadmin': '👑',
@@ -1230,11 +1270,10 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
     return (
       <div key={nodo.id}>
         <div
-          className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all ${
-            esSeleccionado
-              ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg'
-              : 'hover:bg-gray-700/50 text-gray-200'
-          }`}
+          className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all ${esSeleccionado
+            ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg'
+            : 'hover:bg-gray-700/50 text-gray-200'
+            }`}
           style={{ marginLeft: `${marginLeft}px` }}
         >
           {/* Indicador de expansión */}
@@ -1259,16 +1298,16 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
             className="flex items-center gap-2 flex-1 text-sm"
             onClick={async () => {
               setAgenteSeleccionado(nodo);
-              
+
               // Recargar jerarquía completa para obtener TODOS los usuarios
               const token = localStorage.getItem('adminToken');
               const hierarchyResponse = await axios.get('/api/admin/users/hierarchy', {
                 headers: { Authorization: `Bearer ${token}` }
               });
-              
+
               const allUsers = hierarchyResponse.data.all || [];
               setAllUsersHierarchy(allUsers); // Actualizar todos los usuarios
-              
+
               // Cargar usuarios del agente con datos actualizados
               cargarUsuariosDelAgente(nodo.id, allUsers);
               setUsuarioSeleccionado(null);
@@ -1276,10 +1315,10 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
           >
             {/* Icono según rol */}
             <span className="text-lg">{iconoRole}</span>
-            
+
             {/* Nombre */}
             <span className="font-medium flex-1">{nodo.username}</span>
-            
+
             {/* Punto amarillo si tiene sub-agentes */}
             {tieneSubAgentesFlag && (
               <div className="w-2 h-2 bg-yellow-400 rounded-full shadow-lg"></div>
@@ -1410,447 +1449,445 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Panel Izquierdo: Árbol de Referidos (solo agentes) */}
-      <div className="space-y-6 lg:col-span-1">
-        <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50 shadow-lg">
-          <div className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white text-center py-4 rounded-xl mb-6">
-            <h3 className="text-2xl font-bold">🌳 Árbol de Referidos</h3>
-            <p className="text-sm text-indigo-200 mt-1">Panel de {currentUser.username || agenteSeleccionado?.username || 'Usuario'}</p>
-          </div>
+        {/* Panel Izquierdo: Árbol de Referidos (solo agentes) */}
+        <div className="space-y-6 lg:col-span-1">
+          <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50 shadow-lg">
+            <div className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white text-center py-4 rounded-xl mb-6">
+              <h3 className="text-2xl font-bold">🌳 Árbol de Referidos</h3>
+              <p className="text-sm text-indigo-200 mt-1">Panel de {currentUser.username || agenteSeleccionado?.username || 'Usuario'}</p>
+            </div>
 
-          {/* Botones de creación */}
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <button
-              onClick={() => abrirModalCrearUsuario('jugador')}
-              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold py-2 px-3 rounded-lg text-sm flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] shadow-lg"
-            >
-              <span>👤</span>
-              <span>Nuevo Jugador</span>
-            </button>
-
-            {(currentUser.role === 'superadmin' || currentUser.role === 'agente') && (
+            {/* Botones de creación */}
+            <div className="grid grid-cols-2 gap-4 mb-6">
               <button
-                onClick={() => abrirModalCrearUsuario('agente')}
-                className="bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-semibold py-2 px-3 rounded-lg text-sm flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] shadow-lg"
+                onClick={() => abrirModalCrearUsuario('jugador')}
+                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold py-2 px-3 rounded-lg text-sm flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] shadow-lg"
               >
-                <span>🏢</span>
-                <span>Nuevo Agente</span>
+                <span>👤</span>
+                <span>Nuevo Jugador</span>
               </button>
-            )}
-          </div>
 
-          {/* Árbol de solo agentes */}
-          <div className="space-y-2 max-h-[400px] overflow-y-auto">
-            {arbolJerarquico.length > 0 ? (
-              arbolJerarquico.map(nodo => renderArbolReferidos(nodo))
-            ) : (
-              <p className="text-gray-400 text-center py-8">
-                No hay agentes en la red
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Panel Derecho: Listado de Usuarios del agente seleccionado */}
-      <div className="space-y-6 lg:col-span-2">
-        <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50 shadow-lg">
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-center py-4 rounded-xl mb-6">
-            <h3 className="text-2xl font-bold">📋 Listado de Usuarios</h3>
-            {agenteSeleccionado && (
-              <p className="text-sm text-blue-200 mt-1">
-                Red de: {agenteSeleccionado.username}
-              </p>
-            )}
-          </div>
-
-          {/* Campo de búsqueda */}
-          <div className="mb-4">
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="🔍 Buscar en toda la red..."
-                value={busquedaUsuario}
-                onChange={(e) => setBusquedaUsuario(e.target.value)}
-                className="w-full px-4 py-3 pl-10 bg-gray-700/50 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
-              />
-              <span className="absolute left-3 top-3.5 text-gray-400 text-lg">🔍</span>
-              {busquedaUsuario && (
+              {(currentUser.role === 'superadmin' || currentUser.role === 'agente') && (
                 <button
-                  onClick={() => setBusquedaUsuario('')}
-                  className="absolute right-3 top-3 text-gray-400 hover:text-white transition-colors"
+                  onClick={() => abrirModalCrearUsuario('agente')}
+                  className="bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-semibold py-2 px-3 rounded-lg text-sm flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] shadow-lg"
                 >
-                  ✕
+                  <span>🏢</span>
+                  <span>Nuevo Agente</span>
                 </button>
               )}
             </div>
-            {busquedaUsuario && (() => {
-              // BUSCAR EN TODA LA BASE DE DATOS, no solo en red del agente
-              const baseUsuarios = allUsersHierarchy.length > 0 ? allUsersHierarchy : usuarios;
-              
-              // Filtrar directamente en TODOS los usuarios
-              const usuariosFiltrados = baseUsuarios.filter(u => 
-                u.username.toLowerCase().includes(busquedaUsuario.toLowerCase())
-              );
-              
-              return (
-                <p className="text-sm text-gray-400 mt-2">
-                  Buscando "{busquedaUsuario}" en TODA la base de datos • 
-                  <span className="text-green-400 font-semibold ml-1">
-                    {usuariosFiltrados.length} encontrado(s) de {baseUsuarios.length} total
-                  </span>
-                </p>
-              );
-            })()}
-          </div>
 
-          <div className="space-y-2 max-h-[700px] overflow-y-auto">
-            {(() => {
-              // BUSCAR EN TODA LA BASE DE DATOS cuando hay búsqueda activa
-              const baseUsuarios = allUsersHierarchy.length > 0 ? allUsersHierarchy : usuarios;
-              const usuariosParaMostrar = busquedaUsuario.trim() !== ''
-                ? baseUsuarios  // BUSCAR EN TODOS, no filtrar por agente
-                : usuariosDelAgente;
-              
-              const usuariosFiltrados = usuariosParaMostrar.filter(u => 
-                u.username.toLowerCase().includes(busquedaUsuario.toLowerCase())
-              );
-              
-              return usuariosFiltrados.length > 0 ? (
-                usuariosFiltrados.map((usuario) => {
-                  const esAgente = usuario.role === 'agente';
-                  const tieneSubAgentesFlag = esAgente && tieneSubAgentes(usuario.id);
-
-                  return (
-                    <div
-                      key={usuario.id}
-                      onClick={async () => {
-                        if (usuario.is_blocked) {
-                          setModalUsuarioBloqueado({
-                            isOpen: true,
-                            usuario: usuario
-                          });
-                        } else {
-                          const giftCards = await cargarGiftCards(usuario.id);
-                          setModalGestionUsuario({
-                            isOpen: true,
-                            usuario: usuario,
-                            giftCards: giftCards
-                          });
-                        }
-                      }}
-                      className={`flex items-center justify-between px-4 py-3 rounded-lg border transition-all cursor-pointer ${
-                        modalGestionUsuario.usuario?.id === usuario.id
-                          ? 'bg-blue-600 border-blue-400 text-white shadow-lg'
-                          : esAgente 
-                            ? 'bg-indigo-900/30 border-indigo-600/50 text-indigo-200 hover:bg-indigo-900/50' 
-                            : 'bg-gray-700/30 border-gray-600/50 text-gray-200 hover:bg-gray-700/50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3 flex-1">
-                        <span className="text-2xl">{esAgente ? '🏢' : '👤'}</span>
-                        <div className="flex-1">
-                          <p className="font-semibold">{usuario.username}</p>
-                          <p className={`text-xs ${modalGestionUsuario.usuario?.id === usuario.id ? 'text-blue-200' : 'text-gray-400'}`}>
-                            {esAgente ? 'Agente' : 'Jugador'} • ID: {usuario.id}
-                          </p>
-                        </div>
-                        
-                        {/* Indicadores de recursos - ocultos si está bloqueado */}
-                        {!usuario.is_blocked && (
-                          <div className="flex items-center gap-2">
-                            {/* Balance */}
-                            <div className="flex items-center gap-1 bg-green-900/30 border border-green-600/40 rounded-lg px-2 py-1">
-                            <span className="text-xs text-green-400">💰</span>
-                            <span className="text-xs font-semibold text-green-300">
-                              ${Math.floor(usuario.balance || 0).toLocaleString('es-CO')}
-                            </span>
-                          </div>
-                          
-                          {/* Cartones Bronce */}
-                          {((usuario.cards_bronce || 0) > 0 || (usuario.gift_bronce || 0) > 0) && (
-                            <div className="flex items-center gap-1 bg-orange-900/30 border border-orange-600/40 rounded-lg px-2 py-1">
-                              <div className="w-2 h-2 bg-gradient-to-br from-orange-500 to-orange-700 rounded-full"></div>
-                              <span className="text-xs font-semibold text-orange-300">
-                                {currentUser.role === 'superadmin' && (usuario.gift_bronce || 0) > 0
-                                  ? `${usuario.cards_bronce || 0}+${usuario.gift_bronce}🎁`
-                                  : ((usuario.cards_bronce || 0) + (usuario.gift_bronce || 0)).toLocaleString('es-CO')
-                                }
-                              </span>
-                            </div>
-                          )}
-                          
-                          {/* Cartones Plata */}
-                          {((usuario.cards_plata || 0) > 0 || (usuario.gift_plata || 0) > 0) && (
-                            <div className="flex items-center gap-1 bg-gray-700/30 border border-gray-500/40 rounded-lg px-2 py-1">
-                              <div className="w-2 h-2 bg-gradient-to-br from-gray-300 to-gray-500 rounded-full"></div>
-                              <span className="text-xs font-semibold text-gray-300">
-                                {currentUser.role === 'superadmin' && (usuario.gift_plata || 0) > 0
-                                  ? `${usuario.cards_plata || 0}+${usuario.gift_plata}🎁`
-                                  : ((usuario.cards_plata || 0) + (usuario.gift_plata || 0)).toLocaleString('es-CO')
-                                }
-                              </span>
-                            </div>
-                          )}
-                          
-                          {/* Cartones Oro */}
-                          {((usuario.cards_oro || 0) > 0 || (usuario.gift_oro || 0) > 0) && (
-                            <div className="flex items-center gap-1 bg-yellow-900/30 border border-yellow-600/40 rounded-lg px-2 py-1">
-                              <div className="w-2 h-2 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full"></div>
-                              <span className="text-xs font-semibold text-yellow-300">
-                                {currentUser.role === 'superadmin' && (usuario.gift_oro || 0) > 0
-                                  ? `${usuario.cards_oro || 0}+${usuario.gift_oro}🎁`
-                                  : ((usuario.cards_oro || 0) + (usuario.gift_oro || 0)).toLocaleString('es-CO')
-                                }
-                              </span>
-                            </div>
-                          )}
-                          </div>
-                        )}
-                        
-                        {/* Iconos de acción */}
-                        <div className="flex items-center gap-1.5 ml-3">
-                          {/* Badge BLOQUEADO - solo visible si el usuario está bloqueado */}
-                          {usuario.is_blocked && (
-                            <div className="flex items-center gap-1 bg-red-900/50 border border-red-500/50 rounded-lg px-3 py-1 mr-2">
-                              <span className="text-red-400 text-xs font-bold">🔒 BLOQUEADO</span>
-                            </div>
-                          )}
-
-                          {/* Botones de acción - ocultos si el usuario está bloqueado */}
-                          {!usuario.is_blocked && (
-                            <>
-                              {/* Ver información */}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  abrirModalInformacion(usuario);
-                                }}
-                                className="w-8 h-8 rounded-lg bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/30 flex items-center justify-center transition-all hover:scale-110"
-                                title="Ver información"
-                              >
-                                <span className="text-cyan-400 text-sm">ℹ️</span>
-                              </button>
-
-                              {/* Cambiar Contraseña */}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setModalCambiarPassword({
-                                    isOpen: true,
-                                    usuario: usuario,
-                                    newPassword: '',
-                                    confirmPassword: '',
-                                    showPassword: false,
-                                    isProcessing: false
-                                  });
-                                }}
-                                className="w-8 h-8 rounded-lg bg-yellow-600/20 hover:bg-yellow-600/40 border border-yellow-500/30 flex items-center justify-center transition-all hover:scale-110"
-                                title="Cambiar contraseña"
-                              >
-                                <span className="text-yellow-400 text-sm">🔑</span>
-                              </button>
-
-                              {/* Modificar */}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setModalModificar({
-                                    isOpen: true,
-                                    usuario: usuario,
-                                    datosPersonales: {
-                                      nombre_completo: usuario.nombre_completo || '',
-                                      documento: usuario.documento || '',
-                                      email: usuario.email || '',
-                                      telefono: usuario.telefono || ''
-                                    },
-                                    isProcessing: false
-                                  });
-                                }}
-                                className="w-8 h-8 rounded-lg bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/30 flex items-center justify-center transition-all hover:scale-110"
-                                title="Modificar usuario"
-                              >
-                                <span className="text-blue-400 text-sm">✏️</span>
-                              </button>
-
-                              {/* Ocultar */}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  // TODO: Implementar ocultar usuario
-                                  console.log('Ocultar usuario:', usuario.username);
-                                }}
-                                className="w-8 h-8 rounded-lg bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/30 flex items-center justify-center transition-all hover:scale-110"
-                                title="Ocultar usuario"
-                              >
-                                <span className="text-purple-400 text-sm">👁️</span>
-                              </button>
-                            </>
-                          )}
-
-                          {/* Botón de Bloquear/Desbloquear - siempre visible */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              console.log('🔒 Click en candado - Usuario:', usuario.username, 'Bloqueado:', usuario.is_blocked);
-                              console.log('📊 Estados actuales:', { modalBlockUser, modalUnblockUser });
-                              
-                              if (usuario.is_blocked) {
-                                console.log('➡️ Abriendo modal de DESBLOQUEO');
-                                // Abrir modal de desbloqueo
-                                setModalUnblockUser({
-                                  isOpen: true,
-                                  usuario: usuario
-                                });
-                              } else {
-                                console.log('➡️ Abriendo modal de BLOQUEO');
-                                // Abrir modal de bloqueo
-                                setModalBlockUser({
-                                  isOpen: true,
-                                  usuario: usuario
-                                });
-                              }
-                            }}
-                            className={`w-8 h-8 rounded-lg ${
-                              usuario.is_blocked 
-                                ? 'bg-red-600/40 hover:bg-red-600/60 border-red-500/50' 
-                                : 'bg-red-600/20 hover:bg-red-600/40 border-red-500/30'
-                            } border flex items-center justify-center transition-all hover:scale-110`}
-                            title={usuario.is_blocked ? 'Desbloquear usuario' : 'Bloquear usuario'}
-                          >
-                            <span className="text-red-400 text-sm">{usuario.is_blocked ? '🔒' : '🔓'}</span>
-                          </button>
-                        </div>
-                        
-                        {/* Marca de sub-agentes */}
-                        {tieneSubAgentesFlag && (
-                          <span className="bg-yellow-500 text-black text-xs px-2 py-1 rounded-full font-bold ml-2">
-                            SUB-AGENTE
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })
+            {/* Árbol de solo agentes */}
+            <div className="space-y-2 max-h-[400px] overflow-y-auto">
+              {arbolJerarquico.length > 0 ? (
+                arbolJerarquico.map(nodo => renderArbolReferidos(nodo))
               ) : (
-                <div className="text-center py-8 text-gray-400">
-                  <p>
-                    {busquedaUsuario 
-                      ? `No se encontraron usuarios con "${busquedaUsuario}"`
-                      : agenteSeleccionado 
-                        ? `${agenteSeleccionado.username} no tiene usuarios en su red`
-                        : 'Selecciona un agente del árbol para ver sus usuarios'
-                    }
-                  </p>
-                </div>
-              );
-            })()}
+                <p className="text-gray-400 text-center py-8">
+                  No hay agentes en la red
+                </p>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Gestión de Cartones (Usuario Seleccionado del Árbol) */}
-        {usuarioSeleccionado && (
+        {/* Panel Derecho: Listado de Usuarios del agente seleccionado */}
+        <div className="space-y-6 lg:col-span-2">
           <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50 shadow-lg">
-            <div className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white text-center py-4 rounded-xl mb-6">
-              <h3 className="text-xl font-bold mb-2">
-                🎫 Cartones de {usuarioSeleccionado.username}
-              </h3>
-              <p className="text-sm text-indigo-200">
-                💰 Saldo: ${Math.floor(usuarioSeleccionado.balance || 0).toLocaleString('es-CO')}
-              </p>
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-center py-4 rounded-xl mb-6">
+              <h3 className="text-2xl font-bold">📋 Listado de Usuarios</h3>
+              {agenteSeleccionado && (
+                <p className="text-sm text-blue-200 mt-1">
+                  Red de: {agenteSeleccionado.username}
+                </p>
+              )}
             </div>
 
-            <div className="space-y-4">
-              {/* Cartones Bronce */}
-              <div className="p-4 bg-gradient-to-r from-orange-900/30 to-amber-900/30 border-2 border-orange-500/50 rounded-xl shadow-lg">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-gradient-to-br from-orange-500 to-orange-700 rounded-full shadow-lg"></div>
-                    <span className="font-bold text-orange-400">BRONCE</span>
-                  </div>
-                  <span className="text-2xl font-bold text-orange-300">{cartones.bronce.toLocaleString('es-CO')}</span>
-                </div>
-                <div className="flex gap-2">
+            {/* Campo de búsqueda */}
+            <div className="mb-4">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="🔍 Buscar en toda la red..."
+                  value={busquedaUsuario}
+                  onChange={(e) => setBusquedaUsuario(e.target.value)}
+                  className="w-full px-4 py-3 pl-10 bg-gray-700/50 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+                />
+                <span className="absolute left-3 top-3.5 text-gray-400 text-lg">🔍</span>
+                {busquedaUsuario && (
                   <button
-                    onClick={() => handleCargarCartones(usuarioSeleccionado.id, 'bronce', 1)}
-                    className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold py-2 px-4 rounded-xl transition-all transform hover:scale-[1.02] shadow-lg"
+                    onClick={() => setBusquedaUsuario('')}
+                    className="absolute right-3 top-3 text-gray-400 hover:text-white transition-colors"
                   >
-                    + Agregar
+                    ✕
                   </button>
-                  <button
-                    onClick={() => handleCargarCartones(usuarioSeleccionado.id, 'bronce', -1)}
-                    className="flex-1 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold py-2 px-4 rounded-xl transition-all transform hover:scale-[1.02] shadow-lg"
-                    disabled={cartones.bronce <= 0}
-                  >
-                    - Quitar
-                  </button>
-                </div>
+                )}
               </div>
+              {busquedaUsuario && (() => {
+                // BUSCAR EN TODA LA BASE DE DATOS, no solo en red del agente
+                const baseUsuarios = allUsersHierarchy.length > 0 ? allUsersHierarchy : usuarios;
 
-              {/* Cartones Plata */}
-              <div className="p-4 bg-gradient-to-r from-gray-800/30 to-slate-800/30 border-2 border-gray-400/50 rounded-xl shadow-lg">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-gradient-to-br from-gray-300 to-gray-500 rounded-full shadow-lg"></div>
-                    <span className="font-bold text-gray-300">PLATA</span>
-                  </div>
-                  <span className="text-2xl font-bold text-gray-200">{cartones.plata.toLocaleString('es-CO')}</span>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleCargarCartones(usuarioSeleccionado.id, 'plata', 1)}
-                    className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold py-2 px-4 rounded-xl transition-all transform hover:scale-[1.02] shadow-lg"
-                  >
-                    + Agregar
-                  </button>
-                  <button
-                    onClick={() => handleCargarCartones(usuarioSeleccionado.id, 'plata', -1)}
-                    className="flex-1 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold py-2 px-4 rounded-xl transition-all transform hover:scale-[1.02] shadow-lg"
-                    disabled={cartones.plata <= 0}
-                  >
-                    - Quitar
-                  </button>
-                </div>
-              </div>
+                // Filtrar directamente en TODOS los usuarios
+                const usuariosFiltrados = baseUsuarios.filter(u =>
+                  u.username.toLowerCase().includes(busquedaUsuario.toLowerCase())
+                );
 
-              {/* Cartones Oro */}
-              <div className="p-4 bg-gradient-to-r from-yellow-900/30 to-amber-900/30 border-2 border-yellow-500/50 rounded-xl shadow-lg">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full shadow-lg"></div>
-                    <span className="font-bold text-yellow-400">ORO</span>
+                return (
+                  <p className="text-sm text-gray-400 mt-2">
+                    Buscando "{busquedaUsuario}" en TODA la base de datos •
+                    <span className="text-green-400 font-semibold ml-1">
+                      {usuariosFiltrados.length} encontrado(s) de {baseUsuarios.length} total
+                    </span>
+                  </p>
+                );
+              })()}
+            </div>
+
+            <div className="space-y-2 max-h-[700px] overflow-y-auto">
+              {(() => {
+                // BUSCAR EN TODA LA BASE DE DATOS cuando hay búsqueda activa
+                const baseUsuarios = allUsersHierarchy.length > 0 ? allUsersHierarchy : usuarios;
+                const usuariosParaMostrar = busquedaUsuario.trim() !== ''
+                  ? baseUsuarios  // BUSCAR EN TODOS, no filtrar por agente
+                  : usuariosDelAgente;
+
+                const usuariosFiltrados = usuariosParaMostrar.filter(u =>
+                  u.username.toLowerCase().includes(busquedaUsuario.toLowerCase())
+                );
+
+                return usuariosFiltrados.length > 0 ? (
+                  usuariosFiltrados.map((usuario) => {
+                    const esAgente = usuario.role === 'agente';
+                    const tieneSubAgentesFlag = esAgente && tieneSubAgentes(usuario.id);
+
+                    return (
+                      <div
+                        key={usuario.id}
+                        onClick={async () => {
+                          if (usuario.is_blocked) {
+                            setModalUsuarioBloqueado({
+                              isOpen: true,
+                              usuario: usuario
+                            });
+                          } else {
+                            const giftCards = await cargarGiftCards(usuario.id);
+                            setModalGestionUsuario({
+                              isOpen: true,
+                              usuario: usuario,
+                              giftCards: giftCards
+                            });
+                          }
+                        }}
+                        className={`flex items-center justify-between px-4 py-3 rounded-lg border transition-all cursor-pointer ${modalGestionUsuario.usuario?.id === usuario.id
+                          ? 'bg-blue-600 border-blue-400 text-white shadow-lg'
+                          : esAgente
+                            ? 'bg-indigo-900/30 border-indigo-600/50 text-indigo-200 hover:bg-indigo-900/50'
+                            : 'bg-gray-700/30 border-gray-600/50 text-gray-200 hover:bg-gray-700/50'
+                          }`}
+                      >
+                        <div className="flex items-center gap-3 flex-1">
+                          <span className="text-2xl">{esAgente ? '🏢' : '👤'}</span>
+                          <div className="flex-1">
+                            <p className="font-semibold">{usuario.username}</p>
+                            <p className={`text-xs ${modalGestionUsuario.usuario?.id === usuario.id ? 'text-blue-200' : 'text-gray-400'}`}>
+                              {esAgente ? 'Agente' : 'Jugador'} • ID: {usuario.id}
+                            </p>
+                          </div>
+
+                          {/* Indicadores de recursos - ocultos si está bloqueado */}
+                          {!usuario.is_blocked && (
+                            <div className="flex items-center gap-2">
+                              {/* Balance */}
+                              <div className="flex items-center gap-1 bg-green-900/30 border border-green-600/40 rounded-lg px-2 py-1">
+                                <span className="text-xs text-green-400">💰</span>
+                                <span className="text-xs font-semibold text-green-300">
+                                  ${Math.floor(usuario.balance || 0).toLocaleString('es-CO')}
+                                </span>
+                              </div>
+
+                              {/* Cartones Bronce */}
+                              {((usuario.cards_bronce || 0) > 0 || (usuario.gift_bronce || 0) > 0) && (
+                                <div className="flex items-center gap-1 bg-orange-900/30 border border-orange-600/40 rounded-lg px-2 py-1">
+                                  <div className="w-2 h-2 bg-gradient-to-br from-orange-500 to-orange-700 rounded-full"></div>
+                                  <span className="text-xs font-semibold text-orange-300">
+                                    {currentUser.role === 'superadmin' && (usuario.gift_bronce || 0) > 0
+                                      ? `${usuario.cards_bronce || 0}+${usuario.gift_bronce}🎁`
+                                      : ((usuario.cards_bronce || 0) + (usuario.gift_bronce || 0)).toLocaleString('es-CO')
+                                    }
+                                  </span>
+                                </div>
+                              )}
+
+                              {/* Cartones Plata */}
+                              {((usuario.cards_plata || 0) > 0 || (usuario.gift_plata || 0) > 0) && (
+                                <div className="flex items-center gap-1 bg-gray-700/30 border border-gray-500/40 rounded-lg px-2 py-1">
+                                  <div className="w-2 h-2 bg-gradient-to-br from-gray-300 to-gray-500 rounded-full"></div>
+                                  <span className="text-xs font-semibold text-gray-300">
+                                    {currentUser.role === 'superadmin' && (usuario.gift_plata || 0) > 0
+                                      ? `${usuario.cards_plata || 0}+${usuario.gift_plata}🎁`
+                                      : ((usuario.cards_plata || 0) + (usuario.gift_plata || 0)).toLocaleString('es-CO')
+                                    }
+                                  </span>
+                                </div>
+                              )}
+
+                              {/* Cartones Oro */}
+                              {((usuario.cards_oro || 0) > 0 || (usuario.gift_oro || 0) > 0) && (
+                                <div className="flex items-center gap-1 bg-yellow-900/30 border border-yellow-600/40 rounded-lg px-2 py-1">
+                                  <div className="w-2 h-2 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full"></div>
+                                  <span className="text-xs font-semibold text-yellow-300">
+                                    {currentUser.role === 'superadmin' && (usuario.gift_oro || 0) > 0
+                                      ? `${usuario.cards_oro || 0}+${usuario.gift_oro}🎁`
+                                      : ((usuario.cards_oro || 0) + (usuario.gift_oro || 0)).toLocaleString('es-CO')
+                                    }
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Iconos de acción */}
+                          <div className="flex items-center gap-1.5 ml-3">
+                            {/* Badge BLOQUEADO - solo visible si el usuario está bloqueado */}
+                            {usuario.is_blocked && (
+                              <div className="flex items-center gap-1 bg-red-900/50 border border-red-500/50 rounded-lg px-3 py-1 mr-2">
+                                <span className="text-red-400 text-xs font-bold">🔒 BLOQUEADO</span>
+                              </div>
+                            )}
+
+                            {/* Botones de acción - ocultos si el usuario está bloqueado */}
+                            {!usuario.is_blocked && (
+                              <>
+                                {/* Ver información */}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    abrirModalInformacion(usuario);
+                                  }}
+                                  className="w-8 h-8 rounded-lg bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/30 flex items-center justify-center transition-all hover:scale-110"
+                                  title="Ver información"
+                                >
+                                  <span className="text-cyan-400 text-sm">ℹ️</span>
+                                </button>
+
+                                {/* Cambiar Contraseña */}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setModalCambiarPassword({
+                                      isOpen: true,
+                                      usuario: usuario,
+                                      newPassword: '',
+                                      confirmPassword: '',
+                                      showPassword: false,
+                                      isProcessing: false
+                                    });
+                                  }}
+                                  className="w-8 h-8 rounded-lg bg-yellow-600/20 hover:bg-yellow-600/40 border border-yellow-500/30 flex items-center justify-center transition-all hover:scale-110"
+                                  title="Cambiar contraseña"
+                                >
+                                  <span className="text-yellow-400 text-sm">🔑</span>
+                                </button>
+
+                                {/* Modificar */}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setModalModificar({
+                                      isOpen: true,
+                                      usuario: usuario,
+                                      datosPersonales: {
+                                        nombre_completo: usuario.nombre_completo || '',
+                                        documento: usuario.documento || '',
+                                        email: usuario.email || '',
+                                        telefono: usuario.telefono || ''
+                                      },
+                                      isProcessing: false
+                                    });
+                                  }}
+                                  className="w-8 h-8 rounded-lg bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/30 flex items-center justify-center transition-all hover:scale-110"
+                                  title="Modificar usuario"
+                                >
+                                  <span className="text-blue-400 text-sm">✏️</span>
+                                </button>
+
+                                {/* Ocultar */}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    // TODO: Implementar ocultar usuario
+                                    console.log('Ocultar usuario:', usuario.username);
+                                  }}
+                                  className="w-8 h-8 rounded-lg bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/30 flex items-center justify-center transition-all hover:scale-110"
+                                  title="Ocultar usuario"
+                                >
+                                  <span className="text-purple-400 text-sm">👁️</span>
+                                </button>
+                              </>
+                            )}
+
+                            {/* Botón de Bloquear/Desbloquear - siempre visible */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                console.log('🔒 Click en candado - Usuario:', usuario.username, 'Bloqueado:', usuario.is_blocked);
+                                console.log('📊 Estados actuales:', { modalBlockUser, modalUnblockUser });
+
+                                if (usuario.is_blocked) {
+                                  console.log('➡️ Abriendo modal de DESBLOQUEO');
+                                  // Abrir modal de desbloqueo
+                                  setModalUnblockUser({
+                                    isOpen: true,
+                                    usuario: usuario
+                                  });
+                                } else {
+                                  console.log('➡️ Abriendo modal de BLOQUEO');
+                                  // Abrir modal de bloqueo
+                                  setModalBlockUser({
+                                    isOpen: true,
+                                    usuario: usuario
+                                  });
+                                }
+                              }}
+                              className={`w-8 h-8 rounded-lg ${usuario.is_blocked
+                                ? 'bg-red-600/40 hover:bg-red-600/60 border-red-500/50'
+                                : 'bg-red-600/20 hover:bg-red-600/40 border-red-500/30'
+                                } border flex items-center justify-center transition-all hover:scale-110`}
+                              title={usuario.is_blocked ? 'Desbloquear usuario' : 'Bloquear usuario'}
+                            >
+                              <span className="text-red-400 text-sm">{usuario.is_blocked ? '🔒' : '🔓'}</span>
+                            </button>
+                          </div>
+
+                          {/* Marca de sub-agentes */}
+                          {tieneSubAgentesFlag && (
+                            <span className="bg-yellow-500 text-black text-xs px-2 py-1 rounded-full font-bold ml-2">
+                              SUB-AGENTE
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-center py-8 text-gray-400">
+                    <p>
+                      {busquedaUsuario
+                        ? `No se encontraron usuarios con "${busquedaUsuario}"`
+                        : agenteSeleccionado
+                          ? `${agenteSeleccionado.username} no tiene usuarios en su red`
+                          : 'Selecciona un agente del árbol para ver sus usuarios'
+                      }
+                    </p>
                   </div>
-                  <span className="text-2xl font-bold text-yellow-300">{cartones.oro.toLocaleString('es-CO')}</span>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleCargarCartones(usuarioSeleccionado.id, 'oro', 1)}
-                    className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold py-2 px-4 rounded-xl transition-all transform hover:scale-[1.02] shadow-lg"
-                  >
-                    + Agregar
-                  </button>
-                  <button
-                    onClick={() => handleCargarCartones(usuarioSeleccionado.id, 'oro', -1)}
-                    className="flex-1 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold py-2 px-4 rounded-xl transition-all transform hover:scale-[1.02] shadow-lg"
-                    disabled={cartones.oro <= 0}
-                  >
-                    - Quitar
-                  </button>
-                </div>
-              </div>
+                );
+              })()}
             </div>
           </div>
-        )}
-      </div>
-    </div>
 
-    {/* Modal de Cargar/Descargar Dinero */}
+          {/* Gestión de Cartones (Usuario Seleccionado del Árbol) */}
+          {usuarioSeleccionado && (
+            <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50 shadow-lg">
+              <div className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white text-center py-4 rounded-xl mb-6">
+                <h3 className="text-xl font-bold mb-2">
+                  🎫 Cartones de {usuarioSeleccionado.username}
+                </h3>
+                <p className="text-sm text-indigo-200">
+                  💰 Saldo: ${Math.floor(usuarioSeleccionado.balance || 0).toLocaleString('es-CO')}
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                {/* Cartones Bronce */}
+                <div className="p-4 bg-gradient-to-r from-orange-900/30 to-amber-900/30 border-2 border-orange-500/50 rounded-xl shadow-lg">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 bg-gradient-to-br from-orange-500 to-orange-700 rounded-full shadow-lg"></div>
+                      <span className="font-bold text-orange-400">BRONCE</span>
+                    </div>
+                    <span className="text-2xl font-bold text-orange-300">{cartones.bronce.toLocaleString('es-CO')}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleCargarCartones(usuarioSeleccionado.id, 'bronce', 1)}
+                      className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold py-2 px-4 rounded-xl transition-all transform hover:scale-[1.02] shadow-lg"
+                    >
+                      + Agregar
+                    </button>
+                    <button
+                      onClick={() => handleCargarCartones(usuarioSeleccionado.id, 'bronce', -1)}
+                      className="flex-1 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold py-2 px-4 rounded-xl transition-all transform hover:scale-[1.02] shadow-lg"
+                      disabled={cartones.bronce <= 0}
+                    >
+                      - Quitar
+                    </button>
+                  </div>
+                </div>
+
+                {/* Cartones Plata */}
+                <div className="p-4 bg-gradient-to-r from-gray-800/30 to-slate-800/30 border-2 border-gray-400/50 rounded-xl shadow-lg">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 bg-gradient-to-br from-gray-300 to-gray-500 rounded-full shadow-lg"></div>
+                      <span className="font-bold text-gray-300">PLATA</span>
+                    </div>
+                    <span className="text-2xl font-bold text-gray-200">{cartones.plata.toLocaleString('es-CO')}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleCargarCartones(usuarioSeleccionado.id, 'plata', 1)}
+                      className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold py-2 px-4 rounded-xl transition-all transform hover:scale-[1.02] shadow-lg"
+                    >
+                      + Agregar
+                    </button>
+                    <button
+                      onClick={() => handleCargarCartones(usuarioSeleccionado.id, 'plata', -1)}
+                      className="flex-1 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold py-2 px-4 rounded-xl transition-all transform hover:scale-[1.02] shadow-lg"
+                      disabled={cartones.plata <= 0}
+                    >
+                      - Quitar
+                    </button>
+                  </div>
+                </div>
+
+                {/* Cartones Oro */}
+                <div className="p-4 bg-gradient-to-r from-yellow-900/30 to-amber-900/30 border-2 border-yellow-500/50 rounded-xl shadow-lg">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full shadow-lg"></div>
+                      <span className="font-bold text-yellow-400">ORO</span>
+                    </div>
+                    <span className="text-2xl font-bold text-yellow-300">{cartones.oro.toLocaleString('es-CO')}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleCargarCartones(usuarioSeleccionado.id, 'oro', 1)}
+                      className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold py-2 px-4 rounded-xl transition-all transform hover:scale-[1.02] shadow-lg"
+                    >
+                      + Agregar
+                    </button>
+                    <button
+                      onClick={() => handleCargarCartones(usuarioSeleccionado.id, 'oro', -1)}
+                      className="flex-1 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold py-2 px-4 rounded-xl transition-all transform hover:scale-[1.02] shadow-lg"
+                      disabled={cartones.oro <= 0}
+                    >
+                      - Quitar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Modal de Cargar/Descargar Dinero */}
       {modalDinero.isOpen && (
-        <div 
-          className="fixed inset-0 z-[10000]" 
+        <div
+          className="fixed inset-0 z-[10000]"
           onClick={() => setModalDinero({ ...modalDinero, isOpen: false })}
         >
-          <div 
+          <div
             className="absolute bg-white border-2 border-gray-300 rounded-lg shadow-2xl p-6 min-w-[320px]"
             style={{
               top: `${modalDinero.buttonPosition.top + 10}px`,
@@ -1903,11 +1940,10 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                 </button>
                 <button
                   type="submit"
-                  className={`flex-1 ${
-                    modalDinero.tipo === 'cargar' 
-                      ? 'bg-blue-500 hover:bg-blue-600' 
-                      : 'bg-red-500 hover:bg-red-600'
-                  } text-white font-semibold py-2 px-4 rounded-lg transition-colors`}
+                  className={`flex-1 ${modalDinero.tipo === 'cargar'
+                    ? 'bg-blue-500 hover:bg-blue-600'
+                    : 'bg-red-500 hover:bg-red-600'
+                    } text-white font-semibold py-2 px-4 rounded-lg transition-colors`}
                 >
                   Confirmar
                 </button>
@@ -1933,22 +1969,20 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
             <div className="grid grid-cols-2">
               <button
                 onClick={() => setModalCrearUsuario({ ...modalCrearUsuario, tipoUsuario: 'jugador' })}
-                className={`py-4 font-bold text-white transition-all ${
-                  modalCrearUsuario.tipoUsuario === 'jugador' 
-                    ? 'bg-gradient-to-r from-purple-600 to-indigo-600' 
-                    : 'bg-gray-700 hover:bg-gray-600'
-                } rounded-tl-xl flex items-center justify-center gap-2`}
+                className={`py-4 font-bold text-white transition-all ${modalCrearUsuario.tipoUsuario === 'jugador'
+                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600'
+                  : 'bg-gray-700 hover:bg-gray-600'
+                  } rounded-tl-xl flex items-center justify-center gap-2`}
               >
                 <span>👤</span>
                 <span>Jugador</span>
               </button>
               <button
                 onClick={() => setModalCrearUsuario({ ...modalCrearUsuario, tipoUsuario: 'agente' })}
-                className={`py-4 font-bold text-white transition-all ${
-                  modalCrearUsuario.tipoUsuario === 'agente' 
-                    ? 'bg-gradient-to-r from-indigo-600 to-blue-600' 
-                    : 'bg-gray-700 hover:bg-gray-600'
-                } rounded-tr-xl flex items-center justify-center gap-2`}
+                className={`py-4 font-bold text-white transition-all ${modalCrearUsuario.tipoUsuario === 'agente'
+                  ? 'bg-gradient-to-r from-indigo-600 to-blue-600'
+                  : 'bg-gray-700 hover:bg-gray-600'
+                  } rounded-tr-xl flex items-center justify-center gap-2`}
               >
                 <span>🏢</span>
                 <span>Agente</span>
@@ -1959,21 +1993,19 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
             <div className="flex border-b border-gray-700">
               <button
                 onClick={() => setModalCrearUsuario({ ...modalCrearUsuario, tabActiva: 'ingreso' })}
-                className={`flex-1 py-3 font-semibold transition-all ${
-                  modalCrearUsuario.tabActiva === 'ingreso'
-                    ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white'
-                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                }`}
+                className={`flex-1 py-3 font-semibold transition-all ${modalCrearUsuario.tabActiva === 'ingreso'
+                  ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white'
+                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                  }`}
               >
                 Ingreso
               </button>
               <button
                 onClick={() => setModalCrearUsuario({ ...modalCrearUsuario, tabActiva: 'datos_personales' })}
-                className={`flex-1 py-3 font-semibold transition-all ${
-                  modalCrearUsuario.tabActiva === 'datos_personales'
-                    ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white'
-                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-                }`}
+                className={`flex-1 py-3 font-semibold transition-all ${modalCrearUsuario.tabActiva === 'datos_personales'
+                  ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white'
+                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                  }`}
               >
                 Datos personales
               </button>
@@ -2027,12 +2059,11 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                     {modalCrearUsuario.datosIngreso.password && passwordStrengthCreate.level > 0 && (
                       <div className="ml-11 flex items-center gap-2">
                         <div className="flex-1 h-2 bg-gray-700 rounded-full overflow-hidden">
-                          <div 
-                            className={`h-full transition-all duration-300 ${
-                              passwordStrengthCreate.level === 1 ? 'bg-red-500 w-1/3' :
+                          <div
+                            className={`h-full transition-all duration-300 ${passwordStrengthCreate.level === 1 ? 'bg-red-500 w-1/3' :
                               passwordStrengthCreate.level === 2 ? 'bg-yellow-500 w-2/3' :
-                              'bg-green-500 w-full'
-                            }`}
+                                'bg-green-500 w-full'
+                              }`}
                           ></div>
                         </div>
                         <span className={`text-sm font-semibold ${passwordStrengthCreate.color}`}>
@@ -2188,134 +2219,134 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Columna 1: Cartones Normales */}
                   <div className="space-y-3">
-                  {/* Bronce */}
-                  <div className="bg-gradient-to-r from-orange-900/30 to-orange-800/20 border border-orange-700/50 rounded-xl p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-gradient-to-br from-orange-500 to-orange-700 rounded-full"></div>
-                        <span className="text-orange-300 font-semibold">Bronce:</span>
+                    {/* Bronce */}
+                    <div className="bg-gradient-to-r from-orange-900/30 to-orange-800/20 border border-orange-700/50 rounded-xl p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 bg-gradient-to-br from-orange-500 to-orange-700 rounded-full"></div>
+                          <span className="text-orange-300 font-semibold">Bronce:</span>
+                        </div>
+                        <span className="text-white font-bold text-xl">
+                          {(modalGestionUsuario.usuario.cards_bronce || 0).toLocaleString('es-CO')}
+                        </span>
                       </div>
-                      <span className="text-white font-bold text-xl">
-                        {(modalGestionUsuario.usuario.cards_bronce || 0).toLocaleString('es-CO')}
-                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setModalConfirmacion({
+                            isOpen: true,
+                            tipo: 'cartones-agregar',
+                            sala: 'bronce',
+                            cantidad: '',
+                            userId: modalGestionUsuario.usuario.id
+                          })}
+                          className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-2 px-4 rounded-lg transition-all"
+                        >
+                          + Agregar
+                        </button>
+                        <button
+                          onClick={() => setModalConfirmacion({
+                            isOpen: true,
+                            tipo: 'cartones-quitar',
+                            sala: 'bronce',
+                            cantidad: '',
+                            userId: modalGestionUsuario.usuario.id
+                          })}
+                          className="flex-1 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-500 hover:to-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-all"
+                          disabled={(modalGestionUsuario.usuario.cards_bronce || 0) === 0}
+                        >
+                          − Quitar
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setModalConfirmacion({
-                          isOpen: true,
-                          tipo: 'cartones-agregar',
-                          sala: 'bronce',
-                          cantidad: '',
-                          userId: modalGestionUsuario.usuario.id
-                        })}
-                        className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-2 px-4 rounded-lg transition-all"
-                      >
-                        + Agregar
-                      </button>
-                      <button
-                        onClick={() => setModalConfirmacion({
-                          isOpen: true,
-                          tipo: 'cartones-quitar',
-                          sala: 'bronce',
-                          cantidad: '',
-                          userId: modalGestionUsuario.usuario.id
-                        })}
-                        className="flex-1 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-500 hover:to-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-all"
-                        disabled={(modalGestionUsuario.usuario.cards_bronce || 0) === 0}
-                      >
-                        − Quitar
-                      </button>
-                    </div>
-                  </div>
 
-                  {/* Plata */}
-                  <div className="bg-gradient-to-r from-gray-700/30 to-gray-600/20 border border-gray-500/50 rounded-xl p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-gradient-to-br from-gray-300 to-gray-500 rounded-full"></div>
-                        <span className="text-gray-300 font-semibold">Plata:</span>
+                    {/* Plata */}
+                    <div className="bg-gradient-to-r from-gray-700/30 to-gray-600/20 border border-gray-500/50 rounded-xl p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 bg-gradient-to-br from-gray-300 to-gray-500 rounded-full"></div>
+                          <span className="text-gray-300 font-semibold">Plata:</span>
+                        </div>
+                        <span className="text-white font-bold text-xl">
+                          {(modalGestionUsuario.usuario.cards_plata || 0).toLocaleString('es-CO')}
+                        </span>
                       </div>
-                      <span className="text-white font-bold text-xl">
-                        {(modalGestionUsuario.usuario.cards_plata || 0).toLocaleString('es-CO')}
-                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setModalConfirmacion({
+                            isOpen: true,
+                            tipo: 'cartones-agregar',
+                            sala: 'plata',
+                            cantidad: '',
+                            userId: modalGestionUsuario.usuario.id
+                          })}
+                          className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-2 px-4 rounded-lg transition-all"
+                        >
+                          + Agregar
+                        </button>
+                        <button
+                          onClick={() => setModalConfirmacion({
+                            isOpen: true,
+                            tipo: 'cartones-quitar',
+                            sala: 'plata',
+                            cantidad: '',
+                            userId: modalGestionUsuario.usuario.id
+                          })}
+                          className="flex-1 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-500 hover:to-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-all"
+                          disabled={(modalGestionUsuario.usuario.cards_plata || 0) === 0}
+                        >
+                          − Quitar
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setModalConfirmacion({
-                          isOpen: true,
-                          tipo: 'cartones-agregar',
-                          sala: 'plata',
-                          cantidad: '',
-                          userId: modalGestionUsuario.usuario.id
-                        })}
-                        className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-2 px-4 rounded-lg transition-all"
-                      >
-                        + Agregar
-                      </button>
-                      <button
-                        onClick={() => setModalConfirmacion({
-                          isOpen: true,
-                          tipo: 'cartones-quitar',
-                          sala: 'plata',
-                          cantidad: '',
-                          userId: modalGestionUsuario.usuario.id
-                        })}
-                        className="flex-1 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-500 hover:to-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-all"
-                        disabled={(modalGestionUsuario.usuario.cards_plata || 0) === 0}
-                      >
-                        − Quitar
-                      </button>
-                    </div>
-                  </div>
 
-                  {/* Oro */}
-                  <div className="bg-gradient-to-r from-yellow-900/30 to-yellow-800/20 border border-yellow-600/50 rounded-xl p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full"></div>
-                        <span className="text-yellow-300 font-semibold">Oro:</span>
+                    {/* Oro */}
+                    <div className="bg-gradient-to-r from-yellow-900/30 to-yellow-800/20 border border-yellow-600/50 rounded-xl p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full"></div>
+                          <span className="text-yellow-300 font-semibold">Oro:</span>
+                        </div>
+                        <span className="text-white font-bold text-xl">
+                          {(modalGestionUsuario.usuario.cards_oro || 0).toLocaleString('es-CO')}
+                        </span>
                       </div>
-                      <span className="text-white font-bold text-xl">
-                        {(modalGestionUsuario.usuario.cards_oro || 0).toLocaleString('es-CO')}
-                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setModalConfirmacion({
+                            isOpen: true,
+                            tipo: 'cartones-agregar',
+                            sala: 'oro',
+                            cantidad: '',
+                            userId: modalGestionUsuario.usuario.id
+                          })}
+                          className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-2 px-4 rounded-lg transition-all"
+                        >
+                          + Agregar
+                        </button>
+                        <button
+                          onClick={() => setModalConfirmacion({
+                            isOpen: true,
+                            tipo: 'cartones-quitar',
+                            sala: 'oro',
+                            cantidad: '',
+                            userId: modalGestionUsuario.usuario.id
+                          })}
+                          className="flex-1 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-500 hover:to-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-all"
+                          disabled={(modalGestionUsuario.usuario.cards_oro || 0) === 0}
+                        >
+                          − Quitar
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setModalConfirmacion({
-                          isOpen: true,
-                          tipo: 'cartones-agregar',
-                          sala: 'oro',
-                          cantidad: '',
-                          userId: modalGestionUsuario.usuario.id
-                        })}
-                        className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-2 px-4 rounded-lg transition-all"
-                      >
-                        + Agregar
-                      </button>
-                      <button
-                        onClick={() => setModalConfirmacion({
-                          isOpen: true,
-                          tipo: 'cartones-quitar',
-                          sala: 'oro',
-                          cantidad: '',
-                          userId: modalGestionUsuario.usuario.id
-                        })}
-                        className="flex-1 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-500 hover:to-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-all"
-                        disabled={(modalGestionUsuario.usuario.cards_oro || 0) === 0}
-                      >
-                        − Quitar
-                      </button>
-                    </div>
-                  </div>
                   </div> {/* Cierra columna de cartones normales */}
 
                   {/* Columna 2: Gift Cards - Solo visible para Andy */}
                   {currentUser.role === 'superadmin' && currentUser.username?.toLowerCase() === 'andy' && <div className="space-y-3">
-                      <div className="text-pink-300 font-semibold text-sm mb-2 flex items-center gap-2">
-                        🎁 Cartones de Regalo
-                        <span className="text-xs text-purple-300 bg-purple-900/50 px-2 py-1 rounded-full">Solo Andy</span>
-                      </div>
-                    
+                    <div className="text-pink-300 font-semibold text-sm mb-2 flex items-center gap-2">
+                      🎁 Cartones de Regalo
+                      <span className="text-xs text-purple-300 bg-purple-900/50 px-2 py-1 rounded-full">Solo Andy</span>
+                    </div>
+
                     {/* Gift Bronce */}
                     <div className="bg-gradient-to-r from-orange-900/40 to-orange-800/30 border-2 border-orange-500/70 rounded-xl p-4 relative overflow-hidden">
                       <div className="absolute top-2 right-2 bg-orange-500/20 px-2 py-1 rounded text-xs text-orange-300 font-bold">
@@ -2473,18 +2504,17 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
       {modalConfirmacion.isOpen && createPortal(
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60]">
           <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border-2 border-purple-500/50 rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
-            
+
             {/* Header con color dinámico */}
-            <div className={`p-6 ${
-              modalConfirmacion.tipo === 'superadmin-add-balance' ? 'bg-gradient-to-r from-yellow-500 to-amber-600' :
+            <div className={`p-6 ${modalConfirmacion.tipo === 'superadmin-add-balance' ? 'bg-gradient-to-r from-yellow-500 to-amber-600' :
               modalConfirmacion.tipo === 'superadmin-add-cards' ? 'bg-gradient-to-r from-yellow-500 to-amber-600' :
-              modalConfirmacion.tipo === 'dinero-cargar' ? 'bg-gradient-to-r from-green-600 to-emerald-600' :
-              modalConfirmacion.tipo === 'dinero-descargar' ? 'bg-gradient-to-r from-gray-600 to-gray-700' :
-              modalConfirmacion.tipo === 'cartones-agregar' ? 'bg-gradient-to-r from-purple-600 to-indigo-600' :
-              modalConfirmacion.tipo === 'gift-agregar' ? 'bg-gradient-to-r from-pink-600 to-rose-600' :
-              modalConfirmacion.tipo === 'gift-quitar' ? 'bg-gradient-to-r from-gray-600 to-gray-700' :
-              'bg-gradient-to-r from-gray-600 to-gray-700'
-            }`}>
+                modalConfirmacion.tipo === 'dinero-cargar' ? 'bg-gradient-to-r from-green-600 to-emerald-600' :
+                  modalConfirmacion.tipo === 'dinero-descargar' ? 'bg-gradient-to-r from-gray-600 to-gray-700' :
+                    modalConfirmacion.tipo === 'cartones-agregar' ? 'bg-gradient-to-r from-purple-600 to-indigo-600' :
+                      modalConfirmacion.tipo === 'gift-agregar' ? 'bg-gradient-to-r from-pink-600 to-rose-600' :
+                        modalConfirmacion.tipo === 'gift-quitar' ? 'bg-gradient-to-r from-gray-600 to-gray-700' :
+                          'bg-gradient-to-r from-gray-600 to-gray-700'
+              }`}>
               <h3 className="text-2xl font-bold text-white text-center">
                 {modalConfirmacion.tipo === 'superadmin-add-balance' && '👑 SUPERADMIN: Agregar Balance'}
                 {modalConfirmacion.tipo === 'superadmin-add-cards' && `👑 SUPERADMIN: Agregar Cartones ${modalConfirmacion.sala?.toUpperCase()}`}
@@ -2506,7 +2536,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                 {modalConfirmacion.tipo.includes('cartones') && !modalConfirmacion.tipo.includes('superadmin') && !modalConfirmacion.tipo.includes('gift') && 'Ingrese la cantidad de cartones:'}
                 {modalConfirmacion.tipo.includes('gift') && 'Ingrese la cantidad de cartones de regalo:'}
               </label>
-              
+
               {/* Badge de SuperAdmin */}
               {(modalConfirmacion.tipo === 'superadmin-add-balance' || modalConfirmacion.tipo === 'superadmin-add-cards') && (
                 <div className="mb-3 p-3 bg-yellow-500/20 border border-yellow-500/50 rounded-lg">
@@ -2515,7 +2545,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                   </p>
                 </div>
               )}
-              
+
               {/* Mostrar recursos disponibles para operaciones de dinero normales */}
               {modalConfirmacion.tipo === 'dinero-cargar' && (
                 <div className="mb-3 p-3 bg-indigo-900/30 border border-indigo-500/50 rounded-lg">
@@ -2524,7 +2554,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                   </p>
                 </div>
               )}
-              
+
               {/* Mostrar balance del usuario para descargar */}
               {modalConfirmacion.tipo === 'dinero-descargar' && (() => {
                 // Usar datos del modal de gestión en lugar de buscar en array
@@ -2538,7 +2568,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                   </div>
                 );
               })()}
-              
+
               {/* Mostrar recursos disponibles para agregar cartones */}
               {modalConfirmacion.tipo === 'cartones-agregar' && (() => {
                 const cartonesDisponibles = sharedCartonesStock?.[modalConfirmacion.sala] || currentUser[`cards_${modalConfirmacion.sala}`] || 0;
@@ -2550,7 +2580,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                   </div>
                 );
               })()}
-              
+
               {/* Mostrar cartones del usuario para quitar */}
               {modalConfirmacion.tipo === 'cartones-quitar' && (() => {
                 // Usar datos del modal de gestión en lugar de buscar en array
@@ -2564,7 +2594,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                   </div>
                 );
               })()}
-              
+
               {/* Mostrar gift cards disponibles para quitar */}
               {modalConfirmacion.tipo === 'gift-quitar' && (() => {
                 const giftCardsActuales = modalGestionUsuario.giftCards?.[modalConfirmacion.sala] || 0;
@@ -2576,14 +2606,14 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                   </div>
                 );
               })()}
-              
+
               <input
                 type="text"
                 value={modalConfirmacion.cantidad ? parseInt(modalConfirmacion.cantidad || '0').toLocaleString('es-CO') : ''}
                 onChange={(e) => {
                   const rawValue = e.target.value.replace(/\D/g, ''); // Eliminar todo excepto dígitos
-                  setModalConfirmacion({ 
-                    ...modalConfirmacion, 
+                  setModalConfirmacion({
+                    ...modalConfirmacion,
                     cantidad: rawValue // Guardar valor sin formato
                   });
                 }}
@@ -2616,17 +2646,15 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
               <button
                 onClick={ejecutarOperacion}
                 disabled={modalConfirmacion.isProcessing}
-                className={`flex-1 py-3 text-white font-bold rounded-xl transition-all ${
-                  modalConfirmacion.isProcessing ? 'opacity-50 cursor-not-allowed' : ''
-                } ${
-                  modalConfirmacion.tipo === 'superadmin-add-balance' || modalConfirmacion.tipo === 'superadmin-add-cards' ? 'bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500' :
-                  modalConfirmacion.tipo === 'dinero-cargar' ? 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500' :
-                  modalConfirmacion.tipo === 'dinero-descargar' ? 'bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700' :
-                  modalConfirmacion.tipo === 'cartones-agregar' ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500' :
-                  modalConfirmacion.tipo === 'gift-agregar' ? 'bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500' :
-                  modalConfirmacion.tipo === 'gift-quitar' ? 'bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700' :
-                  'bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700'
-                }`}
+                className={`flex-1 py-3 text-white font-bold rounded-xl transition-all ${modalConfirmacion.isProcessing ? 'opacity-50 cursor-not-allowed' : ''
+                  } ${modalConfirmacion.tipo === 'superadmin-add-balance' || modalConfirmacion.tipo === 'superadmin-add-cards' ? 'bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500' :
+                    modalConfirmacion.tipo === 'dinero-cargar' ? 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500' :
+                      modalConfirmacion.tipo === 'dinero-descargar' ? 'bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700' :
+                        modalConfirmacion.tipo === 'cartones-agregar' ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500' :
+                          modalConfirmacion.tipo === 'gift-agregar' ? 'bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500' :
+                            modalConfirmacion.tipo === 'gift-quitar' ? 'bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700' :
+                              'bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700'
+                  }`}
               >
                 {modalConfirmacion.isProcessing ? '⏳ PROCESANDO...' : '✓ ACEPTAR'}
               </button>
@@ -2703,27 +2731,67 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
               <div className="flex justify-between items-center">
                 <span className="text-gray-400">Creado:</span>
                 <span className="font-semibold">
-                  {modalInformacion.usuario?.created_at 
+                  {modalInformacion.usuario?.created_at
                     ? new Date(modalInformacion.usuario.created_at).toLocaleString('es-CO', {
-                        year: 'numeric',
-                        month: '2-digit',
-                        day: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })
+                      year: 'numeric',
+                      month: '2-digit',
+                      day: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })
                     : 'No disponible'}
                 </span>
               </div>
+
+              {/* Sección Gamificación */}
+              {modalInformacion.gamificationStats && (
+                <div className="mt-4 pt-4 border-t border-gray-700">
+                  <h4 className="text-yellow-400 font-bold mb-3 flex items-center gap-2">
+                    🎮 Progreso del Jugador
+                  </h4>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="bg-gray-800 p-2 rounded border border-gray-700">
+                      <p className="text-gray-400">Nivel</p>
+                      <p className="text-white font-bold text-lg">⭐ {modalInformacion.gamificationStats.level}</p>
+                    </div>
+                    <div className="bg-gray-800 p-2 rounded border border-gray-700">
+                      <p className="text-gray-400">XP</p>
+                      <p className="text-purple-400 font-bold">{modalInformacion.gamificationStats.currentXp}</p>
+                    </div>
+                    <div className="bg-gray-800 p-2 rounded border border-gray-700">
+                      <p className="text-gray-400">Racha Actual</p>
+                      <p className="text-orange-400 font-bold">🔥 {modalInformacion.gamificationStats.currentStreak} días</p>
+                    </div>
+                    <div className="bg-gray-800 p-2 rounded border border-gray-700">
+                      <p className="text-gray-400">Logros</p>
+                      <p className="text-yellow-400 font-bold">🏅 {modalInformacion.gamificationStats.achievementsCount}</p>
+                    </div>
+                  </div>
+                  {/* Misiones Hoy */}
+                  <div className="mt-3 bg-blue-900/20 border border-blue-600/30 p-2 rounded flex justify-between">
+                    <span className="text-gray-300">Misiones Hoy:</span>
+                    <span className="text-white font-bold">{modalInformacion.gamificationStats.questProgress}</span>
+                  </div>
+
+                  {/* Botón Manual Unlock */}
+                  <button
+                    onClick={() => handleGrantAchievement(modalInformacion.usuario.id, modalInformacion.usuario.username)}
+                    className="mt-3 w-full py-2 bg-gradient-to-r from-yellow-600 to-amber-600 hover:from-yellow-500 hover:to-amber-500 text-white font-bold rounded text-sm transition-all shadow-lg"
+                  >
+                    🏆 Otorgar Logro Manualmente
+                  </button>
+                </div>
+              )}
 
               {/* Estructura */}
               <div className="border-t border-gray-700 pt-4 mt-4">
                 <span className="text-gray-400 block mb-2">Estructura:</span>
                 <ul className="space-y-1 ml-4">
                   {modalInformacion.estructura.map((username, index) => (
-                    <li 
+                    <li
                       key={index}
-                      className={index === modalInformacion.estructura.length - 1 
-                        ? 'text-blue-400 font-bold' 
+                      className={index === modalInformacion.estructura.length - 1
+                        ? 'text-blue-400 font-bold'
                         : 'text-gray-300'}
                     >
                       • {username}
@@ -2810,11 +2878,10 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                   <div className="mt-2 flex items-center gap-2">
                     <div className="flex-1 h-2 bg-gray-700 rounded-full overflow-hidden">
                       <div
-                        className={`h-full transition-all ${
-                          passwordStrengthChange.level === 1 ? 'bg-red-500 w-1/3' :
+                        className={`h-full transition-all ${passwordStrengthChange.level === 1 ? 'bg-red-500 w-1/3' :
                           passwordStrengthChange.level === 2 ? 'bg-yellow-500 w-2/3' :
-                          'bg-green-500 w-full'
-                        }`}
+                            'bg-green-500 w-full'
+                          }`}
                       ></div>
                     </div>
                     <span className={`text-sm font-semibold ${passwordStrengthChange.color}`}>
@@ -2838,13 +2905,12 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                 />
                 {/* Indicador de coincidencia */}
                 {modalCambiarPassword.confirmPassword && (
-                  <p className={`text-sm mt-2 ${
-                    modalCambiarPassword.newPassword === modalCambiarPassword.confirmPassword 
-                      ? 'text-green-400' 
-                      : 'text-red-400'
-                  }`}>
-                    {modalCambiarPassword.newPassword === modalCambiarPassword.confirmPassword 
-                      ? '✓ Las contraseñas coinciden' 
+                  <p className={`text-sm mt-2 ${modalCambiarPassword.newPassword === modalCambiarPassword.confirmPassword
+                    ? 'text-green-400'
+                    : 'text-red-400'
+                    }`}>
+                    {modalCambiarPassword.newPassword === modalCambiarPassword.confirmPassword
+                      ? '✓ Las contraseñas coinciden'
                       : '✗ Las contraseñas no coinciden'}
                   </p>
                 )}
@@ -2872,11 +2938,10 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
               <button
                 onClick={handleCambiarPassword}
                 disabled={modalCambiarPassword.isProcessing}
-                className={`flex-1 py-3 text-white font-bold rounded-xl transition-all ${
-                  modalCambiarPassword.isProcessing 
-                    ? 'opacity-50 cursor-not-allowed bg-gray-600' 
-                    : 'bg-gradient-to-r from-yellow-600 to-amber-600 hover:from-yellow-500 hover:to-amber-500'
-                }`}
+                className={`flex-1 py-3 text-white font-bold rounded-xl transition-all ${modalCambiarPassword.isProcessing
+                  ? 'opacity-50 cursor-not-allowed bg-gray-600'
+                  : 'bg-gradient-to-r from-yellow-600 to-amber-600 hover:from-yellow-500 hover:to-amber-500'
+                  }`}
               >
                 {modalCambiarPassword.isProcessing ? '⏳ CAMBIANDO...' : '✓ CAMBIAR CONTRASEÑA'}
               </button>
@@ -2989,11 +3054,10 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
               <button
                 onClick={handleModificarUsuario}
                 disabled={modalModificar.isProcessing}
-                className={`flex-1 py-3 text-white font-semibold rounded-xl transition-all ${
-                  modalModificar.isProcessing 
-                    ? 'opacity-50 cursor-not-allowed bg-gray-600' 
-                    : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500'
-                }`}
+                className={`flex-1 py-3 text-white font-semibold rounded-xl transition-all ${modalModificar.isProcessing
+                  ? 'opacity-50 cursor-not-allowed bg-gray-600'
+                  : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500'
+                  }`}
               >
                 {modalModificar.isProcessing ? '⏳ GUARDANDO...' : 'ACEPTAR'}
               </button>
@@ -3005,7 +3069,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
 
       {/* Popup de Éxito - Elegante con desvanecimiento */}
       {showSuccessPopup && createPortal(
-        <div 
+        <div
           className="fixed top-20 left-1/2 transform -translate-x-1/2 z-[10000] animate-fade-in-down"
           style={{
             animation: 'fadeInDown 0.5s ease-out, fadeOut 0.5s ease-in 2.5s forwards'
@@ -3023,7 +3087,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
 
       {/* Popup de Error - Elegante con desvanecimiento */}
       {showErrorPopup && createPortal(
-        <div 
+        <div
           className="fixed top-20 left-1/2 transform -translate-x-1/2 z-[10000] animate-fade-in-down"
           style={{
             animation: 'fadeInDown 0.5s ease-out, fadeOut 0.5s ease-in 2.5s forwards'
@@ -3061,7 +3125,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
 
       {/* Modal de Usuario Bloqueado - No puede recibir recursos */}
       {modalUsuarioBloqueado.isOpen && createPortal(
-        <div 
+        <div
           style={{
             position: 'fixed',
             inset: 0,
@@ -3075,7 +3139,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
           }}
           onClick={() => setModalUsuarioBloqueado({ isOpen: false, usuario: null })}
         >
-          <div 
+          <div
             style={{
               background: 'linear-gradient(135deg, #1f2937 0%, #374151 50%, #1f2937 100%)',
               borderRadius: '1rem',
@@ -3088,7 +3152,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div 
+            <div
               style={{
                 background: 'linear-gradient(90deg, #dc2626 0%, #e11d48 100%)',
                 color: 'white',
@@ -3107,8 +3171,8 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
             {/* Body */}
             <div style={{ padding: '1.5rem' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
-                <div style={{ 
-                  backgroundColor: 'rgba(239, 68, 68, 0.1)', 
+                <div style={{
+                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
                   border: '1px solid rgba(239, 68, 68, 0.3)',
                   borderRadius: '0.5rem',
                   padding: '1rem'
@@ -3120,10 +3184,10 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                     {modalUsuarioBloqueado.usuario?.username}
                   </p>
                 </div>
-                
-                <div style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
+
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
                   gap: '1rem',
                   backgroundColor: 'rgba(251, 146, 60, 0.1)',
                   border: '1px solid rgba(251, 146, 60, 0.3)',

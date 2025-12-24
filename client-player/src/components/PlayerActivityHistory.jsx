@@ -18,17 +18,17 @@ const PlayerActivityHistory = ({ onClose }) => {
       setLoading(true);
       // Buscar token en ambas ubicaciones (playerToken es el correcto)
       const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
-      
+
       // Si no hay token, mostrar error y no intentar cargar
       if (!token) {
         setError('Sesión expirada. Por favor, cierra sesión y vuelve a iniciar sesión.');
         setLoading(false);
         return;
       }
-      
-      console.log('🔍 Cargando historial desde:', `${import.meta.env.VITE_API_URL}/activity-history`);
+
+      console.log('🔍 Cargando historial desde:', '/api/activity-history');
       console.log('🔑 Token encontrado:', token ? 'Sí' : 'No');
-      const response = await axios.get(`${import.meta.env.VITE_API_URL}/activity-history`, {
+      const response = await axios.get('/api/activity-history', {
         headers: { Authorization: `Bearer ${token}` }
       });
       console.log('✅ Historial cargado:', response.data);
@@ -37,7 +37,7 @@ const PlayerActivityHistory = ({ onClose }) => {
     } catch (err) {
       console.error('❌ Error cargando historial:', err);
       console.error('Response:', err.response);
-      
+
       // Si es 401, token expirado - mostrar mensaje sin redirigir
       if (err.response?.status === 401) {
         setError('Tu sesión ha expirado. Por favor, cierra sesión y vuelve a iniciar sesión desde el menú de Perfil.');
@@ -53,7 +53,7 @@ const PlayerActivityHistory = ({ onClose }) => {
     try {
       const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
       const response = await axios.get(
-        `${import.meta.env.VITE_API_URL}/activity-history/session/${sessionId}`,
+        `/api/activity-history/session/${sessionId}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setSelectedSession(response.data.session);
@@ -123,7 +123,7 @@ const PlayerActivityHistory = ({ onClose }) => {
   const renderSummary = () => {
     if (!history?.summary) return null;
     const s = history.summary;
-    
+
     return (
       <div className="summary-section">
         <h3>📊 Resumen de Actividad</h3>
@@ -257,7 +257,7 @@ const PlayerActivityHistory = ({ onClose }) => {
                   {session.draw_date} {session.draw_time}
                 </div>
               </div>
-              
+
               <div className="session-body">
                 <div className="session-stat">
                   <span>Mis cartones:</span>
@@ -267,7 +267,7 @@ const PlayerActivityHistory = ({ onClose }) => {
                   <span>Total participantes:</span>
                   <strong>{session.total_cards} cartones</strong>
                 </div>
-                
+
                 {session.winner_linea_username && (
                   <div className={`winner-info ${session.is_winner_linea ? 'highlight' : ''}`}>
                     <span>🏁 Línea:</span>
@@ -278,7 +278,7 @@ const PlayerActivityHistory = ({ onClose }) => {
                     <small>Bolilla {session.linea_ball_index + 1}: #{session.linea_ball_number}</small>
                   </div>
                 )}
-                
+
                 {session.winner_bingo_username && (
                   <div className={`winner-info ${session.is_winner_bingo ? 'highlight' : ''}`}>
                     <span>🏆 BINGO:</span>
@@ -291,7 +291,7 @@ const PlayerActivityHistory = ({ onClose }) => {
                 )}
               </div>
 
-              <button 
+              <button
                 className="btn-details"
                 onClick={() => loadSessionDetails(session.game_session_id)}
               >
@@ -440,7 +440,7 @@ const PlayerActivityHistory = ({ onClose }) => {
             <h2>Detalles del Sorteo</h2>
             <button className="btn-close" onClick={() => setSelectedSession(null)}>×</button>
           </div>
-          
+
           <div className="modal-body">
             <div className="session-info-grid">
               <div className="info-item">
@@ -535,43 +535,43 @@ const PlayerActivityHistory = ({ onClose }) => {
         </div>
 
         <div className="tabs">
-          <button 
+          <button
             className={`tab ${activeTab === 'summary' ? 'active' : ''}`}
             onClick={() => setActiveTab('summary')}
           >
             📊 Resumen
           </button>
-          <button 
+          <button
             className={`tab ${activeTab === 'tickets' ? 'active' : ''}`}
             onClick={() => setActiveTab('tickets')}
           >
             🎫 Tickets
           </button>
-          <button 
+          <button
             className={`tab ${activeTab === 'cards' ? 'active' : ''}`}
             onClick={() => setActiveTab('cards')}
           >
             🎴 Cartones
           </button>
-          <button 
+          <button
             className={`tab ${activeTab === 'sessions' ? 'active' : ''}`}
             onClick={() => setActiveTab('sessions')}
           >
             🎮 Sorteos
           </button>
-          <button 
+          <button
             className={`tab ${activeTab === 'prizes' ? 'active' : ''}`}
             onClick={() => setActiveTab('prizes')}
           >
             🏆 Premios
           </button>
-          <button 
+          <button
             className={`tab ${activeTab === 'withdrawals' ? 'active' : ''}`}
             onClick={() => setActiveTab('withdrawals')}
           >
             📤 Retiros
           </button>
-          <button 
+          <button
             className={`tab ${activeTab === 'balance' ? 'active' : ''}`}
             onClick={() => setActiveTab('balance')}
           >

@@ -6,43 +6,27 @@ import '../styles/CasinoLobby.css';
 import '../styles/Countdown.css';
 import Countdown from './Countdown';
 import PlayerActivityHistory from './PlayerActivityHistory';
-import { FaClock, FaUsers, FaMoneyBillWave, FaTrophy, FaStar, FaGlassCheers, FaGift, FaHeadset, FaTicketAlt, FaEye, FaEyeSlash, FaMusic, FaVolumeUp, FaVolumeMute, FaUser, FaKey, FaSignOutAlt } from 'react-icons/fa';
+import { FaClock, FaUsers, FaMoneyBillWave, FaTrophy, FaStar, FaGlassCheers, FaGift, FaHeadset, FaTicketAlt, FaEye, FaEyeSlash, FaMusic, FaVolumeUp, FaVolumeMute, FaUser, FaKey, FaSignOutAlt, FaMapMarkedAlt } from 'react-icons/fa';
 import logo from '../assets/logo.png';
 import giftIcon from '../assets/Gift_icon.png';
 import bronzeIcon from '../assets/bronze_icon.png';
 import silverIcon from '../assets/silver_icon.png';
 import goldIcon from '../assets/gold_icon.png';
 import lobbyBackground from '../assets/lobby-background.jpg';
+
 import audioService from '../services/audioService';
+import BattlePass from './Gamification/BattlePass';
+import ChatWidget from './Gamification/ChatWidget';
+import LeaderboardWidget from './Gamification/LeaderboardWidget';
+import WinnersTicker from './WinnersTicker';
+import SupportModal from './Support/SupportModal';
+import CustomTour from './CustomTour';
+import WithdrawalModal from './Withdrawal/WithdrawalModal';
+import FortuneWheel from './Gamification/FortuneWheel';
 
-// Precargar todas las imágenes al inicio y mantenerlas en cache
-const imageCache = {};
-const preloadImages = () => {
-  const images = [
-    { key: 'logo', src: logo },
-    { key: 'gift', src: giftIcon },
-    { key: 'bronze', src: bronzeIcon },
-    { key: 'silver', src: silverIcon },
-    { key: 'gold', src: goldIcon },
-    { key: 'background', src: lobbyBackground }
-  ];
+// ... (existing code)
 
-  images.forEach(({ key, src }) => {
-    if (!imageCache[key]) {
-      const img = new Image();
-      img.src = src;
-      img.onload = () => {
-        imageCache[key] = img;
-        console.log(`✅ Imagen precargada: ${key}`);
-      };
-    }
-  });
-};
-
-// Ejecutar precarga inmediatamente
-if (typeof window !== 'undefined') {
-  preloadImages();
-}
+// ...
 
 const getTargetTime = (hour) => {
   const target = new Date();
@@ -53,17 +37,6 @@ const getTargetTime = (hour) => {
   }
   return target;
 };
-
-const fakeWinners = [
-  { name: 'Juanito123', amount: '$150', room: 'oro' },
-  { name: 'MariaGana', amount: '$75', room: 'plata' },
-  { name: 'CarlosElGrande', amount: '$200', room: 'oro' },
-  { name: 'SofiaLaIncreible', amount: '$50', room: 'bronce' },
-  { name: 'PedroPicaPiedra', amount: '$100', room: 'plata' },
-  { name: 'LuisaFernanda', amount: '$300', room: 'oro' },
-  { name: 'GamerXtreme', amount: '$20', room: 'bronce' },
-  { name: 'QueenOfCards', amount: '$55', room: 'bronce' },
-];
 
 const RoomCard = ({ room }) => {
   const statusText = {
@@ -186,29 +159,7 @@ const RoomCard = ({ room }) => {
   );
 };
 
-const WinnersTicker = () => {
-  const duplicatedWinners = [...fakeWinners, ...fakeWinners];
-
-  return (
-    <div className="winners-ticker">
-      <div className="ticker-label">🏆 GANADORES RECIENTES</div>
-      <div className="ticker-content">
-        <div className="ticker-track">
-          {duplicatedWinners.map((winner, index) => (
-            <div key={index} className="ticker-item">
-              <span className="winner-name">{winner.name}</span>
-              <span className="winner-separator">ganó</span>
-              <span className="winner-amount">{winner.amount}</span>
-              <span className={`winner-room room-${winner.room}`}>
-                {winner.room}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-};
+// ... (existing code)
 
 
 const CasinoLobby = ({ user, onLogout }) => {
@@ -228,6 +179,29 @@ const CasinoLobby = ({ user, onLogout }) => {
     confirm: false
   });
   const [passwordStrength, setPasswordStrength] = useState({ level: 0, text: '', color: '' });
+  const [showBattlePass, setShowBattlePass] = useState(false);
+  const [showWheel, setShowWheel] = useState(false);
+  const [runTour, setRunTour] = useState(false);
+
+  useEffect(() => {
+    // Check if tour has been seen
+    const hasSeenTour = localStorage.getItem('tutorial_seen');
+    if (!hasSeenTour) {
+      setTimeout(() => setRunTour(true), 1500); // Small delay for loading
+    }
+  }, []);
+
+  const handleTourEnd = () => {
+    setRunTour(false);
+    localStorage.setItem('tutorial_seen', 'true');
+  };
+
+  const handleRestartTour = () => {
+    setRunTour(true);
+    setShowProfileMenu(false);
+  };
+  const [showSupport, setShowSupport] = useState(false);
+  const [showWithdrawal, setShowWithdrawal] = useState(false);
 
   // Estado de audio
   const [audioStatus, setAudioStatus] = useState({
@@ -273,6 +247,29 @@ const CasinoLobby = ({ user, onLogout }) => {
       setLoadingLobby(false);
     }
   };
+
+  // NUEVO: Estado para disponibilidad de la rueda
+  const [wheelReady, setWheelReady] = useState(false);
+
+  // NUEVO: Verificar estado de la rueda
+  const checkWheelStatus = async () => {
+    try {
+      const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
+      const response = await axios.get('/api/gamification/wheel/status', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setWheelReady(response.data.canSpin);
+    } catch (error) {
+      console.error('Error checking wheel status:', error);
+    }
+  };
+
+  useEffect(() => {
+    checkWheelStatus();
+    // Re-chequear cada minuto
+    const interval = setInterval(checkWheelStatus, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   // NUEVO: Función para formatear valores monetarios
   const formatMoney = (amount) => {
@@ -498,7 +495,7 @@ const CasinoLobby = ({ user, onLogout }) => {
   return (
     <div className="casino-lobby" style={{ '--lobby-bg-image': `url(${lobbyBackground})` }}>
       {/* Top User Bar */}
-      <div className="user-top-bar">
+      <div className="user-top-bar" id="user-main-bar">
         <div className="user-info-section">
           <span className="user-name">👤 {user?.username || 'Usuario'}</span>
           <div className="user-resources">
@@ -514,13 +511,83 @@ const CasinoLobby = ({ user, onLogout }) => {
         </div>
         <div className="user-actions">
           <button
+            id="btn-history"
             className="btn-profile btn-history"
             onClick={() => setShowActivityHistory(true)}
           >
             <FaStar />
+
             <span>Mi Historial</span>
+
           </button>
-          <div className="profile-menu-container">
+
+          <button
+            id="btn-support"
+            className="btn-profile btn-support"
+            style={{
+              background: 'linear-gradient(45deg, #4f46e5, #4338ca)',
+              color: 'white',
+              fontWeight: 'bold',
+              border: '2px solid rgba(255,255,255,0.2)',
+              marginRight: '8px'
+            }}
+            onClick={() => setShowSupport(true)}
+            title="Soporte Técnico"
+          >
+            <FaHeadset />
+          </button>
+
+          <button
+            id="withdraw-btn"
+            className="btn-profile btn-withdrawal"
+            style={{
+              background: 'linear-gradient(45deg, #10B981, #059669)',
+              color: 'white',
+              fontWeight: 'bold',
+              border: '2px solid rgba(255,255,255,0.2)',
+              marginRight: '8px'
+            }}
+            onClick={() => setShowWithdrawal(true)}
+            title="Retirar Premios"
+          >
+            <FaMoneyBillWave />
+            <span style={{ marginLeft: '5px' }}>Retirar</span>
+          </button>
+
+          <button
+            id="battlepass-btn"
+            className="btn-profile btn-battlepass"
+            style={{
+              background: 'linear-gradient(45deg, #FFD700, #FFA500)',
+              color: 'black',
+              fontWeight: 'bold',
+              border: '2px solid #FFF'
+            }}
+            onClick={() => setShowBattlePass(true)}
+          >
+            <FaTrophy />
+            <span>BINGO PASS</span>
+          </button>
+
+          <button
+            id="wheel-btn"
+            className={`btn-profile btn-wheel ${wheelReady ? 'glow-active' : ''}`}
+            style={{
+              background: 'linear-gradient(45deg, #e1b12c, #fbc531)',
+              color: 'black',
+              fontWeight: 'bold',
+              border: wheelReady ? '2px solid #fff' : '2px solid #FFF',
+              marginRight: '8px',
+              boxShadow: wheelReady ? '0 0 20px #ffd700, 0 0 40px #ffea00' : 'none',
+              animation: wheelReady ? 'pulse-gold 1.5s infinite' : 'none'
+            }}
+            onClick={() => setShowWheel(true)}
+          >
+            <FaStar className={wheelReady ? "animate-spin-fast" : "animate-spin-slow"} style={{ animationDuration: wheelReady ? '1s' : '3s' }} />
+            <span>FORTUNA</span>
+          </button>
+
+          <div className="profile-menu-container" id="profile-section">
             <button
               className="btn-profile"
               onClick={() => setShowProfileMenu(!showProfileMenu)}
@@ -530,6 +597,10 @@ const CasinoLobby = ({ user, onLogout }) => {
             </button>
             {showProfileMenu && (
               <div className="profile-dropdown">
+                <button className="dropdown-item" onClick={handleRestartTour}>
+                  <FaMapMarkedAlt />
+                  <span>Tour por la Página</span>
+                </button>
                 <button className="dropdown-item" onClick={() => {
                   setShowProfileMenu(false);
                   setShowChangePasswordModal(true);
@@ -548,6 +619,8 @@ const CasinoLobby = ({ user, onLogout }) => {
           </div>
         </div>
       </div>
+
+      <CustomTour runTour={runTour} onTourEnd={handleTourEnd} />
 
       {/* Header con Logo */}
       <header className="lobby-header">
@@ -570,7 +643,8 @@ const CasinoLobby = ({ user, onLogout }) => {
         </div>
 
         {/* Logo Central */}
-        <div className="logo-container">
+        <div className="logo-container" id="lobby-header-logo">
+          <div className="logo-shine"></div>
           <div className="logo-shine"></div>
           <img
             src={logo}
@@ -604,7 +678,7 @@ const CasinoLobby = ({ user, onLogout }) => {
       </header>
 
       {/* Grid de Salas */}
-      <div className="rooms-grid">
+      <div className="rooms-grid" id="rooms-grid">
         {roomsData.map((room, index) => (
           <RoomCard key={room.id} room={room} style={{ animationDelay: `${index * 100}ms` }} />
         ))}
@@ -625,273 +699,320 @@ const CasinoLobby = ({ user, onLogout }) => {
             <span>Salas VIP Exclusivas</span>
           </div>
         </div>
+
+        <WinnersTicker />
+
+        <div className="container mx-auto px-4 mt-6 mb-2 relative z-10">
+          <div className="flex justify-center" id="leaderboard-widget">
+            <LeaderboardWidget />
+          </div>
+        </div>
       </footer>
 
-      <WinnersTicker />
+      {/* MODALS */}
+      <SupportModal isOpen={showSupport} onClose={() => setShowSupport(false)} />
+
+      {
+        showWithdrawal && (
+          <WithdrawalModal onClose={() => setShowWithdrawal(false)} />
+        )
+      }
 
       {/* Modal de Cambiar Contraseña */}
-      {showChangePasswordModal && createPortal(
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.7)',
-          backdropFilter: 'blur(10px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 9999
-        }}>
+      <FortuneWheel
+        isOpen={showWheel}
+        onClose={() => setShowWheel(false)}
+        onPrizeClaimed={(prize) => {
+          // Opcional: recargar perfil para actualizar saldo
+          loadUserProfile();
+        }}
+      />
+      {
+        showChangePasswordModal && createPortal(
           <div style={{
-            background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
-            border: '2px solid rgba(147, 51, 234, 0.5)',
-            borderRadius: '16px',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-            width: '100%',
-            maxWidth: '28rem',
-            margin: '0 1rem',
-            overflow: 'hidden'
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            backdropFilter: 'blur(10px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999
           }}>
-            {/* Header */}
             <div style={{
-              padding: '1.5rem',
-              background: 'linear-gradient(to right, rgb(147, 51, 234), rgb(79, 70, 229))',
-              textAlign: 'center'
+              background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
+              border: '2px solid rgba(147, 51, 234, 0.5)',
+              borderRadius: '16px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              width: '100%',
+              maxWidth: '28rem',
+              margin: '0 1rem',
+              overflow: 'hidden'
             }}>
-              <h3 style={{
-                fontSize: '1.5rem',
-                fontWeight: 'bold',
-                color: 'white',
-                margin: 0
+              {/* Header */}
+              <div style={{
+                padding: '1.5rem',
+                background: 'linear-gradient(to right, rgb(147, 51, 234), rgb(79, 70, 229))',
+                textAlign: 'center'
               }}>
-                🔑 Cambiar Contraseña
-              </h3>
-            </div>
-
-            {/* Body */}
-            <form onSubmit={handleChangePassword} style={{ padding: '1.5rem' }}>
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{
-                  display: 'block',
-                  color: '#d1d5db',
-                  fontWeight: '600',
-                  marginBottom: '0.5rem',
-                  fontSize: '0.875rem'
+                <h3 style={{
+                  fontSize: '1.5rem',
+                  fontWeight: 'bold',
+                  color: 'white',
+                  margin: 0
                 }}>
-                  Contraseña Actual:
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    type={showPasswords.current ? "text" : "password"}
-                    value={passwordData.currentPassword}
-                    onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
-                    style={{
-                      width: '100%',
-                      backgroundColor: 'rgba(55, 65, 81, 0.5)',
-                      border: '1px solid rgb(75, 85, 99)',
-                      borderRadius: '0.5rem',
-                      padding: '0.75rem 3rem 0.75rem 1rem',
-                      color: 'white',
-                      outline: 'none'
-                    }}
-                    placeholder="Ingresa tu contraseña actual"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPasswords({ ...showPasswords, current: !showPasswords.current })}
-                    style={{
-                      position: 'absolute',
-                      right: '0.75rem',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      background: 'none',
-                      border: 'none',
-                      color: 'white',
-                      cursor: 'pointer',
-                      fontSize: '1.125rem'
-                    }}
-                  >
-                    {showPasswords.current ? '👁' : '🔒'}
-                  </button>
-                </div>
+                  🔑 Cambiar Contraseña
+                </h3>
               </div>
 
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{
-                  display: 'block',
-                  color: '#d1d5db',
-                  fontWeight: '600',
-                  marginBottom: '0.5rem',
-                  fontSize: '0.875rem'
-                }}>
-                  Nueva Contraseña:
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    type={showPasswords.new ? "text" : "password"}
-                    value={passwordData.newPassword}
-                    onChange={(e) => {
-                      const newPwd = e.target.value;
-                      setPasswordData({ ...passwordData, newPassword: newPwd });
-                      setPasswordStrength(calculatePasswordStrength(newPwd));
-                    }}
-                    style={{
-                      width: '100%',
-                      backgroundColor: 'rgba(55, 65, 81, 0.5)',
-                      border: '1px solid rgb(75, 85, 99)',
-                      borderRadius: '0.5rem',
-                      padding: '0.75rem 3rem 0.75rem 1rem',
-                      color: 'white',
-                      outline: 'none'
-                    }}
-                    placeholder="Mínimo 6 caracteres"
-                    required
-                    minLength={6}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPasswords({ ...showPasswords, new: !showPasswords.new })}
-                    style={{
-                      position: 'absolute',
-                      right: '0.75rem',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      background: 'none',
-                      border: 'none',
-                      color: 'white',
-                      cursor: 'pointer',
-                      fontSize: '1.125rem'
-                    }}
-                  >
-                    {showPasswords.new ? '👁' : '🔒'}
-                  </button>
-                </div>
-                {passwordData.newPassword && passwordStrength.level > 0 && (
-                  <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <div style={{ flex: 1, height: '0.5rem', backgroundColor: 'rgb(75, 85, 99)', borderRadius: '9999px', overflow: 'hidden' }}>
-                      <div style={{
-                        height: '100%',
-                        transition: 'all 0.3s',
-                        backgroundColor: passwordStrength.level === 1 ? 'rgb(239, 68, 68)' : passwordStrength.level === 2 ? 'rgb(234, 179, 8)' : 'rgb(34, 197, 94)',
-                        width: passwordStrength.level === 1 ? '33.33%' : passwordStrength.level === 2 ? '66.66%' : '100%'
-                      }}></div>
-                    </div>
-                    <span style={{
-                      fontSize: '0.875rem',
-                      fontWeight: '600',
-                      color: passwordStrength.level === 1 ? 'rgb(239, 68, 68)' : passwordStrength.level === 2 ? 'rgb(234, 179, 8)' : 'rgb(34, 197, 94)'
-                    }}>
-                      {passwordStrength.text}
-                    </span>
+              {/* Body */}
+              <form onSubmit={handleChangePassword} style={{ padding: '1.5rem' }}>
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{
+                    display: 'block',
+                    color: '#d1d5db',
+                    fontWeight: '600',
+                    marginBottom: '0.5rem',
+                    fontSize: '0.875rem'
+                  }}>
+                    Contraseña Actual:
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={showPasswords.current ? "text" : "password"}
+                      value={passwordData.currentPassword}
+                      onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                      style={{
+                        width: '100%',
+                        backgroundColor: 'rgba(55, 65, 81, 0.5)',
+                        border: '1px solid rgb(75, 85, 99)',
+                        borderRadius: '0.5rem',
+                        padding: '0.75rem 3rem 0.75rem 1rem',
+                        color: 'white',
+                        outline: 'none'
+                      }}
+                      placeholder="Ingresa tu contraseña actual"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPasswords({ ...showPasswords, current: !showPasswords.current })}
+                      style={{
+                        position: 'absolute',
+                        right: '0.75rem',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        color: 'white',
+                        cursor: 'pointer',
+                        fontSize: '1.125rem'
+                      }}
+                    >
+                      {showPasswords.current ? '👁' : '🔒'}
+                    </button>
                   </div>
-                )}
-              </div>
+                </div>
 
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{
-                  display: 'block',
-                  color: '#d1d5db',
-                  fontWeight: '600',
-                  marginBottom: '0.5rem',
-                  fontSize: '0.875rem'
-                }}>
-                  Confirmar Nueva Contraseña:
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    type={showPasswords.confirm ? "text" : "password"}
-                    value={passwordData.confirmPassword}
-                    onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                    style={{
-                      width: '100%',
-                      backgroundColor: 'rgba(55, 65, 81, 0.5)',
-                      border: '1px solid rgb(75, 85, 99)',
-                      borderRadius: '0.5rem',
-                      padding: '0.75rem 3rem 0.75rem 1rem',
-                      color: 'white',
-                      outline: 'none'
-                    }}
-                    placeholder="Repite la nueva contraseña"
-                    required
-                    minLength={6}
-                  />
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{
+                    display: 'block',
+                    color: '#d1d5db',
+                    fontWeight: '600',
+                    marginBottom: '0.5rem',
+                    fontSize: '0.875rem'
+                  }}>
+                    Nueva Contraseña:
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={showPasswords.new ? "text" : "password"}
+                      value={passwordData.newPassword}
+                      onChange={(e) => {
+                        const newPwd = e.target.value;
+                        setPasswordData({ ...passwordData, newPassword: newPwd });
+                        setPasswordStrength(calculatePasswordStrength(newPwd));
+                      }}
+                      style={{
+                        width: '100%',
+                        backgroundColor: 'rgba(55, 65, 81, 0.5)',
+                        border: '1px solid rgb(75, 85, 99)',
+                        borderRadius: '0.5rem',
+                        padding: '0.75rem 3rem 0.75rem 1rem',
+                        color: 'white',
+                        outline: 'none'
+                      }}
+                      placeholder="Mínimo 6 caracteres"
+                      required
+                      minLength={6}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPasswords({ ...showPasswords, new: !showPasswords.new })}
+                      style={{
+                        position: 'absolute',
+                        right: '0.75rem',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        color: 'white',
+                        cursor: 'pointer',
+                        fontSize: '1.125rem'
+                      }}
+                    >
+                      {showPasswords.new ? '👁' : '🔒'}
+                    </button>
+                  </div>
+                  {passwordData.newPassword && passwordStrength.level > 0 && (
+                    <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <div style={{ flex: 1, height: '0.5rem', backgroundColor: 'rgb(75, 85, 99)', borderRadius: '9999px', overflow: 'hidden' }}>
+                        <div style={{
+                          height: '100%',
+                          transition: 'all 0.3s',
+                          backgroundColor: passwordStrength.level === 1 ? 'rgb(239, 68, 68)' : passwordStrength.level === 2 ? 'rgb(234, 179, 8)' : 'rgb(34, 197, 94)',
+                          width: passwordStrength.level === 1 ? '33.33%' : passwordStrength.level === 2 ? '66.66%' : '100%'
+                        }}></div>
+                      </div>
+                      <span style={{
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        color: passwordStrength.level === 1 ? 'rgb(239, 68, 68)' : passwordStrength.level === 2 ? 'rgb(234, 179, 8)' : 'rgb(34, 197, 94)'
+                      }}>
+                        {passwordStrength.text}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{
+                    display: 'block',
+                    color: '#d1d5db',
+                    fontWeight: '600',
+                    marginBottom: '0.5rem',
+                    fontSize: '0.875rem'
+                  }}>
+                    Confirmar Nueva Contraseña:
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={showPasswords.confirm ? "text" : "password"}
+                      value={passwordData.confirmPassword}
+                      onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                      style={{
+                        width: '100%',
+                        backgroundColor: 'rgba(55, 65, 81, 0.5)',
+                        border: '1px solid rgb(75, 85, 99)',
+                        borderRadius: '0.5rem',
+                        padding: '0.75rem 3rem 0.75rem 1rem',
+                        color: 'white',
+                        outline: 'none'
+                      }}
+                      placeholder="Repite la nueva contraseña"
+                      required
+                      minLength={6}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPasswords({ ...showPasswords, confirm: !showPasswords.confirm })}
+                      style={{
+                        position: 'absolute',
+                        right: '0.75rem',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        color: 'white',
+                        cursor: 'pointer',
+                        fontSize: '1.125rem'
+                      }}
+                    >
+                      {showPasswords.confirm ? '👁' : '🔒'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div style={{ display: 'flex', gap: '0.75rem', paddingTop: '1rem' }}>
                   <button
                     type="button"
-                    onClick={() => setShowPasswords({ ...showPasswords, confirm: !showPasswords.confirm })}
-                    style={{
-                      position: 'absolute',
-                      right: '0.75rem',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      background: 'none',
-                      border: 'none',
-                      color: 'white',
-                      cursor: 'pointer',
-                      fontSize: '1.125rem'
+                    onClick={() => {
+                      setShowChangePasswordModal(false);
+                      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
                     }}
+                    style={{
+                      flex: 1,
+                      padding: '0.75rem',
+                      background: 'linear-gradient(to right, rgb(75, 85, 99), rgb(55, 65, 81))',
+                      color: 'white',
+                      fontWeight: 'bold',
+                      borderRadius: '0.75rem',
+                      border: 'none',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseOver={(e) => e.target.style.background = 'linear-gradient(to right, rgb(107, 114, 128), rgb(75, 85, 99))'}
+                    onMouseOut={(e) => e.target.style.background = 'linear-gradient(to right, rgb(75, 85, 99), rgb(55, 65, 81))'}
                   >
-                    {showPasswords.confirm ? '👁' : '🔒'}
+                    CANCELAR
+                  </button>
+                  <button
+                    type="submit"
+                    style={{
+                      flex: 1,
+                      padding: '0.75rem',
+                      background: 'linear-gradient(to right, rgb(147, 51, 234), rgb(79, 70, 229))',
+                      color: 'white',
+                      fontWeight: 'bold',
+                      borderRadius: '0.75rem',
+                      border: 'none',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseOver={(e) => e.target.style.background = 'linear-gradient(to right, rgb(168, 85, 247), rgb(99, 102, 241))'}
+                    onMouseOut={(e) => e.target.style.background = 'linear-gradient(to right, rgb(147, 51, 234), rgb(79, 70, 229))'}
+                  >
+                    ✓ CAMBIAR
                   </button>
                 </div>
-              </div>
-
-              {/* Footer */}
-              <div style={{ display: 'flex', gap: '0.75rem', paddingTop: '1rem' }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowChangePasswordModal(false);
-                    setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
-                  }}
-                  style={{
-                    flex: 1,
-                    padding: '0.75rem',
-                    background: 'linear-gradient(to right, rgb(75, 85, 99), rgb(55, 65, 81))',
-                    color: 'white',
-                    fontWeight: 'bold',
-                    borderRadius: '0.75rem',
-                    border: 'none',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseOver={(e) => e.target.style.background = 'linear-gradient(to right, rgb(107, 114, 128), rgb(75, 85, 99))'}
-                  onMouseOut={(e) => e.target.style.background = 'linear-gradient(to right, rgb(75, 85, 99), rgb(55, 65, 81))'}
-                >
-                  CANCELAR
-                </button>
-                <button
-                  type="submit"
-                  style={{
-                    flex: 1,
-                    padding: '0.75rem',
-                    background: 'linear-gradient(to right, rgb(147, 51, 234), rgb(79, 70, 229))',
-                    color: 'white',
-                    fontWeight: 'bold',
-                    borderRadius: '0.75rem',
-                    border: 'none',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseOver={(e) => e.target.style.background = 'linear-gradient(to right, rgb(168, 85, 247), rgb(99, 102, 241))'}
-                  onMouseOut={(e) => e.target.style.background = 'linear-gradient(to right, rgb(147, 51, 234), rgb(79, 70, 229))'}
-                >
-                  ✓ CAMBIAR
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>,
-        document.body
-      )}
+              </form>
+            </div>
+          </div>,
+          document.body
+        )
+      }
 
       {/* Activity History Modal */}
-      {showActivityHistory && (
-        <PlayerActivityHistory onClose={() => setShowActivityHistory(false)} />
-      )}
-    </div>
+      {
+        showActivityHistory && (
+          <PlayerActivityHistory onClose={() => setShowActivityHistory(false)} />
+        )
+      }
+      {/* Modal de Battle Pass */}
+      {
+        showBattlePass && createPortal(
+          <BattlePass onClose={() => setShowBattlePass(false)} />,
+          document.body
+        )
+      }
+
+      {/* Modal de Retiro */}
+      {
+        showWithdrawal && (
+          <WithdrawalModal
+            isOpen={showWithdrawal}
+            onClose={() => setShowWithdrawal(false)}
+            onWithdrawalSuccess={() => {
+              loadUserProfile(); // Refresh balance
+            }}
+          />
+        )
+      }
+    </div >
   );
 };
 

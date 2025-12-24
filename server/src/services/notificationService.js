@@ -39,7 +39,7 @@ async function broadcastLevelUp(username, newLevel, rankName) {
   }
 
   const message = `¡Bravo! ${username} acaba de alcanzar nivel ${rankName} 🏆`;
-  
+
   const announcement = {
     id: Date.now(),
     text: message,
@@ -160,7 +160,7 @@ async function broadcastWelcome(username, role = 'jugador') {
 async function broadcastAchievement(username, achievementName, achievementIcon = '🏅') {
   if (!globalIO) return;
 
-  const message = `${achievementIcon} El Agente ${username} desbloqueó: ${achievementName}`;
+  const message = `${achievementIcon} ${username} desbloqueó: ${achievementName}`;
 
   const announcement = {
     id: Date.now(),

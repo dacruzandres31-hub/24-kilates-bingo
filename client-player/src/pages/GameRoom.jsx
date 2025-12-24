@@ -344,10 +344,11 @@ export default function GameRoom() {
                 <StackedBingoCards
                   gameSessionId={gameState.sessionId}
                   socket={socket}
-                  onCardSelect={(card) => {
-                    if (card) {
-                      const fullCard = myCards.find(c => c.id === card.cardId);
-                      setSelectedCard(fullCard);
+                  onCardSelect={(analyzedCard) => {
+                    if (analyzedCard) {
+                      const fullCard = myCards.find(c => c.id === analyzedCard.cardId);
+                      // Merge analysis data (alerts, missing numbers) into the selected card
+                      setSelectedCard({ ...fullCard, ...analyzedCard });
                     } else {
                       setSelectedCard(null);
                     }
@@ -399,6 +400,13 @@ export default function GameRoom() {
                 gridNumbers={selectedCard.gridNumbers}
                 markedNumbers={new Set(gameState.drawnNumbers)}
                 showNumbers={true}
+                missingNumbers={
+                  selectedCard.lineAnalysis
+                    ? selectedCard.lineAnalysis
+                      .filter(l => l.missing === 1 && !l.isComplete)
+                      .flatMap(l => l.missingNumbers)
+                    : []
+                }
               />
             </div>
             <div className="mt-4 grid grid-cols-3 gap-4">

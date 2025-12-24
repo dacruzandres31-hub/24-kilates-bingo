@@ -9,9 +9,9 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-export default function PrizeClaimModal({ 
-  isOpen, 
-  onClose, 
+export default function PrizeClaimModal({
+  isOpen,
+  onClose,
   prizeType, // 'LINEA', 'BINGO', 'POZO'
   prizeAmount,
   sessionId,
@@ -40,7 +40,7 @@ export default function PrizeClaimModal({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Validaciones
     if (!formData.withdrawalAmount || formData.withdrawalAmount <= 0) {
       setError('El monto a retirar debe ser mayor a 0');
@@ -51,12 +51,12 @@ export default function PrizeClaimModal({
       setError(`El monto a retirar no puede superar el premio ($${prizeAmount.toLocaleString()})`);
       return;
     }
-    
+
     if (!formData.bankAccountHolder.trim()) {
       setError('El titular de la cuenta es requerido');
       return;
     }
-    
+
     if (!formData.cbu.trim()) {
       setError('El CBU es requerido');
       return;
@@ -70,9 +70,9 @@ export default function PrizeClaimModal({
     try {
       setLoading(true);
       setError(null);
-      
+
       const token = localStorage.getItem('token');
-      
+
       const { data } = await axios.post(
         `${API_URL}/api/withdrawals/request`,
         {
@@ -296,7 +296,7 @@ export default function PrizeClaimModal({
               </form>
 
               <p className="text-xs text-gray-500 text-center mt-4">
-                Su solicitud será revisada por Andy en breve
+                Su solicitud será revisada por 24Kilates en breve
               </p>
             </>
           ) : (
@@ -306,7 +306,7 @@ export default function PrizeClaimModal({
               <p className="text-gray-300">
                 Su solicitud de retiro ha sido creada exitosamente.
                 <br />
-                Andy la procesará pronto.
+                24Kilates la procesará pronto.
               </p>
             </div>
           )}

@@ -1,3 +1,4 @@
+// Forces restart
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -27,6 +28,7 @@ const giftCardsRoutes = require('./routes/giftCards');
 const cardsRoutes = require('./routes/cardsRoutes');
 const gameAdminController = require('./controllers/gameAdminController');
 const cardPoolService = require('./services/cardPoolService');
+const activityHistoryRoutes = require('./routes/activityHistoryRoutes');
 const db = require('./db');
 
 // CONFIGURACIÓN INICIAL
@@ -82,12 +84,15 @@ const metricsService = require('./services/metricsService'); // Add import
 // ...
 
 // SOCKET.IO - Event handlers
+const chatEvents = require('./socket/chatEvents'); // Importar lógica de chat
+
 io.on('connection', (socket) => {
   metricsService.increment('activeConnections');
   metricsService.increment('totalConnections');
   console.log(`[Socket.IO] Cliente conectado: ${socket.id}`);
 
-  // ... (existing code)
+  // Entregar gestión de chat
+  chatEvents(io, socket);
 
   socket.on('disconnect', () => {
     metricsService.increment('activeConnections', -1);
@@ -118,6 +123,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/admin/gift-cards', giftCardsRoutes);
 app.use('/api/superadmin', superAdminRoutes);
 app.use('/api/game-admin', gameAdminRoutes);
+app.use('/api/support', require('./routes/supportRoutes'));
 
 // HEALTH CHECK
 app.get('/health', (req, res) => {

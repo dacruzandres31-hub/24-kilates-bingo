@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const authenticateToken = (req, res, next) => {
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '');
-    
+
     if (!token) {
       return res.status(401).json({ error: 'No autorizado. Token no proporcionado.' });
     }
@@ -25,7 +25,7 @@ const isAdmin = (req, res, next) => {
 
   const allowedRoles = ['admin', 'superadmin', 'agente'];
   if (!allowedRoles.includes(req.user.role)) {
-    return res.status(403).json({ 
+    return res.status(403).json({
       error: 'Acceso denegado. Se requiere rol de administrador o agente.',
       currentRole: req.user.role
     });
@@ -41,8 +41,8 @@ const isSuperAdmin = (req, res, next) => {
   }
 
   if (req.user.role !== 'superadmin') {
-    return res.status(403).json({ 
-      error: 'Acceso denegado. Se requiere rol de superadmin.' 
+    return res.status(403).json({
+      error: 'Acceso denegado. Se requiere rol de superadmin.'
     });
   }
 
@@ -57,8 +57,24 @@ const isCajeroOrAdmin = (req, res, next) => {
 
   const allowedRoles = ['cajero', 'admin', 'superadmin'];
   if (!allowedRoles.includes(req.user.role)) {
-    return res.status(403).json({ 
-      error: 'Acceso denegado. Se requiere rol de cajero o administrador.' 
+    return res.status(403).json({
+      error: 'Acceso denegado. Se requiere rol de cajero o administrador.'
+    });
+  }
+
+  next();
+};
+
+// Middleware: Solo usuario Andy
+const isAndy = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'No autenticado' });
+  }
+
+  // Verificar username exacto (o ID si es fijo, username es más legible)
+  if (req.user.username !== 'Andy') {
+    return res.status(403).json({
+      error: 'Acceso denegado. Exclusivo para Andy.'
     });
   }
 
@@ -70,7 +86,8 @@ module.exports = {
   authenticateToken,
   isAdmin,
   isSuperAdmin,
-  isCajeroOrAdmin
+  isCajeroOrAdmin,
+  isAndy
 };
 
 // Mantener compatibilidad con código antiguo

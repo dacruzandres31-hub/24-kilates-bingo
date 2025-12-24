@@ -29,7 +29,7 @@ export default function LoginPlayer({ onLogin }) {
         password
       });
 
-      const { token, user } = response.data;
+      const { token, user, gamification } = response.data;
 
       // Verificar que sea jugador
       if (user.role !== 'jugador') {
@@ -41,8 +41,8 @@ export default function LoginPlayer({ onLogin }) {
       // Guardar información del usuario
       localStorage.setItem('playerToken', token);
       localStorage.setItem('playerUser', JSON.stringify(user));
-      
-      onLogin(token, user);
+
+      onLogin(token, user, gamification);
     } catch (err) {
       console.log('🚫 Error en login:', err.response?.status, err.response?.data);
       // Verificar si el usuario está bloqueado
@@ -64,9 +64,9 @@ export default function LoginPlayer({ onLogin }) {
       <div className="login-wrapper">
         {/* Logo */}
         <div className="login-logo-container">
-          <img 
-            src="/logo.png" 
-            alt="Bingo 24K" 
+          <img
+            src="/logo.png"
+            alt="Bingo 24K"
             className="login-logo"
           />
         </div>

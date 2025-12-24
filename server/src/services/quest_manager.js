@@ -53,7 +53,7 @@ const QUESTS_DEFINITIONS = {
 async function createDailyQuests(userId, questDate = null) {
   try {
     const date = questDate || new Date().toISOString().split('T')[0];
-    
+
     const connection = await pool.getConnection();
     try {
       await connection.query('START TRANSACTION');
@@ -89,7 +89,7 @@ async function createDailyQuests(userId, questDate = null) {
       }
 
       await connection.query('COMMIT');
-      
+
       return {
         success: true,
         questsCreated: questsToInsert.length,
@@ -161,11 +161,10 @@ async function updateQuestProgress(userId, questType, increment = 1) {
     try {
       await connection.query('START TRANSACTION');
 
-      // Obtener la misión
       const [questResult] = await connection.query(
-        `SELECT id, progress_current, progress_target, reward_type, reward_amount, is_completed
+        `SELECT id, progress_current, progress_target, quest_type, xp_reward, completed
          FROM daily_quests
-         WHERE user_id = ? AND quest_type = ? AND quest_date = ? AND is_completed = false
+         WHERE user_id = ? AND quest_type = ? AND quest_date = ? AND completed = 0
          LIMIT 1`,
         [userId, questType, date]
       );
@@ -190,19 +189,26 @@ async function updateQuestProgress(userId, questType, increment = 1) {
         );
 
         // Acreditar premio
-        if (quest.reward_type === 'credits') {
+        // Derivar tipo de premio según el tipo de misión (hardcodeado según definiciones)
+        // daily_attendance, mala_racha, weekly_hunter -> CREDITS
+        // explorer -> XP MULTIPLIER
+
+        const isCreditReward = ['daily_attendance', 'mala_racha', 'weekly_hunter'].includes(quest.quest_type);
+        const isMultiplierReward = ['explorer'].includes(quest.quest_type);
+
+        if (isCreditReward) {
           await connection.query(
             `UPDATE users SET balance = balance + ? WHERE id = ?`,
-            [quest.reward_amount, userId]
+            [quest.xp_reward, userId]
           );
           reward = {
             type: 'credits',
-            amount: quest.reward_amount
+            amount: quest.xp_reward
           };
-        } else if (quest.reward_type === 'xp_multiplier') {
+        } else if (isMultiplierReward) {
           reward = {
             type: 'xp_multiplier',
-            multiplier: quest.reward_amount,
+            multiplier: quest.xp_reward,
             duration: '24hs'
           };
         }
@@ -284,10 +290,10 @@ async function recordRoomPlay(userId, room) {
 
     const roomsPlayed = result[0].map(r => r.room);
 
-    if (roomsPlayed.length >= 3 && 
-        roomsPlayed.includes('bronce') && 
-        roomsPlayed.includes('plata') && 
-        roomsPlayed.includes('oro')) {
+    if (roomsPlayed.length >= 3 &&
+      roomsPlayed.includes('bronce') &&
+      roomsPlayed.includes('plata') &&
+      roomsPlayed.includes('oro')) {
       // Completó todas las salas hoy
       return updateQuestProgress(userId, 'explorer', 3);
     }
@@ -310,11 +316,11 @@ async function getQuestStats(userId) {
     const result = await pool.query(
       `SELECT 
         COUNT(*) as total_quests,
-        SUM(CASE WHEN is_completed = true THEN 1 ELSE 0 END) as completed_quests,
-        SUM(CASE WHEN is_completed = true AND reward_type = 'credits' THEN reward_amount ELSE 0 END) as total_credits_earned
+        SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END) as completed_quests,
+        SUM(CASE WHEN completed = 1 AND quest_type IN ('daily_attendance', 'mala_racha', 'weekly_hunter') THEN xp_reward ELSE 0 END) as total_credits_earned
        FROM daily_quests
-       WHERE user_id = ? AND quest_date = CURRENT_DATE`,
-      [userId]
+       WHERE user_id = ? AND quest_date = ?`,
+      [userId, new Date().toISOString().split('T')[0]]
     );
 
     const stats = result[0][0];

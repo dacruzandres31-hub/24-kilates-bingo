@@ -11,6 +11,9 @@ import GestionFinanzas from '../components/GestionFinanzas';
 
 import AllInventoriesPanel from '../components/AllInventoriesPanel';
 import CardMovementsHistory from '../components/CardMovementsHistory';
+import GamificationStatsPanel from '../components/GamificationStatsPanel';
+import SupportPanel from '../components/SupportPanel';
+import WithdrawalsPanel from '../components/WithdrawalsPanel';
 import { SuperAdminOnly } from '../components/ProtectedContent';
 
 // Paneles de Sesiones y Pozos
@@ -64,7 +67,9 @@ export default function Dashboard() {
     'sesiones-live': false,
     'room-config': false,
     'horarios-config': false,
-    'alertas': false
+    'alertas': false,
+    'support': false,
+    'withdrawals': false
   });
 
   useEffect(() => {
@@ -82,7 +87,7 @@ export default function Dashboard() {
           setShowCartonesDropdown(false);
         }
       }
-      
+
       // Cerrar dropdown de perfil si se hace clic fuera
       if (showPerfilDropdown && perfilButtonRef.current) {
         const perfilDropdown = document.querySelector('[data-dropdown="perfil"]');
@@ -99,7 +104,7 @@ export default function Dashboard() {
   const fetchDashboardData = async () => {
     try {
       const token = localStorage.getItem('adminToken');
-      
+
       const [userRes, finRes, inventoryRes] = await Promise.all([
         axios.get('/api/admin/profile', {
           headers: { Authorization: `Bearer ${token}` }
@@ -111,10 +116,10 @@ export default function Dashboard() {
           headers: { Authorization: `Bearer ${token}` }
         })
       ]);
-      
+
       setUserData(userRes.data);
       setFinancialData(finRes.data);
-      
+
       // Convertir inventario a formato de stock
       const inventory = inventoryRes.data.inventory || [];
       setCartonesStock({
@@ -150,10 +155,10 @@ export default function Dashboard() {
         acc[key] = false;
         return acc;
       }, {});
-      
+
       // Activar solo la sección clickeada
       newSections[sectionId] = true;
-      
+
       return newSections;
     });
   };
@@ -168,18 +173,18 @@ export default function Dashboard() {
   };
 
   const handleStockDropdown = (e) => {
-    console.log('🔵 handleStockDropdown ejecutado', { 
-      showCartonesDropdown, 
-      hasRef: !!stockButtonRef.current 
+    console.log('🔵 handleStockDropdown ejecutado', {
+      showCartonesDropdown,
+      hasRef: !!stockButtonRef.current
     });
-    
+
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
-    
+
     setShowPerfilDropdown(false);
-    
+
     if (stockButtonRef.current) {
       const rect = stockButtonRef.current.getBoundingClientRect();
       console.log('📍 Posición del botón:', {
@@ -187,7 +192,7 @@ export default function Dashboard() {
         right: window.innerWidth - rect.right,
         willShow: !showCartonesDropdown
       });
-      
+
       setDropdownPositions(prev => ({
         ...prev,
         stock: {
@@ -196,7 +201,7 @@ export default function Dashboard() {
         }
       }));
     }
-    
+
     setShowCartonesDropdown(prev => !prev);
   };
 
@@ -213,14 +218,14 @@ export default function Dashboard() {
 
   const calculatePasswordStrength = (password) => {
     if (!password) return { level: 0, text: '', color: '' };
-    
+
     let strength = 0;
     if (password.length >= 6) strength++;
     if (password.length >= 10) strength++;
     if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
     if (/[0-9]/.test(password)) strength++;
     if (/[^a-zA-Z0-9]/.test(password)) strength++;
-    
+
     if (strength <= 2) return { level: 1, text: 'Débil', color: 'text-red-500' };
     if (strength <= 3) return { level: 2, text: 'Media', color: 'text-yellow-500' };
     return { level: 3, text: 'Fuerte', color: 'text-green-500' };
@@ -228,17 +233,17 @@ export default function Dashboard() {
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
-    
+
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       alert('❌ Las contraseñas no coinciden');
       return;
     }
-    
+
     if (passwordData.newPassword.length < 6) {
       alert('❌ La contraseña debe tener al menos 6 caracteres');
       return;
     }
-    
+
     try {
       const token = localStorage.getItem('adminToken');
       await axios.post('/api/admin/change-password', {
@@ -247,7 +252,7 @@ export default function Dashboard() {
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
+
       alert('✅ Contraseña cambiada exitosamente');
       setShowChangePasswordModal(false);
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
@@ -275,9 +280,10 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex">
       {/* Sidebar */}
-      <Sidebar 
+      <Sidebar
         activeSections={activeSections}
         onToggleSection={handleToggleSection}
+        userData={userData}
       />
 
       {/* Main Content */}
@@ -352,9 +358,16 @@ export default function Dashboard() {
             </section>
           )}
 
+          {/* Gamification Stats - Solo para 24Kilates */}
+          {activeSections['estadisticas-generales'] && userData?.username === 'Andy' && (
+            <section className="mb-8">
+              <GamificationStatsPanel />
+            </section>
+          )}
+
           {/* Gestión de Usuarios - Siempre montado para escuchar eventos */}
           <section className={activeSections['usuarios'] ? 'mb-8' : 'hidden'}>
-            <GestionUsuarios 
+            <GestionUsuarios
               sharedUserData={userData}
               sharedCartonesStock={cartonesStock}
               onResourcesUpdate={(newUserData, newCartonesStock) => {
@@ -509,7 +522,7 @@ export default function Dashboard() {
           {activeSections['sesiones-pozos'] && (
             <section className="mb-8">
               <h2 className="text-2xl font-bold text-white mb-6">💰 Pozos y Premios</h2>
-              <PotStatus 
+              <PotStatus
                 lineaPot={financialData?.pots?.linea || 0}
                 bingoPot={financialData?.pots?.bingo || 0}
                 acumulado={financialData?.pots?.acumulado || 0}
@@ -522,6 +535,22 @@ export default function Dashboard() {
             <section className="mb-8">
               <h2 className="text-2xl font-bold text-white mb-6">⚠️ Alertas del Sistema</h2>
               <AlertsList />
+            </section>
+          )}
+
+          {/* Soporte Técnico - Exclusivo Andy */}
+          {activeSections['support'] && userData?.username === 'Andy' && (
+            <section className="mb-8">
+              <h2 className="text-2xl font-bold text-white mb-6">🎧 Soporte Técnico (24Kilates)</h2>
+              <SupportPanel />
+            </section>
+          )}
+
+          {/* Retiros - Exclusivo Andy */}
+          {activeSections['withdrawals'] && userData?.username === 'Andy' && (
+            <section className="mb-8">
+              <h2 className="text-2xl font-bold text-white mb-6">💸 Gestión de Retiros (24Kilates)</h2>
+              <WithdrawalsPanel />
             </section>
           )}
 
@@ -543,7 +572,7 @@ export default function Dashboard() {
 
       {/* Dropdowns renderizados usando Portals fuera del stacking context del header */}
       {showCartonesDropdown && createPortal(
-        <div 
+        <div
           data-dropdown="stock"
           className="fixed bg-gradient-to-br from-gray-900/98 to-gray-800/98 backdrop-blur-xl border border-purple-500/50 rounded-xl shadow-2xl p-5 min-w-[320px]"
           style={{
@@ -558,7 +587,7 @@ export default function Dashboard() {
             </h3>
             <p className="text-xs text-gray-400 mt-1">Panel de {userData?.username || 'Administrador'}</p>
           </div>
-          
+
           <div className="space-y-3">
             {/* Balance */}
             <div className="flex items-center justify-between p-3 bg-gradient-to-r from-green-900/40 to-emerald-900/30 border border-green-600/50 rounded-lg">
@@ -601,7 +630,7 @@ export default function Dashboard() {
       )}
 
       {showPerfilDropdown && createPortal(
-        <div 
+        <div
           data-dropdown="perfil"
           className="fixed bg-gray-800/95 backdrop-blur-lg border border-gray-700/50 rounded-xl shadow-2xl min-w-[220px] overflow-hidden"
           style={{
@@ -696,12 +725,11 @@ export default function Dashboard() {
                 {passwordData.newPassword && passwordStrength.level > 0 && (
                   <div className="mt-2 flex items-center gap-2">
                     <div className="flex-1 h-2 bg-gray-600 rounded-full overflow-hidden">
-                      <div 
-                        className={`h-full transition-all duration-300 ${
-                          passwordStrength.level === 1 ? 'bg-red-500 w-1/3' :
+                      <div
+                        className={`h-full transition-all duration-300 ${passwordStrength.level === 1 ? 'bg-red-500 w-1/3' :
                           passwordStrength.level === 2 ? 'bg-yellow-500 w-2/3' :
-                          'bg-green-500 w-full'
-                        }`}
+                            'bg-green-500 w-full'
+                          }`}
                       ></div>
                     </div>
                     <span className={`text-sm font-semibold ${passwordStrength.color}`}>

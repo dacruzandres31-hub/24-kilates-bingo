@@ -1,330 +1,413 @@
-/**
- * GAMIFICATION ENGINE - "Club 24K"
- * Sistema de fidelización para jugadores con niveles VIP, misiones y premios
- */
-
 const pool = require('../db');
+const notificationService = require('./notificationService'); // Importar NotificationService
 
-// ========== CONFIGURACIÓN DE NIVELES ==========
-const LEVEL_CONFIG = [
-  {
-    level: 1,
-    name: 'Novato',
-    xpRequired: 0,
-    visualBenefit: 'Avatar Gris',
-    creditReward: 0,
-    freeCardReward: 0,
-    exclusiveAccess: false
-  },
-  {
-    level: 2,
-    name: 'Cobre',
-    xpRequired: 500,
-    visualBenefit: 'Avatar Bronceado',
-    creditReward: 0,
-    freeCardReward: 1,
-    exclusiveAccess: false
-  },
-  {
-    level: 3,
-    name: 'Plata Fina',
-    xpRequired: 2000,
-    visualBenefit: 'Marco Plateado',
-    creditReward: 1000,
-    freeCardReward: 0,
-    exclusiveAccess: false
-  },
-  {
-    level: 4,
-    name: 'Oro Puro',
-    xpRequired: 10000,
-    visualBenefit: 'Marco Dorado Brillante',
-    creditReward: 5000,
-    freeCardReward: 0,
-    exclusiveAccess: false
-  },
-  {
-    level: 5,
-    name: 'Diamante 24K',
-    xpRequired: 50000,
-    visualBenefit: 'Marco Animado + Alias Azul',
-    creditReward: 20000,
-    freeCardReward: 0,
-    exclusiveAccess: true
-  }
+const ACCOUNT_LEVEL_CONFIG = [
+  { level: 1, xp: 0, freeReward: 'None', premiumReward: 'Avatar Frame' },
+  { level: 2, xp: 100, freeReward: '50 Credits', premiumReward: 'Golden Chip' },
+  { level: 3, xp: 300, freeReward: 'Ticket', premiumReward: 'Rare Emote' },
+  { level: 4, xp: 600, freeReward: '100 Credits', premiumReward: 'Double XP 1h' },
+  { level: 5, xp: 1000, freeReward: 'Ticket', premiumReward: 'Legendary Border' },
+  { level: 6, xp: 1500, freeReward: '150 Credits', premiumReward: 'VIP Access 24h' },
+  { level: 7, xp: 2100, freeReward: 'Ticket', premiumReward: 'Exclusive Badge' },
+  { level: 8, xp: 2800, freeReward: '200 Credits', premiumReward: 'Golden Name Color' },
+  { level: 9, xp: 3600, freeReward: 'Ticket', premiumReward: 'Mystery Box' },
+  { level: 10, xp: 4500, freeReward: '500 Credits', premiumReward: 'Permanent Avatar' },
+  { level: 11, xp: 5500, freeReward: 'Ticket', premiumReward: 'Season Skin' },
+  { level: 12, xp: 6600, freeReward: '300 Credits', premiumReward: '1000 Credits' },
+  { level: 13, xp: 7800, freeReward: 'Ticket', premiumReward: 'Effect: Sparkles' },
+  { level: 14, xp: 9100, freeReward: '400 Credits', premiumReward: 'Title: Elite' },
+  { level: 15, xp: 10500, freeReward: 'Ticket', premiumReward: 'Effect: Fire' },
+  { level: 16, xp: 12000, freeReward: '500 Credits', premiumReward: 'Badge: Conqueror' },
+  { level: 17, xp: 13600, freeReward: 'Ticket', premiumReward: 'Pet: Golden Dragon' },
+  { level: 18, xp: 15300, freeReward: '600 Credits', premiumReward: 'Lobby Theme' },
+  { level: 19, xp: 17100, freeReward: 'Ticket', premiumReward: 'Private Room Key' },
+  { level: 20, xp: 19000, freeReward: '1000 Credits', premiumReward: 'Title: Legend' }
 ];
 
-/**
- * Agregar XP al jugador cuando compra un cartón
- * Fórmula: $100 pesos gastados = 1 XP
- * @param {number} userId - ID del jugador
- * @param {number} cardPrice - Precio del cartón comprado
- * @returns {object} - {xpAdded, leveledUp, newLevel, rewards}
- */
-async function addXPToPlayer(userId, cardPrice) {
+async function addXPToPlayer(userId, amount) {
   try {
-    // Calcular XP: $100 = 1 XP
-    const xpToAdd = Math.floor(cardPrice / 100);
-    
-    if (xpToAdd === 0) return { xpAdded: 0, leveledUp: false };
-
     const connection = await pool.getConnection();
     try {
-      await connection.query('START TRANSACTION');
+      await connection.query('UPDATE users SET current_xp = current_xp + ? WHERE id = ?', [amount, userId]);
 
-      // Obtener progreso actual del usuario
-      let [userProgress] = await connection.query(
-        `SELECT * FROM gamification_progress WHERE user_id = ?`,
-        [userId]
-      );
+      const [rows] = await connection.query('SELECT username, current_xp, level FROM users WHERE id = ?', [userId]);
+      if (rows.length > 0) {
+        const { username, current_xp, level: currentLevel } = rows[0];
 
-      let progressData;
-      if (userProgress.length === 0) {
-        // Primera vez del usuario
-        await connection.query(
-          `INSERT INTO gamification_progress (user_id, xp_current, current_level, xp_lifetime)
-           VALUES (?, ?, 1, ?)`,
-          [userId, xpToAdd, xpToAdd]
-        );
-        progressData = {
-          xp_current: xpToAdd,
-          current_level: 1,
-          xp_lifetime: xpToAdd
-        };
-      } else {
-        progressData = userProgress[0];
-        progressData.xp_current += xpToAdd;
-        progressData.xp_lifetime += xpToAdd;
-      }
+        let newLevel = currentLevel;
+        for (const cfg of ACCOUNT_LEVEL_CONFIG) {
+          if (current_xp >= cfg.xp) newLevel = cfg.level;
+        }
 
-      // Verificar si hay level-up
-      let leveledUp = false;
-      let newLevel = progressData.current_level;
-      let rewards = {};
+        if (newLevel > currentLevel) {
+          await connection.query('UPDATE users SET level = ? WHERE id = ?', [newLevel, userId]);
 
-      for (let i = progressData.current_level + 1; i <= LEVEL_CONFIG.length; i++) {
-        const levelReq = LEVEL_CONFIG[i - 1];
-        if (progressData.xp_lifetime >= levelReq.xpRequired) {
-          newLevel = i;
-          leveledUp = true;
-          
-          // Acreditar premios del nivel
-          rewards = {
-            creditReward: levelReq.creditReward,
-            freeCardReward: levelReq.freeCardReward,
-            exclusiveAccess: levelReq.exclusiveAccess
-          };
+          // NOTIFICAR LEVEL UP
+          notificationService.broadcastLevelUp(username, newLevel, `Nivel ${newLevel}`);
 
-          if (levelReq.creditReward > 0) {
-            await connection.query(
-              `UPDATE users SET balance = balance + ? WHERE id = ?`,
-              [levelReq.creditReward, userId]
-            );
-          }
+          return { leveledUp: true, newLevel, rewards: [] };
         }
       }
+      return { leveledUp: false };
+    } finally {
+      connection.release();
+    }
+  } catch (e) {
+    console.error('Add XP Error', e);
+    return { leveledUp: false };
+  }
+}
 
-      // Actualizar progreso
-      await connection.query(
-        `UPDATE gamification_progress 
-         SET xp_current = ?, current_level = ?, xp_lifetime = ?, 
-             last_levelup_at = CASE WHEN ? THEN NOW() ELSE last_levelup_at END,
-             updated_at = NOW()
-         WHERE user_id = ?`,
-        [progressData.xp_current, newLevel, progressData.xp_lifetime, leveledUp, userId]
+// ...
+
+async function triggerAchievement(userId, code, increment = 1) {
+  try {
+    const connection = await pool.getConnection();
+    try {
+      // 1. Obtener ID del logro y target
+      const [achDefs] = await connection.query(
+        `SELECT id, name, target_value FROM achievements WHERE code = ?`,
+        [code]
       );
 
-      await connection.query('COMMIT');
+      if (achDefs.length === 0) return false;
+      const achievement = achDefs[0];
 
-      return {
-        xpAdded,
-        leveledUp,
-        newLevel,
-        rewards: leveledUp ? rewards : null,
-        currentXP: progressData.xp_current,
-        nextLevelXP: newLevel < LEVEL_CONFIG.length ? LEVEL_CONFIG[newLevel].xpRequired : null
-      };
+      // ... (existing logic) ...
+      const [userAch] = await connection.query(
+        `SELECT id, current_value, is_completed FROM user_achievements 
+         WHERE user_id = ? AND achievement_id = ?`,
+        [userId, achievement.id]
+      );
+
+      let currentValue = 0;
+      let alreadyCompleted = false;
+
+      if (userAch.length === 0) {
+        await connection.query(
+          `INSERT INTO user_achievements (user_id, achievement_id, current_value) VALUES (?, ?, ?)`,
+          [userId, achievement.id, increment]
+        );
+        currentValue = increment;
+      } else {
+        alreadyCompleted = userAch[0].is_completed === 1;
+        currentValue = userAch[0].current_value + increment;
+        await connection.query(
+          `UPDATE user_achievements SET current_value = ? WHERE id = ?`,
+          [currentValue, userAch[0].id]
+        );
+      }
+
+      // 3. Verificar Completitud
+      if (!alreadyCompleted && currentValue >= achievement.target_value) {
+        await connection.query(
+          `UPDATE user_achievements SET is_completed = TRUE, completed_at = NOW() WHERE user_id = ? AND achievement_id = ?`,
+          [userId, achievement.id]
+        );
+
+        // Obtener username para notificar
+        const [u] = await connection.query('SELECT username FROM users WHERE id = ?', [userId]);
+        if (u.length > 0) {
+          notificationService.broadcastAchievement(u[0].username, achievement.name, '🏆');
+        }
+
+        console.log(`🏆 Achievement Unlocked: ${code} for User ${userId}`);
+        return { unlocked: true, code };
+      }
+
+      return { unlocked: false, progress: currentValue, target: achievement.target_value };
 
     } finally {
       connection.release();
     }
-
   } catch (err) {
-    console.error('❌ Error in addXPToPlayer:', err);
-    throw err;
+    console.error('Trigger Achievement Error:', err);
+    return false;
   }
 }
 
-/**
- * Obtener progreso actual del jugador
- * @param {number} userId - ID del jugador
- * @returns {object} - Progreso, nivel, XP, logros
- */
 async function getPlayerProgress(userId) {
   try {
-    const [result] = await pool.query(
-      `SELECT * FROM gamification_progress WHERE user_id = ?`,
-      [userId]
-    );
+    const connection = await pool.getConnection();
+    try {
+      // Obtener datos básicos
+      const [userRows] = await connection.query(`SELECT level, current_xp FROM users WHERE id = ?`, [userId]);
+      if (userRows.length === 0) return { level: 1, currentXp: 0 };
 
-    if (result.length === 0) {
+      const { level, current_xp } = userRows[0];
+
+      // Obtener racha
+      const [streakRows] = await connection.query(`SELECT current_streak FROM user_streaks WHERE user_id = ?`, [userId]);
+      const currentStreak = streakRows.length > 0 ? streakRows[0].current_streak : 0;
+
+      // Obtener logros completados
+      const [achRows] = await connection.query(`SELECT COUNT(*) as count FROM user_achievements WHERE user_id = ? AND is_completed = TRUE`, [userId]);
+      const achievementsCount = achRows[0].count;
+
       return {
-        level: 1,
-        currentXP: 0,
-        nextLevelXP: LEVEL_CONFIG[1].xpRequired,
-        progressPercent: 0,
-        achievements: [],
-        rank: 'Novato'
+        userId,
+        level,
+        currentXp: current_xp,
+        currentStreak,
+        achievementsCount
       };
+    } finally {
+      connection.release();
     }
-
-    const progress = result[0];
-    const currentLevelConfig = LEVEL_CONFIG[progress.current_level - 1];
-    const nextLevelConfig = progress.current_level < LEVEL_CONFIG.length ? LEVEL_CONFIG[progress.current_level] : null;
-
-    const xpForCurrentLevel = currentLevelConfig.xpRequired;
-    const xpForNextLevel = nextLevelConfig ? nextLevelConfig.xpRequired : progress.xp_lifetime;
-    
-    const xpInCurrentLevel = progress.xp_lifetime - xpForCurrentLevel;
-    const xpNeededForNextLevel = xpForNextLevel - xpForCurrentLevel;
-    const progressPercent = Math.min(100, Math.round((xpInCurrentLevel / xpNeededForNextLevel) * 100));
-
-    return {
-      level: progress.current_level,
-      rankName: currentLevelConfig.name,
-      currentXP: xpInCurrentLevel,
-      nextLevelXP: xpNeededForNextLevel,
-      totalXPLifetime: progress.xp_lifetime,
-      progressPercent,
-      achievements: progress.achievements_unlocked || [],
-      visualBenefit: currentLevelConfig.visualBenefit,
-      lastLevelup: progress.last_levelup_at
-    };
-
   } catch (err) {
-    console.error('❌ Error in getPlayerProgress:', err);
+    console.error('getPlayerProgress Error', err);
+    return { level: 1, currentXp: 0 };
+  }
+}
+
+async function getTopPlayers() {
+  try {
+    const connection = await pool.getConnection();
+    try {
+      const [rows] = await connection.query(`
+        SELECT id, username, level, current_xp 
+        FROM users 
+        WHERE role = 'user' 
+        ORDER BY level DESC, current_xp DESC 
+        LIMIT 5
+      `);
+
+      return rows.map((r, index) => ({
+        rank: index + 1,
+        username: r.username,
+        level: r.level,
+        xp: r.current_xp
+      }));
+    } finally {
+      connection.release();
+    }
+  } catch (err) {
+    console.error('getTopPlayers Error', err);
+    return [];
+  }
+}
+
+// Girar la Ruleta de la Suerte (Cooldown 4 horas)
+async function spinFortuneWheel(userId) {
+  try {
+    const connection = await pool.getConnection();
+    try {
+      await connection.query('START TRANSACTION');
+
+      // 1. Verify Cooldown
+      const [userRows] = await connection.query(
+        `SELECT last_wheel_spin FROM users WHERE id = ?`,
+        [userId]
+      );
+
+      if (userRows.length === 0) throw new Error('User not found');
+
+      const lastSpin = userRows[0].last_wheel_spin;
+      const now = new Date();
+
+      if (lastSpin) {
+        const diffMs = now - new Date(lastSpin);
+        const hoursSinceLastSpin = diffMs / (1000 * 60 * 60);
+
+        if (hoursSinceLastSpin < 4) {
+          // UNLIMITED SPIN RESTRICTION REMOVED FOR TESTING
+          // const remainingMinutes = Math.ceil((4 - hoursSinceLastSpin) * 60);
+          // throw new Error(`Cooldown active. Try again in ${remainingMinutes} minutes.`);
+        }
+      }
+
+      // 2. Determine Prize (Weighted Random)
+      // Ajustados para premios más pequeños y frecuentes que el premio semanal
+      // 2. Determine Prize (Weighted Random)
+      // New Config: ONLY Tickets (Bronze/Silver/Gold) + Impossible Big Cash
+      // 12 Segments total
+
+      const prizes = [
+        // BIG CASH (Weight 0 - Impossible) - Placed at 0, 4, 8 indices
+        { index: 0, type: 'credits', amount: 100000, label: '$100.000', weight: 0, color: '#e74c3c' }, // Red
+        { index: 4, type: 'credits', amount: 50000, label: '$50.000', weight: 0, color: '#e67e22' },  // Orange
+        { index: 8, type: 'credits', amount: 5000, label: '$5.000', weight: 0, color: '#f1c40f' },   // Gold/Yellow
+
+        // TICKETS (Weights > 0)
+        // Filling the gaps: 1, 2, 3, 5, 6, 7, 9, 10, 11
+        // Bronze: Common (High weight)
+        { index: 1, type: 'ticket', room: 'bronce', label: '🎫 BRONCE', weight: 100, color: '#cd7f32' },
+        { index: 2, type: 'ticket', room: 'bronce', label: '🎫 BRONCE', weight: 100, color: '#cd7f32' },
+        { index: 3, type: 'ticket', room: 'bronce', label: '🎫 BRONCE', weight: 100, color: '#cd7f32' },
+
+        // Silver: Uncommon (Medium weight)
+        { index: 5, type: 'ticket', room: 'plata', label: '🎫 PLATA', weight: 50, color: '#bdc3c7' },
+        { index: 6, type: 'ticket', room: 'plata', label: '🎫 PLATA', weight: 50, color: '#bdc3c7' },
+        { index: 7, type: 'ticket', room: 'plata', label: '🎫 PLATA', weight: 50, color: '#bdc3c7' },
+
+        // Gold: Rare (Low weight)
+        { index: 9, type: 'ticket', room: 'oro', label: '🎫 ORO', weight: 10, color: '#f1c40f' },
+        { index: 10, type: 'ticket', room: 'oro', label: '🎫 ORO', weight: 10, color: '#f1c40f' },
+        { index: 11, type: 'ticket', room: 'bronce', label: '🎫 BRONCE', weight: 100, color: '#cd7f32' } // Extra bronze to fill
+      ];
+
+      const totalWeight = prizes.reduce((sum, p) => sum + p.weight, 0);
+      let random = Math.random() * totalWeight;
+      let selectedPrize = prizes.find(p => p.weight > 0);
+
+      for (const p of prizes) {
+        if (p.weight === 0) continue;
+        if (random < p.weight) {
+          selectedPrize = p;
+          break;
+        }
+        random -= p.weight;
+      }
+
+      // 3. Entregar Premio
+      if (selectedPrize.type === 'credits') {
+        await connection.query(`UPDATE users SET balance = balance + ? WHERE id = ?`, [selectedPrize.amount, userId]);
+      } else if (selectedPrize.type === 'ticket') {
+        const ticketRoom = selectedPrize.room || 'bronce'; // Use dynamic room
+
+        // Check if item exists in inventory
+        // (Assuming standard inventory logic here, might need adjustment based on exact DB schema)
+        // First get item id
+        const [items] = await connection.query(`SELECT id FROM cosmetic_items WHERE type='ticket' AND ticket_room=? LIMIT 1`, [ticketRoom]);
+        if (items.length > 0) {
+          const itemId = items[0].id;
+          const [inv] = await connection.query(`SELECT id, quantity FROM user_inventory WHERE user_id=? AND item_id=?`, [userId, itemId]);
+          if (inv.length > 0) {
+            await connection.query(`UPDATE user_inventory SET quantity = quantity + 1 WHERE id=?`, [inv[0].id]);
+          } else {
+            await connection.query(`INSERT INTO user_inventory (user_id, item_id, quantity) VALUES (?, ?, 1)`, [userId, itemId]);
+          }
+        }
+      }
+
+      // 4. Update last_wheel_spin
+      await connection.query(
+        `UPDATE users SET last_wheel_spin = NOW() WHERE id = ?`,
+        [userId]
+      );
+
+      // Log for audit
+      await connection.query(
+        `INSERT INTO game_events (user_id, event_type, details) VALUES (?, 'fortune_wheel_spin', ?)`,
+        [userId, JSON.stringify(selectedPrize)]
+      );
+
+      await connection.commit();
+      return selectedPrize;
+
+    } catch (err) {
+      await connection.rollback();
+      throw err;
+    } finally {
+      connection.release();
+    }
+  } catch (err) {
+    console.error('Spin Fortune Wheel Error:', err);
     throw err;
   }
 }
 
-/**
- * Obtener todos los niveles disponibles
- * @returns {array} - Configuración de todos los niveles
- */
-function getAllLevels() {
-  return LEVEL_CONFIG.map(level => ({
-    ...level,
-    level: level.level,
-    name: level.name,
-    xpRequired: level.xpRequired,
-    visualBenefit: level.visualBenefit,
-    creditReward: level.creditReward,
-    freeCardReward: level.freeCardReward
-  }));
-}
-
-/**
- * Obtener requisitos XP para el próximo nivel
- * @param {number} userId - ID del jugador
- * @returns {object} - XP actual y necesario para próximo nivel
- */
-async function getNextLevelRequirement(userId) {
+// Girar la Ruleta Semanal (Premio Racha 7 días)
+async function spinDailyWheel(userId) {
   try {
-    const [progress] = await pool.query(
-      `SELECT current_level, xp_lifetime FROM gamification_progress WHERE user_id = ?`,
-      [userId]
-    );
+    const connection = await pool.getConnection();
+    try {
+      await connection.query('START TRANSACTION');
 
-    if (progress.length === 0) {
-      return {
-        currentLevel: 1,
-        currentXP: 0,
-        nextLevelName: LEVEL_CONFIG[1].name,
-        xpRequired: LEVEL_CONFIG[1].xpRequired,
-        xpRemaining: LEVEL_CONFIG[1].xpRequired
-      };
+      // 1. Verify Streak Requirement
+      const [streakRows] = await connection.query(
+        `SELECT * FROM user_streaks WHERE user_id = ?`,
+        [userId]
+      );
+
+      if (streakRows.length === 0 || streakRows[0].current_streak < 7) {
+        throw new Error('Not eligible for spin (Streak < 7)');
+      }
+
+      // Check if already claimed today
+      const today = new Date().toISOString().split('T')[0];
+      if (streakRows[0].last_claim_date === today) {
+        throw new Error('Already claimed today');
+      }
+
+      // 2. Determinar Premio (Weighted Random)
+      const prizes = [
+        { type: 'credits', amount: 500, weight: 50 },  // 50%
+        { type: 'credits', amount: 1000, weight: 30 }, // 30%
+        { type: 'credits', amount: 5000, weight: 15 }, // 15%
+        { type: 'ticket', quantity: 1, name: 'Ticket Oro', weight: 4 }, // 4%
+        { type: 'credits', amount: 50000, weight: 1 }   // 1% (Grand Prize)
+      ];
+
+      const totalWeight = prizes.reduce((sum, p) => sum + p.weight, 0);
+      let random = Math.random() * totalWeight;
+      let selectedPrize = prizes[0];
+
+      for (const p of prizes) {
+        if (random < p.weight) {
+          selectedPrize = p;
+          break;
+        }
+        random -= p.weight;
+      }
+
+      // 3. Entregar Premio
+      if (selectedPrize.type === 'credits') {
+        await connection.query(`UPDATE users SET balance = balance + ? WHERE id = ?`, [selectedPrize.amount, userId]);
+      } else if (selectedPrize.type === 'ticket') {
+        // Add to inventory (simplified)
+        // In real implementation call shop logic or insert to user_inventory
+      }
+
+      // 4. Marcar como reclamado (y resetear racha si el diseño lo pide, o dejarla en 7?)
+      // Design V2: Reset loop
+      await connection.query(
+        `UPDATE user_streaks SET current_streak = 1, last_claim_date = ? WHERE user_id = ?`,
+        [today, userId]
+      );
+
+      await connection.commit();
+      return selectedPrize;
+
+    } catch (err) {
+      await connection.rollback();
+      throw err;
+    } finally {
+      connection.release();
     }
-
-    const data = progress[0];
-    if (data.current_level >= LEVEL_CONFIG.length) {
-      return {
-        currentLevel: data.current_level,
-        currentXP: data.xp_lifetime,
-        nextLevelName: 'Máximo',
-        xpRequired: data.xp_lifetime,
-        xpRemaining: 0
-      };
-    }
-
-    const nextLevel = LEVEL_CONFIG[data.current_level];
-    return {
-      currentLevel: data.current_level,
-      currentXP: data.xp_lifetime,
-      nextLevelName: nextLevel.name,
-      xpRequired: nextLevel.xpRequired,
-      xpRemaining: Math.max(0, nextLevel.xpRequired - data.xp_lifetime)
-    };
-
   } catch (err) {
-    console.error('❌ Error in getNextLevelRequirement:', err);
+    console.error('Spin Wheel Error:', err);
     throw err;
   }
 }
 
-/**
- * Obtener top jugadores por nivel
- * @param {number} limit - Cantidad de jugadores (default 10)
- * @returns {array} - Top players con nivel y XP
- */
-async function getTopPlayers(limit = 10) {
+// Check Daily Streak
+async function checkDailyStreak(userId) {
   try {
-    const [result] = await pool.query(
-      `SELECT u.id, u.username, up.current_level, up.xp_lifetime
-       FROM gamification_progress up
-       JOIN users u ON u.id = up.user_id
-       WHERE u.role = 'jugador'
-       ORDER BY up.xp_lifetime DESC
-       LIMIT ?`,
-      [limit]
-    );
-
-    return result.map(row => ({
-      userId: row.id,
-      username: row.username,
-      level: row.current_level,
-      totalXP: row.xp_lifetime,
-      rankName: LEVEL_CONFIG[row.current_level - 1]?.name || 'Novato'
-    }));
-
-  } catch (err) {
-    console.error('❌ Error in getTopPlayers:', err);
-    throw err;
-  }
-}
-
-/**
- * Inicializar progreso para nuevo usuario
- * @param {number} userId - ID del jugador
- */
-async function initializePlayerProgress(userId) {
-  try {
-    await pool.query(
-      `INSERT INTO gamification_progress (user_id, xp_current, current_level, xp_lifetime)
-       VALUES (?, 0, 1, 0)
-       ON DUPLICATE KEY UPDATE user_id = user_id`,
-      [userId]
-    );
-  } catch (err) {
-    console.error('❌ Error in initializePlayerProgress:', err);
-    throw err;
+    const connection = await pool.getConnection();
+    try {
+      const [rows] = await connection.query('SELECT * FROM user_streaks WHERE user_id = ?', [userId]);
+      if (rows.length === 0) return { currentStreak: 0, lastClaimDate: null };
+      return {
+        currentStreak: rows[0].current_streak,
+        lastClaimDate: rows[0].last_claim_date
+      };
+    } finally {
+      connection.release();
+    }
+  } catch (e) {
+    console.error('Streak Check Error', e);
+    return null;
   }
 }
 
 module.exports = {
   addXPToPlayer,
+  checkDailyStreak,
+  triggerAchievement,
   getPlayerProgress,
-  getAllLevels,
-  getNextLevelRequirement,
   getTopPlayers,
-  initializePlayerProgress
+  getAllLevels: () => ACCOUNT_LEVEL_CONFIG,
+  spinDailyWheel, // Racha 7 dias
+  spinFortuneWheel // Rueda cada 4 horas
 };

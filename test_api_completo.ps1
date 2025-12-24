@@ -17,7 +17,8 @@ try {
     $response = Invoke-RestMethod -Uri "$BaseURL/health" -Method Get -Headers $Headers
     Write-Host "PASS - Status: $($response.status)" -ForegroundColor Green
     $PassCount++
-} catch {
+}
+catch {
     Write-Host "FAIL - $($_.Exception.Message)" -ForegroundColor Red
     $FailCount++
 }
@@ -30,7 +31,7 @@ $timestamp = Get-Date -Format "HHmmss"
 $registerBody = @{
     username = "test_$timestamp"
     password = "Test123!"
-    role = "jugador"
+    role     = "jugador"
 } | ConvertTo-Json
 
 try {
@@ -40,7 +41,8 @@ try {
     $global:UserId = $response.user.id
     $global:Username = $response.user.username
     $PassCount++
-} catch {
+}
+catch {
     Write-Host "FAIL - $($_.Exception.Message)" -ForegroundColor Red
     $FailCount++
 }
@@ -58,7 +60,8 @@ try {
     $response = Invoke-RestMethod -Uri "$BaseURL/api/auth/login" -Method Post -Headers $Headers -Body $loginBody
     Write-Host "PASS - Token renovado" -ForegroundColor Green
     $PassCount++
-} catch {
+}
+catch {
     Write-Host "FAIL - $($_.Exception.Message)" -ForegroundColor Red
     $FailCount++
 }
@@ -67,7 +70,7 @@ Start-Sleep -Seconds 1
 
 # Configurar headers autenticados
 $authHeaders = @{
-    "Content-Type" = "application/json"
+    "Content-Type"  = "application/json"
     "Authorization" = "Bearer $global:Token"
 }
 
@@ -77,7 +80,8 @@ try {
     $response = Invoke-RestMethod -Uri "$BaseURL/api/auth/verify" -Method Get -Headers $authHeaders
     Write-Host "PASS - Token valido para user: $($response.user.username)" -ForegroundColor Green
     $PassCount++
-} catch {
+}
+catch {
     Write-Host "FAIL - $($_.Exception.Message)" -ForegroundColor Red
     $FailCount++
 }
@@ -90,7 +94,8 @@ try {
     $response = Invoke-RestMethod -Uri "$BaseURL/api/gamification/init" -Method Post -Headers $authHeaders
     Write-Host "PASS - Gamificacion inicializada" -ForegroundColor Green
     $PassCount++
-} catch {
+}
+catch {
     Write-Host "FAIL (puede estar ya inicializado) - $($_.Exception.Message)" -ForegroundColor Yellow
     $FailCount++
 }
@@ -103,7 +108,8 @@ try {
     $response = Invoke-RestMethod -Uri "$BaseURL/api/gamification/progress" -Method Get -Headers $authHeaders
     Write-Host "PASS - Level: $($response.progress.current_level), XP: $($response.progress.xp_current)" -ForegroundColor Green
     $PassCount++
-} catch {
+}
+catch {
     Write-Host "FAIL - $($_.Exception.Message)" -ForegroundColor Red
     $FailCount++
 }
@@ -116,7 +122,8 @@ try {
     $response = Invoke-RestMethod -Uri "$BaseURL/api/gamification/levels" -Method Get -Headers $authHeaders
     Write-Host "PASS - Total niveles: $($response.levels.Count)" -ForegroundColor Green
     $PassCount++
-} catch {
+}
+catch {
     Write-Host "FAIL - $($_.Exception.Message)" -ForegroundColor Red
     $FailCount++
 }
@@ -129,7 +136,8 @@ try {
     $response = Invoke-RestMethod -Uri "$BaseURL/api/inventory" -Method Get -Headers $authHeaders
     Write-Host "PASS - Items en inventario: $($response.items.Count)" -ForegroundColor Green
     $PassCount++
-} catch {
+}
+catch {
     Write-Host "FAIL - $($_.Exception.Message)" -ForegroundColor Red
     $FailCount++
 }
@@ -139,10 +147,11 @@ Start-Sleep -Seconds 1
 # TEST 9: Misiones Diarias
 Write-Host "`n[9/10] Misiones diarias..." -ForegroundColor Yellow
 try {
-    $response = Invoke-RestMethod -Uri "$BaseURL/api/gamification/missions/daily" -Method Get -Headers $authHeaders
-    Write-Host "PASS - Misiones disponibles: $($response.missions.Count)" -ForegroundColor Green
+    $response = Invoke-RestMethod -Uri "$BaseURL/api/gamification/quests" -Method Get -Headers $authHeaders
+    Write-Host "PASS - Misiones disponibles: $($response.quests.Count)" -ForegroundColor Green
     $PassCount++
-} catch {
+}
+catch {
     Write-Host "FAIL - $($_.Exception.Message)" -ForegroundColor Red
     $FailCount++
 }
@@ -152,10 +161,11 @@ Start-Sleep -Seconds 1
 # TEST 10: Ranking
 Write-Host "`n[10/10] Ranking..." -ForegroundColor Yellow
 try {
-    $response = Invoke-RestMethod -Uri "$BaseURL/api/gamification/ranking?period=weekly" -Method Get -Headers $authHeaders
+    $response = Invoke-RestMethod -Uri "$BaseURL/api/gamification/ranking/weekly" -Method Get -Headers $authHeaders
     Write-Host "PASS - Jugadores en ranking: $($response.ranking.Count)" -ForegroundColor Green
     $PassCount++
-} catch {
+}
+catch {
     Write-Host "FAIL - $($_.Exception.Message)" -ForegroundColor Red
     $FailCount++
 }
@@ -169,9 +179,11 @@ Write-Host "Tests FAIL: $FailCount / 10" -ForegroundColor $(if ($FailCount -eq 0
 
 if ($PassCount -ge 8) {
     Write-Host "`n[RESULTADO] Sistema funcionando correctamente!" -ForegroundColor Green
-} elseif ($PassCount -ge 5) {
+}
+elseif ($PassCount -ge 5) {
     Write-Host "`n[RESULTADO] Sistema funcional con algunos errores menores" -ForegroundColor Yellow
-} else {
+}
+else {
     Write-Host "`n[RESULTADO] Sistema requiere revision" -ForegroundColor Red
 }
 

@@ -12,8 +12,8 @@ import '../styles/BingoCard.css';
  */
 
 const BingoCard = forwardRef((props, ref) => {
-  const { gridNumbers, cardNumber, isSelected, onSelect, equippedSkin } = props;
-  
+  const { gridNumbers, cardNumber, isSelected, onSelect, equippedSkin, missingNumbers = [] } = props;
+
   const [markedNumbers, setMarkedNumbers] = useState(new Set());
 
   // Método público para marcar números
@@ -31,12 +31,12 @@ const BingoCard = forwardRef((props, ref) => {
 
     // Convertir a array plano para validación (solo números, no nulls)
     const allNumbers = gridNumbers.flat().filter(n => n !== null && n !== undefined);
-    
+
     // Check BINGO: todos los 15 números marcados
-    const totalMarked = Array.from(markedNumbers).filter(n => 
+    const totalMarked = Array.from(markedNumbers).filter(n =>
       allNumbers.includes(n)
     ).length;
-    
+
     if (totalMarked === 15) {
       return 'bingo';
     }
@@ -45,10 +45,10 @@ const BingoCard = forwardRef((props, ref) => {
     for (let row = 0; row < 3; row++) {
       let lineMarked = 0;
       let lineTotal = 0;
-      
+
       for (let col = 0; col < 9; col++) {
         const num = gridNumbers[row][col];
-        
+
         if (num !== null && num !== undefined) {
           lineTotal++;
           if (markedNumbers.has(num)) {
@@ -56,7 +56,7 @@ const BingoCard = forwardRef((props, ref) => {
           }
         }
       }
-      
+
       // Línea completa: 5 números marcados
       if (lineMarked === 5 && lineTotal === 5) {
         return 'linea';
@@ -99,11 +99,12 @@ const BingoCard = forwardRef((props, ref) => {
             {row.map((number, colIdx) => {
               const isMarked = number !== null && markedNumbers.has(number);
               const isEmpty = number === null || number === undefined;
-              
+              const isMissing = !isEmpty && !isMarked && missingNumbers.includes(number);
+
               return (
                 <div
                   key={`${rowIdx}-${colIdx}`}
-                  className={`cell ${isMarked ? 'marked' : ''} ${isEmpty ? 'empty' : ''}`}
+                  className={`cell ${isMarked ? 'marked' : ''} ${isEmpty ? 'empty' : ''} ${isMissing ? 'missing-for-win' : ''}`}
                 >
                   {isEmpty ? '' : number}
                 </div>

@@ -7,11 +7,14 @@ import StarterRoom from './components/StarterRoom';
 import BronzeRoom from './components/BronzeRoom';
 import SilverRoom from './components/SilverRoom';
 import GoldRoom from './components/GoldRoom';
+import StreakModal from './components/Gamification/StreakModal';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showStreakModal, setShowStreakModal] = useState(false);
+  const [streakData, setStreakData] = useState(null);
 
   useEffect(() => {
     // Verificar si hay token guardado
@@ -24,15 +27,21 @@ function App() {
       setUser(JSON.parse(savedUser));
       setIsAuthenticated(true);
     }
-    
+
     setLoading(false);
   }, []);
 
-  const handleLogin = (token, userData) => {
+  const handleLogin = (token, userData, gamificationData) => {
     // Configurar axios con el token
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     setUser(userData);
     setIsAuthenticated(true);
+
+    // Check Streak
+    if (gamificationData && gamificationData.streak && !gamificationData.streak.error) {
+      setStreakData(gamificationData.streak);
+      setShowStreakModal(true);
+    }
   };
 
   const handleLogout = () => {
@@ -68,6 +77,13 @@ function App() {
         <Route path="/sala/oro" element={<GoldRoom user={user} onLogout={handleLogout} />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+
+      {showStreakModal && streakData && (
+        <StreakModal
+          streak={streakData.streak}
+          onClose={() => setShowStreakModal(false)}
+        />
+      )}
     </Router>
   );
 }

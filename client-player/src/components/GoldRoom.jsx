@@ -11,6 +11,7 @@ import BingoCardPreview from './BingoCardPreview';
 import Countdown from './Countdown';
 import ModernBallMachine from './ModernBallMachine';
 import RecentBallsPanel from './RecentBallsPanel';
+import useSocket from '../hooks/useSocket';
 
 export default function GoldRoom({ onLogout }) {
   const { sessionId } = useParams();
@@ -302,6 +303,25 @@ export default function GoldRoom({ onLogout }) {
       audioService.stopBolilleroGirando();
     };
   }, []);
+
+  // Listen for Global Ticker / Gamification Events
+  const socket = useSocket();
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleGlobalMessage = (data) => {
+      // data: { text, icon, type, ... }
+      // We only show Big Wins and Level Ups to avoid spam
+      if (['bigwin', 'levelup', 'achievement'].includes(data.type)) {
+        addToast(data.icon, 'Notificación', data.text, 5000);
+      }
+    };
+
+    socket.on('global_ticker_message', handleGlobalMessage);
+    return () => {
+      socket.off('global_ticker_message', handleGlobalMessage);
+    };
+  }, [socket]);
 
   // Simulación de sorteo BINGO 90 (reemplazar con Socket.IO en producción)
   useEffect(() => {

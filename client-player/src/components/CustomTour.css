@@ -1,0 +1,155 @@
+/* CustomTour.css */
+
+.custom-tour-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 9999;
+    pointer-events: none;
+    /* Allow clicks to pass through except for the card/buttons */
+}
+
+/* Spotlight Effect:
+   We place a div exactly over the target element. 
+   Then we give it a MASSIVE box-shadow that covers the rest of the screen with darkness.
+*/
+.tour-spotlight {
+    position: absolute;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.85);
+    border-radius: 8px;
+    transition: all 0.4s ease-in-out;
+    pointer-events: none;
+    z-index: 10000;
+    /* Optional: Add a gold glow around the spotlight */
+    border: 2px solid rgba(255, 215, 0, 0.5);
+}
+
+.tour-card {
+    position: absolute;
+    width: 300px;
+    background: rgba(26, 26, 26, 0.95);
+    padding: 1.5rem;
+    border-radius: 12px;
+    border: 1px solid #ffd700;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(255, 215, 0, 0.2);
+    z-index: 10001;
+    /* Above spotlight */
+    pointer-events: auto;
+    /* Re-enable clicks for the card */
+    transition: all 0.4s ease-in-out;
+    backdrop-filter: blur(10px);
+    font-family: 'Outfit', sans-serif;
+    color: white;
+}
+
+/* Arrow/Pointer for the card */
+.tour-card::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 10px;
+    border-style: solid;
+}
+
+.tour-card.bottom::before {
+    top: -20px;
+    border-color: transparent transparent #ffd700 transparent;
+}
+
+.tour-card.top::before {
+    bottom: -20px;
+    border-color: #ffd700 transparent transparent transparent;
+}
+
+.tour-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 0.5rem;
+}
+
+.tour-header h3 {
+    margin: 0;
+    color: #ffd700;
+    font-size: 1.1rem;
+    font-weight: bold;
+}
+
+.tour-close {
+    background: none;
+    border: none;
+    color: #888;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: color 0.2s;
+}
+
+.tour-close:hover {
+    color: white;
+}
+
+.tour-body p {
+    font-size: 0.9rem;
+    color: #d1d5db;
+    line-height: 1.5;
+    margin: 0 0 1rem 0;
+}
+
+.tour-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.tour-counter {
+    font-size: 0.8rem;
+    color: #6b7280;
+}
+
+.tour-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.tour-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+}
+
+.tour-btn.primary {
+    background: linear-gradient(45deg, #ffd700, #ffa500);
+    color: black;
+}
+
+.tour-btn.primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 10px rgba(255, 215, 0, 0.3);
+}
+
+.tour-btn.secondary {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.tour-btn.secondary:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.tour-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}

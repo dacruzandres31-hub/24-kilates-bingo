@@ -1,13 +1,15 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const pool = require('../db');
+const gamificationEngine = require('../services/gamification_engine');
 
 const SECRET = process.env.JWT_SECRET || 'tu_super_secret_key_24k';
 
 // Generar JWT
-const generateToken = (userId, role) => {
-  const token = jwt.sign({ id: userId, role }, SECRET, { expiresIn: '30d' });
-  console.log('🔑 [TOKEN-GEN] Generated token payload:', { id: userId, role });
+// Generar JWT
+const generateToken = (userId, role, username) => {
+  const token = jwt.sign({ id: userId, role, username }, SECRET, { expiresIn: '30d' });
+  console.log('🔑 [TOKEN-GEN] Generated token payload:', { id: userId, role, username });
   return token;
 };
 
@@ -34,7 +36,7 @@ exports.login = async (req, res) => {
 
     // Verificar si el usuario está bloqueado
     if (user.is_blocked) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         error: 'Usuario bloqueado',
         blocked: true,
         reason: user.block_reason,
@@ -49,7 +51,15 @@ exports.login = async (req, res) => {
     }
 
     // Generar token
-    const token = generateToken(user.id, user.role);
+    const token = generateToken(user.id, user.role, user.username);
+
+    // Check Daily Streak
+    let streakData = null;
+    try {
+      streakData = await gamificationEngine.checkDailyStreak(user.id);
+    } catch (e) {
+      console.error('Login streak error:', e);
+    }
 
     res.json({
       token,
@@ -58,6 +68,9 @@ exports.login = async (req, res) => {
         username: user.username,
         role: user.role,
         balance: user.balance
+      },
+      gamification: {
+        streak: streakData
       }
     });
   } catch (error) {
@@ -133,7 +146,7 @@ exports.register = async (req, res) => {
       }
     }
 
-    const token = generateToken(newUser.id, newUser.role);
+    const token = generateToken(newUser.id, newUser.role, newUser.username);
 
     res.status(201).json({
       token,
@@ -153,9 +166,17 @@ exports.register = async (req, res) => {
 // REFRESH TOKEN - Renovar token expirado
 exports.refreshToken = async (req, res) => {
   try {
-    const { userId, role } = req.user; // Del middleware authMiddleware
+    const { id, role } = req.user; // Corregido: id en lugar de userId
 
-    const newToken = generateToken(userId, role);
+    // Obtener username actualizado de la BD
+    const [userResult] = await pool.query('SELECT username, role, is_blocked FROM users WHERE id = ?', [id]);
+
+    if (userResult.length === 0 || userResult[0].is_blocked) {
+      return res.status(401).json({ error: 'Usuario no válido o bloqueado' });
+    }
+
+    const user = userResult[0];
+    const newToken = generateToken(id, user.role, user.username);
 
     res.json({ token: newToken });
   } catch (error) {
@@ -224,9 +245,9 @@ exports.changePassword = async (req, res) => {
       [newPasswordHash, userId]
     );
 
-    res.json({ 
-      success: true, 
-      message: 'Contraseña actualizada exitosamente' 
+    res.json({
+      success: true,
+      message: 'Contraseña actualizada exitosamente'
     });
   } catch (error) {
     console.error('Error cambiando contraseña:', error);
