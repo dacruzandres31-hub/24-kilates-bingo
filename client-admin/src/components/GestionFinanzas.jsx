@@ -12,11 +12,13 @@ import MovimientosChips from './MovimientosChips';
 import SolicitudesRetiro from './SolicitudesRetiro';
 import ComisionesPanel from './ComisionesPanel';
 import ReporteIngresos from './ReporteIngresos';
+import RentabilidadPanel from './RentabilidadPanel';
 
 export default function GestionFinanzas({ userData }) {
-  const [activeTab, setActiveTab] = useState('movimientos');
+  const [activeTab, setActiveTab] = useState('rentabilidad');
 
   const tabs = [
+    { id: 'rentabilidad', name: '📈 Rentabilidad (GGR)', icon: '📈' },
     { id: 'movimientos', name: '💵 Movimientos', icon: '💵' },
     { id: 'retiros', name: '🏦 Retiros', icon: '🏦' },
     { id: 'comisiones', name: '💰 Comisiones', icon: '💰' },
@@ -38,11 +40,10 @@ export default function GestionFinanzas({ userData }) {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 px-6 py-4 text-sm font-medium transition-all duration-200 ${
-                activeTab === tab.id
+              className={`flex-1 px-6 py-4 text-sm font-medium transition-all duration-200 ${activeTab === tab.id
                   ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg'
                   : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
-              }`}
+                }`}
             >
               <span className="text-lg mr-2">{tab.icon}</span>
               {tab.name}
@@ -52,6 +53,7 @@ export default function GestionFinanzas({ userData }) {
 
         {/* Tab Content */}
         <div className="p-6">
+          {activeTab === 'rentabilidad' && <RentabilidadPanel />}
           {activeTab === 'movimientos' && <MovimientosChips />}
           {activeTab === 'retiros' && <SolicitudesRetiro userData={userData} />}
           {activeTab === 'comisiones' && <ComisionesPanel />}

@@ -29,7 +29,8 @@ const {
   changePassword,
   changeUserPassword,
   updateUserPersonalData,
-  bulkTransferCards
+  bulkTransferCards,
+  getGGRStats
 } = require('../controllers/adminController');
 
 const cardInventoryController = require('../controllers/cardInventoryController');
@@ -139,6 +140,13 @@ const metricsService = require('../services/metricsService'); // Add import
 router.get('/metrics', authenticateToken, isAdmin, (req, res) => {
   res.json(metricsService.getMetrics());
 });
+
+// ========================================
+// 💰 FINANCIAL REPORTS (GGR)
+// ========================================
+router.get('/finances/ggr', authenticateToken, isAdmin, getGGRStats);
+
+module.exports = router;
 
 // [REMOVED DEBUG ROUTES] - Using standard GET routes instead
 

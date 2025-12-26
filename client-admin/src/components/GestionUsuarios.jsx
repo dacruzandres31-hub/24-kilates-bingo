@@ -112,6 +112,35 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
       setShowSuccessPopup(true);
       setTimeout(() => setShowSuccessPopup(false), 3000);
 
+      // 4. Generar Recibo Automático si hay datos de calculadora
+      if (bulkData && bulkData.details) {
+        // Preparar items
+        const items = [];
+        if (bulkData.details.bronce?.qty > 0) items.push({ room: 'bronce', qty: bulkData.details.bronce.qty });
+        if (bulkData.details.plata?.qty > 0) items.push({ room: 'plata', qty: bulkData.details.plata.qty });
+        if (bulkData.details.oro?.qty > 0) items.push({ room: 'oro', qty: bulkData.details.oro.qty });
+
+        // Identificar usuario objetivo
+        // Si modalGestionUsuario está abierto, es ese.
+        const targetUser = modalGestionUsuario.usuario;
+
+        setModalRecibo({
+          isOpen: true,
+          data: {
+            type: 'cartones',
+            operation: bulkData.role === 'admin' ? 'Carga Admin (80%)' : bulkData.role === 'agent' ? 'Carga Agente (85%)' : 'Venta Cartones',
+            userName: targetUser?.username || 'Desconocido',
+            recipientId: targetUser?.id,
+            quantity: bulkData.summary.totalQty,
+            room: items.length === 1 ? items[0].room : 'Multi-Sala',
+            items: items.length > 1 ? items : null, // Solo pasar items si son > 1 o siempre? Pasemos siempre si queremos detalle
+            timestamp: new Date().toLocaleString(),
+            transactionId: `BLK-${Date.now().toString().slice(-6)}`,
+            extraDetails: null
+          }
+        });
+      }
+
     } catch (error) {
       console.error("Error refreshing users after bulk load", error);
     }

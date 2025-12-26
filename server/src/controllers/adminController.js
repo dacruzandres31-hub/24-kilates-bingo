@@ -98,24 +98,105 @@ async function getFinancialSummary(req, res) {
     res.json({
       success: true,
       today: {
-        sales: stats.sales || 0,
-        prizesDistributed: stats.prizesDistributed || 0,
-        netBalance: netBalance,
-        activeUsers: stats.activeUsers || 0
-      },
-      pots: {
-        linea: 0,
-        bingo: 0,
-        acumulado: 0
+        sales: parseFloat(stats.sales || 0),
+        prizes: parseFloat(stats.prizesDistributed || 0),
+        net: netBalance,
+        activeUsers: parseInt(stats.activeUsers || 0)
+      }
+    });
+  } catch (error) {
+    console.error('Error getting financial summary:', error);
+    res.status(500).json({ error: 'Error obteniendo resumen financiero' });
+  }
+}
+
+/**
+ * GET /api/admin/finances/ggr
+ * Reporte de Rentabilidad Real (GGR)
+ * Entradas (Dinero Real) vs Salidas (Retiros Pagados)
+ */
+async function getGGRStats(req, res) {
+  try {
+    const { startDate, endDate } = req.query;
+
+    // Filtros de fecha base
+    let dateFilter = '';
+    const params = [];
+
+    if (startDate && endDate) {
+      dateFilter = 'AND DATE(created_at) BETWEEN ? AND ?';
+      params.push(startDate, endDate);
+    } else {
+      // Default: Mes actual
+      dateFilter = 'AND MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())';
+    }
+
+    // 1. DINERO ENTRADO (Ventas de Cartones + Cargas Manuales)
+    // Ventas de cartones (Solo pagados, no regalo)
+    const [salesResult] = await pool.query(`
+      SELECT COALESCE(SUM(price), 0) as total
+      FROM daily_stock_cards
+      WHERE status = 'sold' 
+      AND price > 0
+      ${dateFilter.replace('created_at', 'play_date')} 
+    `, params); // Nota: play_date es la fecha de juego, created_at la de compra? Usamos play_date por consistencia contable
+
+    // Cargas Manuales de Saldo (Admin Credits)
+    // Asumimos que hay una tabla o log para esto. Si no, usamos chips_movements type='admin_adjustment' & amount > 0
+    const [manualLoadsResult] = await pool.query(`
+      SELECT COALESCE(SUM(amount), 0) as total
+      FROM chips_movements
+      WHERE movement_type = 'admin_adjustment'
+      AND amount > 0
+      ${dateFilter}
+    `, params);
+
+    const totalIn = parseFloat(salesResult[0].total) + parseFloat(manualLoadsResult[0].total);
+
+    // 2. DINERO SALIDO (Retiros Pagados)
+    // Solo estatus 'completed' o 'approved' que implican pago real
+    // Nota: params se duplican porque la query es nueva, hay que pasar params de nuevo
+    const [withdrawalsResult] = await pool.query(`
+      SELECT COALESCE(SUM(amount), 0) as total
+      FROM withdrawal_requests
+      WHERE status IN ('completed', 'approved')
+      ${dateFilter.replace('created_at', 'requested_at')} 
+    `, params); // Usamos requested_at que si existe
+
+    const totalOut = parseFloat(withdrawalsResult[0].total);
+
+    // 3. PASIVO (Liability) - Dinero de jugadores aun no retirado
+    const [liabilityResult] = await pool.query(`
+      SELECT COALESCE(SUM(balance), 0) as total FROM users WHERE role = 'jugador'
+    `);
+    const currentLiability = parseFloat(liabilityResult[0].total);
+
+    // 4. GGR CÁLCULO
+    const ggr = totalIn - totalOut;
+    const margin = totalIn > 0 ? ((ggr / totalIn) * 100).toFixed(2) : 0;
+
+    res.json({
+      success: true,
+      data: {
+        period: { startDate, endDate },
+        metrics: {
+          totalIn,
+          totalOut,
+          ggr,
+          margin: parseFloat(margin),
+          currentLiability
+        },
+        breakdown: {
+          sales: parseFloat(salesResult[0].total),
+          manualLoads: parseFloat(manualLoadsResult[0].total),
+          withdrawals: totalOut
+        }
       }
     });
 
   } catch (error) {
-    console.error('❌ Error obteniendo resumen financiero:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Error obteniendo resumen financiero'
-    });
+    console.error('Error calculating GGR:', error);
+    res.status(500).json({ error: 'Error calculando rentabilidad' });
   }
 }
 
@@ -2231,9 +2312,76 @@ const bulkTransferCards = async (req, res) => {
   }
 };
 
+
+
+/**
+ * GET /api/admin/users
+ * Obtiene lista de todos los usuarios
+ */
+async function getAllUsers(req, res) {
+  try {
+    const [users] = await pool.query(`
+      SELECT id, username, role, balance, created_at, phone_number,
+      (SELECT COUNT(*) FROM users u2 WHERE u2.created_by = u.id) as agents_count
+      FROM users u
+      ORDER BY created_at DESC
+    `);
+    res.json(users);
+  } catch (error) {
+    console.error('Error getting all users:', error);
+    res.status(500).json({ error: 'Error obteniendo usuarios' });
+  }
+}
+
+
+/**
+ * POST /api/admin/users/remove-cards
+ * Retira cartones de un usuario (Corrección)
+ */
+async function removeCardsFromUser(req, res) {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const { userId, room, quantity, isGift } = req.body;
+    const adminId = req.user.id;
+
+    if (!quantity || quantity <= 0) {
+      throw new Error('Cantidad inválida');
+    }
+
+    // Usar servicio para deducir
+    await cardInventoryService.deductUserInventory(
+      connection,
+      userId,
+      room,
+      parseInt(quantity),
+      isGift || false
+    );
+
+    // Registrar movimiento
+    await connection.query(
+      `INSERT INTO chips_movements (user_id, amount, movement_type, description, created_by)
+       VALUES (?, 0, 'admin_adjustment', ?, ?)`,
+      [userId, `Retiro de ${quantity} cartones ${room} (Regalo: ${isGift ? 'SI' : 'NO'})`, adminId]
+    );
+
+    await connection.commit();
+    res.json({ success: true, message: 'Cartones retirados exitosamente' });
+
+  } catch (error) {
+    await connection.rollback();
+    console.error('Error removing cards:', error);
+    res.status(500).json({ error: error.message });
+  } finally {
+    connection.release();
+  }
+}
+
 module.exports = {
   getAdminProfile,
   getFinancialSummary,
+  getGGRStats,
+  getAllUsers,
   getDashboardStats,
   sendGlobalMessage,
   getSessionStats,
@@ -2243,8 +2391,8 @@ module.exports = {
   getUsersHierarchy,
   createUser,
   addCardsToUser,
+  removeCardsFromUser,
   addBalanceToUser,
-  // Card Inventory (Admin/Cajero)
   getMyCardInventory,
   transferCardsToUser,
   getMyCardMovements,

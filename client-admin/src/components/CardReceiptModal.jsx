@@ -171,11 +171,26 @@ const CardReceiptModal = ({ isOpen, onClose, data }) => {
                                 <span className="font-bold text-gray-900">{userName}</span>
                             </div>
 
-                            {room && (
-                                <div className="flex justify-between border-b border-dashed border-gray-200 pb-2">
-                                    <span className="text-gray-500">SALA:</span>
-                                    <span className="font-bold text-gray-900">{room.toUpperCase()}</span>
+                            {/* Si hay items detallados (ej: Multi-Sala) */}
+                            {data.items && data.items.length > 0 ? (
+                                <div className="border-b border-dashed border-gray-200 pb-2">
+                                    <div className="text-gray-500 text-xs mb-1">DETALLE:</div>
+                                    <div className="space-y-1">
+                                        {data.items.map((item, idx) => (
+                                            <div key={idx} className="flex justify-between text-xs">
+                                                <span className="text-gray-800 capitalize">• {item.room}</span>
+                                                <span className="font-bold text-gray-900">{item.qty} u.</span>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
+                            ) : (
+                                room && (
+                                    <div className="flex justify-between border-b border-dashed border-gray-200 pb-2">
+                                        <span className="text-gray-500">SALA:</span>
+                                        <span className="font-bold text-gray-900">{room.toUpperCase()}</span>
+                                    </div>
+                                )
                             )}
 
                             {/* Banking Details for Withdrawals */}
