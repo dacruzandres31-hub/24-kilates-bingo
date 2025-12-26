@@ -11,6 +11,10 @@ const authenticateToken = (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'tu_clave_secreta_muy_segura_12345');
     req.user = decoded;
+    // Normalizar para compatibilidad (el token trae 'id', los controllers a veces usan 'userId')
+    if (decoded.id && !decoded.userId) {
+      req.user.userId = decoded.id;
+    }
     next();
   } catch (error) {
     res.status(401).json({ error: 'No autorizado. Token inválido.' });
@@ -72,7 +76,7 @@ const isAndy = (req, res, next) => {
   }
 
   // Verificar username exacto (o ID si es fijo, username es más legible)
-  if (req.user.username !== 'Andy') {
+  if (req.user.username?.toLowerCase() !== 'andy') {
     return res.status(403).json({
       error: 'Acceso denegado. Exclusivo para Andy.'
     });
@@ -81,13 +85,29 @@ const isAndy = (req, res, next) => {
   next();
 };
 
+// Middleware: SuperAdmin o Andy
+const isSuperAdminOrAndy = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'No autenticado' });
+  }
+
+  if (req.user.role === 'superadmin' || req.user.username?.toLowerCase() === 'andy') {
+    return next();
+  }
+
+  return res.status(403).json({
+    error: 'Acceso denegado. Se requiere rol de superadmin o ser el usuario Andy.'
+  });
+};
+
 // Exportar middlewares
 module.exports = {
   authenticateToken,
   isAdmin,
   isSuperAdmin,
   isCajeroOrAdmin,
-  isAndy
+  isAndy,
+  isSuperAdminOrAndy
 };
 
 // Mantener compatibilidad con código antiguo

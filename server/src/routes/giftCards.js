@@ -1,24 +1,24 @@
 const express = require('express');
 const router = express.Router();
 const giftCardsController = require('../controllers/giftCardsController');
-const { authenticateToken, isSuperAdmin } = require('../middleware/authMiddleware');
+const { authenticateToken, isSuperAdmin, isSuperAdminOrAndy } = require('../middleware/authMiddleware');
 
 /**
  * RUTAS: Sistema de Cartones de Regalo
- * Todas las rutas requieren autenticación y rol SuperAdmin
+ * Todas las rutas requieren autenticación y rol SuperAdmin (o el usuario Andy)
  */
 
 // Agregar cartones de regalo
 router.post('/add',
   authenticateToken,
-  isSuperAdmin,
+  isSuperAdminOrAndy,
   giftCardsController.addGiftCards
 );
 
 // Quitar cartones de regalo
 router.post('/remove',
   authenticateToken,
-  isSuperAdmin,
+  isSuperAdminOrAndy,
   giftCardsController.removeGiftCards
 );
 

@@ -24,9 +24,10 @@ const cardInventoryService = require('../services/cardInventoryService');
 async function getAdminProfile(req, res) {
   try {
     const { userId, role } = req.user;
+    console.log(`🔎 [getAdminProfile] Buscando perfil para ID: ${userId}, Role: ${role}`);
 
-    // SuperAdmin ve cartones normales y regalo separados
-    if (role === 'superadmin') {
+    // SuperAdmin (o Andy) ve cartones normales y regalo separados
+    if (role === 'superadmin' || req.user.username?.toLowerCase() === 'andy') {
       const [users] = await pool.query(
         `SELECT u.id, u.username, u.role, u.balance,
           COALESCE(SUM(CASE WHEN uci.room = 'bronce' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_bronce,
@@ -63,9 +64,11 @@ async function getAdminProfile(req, res) {
     );
 
     if (users.length === 0) {
+      console.log(`❌ [getAdminProfile] Usuario ID ${userId} no encontrado en la base de datos`);
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
 
+    console.log(`✅ [getAdminProfile] Perfil encontrado para ${users[0].username}`);
     res.json(users[0]);
 
   } catch (error) {
@@ -684,8 +687,8 @@ async function getUsersHierarchy(req, res) {
     let allUsers;
     let currentUserData;
 
-    // SuperAdmin ve TODOS los usuarios con cartones normales y regalo separados
-    if (currentUserRole === 'superadmin') {
+    // SuperAdmin (o Andy) ve TODOS los usuarios con cartones normales y regalo separados
+    if (currentUserRole === 'superadmin' || req.user.username?.toLowerCase() === 'andy') {
       [allUsers] = await pool.query(`
         SELECT u.id, u.username, u.role, u.parent_id, u.balance, u.created_at,
                u.nombre_completo, u.documento, u.email, u.telefono,
@@ -1041,15 +1044,123 @@ async function addCardsToUser(req, res) {
 
     // Agregar o quitar cartones
     if (quantity > 0) {
-      // AGREGAR cartones = Transferir desde inventario del admin (para todos)
-      // SuperAdmin debe cargar su inventario primero usando Card Inventory panel
-      await cardInventoryService.transferCards(
-        currentUserId,  // from (admin)
-        userId,         // to (usuario)
-        room,
-        quantity,
-        currentUserId   // executedBy
-      );
+      // Verificar rol del destinatario
+      const [recipientData] = await pool.query('SELECT role FROM users WHERE id = ?', [userId]);
+      const recipientRole = recipientData[0]?.role;
+
+      if (recipientRole === 'agente') {
+        // --- CASO AGENTE: CARGA 100% + BONO EXTRA 10% ---
+        console.log(`👤 [Transfer] Destinatario es AGENTE. Aplicando carga 100% + Bono Extra.`);
+
+        await cardInventoryService.transferCards(
+          currentUserId, userId, room, quantity, currentUserId
+        );
+
+        // ACREDITACIÓN AUTOMÁTICA DE BONO (10%)
+        try {
+          const [roomSettings] = await pool.query(
+            'SELECT agent_bonus_percentage FROM room_settings WHERE room = ?',
+            [room]
+          );
+          const bonusPct = roomSettings.length > 0 ? parseFloat(roomSettings[0].agent_bonus_percentage) : 10.0;
+          const bonusQty = Math.floor(quantity * (bonusPct / 100));
+
+          if (bonusQty > 0) {
+            console.log(`🎁 [Bonus] Acreditando bono extra: ${bonusQty} regalo para agente ${userId}`);
+            const connection = await pool.getConnection();
+            try {
+              await connection.beginTransaction();
+              await connection.query(
+                `INSERT INTO user_card_inventory (user_id, room, quantity, is_gift)
+                 VALUES (?, ?, ?, TRUE)
+                 ON DUPLICATE KEY UPDATE quantity = quantity + ?, updated_at = CURRENT_TIMESTAMP`,
+                [userId, room, bonusQty, bonusQty]
+              );
+              await connection.query(
+                `INSERT INTO card_movements_log (user_id, from_user_id, to_user_id, room, quantity, movement_type, is_gift, reason, executed_by)
+                 VALUES (?, ?, ?, ?, ?, 'transfer_bonus', TRUE, 'Bono automático Agente', ?)`,
+                [userId, currentUserId, userId, room, bonusQty, currentUserId]
+              );
+              await connection.commit();
+            } finally {
+              connection.release();
+            }
+          }
+        } catch (err) {
+          console.error('❌ Error bono agente:', err);
+        }
+      } else {
+        // --- CASO JUGADOR: SPLIT 90/10 (Saca 90 Pagos + 10 Regalo del Admin y da lo mismo al Jugador) ---
+        console.log(`👤 [Transfer] Destinatario es JUGADOR. Aplicando Split 90/10.`);
+
+        const targetPaid = Math.floor(quantity * 0.9);
+        const targetGift = quantity - targetPaid;
+
+        const connection = await pool.getConnection();
+        try {
+          await connection.beginTransaction();
+
+          // 1. Obtener stock disponible del admin
+          const [stocks] = await connection.query(
+            `SELECT is_gift, SUM(quantity) as total FROM user_card_inventory 
+             WHERE user_id = ? AND room = ? GROUP BY is_gift`,
+            [currentUserId, room]
+          );
+
+          let senderPaid = 0; let senderGift = 0;
+          stocks.forEach(s => { if (s.is_gift) senderGift = parseInt(s.total); else senderPaid = parseInt(s.total); });
+
+          // 2. Calcular transferencia real respetando stock
+          let tPaid = Math.min(targetPaid, senderPaid);
+          let tGift = Math.min(targetGift, senderGift);
+
+          if (tPaid + tGift < quantity) {
+            let needed = quantity - (tPaid + tGift);
+            if (tPaid < targetPaid) { // Si faltan pagos, sacar más de regalo
+              let extra = Math.min(needed, senderGift - tGift);
+              tGift += extra; needed -= extra;
+            }
+            if (needed > 0 && tGift < targetGift) { // Si aún falta, sacar más de pagos
+              let extra = Math.min(needed, senderPaid - tPaid);
+              tPaid += extra; needed -= extra;
+            }
+            if (tPaid + tGift < quantity) {
+              throw new Error(`Stock insuficiente. Solo tienes ${tPaid + tGift} cartones en total.`);
+            }
+          }
+
+          // 3. Ejecutar transferencias específicas (Deduce del Admin y acredita al Jugador)
+          const executeTransfer = async (conn, from, to, q, isGift) => {
+            if (q <= 0) return;
+            // Debitar del Admin
+            let rem = q;
+            const [recs] = await conn.query(`SELECT id, quantity FROM user_card_inventory WHERE user_id = ? AND room = ? AND is_gift = ? ORDER BY id ASC`, [from, room, isGift]);
+            for (const r of recs) {
+              if (rem <= 0) break;
+              const sub = Math.min(r.quantity, rem);
+              await conn.query(`UPDATE user_card_inventory SET quantity = quantity - ? WHERE id = ?`, [sub, r.id]);
+              rem -= sub;
+            }
+            // Acreditar al Jugador
+            await conn.query(`INSERT INTO user_card_inventory (user_id, room, quantity, is_gift) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE quantity = quantity + ?`, [to, room, q, isGift, q]);
+            // Logs
+            await conn.query(`INSERT INTO card_movements_log (user_id, from_user_id, to_user_id, room, quantity, movement_type, is_gift, reason, executed_by)
+                             VALUES (?, ?, ?, ?, ?, 'transfer', ?, 'Venta Jugador (Split)', ?)`, [to, from, to, room, q, isGift, from]);
+          };
+
+          await executeTransfer(connection, currentUserId, userId, tPaid, false);
+          await executeTransfer(connection, currentUserId, userId, tGift, true);
+
+          await connection.commit();
+          console.log(`✅ [Split] Transferidos ${tPaid} pagos y ${tGift} regalo a jugador ${userId}`);
+        } catch (err) {
+          await connection.rollback();
+          throw err;
+        } finally {
+          connection.release();
+        }
+      }
+      // ----------------------------------------------------
     } else if (quantity < 0) {
       // QUITAR cartones = Eliminar del usuario y crear para el admin
       const quantityToRemove = Math.abs(quantity);
@@ -1584,6 +1695,64 @@ async function transferCardsToUser(req, res) {
     );
 
     // ============================================
+    // LÓGICA DE BONIFICACIÓN AUTOMÁTICA (10% Default o Configurable)
+    // ============================================
+    try {
+      // 1. Obtener porcentaje de bonificación de la sala
+      const [roomSettings] = await pool.query(
+        'SELECT agent_bonus_percentage FROM room_settings WHERE room = ?',
+        [room]
+      );
+
+      const bonusPercentage = roomSettings.length > 0
+        ? parseFloat(roomSettings[0].agent_bonus_percentage)
+        : 10.00; // Fallback 10%
+
+      // 2. Calcular cantidad de regalo
+      const bonusQuantity = Math.floor(quantity * (bonusPercentage / 100));
+
+      if (bonusQuantity > 0) {
+        console.log(`🎁 [Bonus System] Aplicando bono del ${bonusPercentage}% (${bonusQuantity} cartones) a user_${to_user_id} por compra de ${quantity}`);
+
+        // 3. Insertar cartones de regalo (is_gift = TRUE)
+        // Verificar si ya tiene inventario de regalo de esta sala
+        const [existingGift] = await pool.query(
+          `SELECT id, quantity FROM user_card_inventory 
+           WHERE user_id = ? AND room = ? AND is_gift = TRUE
+           LIMIT 1`,
+          [to_user_id, room]
+        );
+
+        if (existingGift.length > 0) {
+          await pool.query(
+            `UPDATE user_card_inventory 
+             SET quantity = quantity + ?, updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?`,
+            [bonusQuantity, existingGift[0].id]
+          );
+        } else {
+          await pool.query(
+            `INSERT INTO user_card_inventory 
+             (user_id, room, quantity, is_gift, created_at, updated_at)
+             VALUES (?, ?, ?, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+            [to_user_id, room, bonusQuantity]
+          );
+        }
+
+        // 4. Registrar en log de movimientos
+        await pool.query(
+          `INSERT INTO card_movements_log 
+           (user_id, room, movement_type, quantity, is_gift, reason, executed_by, created_at)
+           VALUES (?, ?, 'credit', ?, TRUE, ?, ?, CURRENT_TIMESTAMP)`,
+          [to_user_id, room, bonusQuantity, `Bono automático ${bonusPercentage}% por compra de ${quantity} cartones`, req.user.id]
+        );
+      }
+    } catch (bonusError) {
+      console.error('❌ Error aplicando bono automático:', bonusError);
+      // No fallamos la request principal, solo logueamos el error
+    }
+
+    // ============================================
     // EMITIR ACTUALIZACIÓN DE RECURSOS (Socket.IO)
     // ============================================
     // Fix: Emitir evento para que el jugador vea los cartones recibidos en tiempo real
@@ -1943,6 +2112,125 @@ async function updateUserPersonalData(req, res) {
   }
 }
 
+const bulkTransferCards = async (req, res) => {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const { targetUserId, items, applyBonus } = req.body;
+    // items: [{ room, quantity, bonusQuantity? }, ...]
+
+    if (!targetUserId || !items || !Array.isArray(items)) {
+      throw new Error('Datos de carga masiva inválidos.');
+    }
+
+    // Obtener datos del admin (req.user)
+    const adminId = req.user.id;
+
+    const results = [];
+
+    for (const item of items) {
+      const { room, quantity } = item;
+      if (quantity <= 0) continue;
+
+      // Verificar rol del destinatario
+      const [recipientData] = await connection.query('SELECT role FROM users WHERE id = ?', [targetUserId]);
+      const recipientRole = recipientData[0]?.role;
+
+      if (recipientRole === 'agente') {
+        // --- CASO AGENTE: CARGA 100% PAGOS + BONO EXTRA ---
+        const [stock] = await connection.query(
+          `SELECT quantity FROM user_card_inventory WHERE user_id = ? AND room = ? AND is_gift = FALSE FOR UPDATE`,
+          [adminId, room]
+        );
+        if (!stock.length || stock[0].quantity < quantity) {
+          throw new Error(`Stock insuficiente de cartones pagos en sala ${room} para transferir a agente.`);
+        }
+        await connection.query(`UPDATE user_card_inventory SET quantity = quantity - ? WHERE user_id = ? AND room = ? AND is_gift = FALSE`, [quantity, adminId, room]);
+        await connection.query(`INSERT INTO user_card_inventory (user_id, room, quantity, is_gift) VALUES (?, ?, ?, FALSE) ON DUPLICATE KEY UPDATE quantity = quantity + ?`, [targetUserId, room, quantity, quantity]);
+        await connection.query(`INSERT INTO card_movements_log (user_id, from_user_id, to_user_id, room, quantity, movement_type, is_gift, executed_by) VALUES (?, ?, ?, ?, ?, 'transfer', FALSE, ?)`, [targetUserId, adminId, targetUserId, room, quantity, adminId]);
+
+        let bonusQty = 0;
+        if (applyBonus) {
+          const [roomSettings] = await connection.query('SELECT agent_bonus_percentage FROM room_settings WHERE room = ?', [room]);
+          const bonusPct = roomSettings.length > 0 ? parseFloat(roomSettings[0].agent_bonus_percentage) : 10.0;
+          bonusQty = Math.floor(quantity * (bonusPct / 100));
+          if (bonusQty > 0) {
+            await connection.query(`INSERT INTO user_card_inventory (user_id, room, quantity, is_gift) VALUES (?, ?, ?, TRUE) ON DUPLICATE KEY UPDATE quantity = quantity + ?`, [targetUserId, room, bonusQty, bonusQty]);
+            await connection.query(`INSERT INTO card_movements_log (user_id, from_user_id, to_user_id, room, quantity, movement_type, is_gift, reason, executed_by) VALUES (?, ?, ?, ?, ?, 'transfer_bonus', TRUE, 'Bono masivo Agente', ?)`, [targetUserId, adminId, targetUserId, room, bonusQty, adminId]);
+          }
+        }
+        results.push({ room, quantity, bonusQty });
+      } else {
+        // --- CASO JUGADOR: SPLIT 90/10 ---
+        const targetPaid = Math.floor(quantity * 0.9);
+        const targetGift = quantity - targetPaid;
+        const [stocks] = await connection.query(`SELECT is_gift, SUM(quantity) as total FROM user_card_inventory WHERE user_id = ? AND room = ? GROUP BY is_gift`, [adminId, room]);
+        let sPaid = 0; let sGift = 0;
+        stocks.forEach(s => { if (s.is_gift) sGift = parseInt(s.total) || 0; else sPaid = parseInt(s.total) || 0; });
+
+        let tPaid = Math.min(targetPaid, sPaid);
+        let tGift = Math.min(targetGift, sGift);
+        if (tPaid + tGift < quantity) {
+          let needed = quantity - (tPaid + tGift);
+          if (tPaid < targetPaid) { let extra = Math.min(needed, sGift - tGift); tGift += extra; needed -= extra; }
+          if (needed > 0 && tGift < targetGift) { let extra = Math.min(needed, sPaid - tPaid); tPaid += extra; needed -= extra; }
+          if (tPaid + tGift < quantity) throw new Error(`Stock insuficiente en ${room}. Solo tienes ${tPaid + tGift} cartones totales.`);
+        }
+
+        const debitStock = async (conn, uid, rm, q, isG) => {
+          if (q <= 0) return;
+          let rem = q;
+          const [recs] = await conn.query(`SELECT id, quantity FROM user_card_inventory WHERE user_id = ? AND room = ? AND is_gift = ? ORDER BY id ASC`, [uid, rm, isG]);
+          for (const r of recs) {
+            if (rem <= 0) break;
+            const sub = Math.min(r.quantity, rem);
+            await conn.query(`UPDATE user_card_inventory SET quantity = quantity - ? WHERE id = ?`, [sub, r.id]);
+            rem -= sub;
+          }
+        };
+
+        if (tPaid > 0) {
+          await debitStock(connection, adminId, room, tPaid, false);
+          await connection.query(`INSERT INTO user_card_inventory (user_id, room, quantity, is_gift) VALUES (?, ?, ?, FALSE) ON DUPLICATE KEY UPDATE quantity = quantity + ?`, [targetUserId, room, tPaid, tPaid]);
+          await connection.query(`INSERT INTO card_movements_log (user_id, from_user_id, to_user_id, room, quantity, movement_type, is_gift, reason, executed_by) VALUES (?, ?, ?, ?, ?, 'transfer', FALSE, 'Split Jugador', ?)`, [targetUserId, adminId, targetUserId, room, tPaid, adminId]);
+        }
+        if (tGift > 0) {
+          await debitStock(connection, adminId, room, tGift, true);
+          await connection.query(`INSERT INTO user_card_inventory (user_id, room, quantity, is_gift) VALUES (?, ?, ?, TRUE) ON DUPLICATE KEY UPDATE quantity = quantity + ?`, [targetUserId, room, tGift, tGift]);
+          await connection.query(`INSERT INTO card_movements_log (user_id, from_user_id, to_user_id, room, quantity, movement_type, is_gift, reason, executed_by) VALUES (?, ?, ?, ?, ?, 'transfer', TRUE, 'Split Jugador', ?)`, [targetUserId, adminId, targetUserId, room, tGift, adminId]);
+        }
+        results.push({ room, quantity, tPaid, tGift });
+      }
+    }
+
+    await connection.commit();
+
+    // Emitir evento Socket.IO (fuera de la transacción)
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user_${targetUserId}`).emit('resources_updated', {
+        type: 'bulk_transfer',
+        data: results
+      });
+      // También al admin para actualizar su stock visual
+      io.to(`user_${adminId}`).emit('resources_updated', {
+        type: 'bulk_transfer_sent',
+        data: results
+      });
+    }
+
+    res.json({ success: true, message: 'Carga masiva completada', results });
+
+  } catch (error) {
+    await connection.rollback();
+    console.error('Error en bulkTransferCards:', error);
+    res.status(500).json({ success: false, message: error.message || 'Error en carga masiva' });
+  } finally {
+    connection.release();
+  }
+};
+
 module.exports = {
   getAdminProfile,
   getFinancialSummary,
@@ -1962,5 +2250,6 @@ module.exports = {
   getMyCardMovements,
   changePassword,
   changeUserPassword,
-  updateUserPersonalData
+  updateUserPersonalData,
+  bulkTransferCards
 };

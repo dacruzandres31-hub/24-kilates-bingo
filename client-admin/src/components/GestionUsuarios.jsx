@@ -4,8 +4,111 @@ import axios from 'axios';
 import BlockUserModal from './BlockUserModal';
 import UnblockUserModal from './UnblockUserModal';
 import useSocket from '../hooks/useSocket';
+import CostCalculatorModal from './CostCalculatorModal';
+import BulkTransferModal from './BulkTransferModal';
 
 export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, onResourcesUpdate }) {
+  // ... (existing state)
+
+  // Estado para la calculadora (V2) y Carga Masiva
+  const [showCalculator, setShowCalculator] = useState(false);
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [bulkData, setBulkData] = useState(null); // Data from calculator
+
+  // Calculator Apply now opens Bulk Modal
+  const handleCalculatorApply = (result) => {
+    setBulkData(result);
+    setShowBulkModal(true);
+    // Note: We don't close calculator here if we want "Back" functionality, but standard flow suggests closing calc -> opening review.
+    setShowCalculator(false);
+  };
+
+  const handleBulkSuccess = async (response) => {
+    // 1. Refresh user data globally
+    // We call API manually here to await the result and update Modal immediately
+    try {
+      const token = localStorage.getItem('adminToken');
+      const res = await axios.get('/api/admin/users/hierarchy', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      // Calculate normalized users
+      const normalizedUsers = (res.data.all || []).map(user => ({
+        ...user,
+        balance: parseFloat(user.balance) || 0,
+        cards_bronce: parseInt(user.cards_bronce) || 0,
+        cards_plata: parseInt(user.cards_plata) || 0,
+        cards_oro: parseInt(user.cards_oro) || 0,
+        gift_bronce: parseInt(user.gift_bronce) || 0,
+        gift_plata: parseInt(user.gift_plata) || 0,
+        gift_oro: parseInt(user.gift_oro) || 0
+      }));
+
+      setArbolJerarquico(res.data.tree || []);
+      setUsuarios(normalizedUsers);
+      setAllUsersHierarchy(normalizedUsers);
+
+      // Refresh list view (usuariosDelAgente) 
+      if (agenteSeleccionado) {
+        cargarUsuariosDelAgente(agenteSeleccionado.id, normalizedUsers);
+      }
+
+      // 2. Refresh current user view if open
+      if (modalGestionUsuario.usuario) {
+        const updatedUser = normalizedUsers.find(u => u.id === modalGestionUsuario.usuario.id);
+        if (updatedUser) {
+          const giftCards = await cargarGiftCards(updatedUser.id);
+          setModalGestionUsuario(prev => ({
+            ...prev,
+            usuario: updatedUser,
+            giftCards: giftCards
+          }));
+        }
+      }
+      // 3. Refresh Admin Resources (Top Bar & Panels)
+      try {
+        // Breve delay para asegurar consistencia en DB y Cache busting
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        const ts = Date.now();
+        const [adminProfileRes, adminInventoryRes] = await Promise.all([
+          axios.post('/api/admin/refresh/profile', {}, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache'
+            }
+          }),
+          axios.post('/api/admin/refresh/inventory', {}, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache'
+            }
+          })
+        ]);
+
+        if (adminProfileRes.data && adminInventoryRes.data && onResourcesUpdate) {
+          const inventory = adminInventoryRes.data.inventory || [];
+          const newStock = {
+            bronce: parseInt(inventory.find(i => i.room === 'bronce')?.total_cards || 0),
+            plata: parseInt(inventory.find(i => i.room === 'plata')?.total_cards || 0),
+            oro: parseInt(inventory.find(i => i.room === 'oro')?.total_cards || 0)
+          };
+          onResourcesUpdate(adminProfileRes.data, newStock);
+        }
+      } catch (adminErr) {
+        console.error("Error refreshing admin resources", adminErr);
+      }
+
+      // Show success message
+      setSuccessMessage('✅ Carga masiva realizada exitosamente');
+      setShowSuccessPopup(true);
+      setTimeout(() => setShowSuccessPopup(false), 3000);
+
+    } catch (error) {
+      console.error("Error refreshing users after bulk load", error);
+    }
+  };
   const [usuarios, setUsuarios] = useState([]);
   const [allUsersHierarchy, setAllUsersHierarchy] = useState([]); // TODOS los usuarios de la jerarquía (para búsqueda)
   const [arbolJerarquico, setArbolJerarquico] = useState([]);
@@ -123,6 +226,8 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
     isOpen: false,
     usuario: null
   });
+
+
 
   useEffect(() => {
     cargarUsuarios();
@@ -1042,14 +1147,26 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
           headers: { Authorization: `Bearer ${token}` }
         });
 
+        // Normalizar datos (convertir strings a números)
+        const normalizedAll = (response.data.all || []).map(u => ({
+          ...u,
+          balance: parseFloat(u.balance) || 0,
+          cards_bronce: parseInt(u.cards_bronce) || 0,
+          cards_plata: parseInt(u.cards_plata) || 0,
+          cards_oro: parseInt(u.cards_oro) || 0,
+          gift_bronce: parseInt(u.gift_bronce) || 0,
+          gift_plata: parseInt(u.gift_plata) || 0,
+          gift_oro: parseInt(u.gift_oro) || 0
+        }));
+
         // Actualizar lista de usuarios
-        setUsuarios(response.data.all || []);
+        setUsuarios(normalizedAll);
         setArbolJerarquico(response.data.tree || []);
-        setAllUsersHierarchy(response.data.all || []); // Actualizar búsqueda global
+        setAllUsersHierarchy(normalizedAll); // Actualizar búsqueda global
 
         // CRÍTICO: Actualizar el modal de gestión si está abierto con el usuario completo
         if (modalGestionUsuario.isOpen && modalGestionUsuario.usuario?.id === userId) {
-          const usuarioActualizado = response.data.all.find(u => u.id === userId);
+          const usuarioActualizado = normalizedAll.find(u => u.id === userId);
           if (usuarioActualizado) {
             console.log('✅ Modal actualizado - Balance anterior:', modalGestionUsuario.usuario.balance, 'Nuevo:', usuarioActualizado.balance);
             const giftCards = await cargarGiftCards(userId);
@@ -1061,24 +1178,47 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
           }
         }
 
-        // Actualizar usuarios del agente seleccionado
+        // Actualizar usuarios del agente seleccionado con datos normalizados
         if (agenteSeleccionado) {
-          cargarUsuariosDelAgente(agenteSeleccionado.id, response.data.all || []);
+          cargarUsuariosDelAgente(agenteSeleccionado.id, normalizedAll);
         }
 
         // DESPUÉS de recargar, actualizar recursos del admin si cargó/descargó a otro usuario
-        if (tipo === 'dinero-cargar' && userId !== currentUser.id && onResourcesUpdate) {
-          const newAdminBalance = (currentUser.balance || 0) - cantidadNum;
-          const newUserData = { ...currentUser, balance: newAdminBalance };
-          setCurrentUser(newUserData);
-          onResourcesUpdate(newUserData, null);
-        }
+        // DESPUÉS de recargar, actualizar recursos del admin (Panel Superior)
+        if (onResourcesUpdate) {
+          try {
+            // Breve delay para asegurar consistencia en DB y Cache busting
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            const ts = Date.now();
+            const [adminProfileRes, adminInventoryRes] = await Promise.all([
+              axios.post('/api/admin/refresh/profile', {}, {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  'Cache-Control': 'no-cache',
+                  'Pragma': 'no-cache'
+                }
+              }),
+              axios.post('/api/admin/refresh/inventory', {}, {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  'Cache-Control': 'no-cache',
+                  'Pragma': 'no-cache'
+                }
+              })
+            ]);
 
-        if (tipo === 'dinero-descargar' && userId !== currentUser.id && onResourcesUpdate) {
-          const newAdminBalance = (currentUser.balance || 0) + cantidadNum;
-          const newUserData = { ...currentUser, balance: newAdminBalance };
-          setCurrentUser(newUserData);
-          onResourcesUpdate(newUserData, null);
+            if (adminProfileRes.data && adminInventoryRes.data) {
+              const inventory = adminInventoryRes.data.inventory || [];
+              const newStock = {
+                bronce: parseInt(inventory.find(i => i.room === 'bronce')?.total_cards || 0),
+                plata: parseInt(inventory.find(i => i.room === 'plata')?.total_cards || 0),
+                oro: parseInt(inventory.find(i => i.room === 'oro')?.total_cards || 0)
+              };
+              onResourcesUpdate(adminProfileRes.data, newStock);
+            }
+          } catch (adminErr) {
+            console.error("Error refreshing admin resources", adminErr);
+          }
         }
       } else if (tipo === 'gift-agregar' || tipo === 'gift-quitar') {
         // OPERACIONES DE GIFT CARDS
@@ -1107,18 +1247,31 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         // Recargar gift cards y actualizar modal completo
         const giftCards = await cargarGiftCards(userId);
 
-        // Recargar usuarios completos
+        // Recargar usuarios completos para normalizar
         const response = await axios.get('/api/admin/users/hierarchy', {
           headers: { Authorization: `Bearer ${token}` }
         });
 
-        setUsuarios(response.data.all || []);
+        // Normalizar datos (convertir strings a números)
+        const normalizedAll = (response.data.all || []).map(u => ({
+          ...u,
+          balance: parseFloat(u.balance) || 0,
+          cards_bronce: parseInt(u.cards_bronce) || 0,
+          cards_plata: parseInt(u.cards_plata) || 0,
+          cards_oro: parseInt(u.cards_oro) || 0,
+          gift_bronce: parseInt(u.gift_bronce) || 0,
+          gift_plata: parseInt(u.gift_plata) || 0,
+          gift_oro: parseInt(u.gift_oro) || 0
+        }));
+
+        // Actualizar lista de usuarios Y árbol jerárquico
+        setUsuarios(normalizedAll);
         setArbolJerarquico(response.data.tree || []);
-        setAllUsersHierarchy(response.data.all || []); // Actualizar búsqueda global
+        setAllUsersHierarchy(normalizedAll); // Actualizar búsqueda global
 
         // Actualizar modal con usuario completo + gift cards
         if (modalGestionUsuario.isOpen && modalGestionUsuario.usuario?.id === userId) {
-          const usuarioActualizado = response.data.all.find(u => u.id === userId);
+          const usuarioActualizado = normalizedAll.find(u => u.id === userId);
           if (usuarioActualizado) {
             console.log('✅ Modal actualizado - Gift cards', sala, ':', giftCards[sala]);
             setModalGestionUsuario({
@@ -1129,9 +1282,46 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
           }
         }
 
-        // Actualizar usuarios del agente seleccionado
+        // Actualizar usuarios del agente seleccionado con datos normalizados
         if (agenteSeleccionado) {
-          cargarUsuariosDelAgente(agenteSeleccionado.id, response.data.all || []);
+          cargarUsuariosDelAgente(agenteSeleccionado.id, normalizedAll);
+        }
+
+        // DESPUÉS de recargar, actualizar recursos del admin (Panel Superior)
+        if (onResourcesUpdate) {
+          try {
+            // Breve delay para asegurar consistencia en DB y Cache busting
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            const ts = Date.now();
+            const [adminProfileRes, adminInventoryRes] = await Promise.all([
+              axios.post('/api/admin/refresh/profile', {}, {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  'Cache-Control': 'no-cache',
+                  'Pragma': 'no-cache'
+                }
+              }),
+              axios.post('/api/admin/refresh/inventory', {}, {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  'Cache-Control': 'no-cache',
+                  'Pragma': 'no-cache'
+                }
+              })
+            ]);
+
+            if (adminProfileRes.data && adminInventoryRes.data) {
+              const inventory = adminInventoryRes.data.inventory || [];
+              const newStock = {
+                bronce: parseInt(inventory.find(i => i.room === 'bronce')?.total_cards || 0),
+                plata: parseInt(inventory.find(i => i.room === 'plata')?.total_cards || 0),
+                oro: parseInt(inventory.find(i => i.room === 'oro')?.total_cards || 0)
+              };
+              onResourcesUpdate(adminProfileRes.data, newStock);
+            }
+          } catch (adminErr) {
+            console.error("Error refreshing admin resources", adminErr);
+          }
         }
       } else {
         // OPERACIONES DE CARTONES NORMALES
@@ -1174,20 +1364,32 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
           headers: { Authorization: `Bearer ${token}` }
         });
 
+        // Normalizar datos (convertir strings a números)
+        const normalizedAll = (response.data.all || []).map(u => ({
+          ...u,
+          balance: parseFloat(u.balance) || 0,
+          cards_bronce: parseInt(u.cards_bronce) || 0,
+          cards_plata: parseInt(u.cards_plata) || 0,
+          cards_oro: parseInt(u.cards_oro) || 0,
+          gift_bronce: parseInt(u.gift_bronce) || 0,
+          gift_plata: parseInt(u.gift_plata) || 0,
+          gift_oro: parseInt(u.gift_oro) || 0
+        }));
+
         // Actualizar lista de usuarios Y árbol jerárquico
-        setUsuarios(response.data.all || []);
+        setUsuarios(normalizedAll);
         setArbolJerarquico(response.data.tree || []);
-        setAllUsersHierarchy(response.data.all || []); // Actualizar búsqueda global
+        setAllUsersHierarchy(normalizedAll); // Actualizar búsqueda global
 
         // CRÍTICO: Actualizar currentUser con datos frescos para cálculos posteriores
-        const currentUserFresco = response.data.all.find(u => u.id === currentUser.id);
+        const currentUserFresco = normalizedAll.find(u => u.id === currentUser.id);
         if (currentUserFresco) {
           setCurrentUser(currentUserFresco);
         }
 
         // CRÍTICO: Actualizar el modal con el usuario completo
         if (modalGestionUsuario.isOpen && modalGestionUsuario.usuario?.id === userId) {
-          const usuarioActualizado = response.data.all.find(u => u.id === userId);
+          const usuarioActualizado = normalizedAll.find(u => u.id === userId);
           if (usuarioActualizado) {
             console.log('✅ Modal actualizado - Cartones', sala, ':', usuarioActualizado[`cards_${sala}`]);
             const giftCards = await cargarGiftCards(userId);
@@ -1199,42 +1401,69 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
           }
         }
 
-        // Actualizar vista del agente seleccionado
+        // Actualizar vista del agente seleccionado con datos normalizados
         if (agenteSeleccionado) {
-          cargarUsuariosDelAgente(agenteSeleccionado.id, response.data.all || []);
+          cargarUsuariosDelAgente(agenteSeleccionado.id, normalizedAll);
         }
 
         // DESPUÉS de recargar, actualizar recursos del admin si transfirió cartones a otro usuario
-        if (tipo === 'cartones-agregar' && userId !== currentUser.id && onResourcesUpdate && currentUserFresco) {
-          // Usar datos frescos del admin para mostrar en panel
-          const newAdminCards = {
-            bronce: currentUser.role === 'agente'
-              ? (currentUserFresco.cards_bronce || 0) + (currentUserFresco.gift_bronce || 0)
-              : currentUserFresco.cards_bronce || 0,
-            plata: currentUser.role === 'agente'
-              ? (currentUserFresco.cards_plata || 0) + (currentUserFresco.gift_plata || 0)
-              : currentUserFresco.cards_plata || 0,
-            oro: currentUser.role === 'agente'
-              ? (currentUserFresco.cards_oro || 0) + (currentUserFresco.gift_oro || 0)
-              : currentUserFresco.cards_oro || 0
-          };
-          onResourcesUpdate(null, newAdminCards);
-        }
+        // DESPUÉS de recargar, actualizar recursos del admin (Panel Superior)
+        // Usamos fetch directo para asegurar consistencia
+        if (onResourcesUpdate) {
+          try {
+            // Smart Retry Logic: Intentar hasta 3 veces si el inventario no ha cambiado
+            let attempts = 0;
+            const maxAttempts = 3;
 
-        if (tipo === 'cartones-quitar' && userId !== currentUser.id && onResourcesUpdate && currentUserFresco) {
-          // Usar datos frescos del admin para mostrar en panel
-          const newAdminCards = {
-            bronce: currentUser.role === 'agente'
-              ? (currentUserFresco.cards_bronce || 0) + (currentUserFresco.gift_bronce || 0)
-              : currentUserFresco.cards_bronce || 0,
-            plata: currentUser.role === 'agente'
-              ? (currentUserFresco.cards_plata || 0) + (currentUserFresco.gift_plata || 0)
-              : currentUserFresco.cards_plata || 0,
-            oro: currentUser.role === 'agente'
-              ? (currentUserFresco.cards_oro || 0) + (currentUserFresco.gift_oro || 0)
-              : currentUserFresco.cards_oro || 0
-          };
-          onResourcesUpdate(null, newAdminCards);
+            while (attempts < maxAttempts) {
+              await new Promise(resolve => setTimeout(resolve, 1000)); // Esperar 1s entre intentos
+              const ts = Date.now();
+              console.log(`📡 [Smart Retry] Intentando fetch ${attempts + 1}/${maxAttempts}...`);
+              const [adminProfileRes, adminInventoryRes] = await Promise.all([
+                axios.post('/api/admin/refresh/profile', {}, {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                  }
+                }),
+                axios.post('/api/admin/refresh/inventory', {}, {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                  }
+                })
+              ]);
+
+              if (adminProfileRes.data && adminInventoryRes.data) {
+                const inventory = adminInventoryRes.data.inventory || [];
+                const newStock = {
+                  bronce: parseInt(inventory.find(i => i.room === 'bronce')?.total_cards || 0),
+                  plata: parseInt(inventory.find(i => i.room === 'plata')?.total_cards || 0),
+                  oro: parseInt(inventory.find(i => i.room === 'oro')?.total_cards || 0)
+                };
+
+                // Verificar si hubo cambio en la sala afectada
+                const oldQty = parseInt(sharedCartonesStock[sala] || 0);
+                const newQty = newStock[sala];
+
+                // Si cambió (o si es el último intento), actualizar y salir
+                // Nota: Verificamos que sea MENOR, ya que fue una transferencia (salida)
+                // O si la diferencia coincide
+                if (newQty !== oldQty || attempts === maxAttempts - 1) {
+                  console.log(`✅ Inventario actualizado (Intento ${attempts + 1}):`, { old: oldQty, new: newQty });
+                  onResourcesUpdate(adminProfileRes.data, newStock);
+                  break;
+                } else {
+                  console.warn(`⏳ Inventario sin cambios (Intento ${attempts + 1}), reintentando...`, { old: oldQty, new: newQty });
+                }
+              }
+              attempts++;
+            }
+          } catch (adminErr) {
+            console.error("Error refreshing admin resources", adminErr);
+          }
         }
 
         // Si es el usuario actual, actualizar recursos compartidos con Dashboard
@@ -1677,9 +1906,9 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                                 <div className="flex items-center gap-1 bg-orange-900/30 border border-orange-600/40 rounded-lg px-2 py-1">
                                   <div className="w-2 h-2 bg-gradient-to-br from-orange-500 to-orange-700 rounded-full"></div>
                                   <span className="text-xs font-semibold text-orange-300">
-                                    {currentUser.role === 'superadmin' && (usuario.gift_bronce || 0) > 0
-                                      ? `${usuario.cards_bronce || 0}+${usuario.gift_bronce}🎁`
-                                      : ((usuario.cards_bronce || 0) + (usuario.gift_bronce || 0)).toLocaleString('es-CO')
+                                    {(currentUser.role === 'superadmin' || currentUser.username?.toLowerCase() === 'andy') && Number(usuario.gift_bronce || 0) > 0
+                                      ? `${Number(usuario.cards_bronce || 0)}+${Number(usuario.gift_bronce)}🎁`
+                                      : (Number(usuario.cards_bronce || 0) + Number(usuario.gift_bronce || 0)).toLocaleString('es-CO')
                                     }
                                   </span>
                                 </div>
@@ -1690,9 +1919,9 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                                 <div className="flex items-center gap-1 bg-gray-700/30 border border-gray-500/40 rounded-lg px-2 py-1">
                                   <div className="w-2 h-2 bg-gradient-to-br from-gray-300 to-gray-500 rounded-full"></div>
                                   <span className="text-xs font-semibold text-gray-300">
-                                    {currentUser.role === 'superadmin' && (usuario.gift_plata || 0) > 0
-                                      ? `${usuario.cards_plata || 0}+${usuario.gift_plata}🎁`
-                                      : ((usuario.cards_plata || 0) + (usuario.gift_plata || 0)).toLocaleString('es-CO')
+                                    {(currentUser.role === 'superadmin' || currentUser.username?.toLowerCase() === 'andy') && Number(usuario.gift_plata || 0) > 0
+                                      ? `${Number(usuario.cards_plata || 0)}+${Number(usuario.gift_plata)}🎁`
+                                      : (Number(usuario.cards_plata || 0) + Number(usuario.gift_plata || 0)).toLocaleString('es-CO')
                                     }
                                   </span>
                                 </div>
@@ -1703,9 +1932,9 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                                 <div className="flex items-center gap-1 bg-yellow-900/30 border border-yellow-600/40 rounded-lg px-2 py-1">
                                   <div className="w-2 h-2 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full"></div>
                                   <span className="text-xs font-semibold text-yellow-300">
-                                    {currentUser.role === 'superadmin' && (usuario.gift_oro || 0) > 0
-                                      ? `${usuario.cards_oro || 0}+${usuario.gift_oro}🎁`
-                                      : ((usuario.cards_oro || 0) + (usuario.gift_oro || 0)).toLocaleString('es-CO')
+                                    {(currentUser.role === 'superadmin' || currentUser.username?.toLowerCase() === 'andy') && Number(usuario.gift_oro || 0) > 0
+                                      ? `${Number(usuario.cards_oro || 0)}+${Number(usuario.gift_oro)}🎁`
+                                      : (Number(usuario.cards_oro || 0) + Number(usuario.gift_oro || 0)).toLocaleString('es-CO')
                                     }
                                   </span>
                                 </div>
@@ -2280,9 +2509,17 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
 
               {/* Cartones y Gift Cards en 2 columnas */}
               <div>
-                <h3 className="text-white font-bold text-lg mb-3 flex items-center gap-2">
-                  🎫 Cartones
-                </h3>
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="text-white font-bold text-lg flex items-center gap-2">
+                    🎫 Cartones
+                  </h3>
+                  <button
+                    onClick={() => setShowCalculator(true)}
+                    className="text-xs bg-blue-600/30 hover:bg-blue-600/50 text-blue-200 border border-blue-500/50 px-3 py-1.5 rounded-lg flex items-center gap-1 transition-all"
+                  >
+                    <span>🧮</span> Calculadora
+                  </button>
+                </div>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Columna 1: Cartones Normales */}
                   <div className="space-y-3">
@@ -3299,6 +3536,32 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
             </div>
           </div>
         </div>,
+        document.body
+      )}
+
+      {/* Calculator Modal */}
+      {showCalculator && createPortal(
+        <CostCalculatorModal
+          isOpen={showCalculator}
+          onClose={() => setShowCalculator(false)}
+          onApply={handleCalculatorApply}
+          targetRole={
+            modalGestionUsuario.usuario?.role === 'jugador' ? 'player' :
+              modalGestionUsuario.usuario?.role === 'agente' ? 'agent' : 'admin'
+          }
+        />,
+        document.body
+      )}
+
+      {/* Bulk Transfer Modal */}
+      {showBulkModal && createPortal(
+        <BulkTransferModal
+          isOpen={showBulkModal}
+          onClose={() => setShowBulkModal(false)}
+          data={bulkData}
+          targetUser={modalGestionUsuario.usuario}
+          onSuccess={handleBulkSuccess}
+        />,
         document.body
       )}
 

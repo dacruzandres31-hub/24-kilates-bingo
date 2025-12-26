@@ -14,6 +14,7 @@ exports.getRoomSettings = async (req, res) => {
         percentage_bingo,
         percentage_acumulado,
         accumulated_pot_pre40,
+        agent_bonus_percentage,
         updated_at
       FROM room_settings
       ORDER BY FIELD(room, 'bronce', 'plata', 'oro')

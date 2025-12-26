@@ -246,16 +246,16 @@ const CasinoLobby = ({ user, onLogout }) => {
 
           // Actualizar en formato cartones
           updated.cartones = {
-            bronce: cartonesData.bronce || cartonesData.bronze || prev.cartones?.bronce || 0,
-            plata: cartonesData.plata || cartonesData.silver || prev.cartones?.plata || 0,
-            oro: cartonesData.oro || cartonesData.gold || prev.cartones?.oro || 0
+            bronce: cartonesData.bronce !== undefined ? cartonesData.bronce : (cartonesData.bronze !== undefined ? cartonesData.bronze : (prev.cartones?.bronce || 0)),
+            plata: cartonesData.plata !== undefined ? cartonesData.plata : (cartonesData.silver !== undefined ? cartonesData.silver : (prev.cartones?.plata || 0)),
+            oro: cartonesData.oro !== undefined ? cartonesData.oro : (cartonesData.gold !== undefined ? cartonesData.gold : (prev.cartones?.oro || 0))
           };
 
           // También actualizar en formato tickets para compatibilidad
           updated.tickets = {
-            bronze: cartonesData.bronce || cartonesData.bronze || prev.tickets?.bronze || 0,
-            silver: cartonesData.plata || cartonesData.silver || prev.tickets?.silver || 0,
-            gold: cartonesData.oro || cartonesData.gold || prev.tickets?.gold || 0
+            bronze: cartonesData.bronce !== undefined ? cartonesData.bronce : (cartonesData.bronze !== undefined ? cartonesData.bronze : (prev.tickets?.bronze || 0)),
+            silver: cartonesData.plata !== undefined ? cartonesData.plata : (cartonesData.silver !== undefined ? cartonesData.silver : (prev.tickets?.silver || 0)),
+            gold: cartonesData.oro !== undefined ? cartonesData.oro : (cartonesData.gold !== undefined ? cartonesData.gold : (prev.tickets?.gold || 0))
           };
         }
 

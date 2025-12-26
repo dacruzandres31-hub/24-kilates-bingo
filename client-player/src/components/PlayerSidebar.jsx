@@ -42,25 +42,25 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
 
     const handleResourcesUpdated = (data) => {
       console.log('📡 [PlayerSidebar] Recursos actualizados desde admin:', data);
-      
+
       setUserData(prev => {
         const updated = { ...prev };
-        
+
         // Actualizar balance si viene
         if (data.balance !== undefined) {
           updated.balance = data.balance;
         }
-        
+
         // Actualizar cartones si vienen (puede venir como 'cartones' o 'tickets')
         if (data.cartones || data.tickets) {
           const cartonesData = data.cartones || data.tickets;
           updated.tickets = {
-            bronze: cartonesData.bronce || cartonesData.bronze || prev.tickets.bronze,
-            silver: cartonesData.plata || cartonesData.silver || prev.tickets.silver,
-            gold: cartonesData.oro || cartonesData.gold || prev.tickets.gold
+            bronze: cartonesData.bronce !== undefined ? cartonesData.bronce : (cartonesData.bronze !== undefined ? cartonesData.bronze : prev.tickets.bronze),
+            silver: cartonesData.plata !== undefined ? cartonesData.plata : (cartonesData.silver !== undefined ? cartonesData.silver : prev.tickets.silver),
+            gold: cartonesData.oro !== undefined ? cartonesData.oro : (cartonesData.gold !== undefined ? cartonesData.gold : prev.tickets.gold)
           };
         }
-        
+
         return updated;
       });
 
@@ -82,7 +82,7 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
   useEffect(() => {
     // Actualizar estado inicial del audio
     setAudioStatus(audioService.getStatus());
-    
+
     const fetchUserData = async () => {
       try {
         const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
@@ -94,18 +94,18 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
           }));
           return;
         }
-        
+
         console.log('[PlayerSidebar] 🔄 Cargando datos de usuario...');
         console.log('[PlayerSidebar] 🔑 Token:', token.substring(0, 20) + '...');
-        
+
         const response = await axios.get('/api/users/profile', {
           headers: { Authorization: `Bearer ${token}` }
         });
-        
+
         // El API devuelve los datos directamente sin wrapper
         const data = response.data;
         console.log('[PlayerSidebar] ✅ Datos recibidos:', data);
-        
+
         setUserData({
           username: data.username || 'Usuario',
           balance: parseFloat(data.balance) || 0,
@@ -120,28 +120,28 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
         console.error('[PlayerSidebar] ❌ Error cargando datos del usuario:', error);
         console.error('[PlayerSidebar] ❌ Status:', error.response?.status);
         console.error('[PlayerSidebar] ❌ Detalles:', error.response?.data || error.message);
-        
+
         // Mostrar error en UI
         setUserData(prev => ({
           ...prev,
           username: 'Error al cargar'
         }));
-        
+
         // Mostrar notificación de error
         setNotificationMessage('❌ Error cargando datos del perfil');
         setTimeout(() => setNotificationMessage(null), 4000);
       }
     };
-    
+
     fetchUserData();
   }, []);
-  
+
   const toggleMusic = () => {
     const newState = audioService.toggleMusic();
     setAudioStatus(audioService.getStatus());
     console.log(`🎵 Música ${newState ? 'activada' : 'desactivada'}`);
   };
-  
+
   const toggleEfectos = () => {
     const newState = audioService.toggleEfectos();
     setAudioStatus(audioService.getStatus());
@@ -167,17 +167,17 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
-    
+
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       alert('❌ Las contraseñas no coinciden');
       return;
     }
-    
+
     if (passwordData.newPassword.length < 6) {
       alert('❌ La contraseña debe tener al menos 6 caracteres');
       return;
     }
-    
+
     try {
       const token = localStorage.getItem('playerToken');
       const response = await fetch('/api/auth/change-password', {
@@ -191,7 +191,7 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
           newPassword: passwordData.newPassword
         })
       });
-      
+
       if (response.ok) {
         alert('✅ Contraseña cambiada exitosamente');
         setShowChangePassword(false);
@@ -208,7 +208,7 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
   return (
     <>
       {/* Botón flotante para abrir sidebar */}
-      <button 
+      <button
         className={`sidebar-toggle-btn ${isOpen ? 'hidden' : ''}`}
         onClick={onToggle}
         title="Abrir menú"
@@ -276,12 +276,12 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
               <span className="sidebar-value username" style={{ color: accentColor }}>{userData?.username || 'Cargando...'}</span>
             </div>
           </div>
-          
+
           {/* Botón Mi Perfil */}
-          <button 
-            className="change-password-btn" 
+          <button
+            className="change-password-btn"
             onClick={() => setShowChangePassword(true)}
-            style={{ 
+            style={{
               color: themeColor,
               borderColor: `${themeColor}50`,
               marginTop: '10px',
@@ -329,7 +329,7 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
             <FaTicketAlt className="section-icon" style={{ color: themeColor }} />
             <h4 className="section-title" style={{ color: accentColor }}>Mis Cartones</h4>
           </div>
-          
+
           <div className="tickets-list">
             <div className="ticket-item bronze">
               <span className="ticket-room">Bronce</span>
@@ -352,26 +352,26 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
             <FaHome className="action-icon" style={{ color: themeColor }} />
             <span>Volver al Lobby</span>
           </button>
-          
+
           <button className="sidebar-action-btn support-btn" onClick={handleSupport} style={{ borderColor: themeColor }}>
             <FaHeadset className="action-icon" style={{ color: themeColor }} />
             <span>Soporte Técnico</span>
           </button>
         </div>
-        
+
         {/* Controles de Audio - Colapsable */}
         <div className="sidebar-section audio-controls-section" style={{ borderBottom: `1px solid ${themeColor}30` }}>
-          <div 
+          <div
             className="sidebar-section-header collapsible"
             onClick={() => setAudioExpanded(!audioExpanded)}
           >
             <h4 className="section-title" style={{ color: accentColor }}>Audio</h4>
             <span className={`expand-icon ${audioExpanded ? 'expanded' : ''}`} style={{ color: themeColor }}>▼</span>
           </div>
-          
+
           {audioExpanded && (
             <div className="audio-controls">
-              <button 
+              <button
                 className={`audio-control-btn ${audioStatus.musicEnabled ? 'active' : ''}`}
                 onClick={toggleMusic}
                 title={audioStatus.musicEnabled ? 'Desactivar música' : 'Activar música'}
@@ -380,8 +380,8 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
                 {audioStatus.musicEnabled ? <FaMusic style={{ color: themeColor }} /> : <FaVolumeMute />}
                 <span>{audioStatus.musicEnabled ? 'Música ON' : 'Música OFF'}</span>
               </button>
-              
-              <button 
+
+              <button
                 className={`audio-control-btn ${audioStatus.efectosEnabled ? 'active' : ''}`}
                 onClick={toggleEfectos}
                 title={audioStatus.efectosEnabled ? 'Desactivar efectos' : 'Activar efectos'}
@@ -402,7 +402,7 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
 
       {/* Modal de Cambiar Contraseña */}
       {showChangePassword && (
-        <div 
+        <div
           style={{
             position: 'fixed',
             top: 0,
@@ -419,7 +419,7 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
           }}
           onClick={() => setShowChangePassword(false)}
         >
-          <div 
+          <div
             style={{
               background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
               borderRadius: '1rem',
@@ -431,9 +431,9 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 style={{ 
-              color: themeColor, 
-              marginBottom: '1.5rem', 
+            <h3 style={{
+              color: themeColor,
+              marginBottom: '1.5rem',
               textAlign: 'center',
               fontSize: '1.5rem',
               fontWeight: 'bold'
@@ -609,10 +609,10 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
                 </button>
               </div>
             </form>
-            
+
             {/* Separador */}
             <div style={{ margin: '1.5rem 0', borderTop: '1px solid #334155' }} />
-            
+
             {/* Botón Cerrar Sesión */}
             <button
               type="button"

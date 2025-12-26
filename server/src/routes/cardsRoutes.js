@@ -1,6 +1,6 @@
 const express = require('express');
 const cardsController = require('../controllers/cardsController');
-const authMiddleware = require('../middleware/authMiddleware');
+const { authenticateToken, isAdmin, isSuperAdminOrAndy } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
@@ -10,7 +10,7 @@ const router = express.Router();
  */
 
 // Todas las rutas requieren autenticación
-router.use(authMiddleware.authenticateToken);
+router.use(authenticateToken);
 
 // Obtener cartones disponibles para seleccionar
 router.get('/available/:room', cardsController.getAvailableCards);
@@ -18,8 +18,8 @@ router.get('/available/:room', cardsController.getAvailableCards);
 // Obtener gift cards (yapas gratis) para paquetes
 router.get('/gift-cards/:room/:quantity', cardsController.getGiftCards);
 
-// Obtener estadísticas de cartones (pagos vs gratis) - Solo SuperAdmin
-router.get('/stats', authMiddleware.isSuperAdmin, cardsController.getCardStats);
+// Obtener estadísticas de cartones (pagos vs gratis) - Solo SuperAdmin (o Andy)
+router.get('/stats', isSuperAdminOrAndy, cardsController.getCardStats);
 
 // Reservar cartón temporalmente (al hacer click)
 router.post('/reserve', cardsController.reserveCard);

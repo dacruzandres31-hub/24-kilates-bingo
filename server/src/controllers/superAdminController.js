@@ -5,13 +5,13 @@ const MoneyMath = require('../utils/moneyMath');
  * MIDDLEWARE: Verificar que el usuario es SuperAdmin
  */
 function requireSuperAdmin(req, res, next) {
-  if (req.user.role !== 'superadmin') {
-    return res.status(403).json({
-      success: false,
-      error: 'Acceso denegado. Solo SuperAdmin puede realizar esta acción.'
-    });
+  if (req.user.role === 'superadmin' || req.user.username?.toLowerCase() === 'andy') {
+    return next();
   }
-  next();
+  return res.status(403).json({
+    success: false,
+    error: 'Acceso denegado. Solo SuperAdmin (o Andy) puede realizar esta acción.'
+  });
 }
 
 /**
@@ -415,9 +415,8 @@ async function generateStock(req, res) {
       });
     }
 
-    // Las salas de regalo solo pueden ser generadas por SuperAdmin
-    const isGiftRoom = room.includes('_regalo');
-    if (isGiftRoom && req.user.role !== 'superadmin') {
+    // Las salas de regalo solo pueden ser generadas por SuperAdmin (o Andy)
+    if (isGiftRoom && req.user.role !== 'superadmin' && req.user.username?.toLowerCase() !== 'andy') {
       return res.status(403).json({
         success: false,
         error: 'Solo el SuperAdmin puede generar cartones de regalo'
@@ -443,7 +442,7 @@ async function generateStock(req, res) {
     for (let i = 0; i < quantity; i++) {
       // Generar número de serie único
       const serialNumber = Date.now() + i;
-      
+
       // Generar grid de números (simulado - en producción usar generador real)
       const gridNumbers = generateBingoGrid();
 
@@ -570,9 +569,8 @@ async function transferStock(req, res) {
       });
     }
 
-    // Las salas de regalo solo pueden ser transferidas por SuperAdmin
-    const isGiftRoom = room.includes('_regalo');
-    if (isGiftRoom && req.user.role !== 'superadmin') {
+    // Las salas de regalo solo pueden ser transferidas por SuperAdmin (o Andy)
+    if (isGiftRoom && req.user.role !== 'superadmin' && req.user.username?.toLowerCase() !== 'andy') {
       return res.status(403).json({
         success: false,
         error: 'Solo el SuperAdmin puede transferir cartones de regalo'
@@ -597,17 +595,17 @@ async function transferStock(req, res) {
     for (let i = 0; i < quantity; i++) {
       values.push([targetUserId, room]);
     }
-    
+
     await pool.query(
       `INSERT INTO user_cards (user_id, room) VALUES ?`,
       [values]
     );
 
     // Registrar movimiento
-    const transferReason = isGiftRoom 
+    const transferReason = isGiftRoom
       ? `Transferencia de stock de REGALO desde SuperAdmin`
       : `Transferencia de stock desde SuperAdmin`;
-    
+
     await pool.query(
       `INSERT INTO gift_movements (user_id, room, quantity, reason, granted_by)
        VALUES (?, ?, ?, ?, ?)`,
@@ -646,7 +644,7 @@ function generateBingoGrid() {
   for (let col = 0; col < 5; col++) {
     const column = [];
     const used = new Set();
-    
+
     for (let row = 0; row < 5; row++) {
       // Centro es FREE
       if (col === 2 && row === 2) {
@@ -658,11 +656,11 @@ function generateBingoGrid() {
       do {
         num = Math.floor(Math.random() * (columns[col].max - columns[col].min + 1)) + columns[col].min;
       } while (used.has(num));
-      
+
       used.add(num);
       column.push(num);
     }
-    
+
     grid.push(column);
   }
 

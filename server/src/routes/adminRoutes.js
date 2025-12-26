@@ -1,5 +1,11 @@
 const express = require('express');
 const router = express.Router();
+
+router.use((req, res, next) => {
+  console.log(`🔎 [AdminRouter] Routing: ${req.method} ${req.url}`);
+  next();
+});
+
 const {
   authenticateToken,
   isAdmin
@@ -22,7 +28,8 @@ const {
   getMyCardMovements,
   changePassword,
   changeUserPassword,
-  updateUserPersonalData
+  updateUserPersonalData,
+  bulkTransferCards
 } = require('../controllers/adminController');
 
 const cardInventoryController = require('../controllers/cardInventoryController');
@@ -80,6 +87,10 @@ router.get('/cards/inventory', authenticateToken, isAdmin, getMyCardInventory);
 router.get('/cards/all-inventories', authenticateToken, isAdmin, cardInventoryController.getAllInventories);
 router.get('/cards/all-movements', authenticateToken, isAdmin, cardInventoryController.getAllMovements);
 router.post('/cards/transfer', authenticateToken, isAdmin, transferCardsToUser);
+
+// [NEW] Carga masiva de cartones (Multi-room + Bonos)
+router.post('/cards/bulk-transfer', authenticateToken, isAdmin, bulkTransferCards);
+
 router.get('/cards/movements', authenticateToken, isAdmin, getMyCardMovements);
 
 // ========================================
@@ -103,6 +114,7 @@ router.get('/sessions/history/:id', authenticateToken, isAdmin, sessionHistoryCo
 // 💰 POZOS Y CONFIGURACIÓN DE SALAS
 // Consulta de pozos actuales (Admin + SuperAdmin)
 // ========================================
+router.get('/room-settings/config', authenticateToken, isAdmin, roomSettingsController.getRoomSettings); // Para calculadora
 router.get('/room-settings/current-pots', authenticateToken, isAdmin, roomSettingsController.getCurrentPots);
 
 // Historial y Estadísticas de Pozos
@@ -126,6 +138,20 @@ const metricsService = require('../services/metricsService'); // Add import
 // ========================================
 router.get('/metrics', authenticateToken, isAdmin, (req, res) => {
   res.json(metricsService.getMetrics());
+});
+
+router.post('/refresh/profile', authenticateToken, isAdmin, getAdminProfile);
+router.post('/refresh/inventory', authenticateToken, isAdmin, getMyCardInventory);
+
+// CATCH-ALL 404 FOR ADMIN ROUTES
+router.use((req, res) => {
+  console.log(`❌ [AdminRouter] 404 Not Found: ${req.method} ${req.originalUrl} (Subpath: ${req.url})`);
+  res.status(404).json({
+    error: 'Ruta no encontrada en AdminRouter',
+    method: req.method,
+    originalUrl: req.originalUrl,
+    subpath: req.url
+  });
 });
 
 module.exports = router;

@@ -38,7 +38,12 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 // EXPRESS APP
 const app = express();
 
-// MIDDLEWARE SEGURIDAD
+// GLOBAL DEBUG LOGGER
+app.use((req, res, next) => {
+  console.log(`🌍 [Global Request] ${req.method} ${req.originalUrl}`);
+  next();
+});
+
 app.use(helmet());
 app.use(morgan('combined'));
 
@@ -117,6 +122,18 @@ io.on('connection', (socket) => {
 });
 
 // RUTAS API
+console.log('🚀 [Server] Rutas cargadas: ' + new Date().toLocaleTimeString());
+
+// Middleware para debuguear rutas admin
+app.use('/api/admin', (req, res, next) => {
+  console.log(`📡 [Admin Request] ${req.method} ${req.url}`);
+  next();
+});
+
+// ADMIN ROUTES (Higher priority to avoid shadowing)
+app.use('/api/admin/gift-cards', giftCardsRoutes);
+app.use('/api/admin', adminRoutes);
+
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/activity-history', require('./routes/activityHistoryRoutes')); // Historial del jugador
@@ -131,8 +148,6 @@ app.use('/api/chips', chipsRoutes);
 app.use('/api/withdrawals', withdrawalRoutes);
 app.use('/api/commissions', require('./routes/commissionRoutes')); // Sistema de comisiones
 app.use('/api/winners-payment', winnersPaymentRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/admin/gift-cards', giftCardsRoutes);
 app.use('/api/superadmin', superAdminRoutes);
 app.use('/api/game-admin', gameAdminRoutes);
 app.use('/api/support', require('./routes/supportRoutes'));

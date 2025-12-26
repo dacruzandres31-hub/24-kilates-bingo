@@ -23,8 +23,8 @@ async function addGiftCards(req, res) {
     const adminId = req.user.id;
     const adminRole = req.user.role;
 
-    // Solo SuperAdmins pueden gestionar cartones de regalo
-    if (adminRole !== 'superadmin') {
+    // Solo SuperAdmins (o Andy) pueden gestionar cartones de regalo
+    if (adminRole !== 'superadmin' && req.user.username?.toLowerCase() !== 'andy') {
       return res.status(403).json({
         success: false,
         error: 'Solo SuperAdmins pueden gestionar cartones de regalo'
@@ -179,7 +179,8 @@ async function removeGiftCards(req, res) {
     const adminId = req.user.id;
     const adminRole = req.user.role;
 
-    if (adminRole !== 'superadmin') {
+    // Solo SuperAdmins (o Andy) pueden gestionar cartones de regalo
+    if (adminRole !== 'superadmin' && req.user.username?.toLowerCase() !== 'andy') {
       return res.status(403).json({
         success: false,
         error: 'Solo SuperAdmins pueden gestionar cartones de regalo'

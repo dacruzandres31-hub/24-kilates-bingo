@@ -105,17 +105,35 @@ export default function Dashboard() {
     try {
       const token = localStorage.getItem('adminToken');
 
+      const ts = Date.now();
+      console.log('📡 [Dashboard] Fetching resources...');
       const [userRes, finRes, inventoryRes] = await Promise.all([
-        axios.get('/api/admin/profile', {
-          headers: { Authorization: `Bearer ${token}` }
+        axios.post('/api/admin/refresh/profile', {}, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
         }),
         axios.get('/api/admin/financial-summary', {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
         }),
-        axios.get('/api/admin/cards/inventory', {
-          headers: { Authorization: `Bearer ${token}` }
+        axios.post('/api/admin/refresh/inventory', {}, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
         })
       ]);
+      console.log('✅ [Dashboard] Resources fetched successfully');
 
       setUserData(userRes.data);
       setFinancialData(finRes.data);

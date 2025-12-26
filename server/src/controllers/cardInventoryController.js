@@ -68,6 +68,68 @@ exports.creditCards = async (req, res) => {
       reason || `Acreditación manual por ${req.user.username}`
     );
 
+
+    // ============================================
+    // LÓGICA DE BONIFICACIÓN AUTOMÁTICA (10% Default o Configurable)
+    // ============================================
+    // Solo aplicar si es una compra (is_gift = false) y hay cantidad > 0
+    if (!is_gift && quantity > 0) {
+      try {
+        const db = require('../db');
+        // 1. Obtener porcentaje de bonificación de la sala
+        const [roomSettings] = await db.query(
+          'SELECT agent_bonus_percentage FROM room_settings WHERE room = ?',
+          [room]
+        );
+
+        const bonusPercentage = roomSettings.length > 0
+          ? parseFloat(roomSettings[0].agent_bonus_percentage)
+          : 10.00; // Fallback 10%
+
+        // 2. Calcular cantidad de regalo
+        const bonusQuantity = Math.floor(quantity * (bonusPercentage / 100));
+
+        if (bonusQuantity > 0) {
+          console.log(`🎁 [Bonus System] Aplicando bono del ${bonusPercentage}% (${bonusQuantity} cartones) a user_${targetUserId} por crédito SuperAdmin`);
+
+          // 3. Insertar cartones de regalo (is_gift = TRUE)
+          // Verificar si ya tiene inventario de regalo de esta sala
+          const [existingGift] = await db.query(
+            `SELECT id, quantity FROM user_card_inventory 
+             WHERE user_id = ? AND room = ? AND is_gift = TRUE
+             LIMIT 1`,
+            [targetUserId, room]
+          );
+
+          if (existingGift.length > 0) {
+            await db.query(
+              `UPDATE user_card_inventory 
+               SET quantity = quantity + ?, updated_at = CURRENT_TIMESTAMP
+               WHERE id = ?`,
+              [bonusQuantity, existingGift[0].id]
+            );
+          } else {
+            await db.query(
+              `INSERT INTO user_card_inventory 
+               (user_id, room, quantity, is_gift, created_at, updated_at)
+               VALUES (?, ?, ?, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+              [targetUserId, room, bonusQuantity]
+            );
+          }
+
+          // 4. Registrar en log de movimientos
+          await db.query(
+            `INSERT INTO card_movements_log 
+             (user_id, room, movement_type, quantity, is_gift, reason, executed_by, created_at)
+             VALUES (?, ?, 'credit', ?, TRUE, ?, ?, CURRENT_TIMESTAMP)`,
+            [targetUserId, room, bonusQuantity, `Bono automático ${bonusPercentage}% por crédito SuperAdmin`, req.user.id]
+          );
+        }
+      } catch (bonusError) {
+        console.error('❌ Error aplicando bono automático en creditCards:', bonusError);
+      }
+    }
+
     // ============================================
     // EMITIR ACTUALIZACIÓN DE RECURSOS (Socket.IO)
     // ============================================
