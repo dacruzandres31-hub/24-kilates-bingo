@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import axios from 'axios';
 import BlockUserModal from './BlockUserModal';
 import UnblockUserModal from './UnblockUserModal';
+import useSocket from '../hooks/useSocket';
 
 export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, onResourcesUpdate }) {
   const [usuarios, setUsuarios] = useState([]);
@@ -19,6 +20,9 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
     plata: 0,
     oro: 0
   });
+
+  // Socket.IO para actualizaciones en tiempo real
+  const socket = useSocket();
 
   // Estado para el modal de gestión de usuario
   const [modalGestionUsuario, setModalGestionUsuario] = useState({
@@ -166,6 +170,69 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
       window.removeEventListener('openUserManagementModal', handleOpenManagementModal);
     };
   }, []);
+
+  // Escuchar actualizaciones de recursos en tiempo real vía Socket.IO
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleResourcesUpdated = (data) => {
+      console.log('[GestionUsuarios] 📡 resources_updated recibido:', data);
+
+      // Extraer userId del evento (el backend emite a `user_${userId}`)
+      // Necesitamos que el backend también envíe el userId en el payload
+      if (data.userId) {
+        // Actualizar el usuario en la lista de usuarios
+        setUsuarios(prevUsuarios => {
+          return prevUsuarios.map(user => {
+            if (user.id === data.userId) {
+              const updated = { ...user };
+
+              // Actualizar balance si viene
+              if (data.balance !== undefined) {
+                updated.balance = parseFloat(data.balance);
+              }
+
+              // Actualizar cartones usando los campos separados (cards_* y gift_*)
+              if (data.cards_bronce !== undefined) updated.cards_bronce = parseInt(data.cards_bronce) || 0;
+              if (data.cards_plata !== undefined) updated.cards_plata = parseInt(data.cards_plata) || 0;
+              if (data.cards_oro !== undefined) updated.cards_oro = parseInt(data.cards_oro) || 0;
+              if (data.gift_bronce !== undefined) updated.gift_bronce = parseInt(data.gift_bronce) || 0;
+              if (data.gift_plata !== undefined) updated.gift_plata = parseInt(data.gift_plata) || 0;
+              if (data.gift_oro !== undefined) updated.gift_oro = parseInt(data.gift_oro) || 0;
+
+              console.log('[GestionUsuarios] ✅ Usuario actualizado:', updated.username, updated);
+              return updated;
+            }
+            return user;
+          });
+        });
+
+        // También actualizar allUsersHierarchy para búsqueda
+        setAllUsersHierarchy(prevAll => {
+          return prevAll.map(user => {
+            if (user.id === data.userId) {
+              const updated = { ...user };
+              if (data.balance !== undefined) updated.balance = parseFloat(data.balance);
+              if (data.cards_bronce !== undefined) updated.cards_bronce = parseInt(data.cards_bronce) || 0;
+              if (data.cards_plata !== undefined) updated.cards_plata = parseInt(data.cards_plata) || 0;
+              if (data.cards_oro !== undefined) updated.cards_oro = parseInt(data.cards_oro) || 0;
+              if (data.gift_bronce !== undefined) updated.gift_bronce = parseInt(data.gift_bronce) || 0;
+              if (data.gift_plata !== undefined) updated.gift_plata = parseInt(data.gift_plata) || 0;
+              if (data.gift_oro !== undefined) updated.gift_oro = parseInt(data.gift_oro) || 0;
+              return updated;
+            }
+            return user;
+          });
+        });
+      }
+    };
+
+    socket.on('resources_updated', handleResourcesUpdated);
+
+    return () => {
+      socket.off('resources_updated', handleResourcesUpdated);
+    };
+  }, [socket]);
 
   const cargarUsuarios = async () => {
     try {

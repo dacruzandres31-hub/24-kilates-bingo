@@ -284,6 +284,7 @@ export default function Dashboard() {
         activeSections={activeSections}
         onToggleSection={handleToggleSection}
         userData={userData}
+        userRole={userData?.role}
       />
 
       {/* Main Content */}
@@ -530,14 +531,6 @@ export default function Dashboard() {
             </section>
           )}
 
-          {/* Sistema */}
-          {activeSections['sistema'] && (
-            <section className="mb-8">
-              <h2 className="text-2xl font-bold text-white mb-6">⚠️ Alertas del Sistema</h2>
-              <AlertsList />
-            </section>
-          )}
-
           {/* Soporte Técnico - Exclusivo Andy */}
           {activeSections['support'] && userData?.username === 'Andy' && (
             <section className="mb-8">
@@ -551,6 +544,34 @@ export default function Dashboard() {
             <section className="mb-8">
               <h2 className="text-2xl font-bold text-white mb-6">💸 Gestión de Retiros (24Kilates)</h2>
               <WithdrawalsPanel />
+            </section>
+          )}
+
+          {/* Alertas del Sistema */}
+          {activeSections['alertas'] && (
+            <section className="mb-8">
+              <h2 className="text-2xl font-bold text-white mb-6">⚠️ Alertas del Sistema</h2>
+              <AlertsList />
+            </section>
+          )}
+
+          {/* Movimientos del Día */}
+          {activeSections['movimientos'] && (
+            <section className="mb-8">
+              <h2 className="text-2xl font-bold text-white mb-6">💸 Movimientos del Día</h2>
+              <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-6 border border-gray-700">
+                <p className="text-gray-300">Movimientos financieros del día actual...</p>
+              </div>
+            </section>
+          )}
+
+          {/* Últimos Movimientos */}
+          {activeSections['movimientos-recientes'] && (
+            <section className="mb-8">
+              <h2 className="text-2xl font-bold text-white mb-6">🕒 Últimos Movimientos</h2>
+              <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg p-6 border border-gray-700">
+                <p className="text-gray-300">Movimientos recientes...</p>
+              </div>
             </section>
           )}
 

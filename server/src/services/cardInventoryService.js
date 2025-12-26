@@ -14,7 +14,7 @@ class CardInventoryService {
    */
   async creditCards(userId, room, quantity, isGift = false, purchasePrice = null, executedBy, reason = null) {
     const connection = await db.getConnection();
-    
+
     try {
       await connection.beginTransaction();
 
@@ -75,7 +75,7 @@ class CardInventoryService {
    */
   async getInventory(userId, isSuperAdmin = false) {
     const view = isSuperAdmin ? 'v_superadmin_inventory' : 'v_admin_inventory';
-    
+
     const [inventory] = await db.query(
       `SELECT * FROM ${view} WHERE user_id = ?`,
       [userId]
@@ -110,7 +110,7 @@ class CardInventoryService {
       }
 
       const totalAvailable = fromInventory.reduce((sum, item) => sum + item.quantity, 0);
-      
+
       if (totalAvailable < quantity) {
         throw new Error(`Solo tiene ${totalAvailable} cartones disponibles, intentó transferir ${quantity}`);
       }
@@ -163,7 +163,7 @@ class CardInventoryService {
       }
 
       const totalAvailable = inventory.reduce((sum, item) => sum + item.quantity, 0);
-      
+
       if (totalAvailable < quantity) {
         throw new Error(`Solo tienes ${totalAvailable} cartones disponibles`);
       }
@@ -225,9 +225,9 @@ class CardInventoryService {
         for (let i = 0; i < toValidateFromThisType; i++) {
           const serialNumber = await this._generateSerialNumber(gameSessionId, room);
           const gridNumbers = this._generateBingoGrid();
-          
+
           // Calcular contribución a jackpots (solo cartones pagos)
-          const contributedAmount = invItem.is_gift === 0 
+          const contributedAmount = invItem.is_gift === 0
             ? MoneyMath.toNumber(cardPrice.times(0.70))  // 70% a jackpots
             : 0;
 
@@ -315,6 +315,29 @@ class CardInventoryService {
 
       await connection.commit();
 
+      // Emitir evento Socket.IO para actualizar pozos en admin panel
+      if (global.io) {
+        const [updatedSession] = await db.query(
+          'SELECT jackpot_linea, jackpot_bingo, jackpot_pre40 FROM game_sessions WHERE id = ?',
+          [gameSessionId]
+        );
+
+        if (updatedSession.length > 0) {
+          global.io.emit('pots_updated', {
+            sessionId: gameSessionId,
+            room,
+            pots: {
+              jackpot_linea: parseFloat(updatedSession[0].jackpot_linea),
+              jackpot_bingo: parseFloat(updatedSession[0].jackpot_bingo),
+              jackpot_pre40: parseFloat(updatedSession[0].jackpot_pre40)
+            },
+            message: `Pozos actualizados - ${quantity} cartones validados`
+          });
+
+          console.log(`📡 [Socket.IO] Pozos actualizados para sesión ${gameSessionId}`);
+        }
+      }
+
       return {
         success: true,
         message: `${quantity} cartones validados para la sesión ${gameSessionId}`,
@@ -361,7 +384,7 @@ class CardInventoryService {
    */
   _generateBingoGrid() {
     const grid = [];
-    
+
     // B: 1-15, I: 16-30, N: 31-45, G: 46-60, O: 61-75
     const ranges = [
       [1, 15],   // B

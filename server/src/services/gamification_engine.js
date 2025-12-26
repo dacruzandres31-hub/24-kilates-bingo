@@ -265,19 +265,29 @@ async function spinFortuneWheel(userId) {
       } else if (selectedPrize.type === 'ticket') {
         const ticketRoom = selectedPrize.room || 'bronce'; // Use dynamic room
 
-        // Check if item exists in inventory
-        // (Assuming standard inventory logic here, might need adjustment based on exact DB schema)
-        // First get item id
-        const [items] = await connection.query(`SELECT id FROM cosmetic_items WHERE type='ticket' AND ticket_room=? LIMIT 1`, [ticketRoom]);
-        if (items.length > 0) {
-          const itemId = items[0].id;
-          const [inv] = await connection.query(`SELECT id, quantity FROM user_inventory WHERE user_id=? AND item_id=?`, [userId, itemId]);
-          if (inv.length > 0) {
-            await connection.query(`UPDATE user_inventory SET quantity = quantity + 1 WHERE id=?`, [inv[0].id]);
-          } else {
-            await connection.query(`INSERT INTO user_inventory (user_id, item_id, quantity) VALUES (?, ?, 1)`, [userId, itemId]);
-          }
+        // Acreditar 1 cartón como REGALO (is_gift = 1) para que no afecte pozos
+        // Primero verificar si ya existe un registro de regalos para esta sala
+        const [existing] = await connection.query(`
+          SELECT id, quantity FROM user_card_inventory 
+          WHERE user_id = ? AND room = ? AND is_gift = 1
+        `, [userId, ticketRoom]);
+
+        if (existing.length > 0) {
+          // Actualizar cantidad existente
+          await connection.query(`
+            UPDATE user_card_inventory 
+            SET quantity = quantity + 1, updated_at = NOW()
+            WHERE id = ?
+          `, [existing[0].id]);
+        } else {
+          // Crear nuevo registro de regalo
+          await connection.query(`
+            INSERT INTO user_card_inventory (user_id, room, quantity, is_gift, created_at)
+            VALUES (?, ?, 1, 1, NOW())
+          `, [userId, ticketRoom]);
         }
+
+        console.log(`🎁 [FortuneWheel] Usuario ${userId} ganó 1 cartón REGALO de ${ticketRoom}`);
       }
 
       // 4. Update last_wheel_spin
@@ -292,7 +302,55 @@ async function spinFortuneWheel(userId) {
         [userId, JSON.stringify(selectedPrize)]
       );
 
+      // 5. Obtener cartones actualizados ANTES del commit (separados por tipo)
+      const [inventory] = await connection.query(`
+        SELECT 
+          room,
+          SUM(CASE WHEN is_gift = 0 THEN quantity ELSE 0 END) as normal,
+          SUM(CASE WHEN is_gift = 1 THEN quantity ELSE 0 END) as gift,
+          SUM(quantity) as total
+        FROM user_card_inventory
+        WHERE user_id = ?
+        GROUP BY room
+      `, [userId]);
+
+      const cartonesNormales = { bronce: 0, plata: 0, oro: 0 };
+      const cartonesRegalo = { bronce: 0, plata: 0, oro: 0 };
+      const cartonesTotales = { bronce: 0, plata: 0, oro: 0 };
+
+      inventory.forEach(row => {
+        cartonesNormales[row.room] = parseInt(row.normal) || 0;
+        cartonesRegalo[row.room] = parseInt(row.gift) || 0;
+        cartonesTotales[row.room] = parseInt(row.total) || 0;
+      });
+
       await connection.commit();
+
+      // 6. Emitir evento Socket.IO para actualizar recursos en tiempo real
+      if (global.io) {
+        const eventData = {
+          userId, // Agregar userId para que el admin sepa qué usuario actualizar
+          cartones: cartonesTotales, // Total para el jugador
+          cards_bronce: cartonesNormales.bronce, // Separados para el admin
+          cards_plata: cartonesNormales.plata,
+          cards_oro: cartonesNormales.oro,
+          gift_bronce: cartonesRegalo.bronce,
+          gift_plata: cartonesRegalo.plata,
+          gift_oro: cartonesRegalo.oro,
+          message: `¡Ganaste 1 cartón de ${selectedPrize.room.toUpperCase()}! 🎁`
+        };
+
+        // Emitir al jugador específico
+        global.io.to(`user_${userId}`).emit('resources_updated', eventData);
+
+        // También emitir a todos los clientes (para que los admins lo reciban)
+        global.io.emit('resources_updated', eventData);
+
+        console.log(`📡 [FortuneWheel] Evento resources_updated emitido para user_${userId}:`, eventData);
+      } else {
+        console.warn(`⚠️ [FortuneWheel] global.io no disponible, no se pudo emitir evento`);
+      }
+
       return selectedPrize;
 
     } catch (err) {

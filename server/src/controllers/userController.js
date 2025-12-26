@@ -375,7 +375,7 @@ exports.getNetworkStats = async (req, res) => {
 exports.getUserProfile = async (req, res) => {
   try {
     const userId = req.user.id; // El token contiene 'id', no 'userId'
-    
+
     console.log('[getUserProfile] 🔍 Buscando usuario ID:', userId);
 
     // Obtener datos del usuario
@@ -417,7 +417,7 @@ exports.getUserProfile = async (req, res) => {
         gold: parseInt(tickets.gold) || 0
       }
     };
-    
+
     console.log('[getUserProfile] 📤 Enviando respuesta:', response);
     res.json(response);
 
@@ -549,7 +549,7 @@ exports.unblockUser = async (req, res) => {
     const { userId } = req.params;
     const performedBy = req.user.id;
     const performedByRole = req.user.role;
-    
+
     console.log('🔓 [UNBLOCK] Inicio - UserID:', userId, 'PerformedBy:', performedBy, 'Role:', performedByRole);
 
     // Verificar que el usuario existe y está bloqueado
@@ -571,7 +571,7 @@ exports.unblockUser = async (req, res) => {
       'SELECT username FROM users WHERE id = ?',
       [performedBy]
     );
-    
+
     console.log('🔓 [UNBLOCK] Performer:', performerInfo[0]);
 
     const isAndy = performerInfo[0].username === 'Andy';
@@ -581,7 +581,7 @@ exports.unblockUser = async (req, res) => {
     if (isAndy) {
       console.log('🔓 [UNBLOCK] REGLA 1: Andy puede desbloquear - PERMITIDO');
       // Andy tiene permiso total
-    } 
+    }
     // REGLA 2: Si Andy bloqueó al usuario, solo Andy puede desbloquearlo
     else if (user[0].blocked_by) {
       console.log('🔓 [UNBLOCK] Usuario fue bloqueado por ID:', user[0].blocked_by);
@@ -589,12 +589,12 @@ exports.unblockUser = async (req, res) => {
         'SELECT username FROM users WHERE id = ?',
         [user[0].blocked_by]
       );
-      
+
       console.log('🔓 [UNBLOCK] Bloqueador:', blockerInfo[0]);
 
       if (blockerInfo.length > 0 && blockerInfo[0].username === 'Andy') {
         console.log('🔓 [UNBLOCK] REGLA 2: Bloqueado por Andy - Solo Andy puede desbloquear - DENEGADO');
-        return res.status(403).json({ 
+        return res.status(403).json({
           error: 'Solo el SuperAdmin puede desbloquear a este usuario',
           reason: 'Este usuario fue bloqueado por el SuperAdmin. Comunícate con tu Agente Superior para más información.',
           blockedBy: 'SuperAdmin'
@@ -604,28 +604,28 @@ exports.unblockUser = async (req, res) => {
       // REGLA 3: Solo puede desbloquear quien bloqueó o un superior jerárquico
       if (user[0].blocked_by !== performedBy) {
         console.log('🔓 [UNBLOCK] No es el mismo bloqueador, verificando jerarquía...');
-        
+
         // Obtener información del bloqueador para mensaje personalizado
         const [blocker] = await pool.query(
           'SELECT username, role FROM users WHERE id = ?',
           [user[0].blocked_by]
         );
-        
+
         // Verificar si el que intenta desbloquear es superior en la jerarquía del bloqueado
         const canUnblock = await canUnblockUser(performedBy, performedByRole, userId, user[0].blocked_by);
         console.log('🔓 [UNBLOCK] ¿Puede desbloquear?:', canUnblock);
-        
+
         if (!canUnblock) {
           // Mensaje personalizado según quién bloqueó
           if (blocker.length > 0 && blocker[0].role === 'agente') {
             console.log('🔓 [UNBLOCK] DENEGADO - Bloqueado por agente superior');
-            return res.status(403).json({ 
+            return res.status(403).json({
               error: 'Este usuario fue bloqueado por un Agente Superior',
               reason: 'Comunícate con tu superior',
               blockedBy: blocker[0].username
             });
           } else {
-            return res.status(403).json({ 
+            return res.status(403).json({
               error: 'No tienes permiso para desbloquear a este usuario',
               reason: 'Solo puede desbloquear quien bloqueó el usuario o un superior en la jerarquía'
             });

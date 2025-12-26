@@ -79,6 +79,9 @@ gameAdminController.initGameEngine(io);
 // Almacenar instancia de Socket.IO en app para acceso desde controllers
 app.set('io', io);
 
+// También hacer io accesible globalmente para servicios
+global.io = io;
+
 const metricsService = require('./services/metricsService'); // Add import
 
 // ...
@@ -93,6 +96,15 @@ io.on('connection', (socket) => {
 
   // Entregar gestión de chat
   chatEvents(io, socket);
+
+  // Handler para unirse a room personal (para actualizaciones de balance en tiempo real)
+  socket.on('join_personal_room', ({ userId }) => {
+    if (userId) {
+      const roomName = `user_${userId}`;
+      socket.join(roomName);
+      console.log(`[Socket.IO] 📍 Usuario ${userId} unido a room personal: ${roomName}`);
+    }
+  });
 
   socket.on('disconnect', () => {
     metricsService.increment('activeConnections', -1);

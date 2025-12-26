@@ -41,14 +41,14 @@ async function getAdminProfile(req, res) {
          GROUP BY u.id`,
         [userId]
       );
-      
+
       if (users.length === 0) {
         return res.status(404).json({ error: 'Usuario no encontrado' });
       }
-      
+
       return res.json(users[0]);
     }
-    
+
     // Agentes y jugadores ven solo el total (normales + regalo sumados)
     const [users] = await pool.query(
       `SELECT u.id, u.username, u.role, u.balance,
@@ -109,9 +109,9 @@ async function getFinancialSummary(req, res) {
 
   } catch (error) {
     console.error('❌ Error obteniendo resumen financiero:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: 'Error obteniendo resumen financiero' 
+      error: 'Error obteniendo resumen financiero'
     });
   }
 }
@@ -137,7 +137,7 @@ async function getDashboardStats(req, res) {
         FROM users 
         GROUP BY role
       `),
-      
+
       // 2. Calcular ventas del día (basado en chips_movements)
       pool.query(`
         SELECT 
@@ -217,12 +217,12 @@ async function getDashboardStats(req, res) {
     // 💰 Procesar datos financieros con MoneyMath
     const [salesRows] = salesResult;
     const salesData = salesRows[0] || {};
-    
+
     const totalDeposits = MoneyMath.decimal(salesData.total_deposits || 0);
     const totalWithdrawals = MoneyMath.decimal(salesData.total_withdrawals || 0);
     const totalBets = MoneyMath.decimal(salesData.total_bets || 0);
     const totalWins = MoneyMath.decimal(salesData.total_wins || 0);
-    
+
     // Calcular ventas netas del día (depósitos - retiros)
     const ventasNetas = MoneyMath.subtract(
       MoneyMath.toNumber(totalDeposits),
@@ -240,13 +240,13 @@ async function getDashboardStats(req, res) {
       total_retiros: MoneyMath.toNumber(totalWithdrawals),
       total_apuestas: MoneyMath.toNumber(totalBets),
       total_premios: MoneyMath.toNumber(totalWins),
-      
+
       // 💵 Distribución según reglas del negocio
       ganancia_casa_10: MoneyMath.percentage(ventasNetas, 10),
       comisiones_admin_5: MoneyMath.percentage(ventasNetas, 5),
       comisiones_cajero_15: MoneyMath.percentage(ventasNetas, 15),
       para_pozos_70: MoneyMath.percentage(ventasNetas, 70),
-      
+
       usuarios_activos_hoy: salesData.active_users_today || 0
     };
 
@@ -254,7 +254,7 @@ async function getDashboardStats(req, res) {
     const [sessionsRows] = sessionsResult;
     const sesionesActivas = sessionsRows.filter(s => s.status === 'active');
     const sesionesPendientes = sessionsRows.filter(s => s.status === 'pending');
-    
+
     // Calcular pozos totales
     let totalPozosLinea = MoneyMath.decimal(0);
     let totalPozosBingo = MoneyMath.decimal(0);
@@ -269,11 +269,11 @@ async function getDashboardStats(req, res) {
     const juegoStats = {
       sesiones_activas: sesionesActivas.length,
       sesiones_pendientes: sesionesPendientes.length,
-      sesiones_completadas_hoy: sessionsRows.filter(s => 
-        s.status === 'completed' && 
+      sesiones_completadas_hoy: sessionsRows.filter(s =>
+        s.status === 'completed' &&
         new Date(s.end_time).toDateString() === new Date().toDateString()
       ).length,
-      
+
       // Estado de pozos (3 salas: sala1, sala2, sala3)
       pozos: {
         total_linea: MoneyMath.toNumber(totalPozosLinea),
@@ -283,7 +283,7 @@ async function getDashboardStats(req, res) {
           totalPozosLinea.plus(totalPozosBingo).plus(totalPozosAcumulativos)
         )
       },
-      
+
       // Próximas sesiones por sala
       proximas_sesiones: sesionesPendientes.slice(0, 3).map(s => ({
         id: s.id,
@@ -298,7 +298,7 @@ async function getDashboardStats(req, res) {
     // Procesar balances
     const [balancesRows] = balancesResult;
     const balanceData = balancesRows[0] || {};
-    
+
     const sistemaStats = {
       balance_total_usuarios: balanceData.total_balance || 0,
       usuarios_con_saldo: balanceData.users_with_balance || 0,
@@ -309,7 +309,7 @@ async function getDashboardStats(req, res) {
     // Procesar retiros pendientes
     const [withdrawalsRows] = withdrawalsResult;
     const withdrawalData = withdrawalsRows[0] || {};
-    
+
     const retirosStats = {
       pendientes_count: withdrawalData.pending_count || 0,
       pendientes_monto: withdrawalData.pending_amount || 0,
@@ -336,7 +336,7 @@ async function getDashboardStats(req, res) {
       sistema: sistemaStats,
       retiros: retirosStats,
       movimientos_recientes: movimientosRecientes,
-      
+
       // Alertas automáticas
       alertas: [
         ...(retirosStats.requiere_atencion ? [{
@@ -359,10 +359,10 @@ async function getDashboardStats(req, res) {
 
   } catch (error) {
     console.error('❌ Error obteniendo estadísticas del dashboard:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       error: 'Error obteniendo estadísticas del dashboard',
-      details: error.message 
+      details: error.message
     });
   }
 }
@@ -381,7 +381,7 @@ async function getDashboardStats(req, res) {
 async function sendGlobalMessage(req, res) {
   try {
     const { message, type = 'info', priority = 'medium' } = req.body;
-    
+
     // Validar mensaje
     if (!message || message.trim().length === 0) {
       return res.status(400).json({
@@ -392,7 +392,7 @@ async function sendGlobalMessage(req, res) {
 
     // Obtener instancia de Socket.IO desde el servidor
     const io = req.app.get('io');
-    
+
     if (!io) {
       return res.status(500).json({
         success: false,
@@ -419,8 +419,8 @@ async function sendGlobalMessage(req, res) {
 
     console.log(`📢 Mensaje global enviado: "${message}" [${type}]`);
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       message: 'Anuncio enviado a toda la red',
       recipients: io.sockets.sockets.size,
       notification
@@ -428,10 +428,10 @@ async function sendGlobalMessage(req, res) {
 
   } catch (error) {
     console.error('❌ Error enviando mensaje global:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       error: 'Error enviando mensaje global',
-      details: error.message 
+      details: error.message
     });
   }
 }
@@ -443,7 +443,7 @@ async function sendGlobalMessage(req, res) {
 async function getSessionStats(req, res) {
   try {
     const { period = 'today' } = req.query; // 'today', 'week', 'month'
-    
+
     let dateFilter = 'DATE(start_time) = CURDATE()';
     if (period === 'week') {
       dateFilter = 'start_time >= DATE_SUB(NOW(), INTERVAL 7 DAY)';
@@ -473,7 +473,7 @@ async function getSessionStats(req, res) {
         ingresos_totales: stats.total_revenue || 0,
         duracion_promedio_minutos: Math.round(stats.avg_duration_minutes || 0),
         sesiones_completadas: stats.completed_sessions || 0,
-        tasa_completado: stats.total_sessions > 0 
+        tasa_completado: stats.total_sessions > 0
           ? ((stats.completed_sessions / stats.total_sessions) * 100).toFixed(2) + '%'
           : '0%'
       }
@@ -481,10 +481,10 @@ async function getSessionStats(req, res) {
 
   } catch (error) {
     console.error('❌ Error obteniendo estadísticas de sesiones:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       error: 'Error obteniendo estadísticas de sesiones',
-      details: error.message 
+      details: error.message
     });
   }
 }
@@ -538,10 +538,10 @@ async function getUserStats(req, res) {
 
   } catch (error) {
     console.error('❌ Error obteniendo estadísticas de usuarios:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       error: 'Error obteniendo estadísticas de usuarios',
-      details: error.message 
+      details: error.message
     });
   }
 }
@@ -598,7 +598,7 @@ async function getRevenueBreakdown(req, res) {
           transacciones: (movements.withdrawal?.count || 0) + (movements.win?.count || 0)
         },
         balance_neto: netRevenue,
-        
+
         // Distribución según reglas (10% casa, 5% admin, 15% cajeros, 70% pozos)
         distribucion: {
           casa_10: MoneyMath.percentage(netRevenue, 10),
@@ -606,17 +606,17 @@ async function getRevenueBreakdown(req, res) {
           cajeros_15: MoneyMath.percentage(netRevenue, 15),
           pozos_70: MoneyMath.percentage(netRevenue, 70)
         },
-        
+
         movimientos_detalle: movements
       }
     });
 
   } catch (error) {
     console.error('❌ Error obteniendo desglose de ingresos:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       error: 'Error obteniendo desglose de ingresos',
-      details: error.message 
+      details: error.message
     });
   }
 }
@@ -628,7 +628,7 @@ async function getRevenueBreakdown(req, res) {
 async function getStockSummary(req, res) {
   try {
     const today = new Date().toISOString().split('T')[0];
-    
+
     const [stockResults] = await pool.query(`
       SELECT 
         room,
@@ -663,10 +663,10 @@ async function getStockSummary(req, res) {
 
   } catch (error) {
     console.error('❌ Error obteniendo stock de cartones:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       error: 'Error obteniendo stock de cartones',
-      details: error.message 
+      details: error.message
     });
   }
 }
@@ -701,10 +701,10 @@ async function getUsersHierarchy(req, res) {
         GROUP BY u.id
         ORDER BY u.id
       `);
-      
+
       // Obtener datos del usuario actual
       currentUserData = allUsers.find(u => u.id === currentUserId);
-    } 
+    }
     // Agentes solo ven su RED (hijos directos y todos los descendientes)
     else if (currentUserRole === 'agente') {
       // Primero obtener datos del agente actual (con cartones normales y regalo separados)
@@ -723,9 +723,9 @@ async function getUsersHierarchy(req, res) {
         WHERE u.id = ?
         GROUP BY u.id
       `, [currentUserId]);
-      
+
       currentUserData = currentUserRow[0];
-      
+
       // Usar CTE recursivo para obtener toda la red del agente
       const [networkUsers] = await pool.query(`
         WITH RECURSIVE network AS (
@@ -771,7 +771,7 @@ async function getUsersHierarchy(req, res) {
         GROUP BY n.id, n.username, n.role, n.parent_id, n.balance, n.created_at, n.nombre_completo, n.documento, n.email, n.telefono, n.is_blocked, n.block_reason, n.blocked_at, n.blocked_by
         ORDER BY n.id
       `, [currentUserId]);
-      
+
       // Combinar: agente actual + su red
       allUsers = [currentUserData, ...networkUsers];
     }
@@ -812,10 +812,10 @@ async function getUsersHierarchy(req, res) {
 
   } catch (error) {
     console.error('❌ Error obteniendo jerarquía:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       error: 'Error obteniendo jerarquía de usuarios',
-      details: error.message 
+      details: error.message
     });
   }
 }
@@ -832,7 +832,7 @@ async function createUser(req, res) {
   try {
     console.log('🔍 [CREATE-USER] req.user =', JSON.stringify(req.user));
     console.log('🔍 [CREATE-USER] req.body =', JSON.stringify(req.body));
-    
+
     const { username, password, role, parent_id, nombre_completo, documento, email, telefono } = req.body;
     const currentUserId = req.user.id;
     const currentUserRole = req.user.role;
@@ -910,7 +910,7 @@ async function createUser(req, res) {
       try {
         const updates = [];
         const values = [];
-        
+
         if (nombre_completo) {
           updates.push('nombre_completo = ?');
           values.push(nombre_completo);
@@ -957,10 +957,10 @@ async function createUser(req, res) {
     }
 
     console.error('❌ Error creando usuario:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       error: 'Error creando usuario',
-      details: error.message 
+      details: error.message
     });
   }
 }
@@ -1053,7 +1053,7 @@ async function addCardsToUser(req, res) {
     } else if (quantity < 0) {
       // QUITAR cartones = Eliminar del usuario y crear para el admin
       const quantityToRemove = Math.abs(quantity);
-      
+
       const connection = await pool.getConnection();
       try {
         await connection.beginTransaction();
@@ -1079,7 +1079,7 @@ async function addCardsToUser(req, res) {
 
         // 2. Eliminar cartones del usuario (primero normales, luego gift)
         let remaining = quantityToRemove;
-        
+
         // Eliminar de cartones normales primero
         const [normalCards] = await connection.query(
           `SELECT id, quantity FROM user_card_inventory 
@@ -1090,7 +1090,7 @@ async function addCardsToUser(req, res) {
 
         for (const card of normalCards) {
           if (remaining <= 0) break;
-          
+
           const toRemove = Math.min(card.quantity, remaining);
           await connection.query(
             `UPDATE user_card_inventory 
@@ -1098,7 +1098,7 @@ async function addCardsToUser(req, res) {
              WHERE id = ?`,
             [toRemove, card.id]
           );
-          
+
           remaining -= toRemove;
         }
 
@@ -1113,7 +1113,7 @@ async function addCardsToUser(req, res) {
 
           for (const card of giftCards) {
             if (remaining <= 0) break;
-            
+
             const toRemove = Math.min(card.quantity, remaining);
             await connection.query(
               `UPDATE user_card_inventory 
@@ -1121,7 +1121,7 @@ async function addCardsToUser(req, res) {
                WHERE id = ?`,
               [toRemove, card.id]
             );
-            
+
             remaining -= toRemove;
           }
         }
@@ -1165,15 +1165,15 @@ async function addCardsToUser(req, res) {
            VALUES 
            (?, ?, 'debit', ?, FALSE, 'Cartones quitados por admin', ?, CURRENT_TIMESTAMP),
            (?, ?, 'credit', ?, FALSE, 'Cartones recuperados de usuario', ?, CURRENT_TIMESTAMP)`,
-          [userId, room, quantityToRemove, currentUserId, 
-           currentUserId, room, quantityToRemove, currentUserId]
+          [userId, room, quantityToRemove, currentUserId,
+            currentUserId, room, quantityToRemove, currentUserId]
         );
 
         await connection.commit();
         connection.release();
-        
+
         console.log(`✅ Cartones quitados: ${quantityToRemove} ${room} de usuario ${userId} → admin ${currentUserId}`);
-        
+
       } catch (error) {
         await connection.rollback();
         connection.release();
@@ -1201,15 +1201,40 @@ async function addCardsToUser(req, res) {
     const io = req.app.get('io');
     if (io) {
       io.to(`user_${userId}`).emit('resources_updated', {
+        userId, // Agregar userId para que el admin sepa qué usuario actualizar
         cartones: {
           bronce: (parseInt(updatedUser[0].cards_bronce) || 0) + (parseInt(updatedUser[0].gift_bronce) || 0),
           plata: (parseInt(updatedUser[0].cards_plata) || 0) + (parseInt(updatedUser[0].gift_plata) || 0),
           oro: (parseInt(updatedUser[0].cards_oro) || 0) + (parseInt(updatedUser[0].gift_oro) || 0)
         },
+        // Agregar campos separados para admin panel
+        cards_bronce: parseInt(updatedUser[0].cards_bronce) || 0,
+        cards_plata: parseInt(updatedUser[0].cards_plata) || 0,
+        cards_oro: parseInt(updatedUser[0].cards_oro) || 0,
+        gift_bronce: parseInt(updatedUser[0].gift_bronce) || 0,
+        gift_plata: parseInt(updatedUser[0].gift_plata) || 0,
+        gift_oro: parseInt(updatedUser[0].gift_oro) || 0,
         message: `Tus cartones ${room} han sido ${quantity > 0 ? 'incrementados' : 'reducidos'} en ${Math.abs(quantity)}`
       });
+
+      // Emitir también globalmente para que el admin panel lo vea
+      io.emit('resources_updated', {
+        userId,
+        cartones: {
+          bronce: (parseInt(updatedUser[0].cards_bronce) || 0) + (parseInt(updatedUser[0].gift_bronce) || 0),
+          plata: (parseInt(updatedUser[0].cards_plata) || 0) + (parseInt(updatedUser[0].gift_plata) || 0),
+          oro: (parseInt(updatedUser[0].cards_oro) || 0) + (parseInt(updatedUser[0].gift_oro) || 0)
+        },
+        cards_bronce: parseInt(updatedUser[0].cards_bronce) || 0,
+        cards_plata: parseInt(updatedUser[0].cards_plata) || 0,
+        cards_oro: parseInt(updatedUser[0].cards_oro) || 0,
+        gift_bronce: parseInt(updatedUser[0].gift_bronce) || 0,
+        gift_plata: parseInt(updatedUser[0].gift_plata) || 0,
+        gift_oro: parseInt(updatedUser[0].gift_oro) || 0
+      });
+
       console.log(`📡 [WebSocket] Cartones actualizados para user_${userId}: ${room}=${(parseInt(updatedUser[0]['cards_' + room]) || 0) + (parseInt(updatedUser[0]['gift_' + room]) || 0)}`);
-      
+
       // Si es una transferencia (no es el mismo usuario), actualizar también al admin
       if (userId !== currentUserId) {
         const [adminUser] = await pool.query(
@@ -1226,13 +1251,13 @@ async function addCardsToUser(req, res) {
            GROUP BY u.id`,
           [currentUserId]
         );
-        
+
         if (adminUser.length > 0) {
           // Para agentes: sumar normales + regalo, para SuperAdmin: solo normales
           const isAgente = adminUser[0].role === 'agente';
           io.to(`user_${currentUserId}`).emit('resources_updated', {
             cartones: {
-              bronce: isAgente 
+              bronce: isAgente
                 ? (parseInt(adminUser[0].cards_bronce) || 0) + (parseInt(adminUser[0].gift_bronce) || 0)
                 : parseInt(adminUser[0].cards_bronce) || 0,
               plata: isAgente
@@ -1257,10 +1282,10 @@ async function addCardsToUser(req, res) {
 
   } catch (error) {
     console.error('❌ Error gestionando cartones:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       error: 'Error gestionando cartones',
-      details: error.message 
+      details: error.message
     });
   }
 }
@@ -1349,17 +1374,17 @@ async function addBalanceToUser(req, res) {
         'SELECT balance FROM users WHERE id = ?',
         [currentUserId]
       );
-      
+
       if (adminData.length > 0) {
         const adminBalance = MoneyMath.decimal(adminData[0].balance);
         const amountToCredit = MoneyMath.decimal(Math.abs(amount));
         const newAdminBalance = adminBalance.plus(amountToCredit);
-        
+
         await pool.query(
           'UPDATE users SET balance = ? WHERE id = ?',
           [MoneyMath.toNumber(newAdminBalance), currentUserId]
         );
-        
+
         // Registrar movimiento para el admin
         await pool.query(
           `INSERT INTO chips_movements 
@@ -1367,7 +1392,7 @@ async function addBalanceToUser(req, res) {
            VALUES (?, ?, ?, ?, ?, NOW())`,
           [currentUserId, 'deposit', Math.abs(amount), MoneyMath.toNumber(newAdminBalance), `Descarga desde usuario ${username}`]
         );
-        
+
         console.log(`💰 Dinero acreditado al admin: $${Math.abs(amount).toLocaleString('es-CO')}`);
       }
     }
@@ -1378,17 +1403,17 @@ async function addBalanceToUser(req, res) {
         'SELECT balance FROM users WHERE id = ?',
         [currentUserId]
       );
-      
+
       if (adminData.length > 0) {
         const adminBalance = MoneyMath.decimal(adminData[0].balance);
         const amountToDebit = MoneyMath.decimal(amount);
         const newAdminBalance = adminBalance.minus(amountToDebit);
-        
+
         await pool.query(
           'UPDATE users SET balance = ? WHERE id = ?',
           [MoneyMath.toNumber(newAdminBalance), currentUserId]
         );
-        
+
         // Registrar movimiento para el admin
         await pool.query(
           `INSERT INTO chips_movements 
@@ -1396,15 +1421,15 @@ async function addBalanceToUser(req, res) {
            VALUES (?, ?, ?, ?, ?, NOW())`,
           [currentUserId, 'withdrawal', amount, MoneyMath.toNumber(newAdminBalance), `Carga a usuario ${username}`]
         );
-        
+
         console.log(`💸 Dinero debitado del admin: $${amount.toLocaleString('es-CO')}`);
       }
     }
 
     // Registrar movimiento
     const movementType = amount > 0 ? 'deposit' : 'withdrawal';
-    const description = amount > 0 
-      ? `Carga manual desde panel admin` 
+    const description = amount > 0
+      ? `Carga manual desde panel admin`
       : `Descarga manual desde panel admin`;
 
     await pool.query(
@@ -1422,14 +1447,14 @@ async function addBalanceToUser(req, res) {
         message: `Tu balance ha sido ${amount > 0 ? 'incrementado' : 'reducido'} en $${Math.abs(amount).toLocaleString('es-CO')}`
       });
       console.log(`📡 [WebSocket] Balance actualizado para user_${userId}: $${MoneyMath.toNumber(newBalance).toLocaleString('es-CO')}`);
-      
+
       // Si es una transferencia (no es el mismo usuario), actualizar también al admin
       if (userId !== currentUserId) {
         const [adminData] = await pool.query(
           'SELECT balance FROM users WHERE id = ?',
           [currentUserId]
         );
-        
+
         if (adminData.length > 0) {
           io.to(`user_${currentUserId}`).emit('resources_updated', {
             balance: MoneyMath.toNumber(adminData[0].balance),
@@ -1448,10 +1473,10 @@ async function addBalanceToUser(req, res) {
 
   } catch (error) {
     console.error('❌ Error gestionando balance:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       error: 'Error gestionando balance',
-      details: error.message 
+      details: error.message
     });
   }
 }

@@ -6,6 +6,8 @@ const {
 } = require('../socket/winnerEvents');
 const gamificationEngine = require('./gamification_engine');
 const ChipsService = require('./chipsService');
+const { creditStarterPrize } = require('./starterPrizeService');
+const { resetSessionPots } = require('./potAccumulationService');
 
 /**
  * GAME ENGINE - Motor de Sorteo Automático y Validación de Cartones
@@ -21,6 +23,21 @@ const ChipsService = require('./chipsService');
  * 
  * El jugador NO canta línea - el sistema lo detecta y anuncia
  */
+
+/**
+ * Obtiene el multiplicador de XP según la sala
+ * @param {string} room - Sala (bronce/plata/oro/starter)
+ * @returns {number} - Multiplicador (1.0 = 100%, 2.0 = 200%, 4.0 = 400%)
+ */
+function getXPMultiplier(room) {
+  const multipliers = {
+    'starter': 0.1,   // 10% (sala gratis)
+    'bronce': 1.0,    // 100%
+    'plata': 2.0,     // 200%
+    'oro': 4.0        // 400%
+  };
+  return multipliers[room] || 1.0;
+}
 
 class GameEngine {
   constructor(io) {
@@ -89,16 +106,87 @@ class GameEngine {
         // Procesar ganadores de LÍNEA (si no hay ganador previo)
         if (!lineaWinnerFound && lineWinners.length > 0) {
           for (const winner of lineWinners) {
-            const lineaPrize = session.current_pot_linea;
+            // DETECTAR SI ES SALA STARTER
+            const isStarterRoom = room === 'starter' || room === 'free_starter';
 
-            // Acreditar fichas al ganador automáticamente
-            await ChipsService.recordGameMovement(
-              winner.userId,
-              lineaPrize,
-              sessionId,
-              'win',
-              `Premio LÍNEA - Sesión ${sessionId} - Bolea ${currentBall}`
-            );
+            if (isStarterRoom) {
+              // SALA STARTER: Usar premios configurados
+              const [roomConfig] = await pool.query(
+                'SELECT * FROM v_starter_config LIMIT 1'
+              );
+
+              if (roomConfig.length > 0) {
+                const config = roomConfig[0];
+                // Mapear campos de starter_room_config a formato esperado por starterPrizeService
+                const mappedConfig = {
+                  line_prize_type: 'tickets',
+                  line_prize_amount: config.prizes_linea,
+                  line_prize_room: config.ticket_room_linea || 'bronce',
+                  bingo_prize_type: 'tickets',
+                  bingo_prize_amount: config.prizes_bingo,
+                  bingo_prize_room: config.ticket_room_bingo || 'oro',
+                  xp_multiplier: 0.10 // 10% del XP de salas pagas
+                };
+
+                await creditStarterPrize(
+                  winner.userId,
+                  'line',
+                  mappedConfig,
+                  sessionId,
+                  currentBall
+                );
+
+                winners.push({
+                  userId: winner.userId,
+                  cardId: winner.cardId,
+                  amount: config.prizes_linea,
+                  prizeType: 'tickets',
+                  prizeRoom: config.ticket_room_linea || 'bronce',
+                  type: 'linea',
+                  boleaNumber: currentBall,
+                  isStarter: true
+                });
+              }
+            } else {
+              // SALAS PAGAS: Usar pozos acumulados
+              const lineaPrize = session.jackpot_linea;
+
+              // Acreditar fichas al ganador automáticamente
+              await ChipsService.recordGameMovement(
+                winner.userId,
+                lineaPrize,
+                sessionId,
+                'win',
+                `Premio LÍNEA - Sesión ${sessionId} - Bolea ${currentBall}`
+              );
+
+              // Acreditar XP con multiplicador según sala
+              const xpMultiplier = getXPMultiplier(room);
+              const baseXP = 100; // XP base por línea
+              const xpAmount = Math.floor(baseXP * xpMultiplier);
+
+              await pool.query(
+                'UPDATE users SET xp = xp + ? WHERE id = ?',
+                [xpAmount, winner.userId]
+              );
+
+              console.log(`🏆 [LINE] User ${winner.userId} - Prize: $${lineaPrize}, XP: +${xpAmount} (${xpMultiplier}x)`);
+
+              // Resetear pozo de línea
+              await pool.query(
+                'UPDATE game_sessions SET jackpot_linea = 0 WHERE id = ?',
+                [sessionId]
+              );
+
+              winners.push({
+                userId: winner.userId,
+                cardId: winner.cardId,
+                amount: lineaPrize,
+                xpAwarded: xpAmount,
+                type: 'linea',
+                boleaNumber: currentBall
+              });
+            }
 
             // TRIGGER ACHIEVEMENT: FIRST_WIN (Primera Victoria)
             try {
@@ -127,17 +215,112 @@ class GameEngine {
         // Procesar ganadores de BINGO
         if (bingoWinners.length > 0) {
           for (const winner of bingoWinners) {
-            const bingoPrize = session.current_pot_bingo;
-            const isJackpot = currentBall > 40;
+            // DETECTAR SI ES SALA STARTER
+            const isStarterRoom = room === 'starter' || room === 'free_starter';
+            const isJackpot = currentBall <= 40; // Jackpot si gana antes de bolilla 40
 
-            // Acreditar fichas al ganador automáticamente
-            await ChipsService.recordGameMovement(
-              winner.userId,
-              bingoPrize,
-              sessionId,
-              'win',
-              `Premio BINGO${isJackpot ? ' JACKPOT' : ''} - Sesión ${sessionId} - Bolea ${currentBall}`
-            );
+            if (isStarterRoom) {
+              // SALA STARTER: Usar premios configurados
+              const [roomConfig] = await pool.query(
+                'SELECT * FROM v_starter_config LIMIT 1'
+              );
+
+              if (roomConfig.length > 0) {
+                const config = roomConfig[0];
+                // Mapear campos de starter_room_config a formato esperado por starterPrizeService
+                const mappedConfig = {
+                  line_prize_type: 'tickets',
+                  line_prize_amount: config.prizes_linea,
+                  line_prize_room: config.ticket_room_linea || 'bronce',
+                  bingo_prize_type: 'tickets',
+                  bingo_prize_amount: config.prizes_bingo,
+                  bingo_prize_room: config.ticket_room_bingo || 'oro',
+                  xp_multiplier: 0.10 // 10% del XP de salas pagas
+                };
+
+                await creditStarterPrize(
+                  winner.userId,
+                  'bingo',
+                  mappedConfig,
+                  sessionId,
+                  currentBall
+                );
+
+                winners.push({
+                  userId: winner.userId,
+                  cardId: winner.cardId,
+                  amount: config.prizes_bingo,
+                  prizeType: 'tickets',
+                  prizeRoom: config.ticket_room_bingo || 'oro',
+                  type: 'bingo',
+                  boleaNumber: currentBall,
+                  isJackpot,
+                  isStarter: true
+                });
+              }
+            } else {
+              // SALAS PAGAS: Usar pozos acumulados
+              let bingoPrize = session.jackpot_bingo;
+              let totalPrize = bingoPrize;
+              let pre40Won = false;
+
+              // Si ganó antes de bolilla 40, sumar pozo Pre-40
+              if (isJackpot && session.jackpot_pre40 > 0) {
+                totalPrize += session.jackpot_pre40;
+                pre40Won = true;
+                console.log(`🎰 [BINGO PRE-40 JACKPOT] User ${winner.userId} - Bingo: $${bingoPrize} + Pre-40: $${session.jackpot_pre40} = $${totalPrize}`);
+              }
+
+              // Acreditar fichas al ganador automáticamente
+              await ChipsService.recordGameMovement(
+                winner.userId,
+                totalPrize,
+                sessionId,
+                'win',
+                `Premio BINGO${pre40Won ? ' + PRE-40 JACKPOT' : ''} - Sesión ${sessionId} - Bolea ${currentBall}`
+              );
+
+              // Acreditar XP con multiplicador según sala
+              const xpMultiplier = getXPMultiplier(room);
+              const baseXP = pre40Won ? 500 : 300; // Más XP si ganó Pre-40
+              const xpAmount = Math.floor(baseXP * xpMultiplier);
+
+              await pool.query(
+                'UPDATE users SET xp = xp + ? WHERE id = ?',
+                [xpAmount, winner.userId]
+              );
+
+              console.log(`🏆 [BINGO] User ${winner.userId} - Prize: $${totalPrize}, XP: +${xpAmount} (${xpMultiplier}x)`);
+
+              // Resetear pozos según si ganó Pre-40 o no
+              if (pre40Won) {
+                // Resetear ambos pozos (Bingo + Pre-40)
+                await pool.query(
+                  'UPDATE game_sessions SET jackpot_bingo = 0, jackpot_pre40 = 0 WHERE id = ?',
+                  [sessionId]
+                );
+                console.log(`💰 [POTS] Bingo y Pre-40 reseteados a $0`);
+              } else {
+                // Solo resetear pozo de bingo, Pre-40 se mantiene
+                await pool.query(
+                  'UPDATE game_sessions SET jackpot_bingo = 0 WHERE id = ?',
+                  [sessionId]
+                );
+                console.log(`💰 [POTS] Bingo reseteado a $0, Pre-40 se mantiene: $${session.jackpot_pre40}`);
+              }
+
+              winners.push({
+                userId: winner.userId,
+                cardId: winner.cardId,
+                amount: totalPrize,
+                bingoPrize: bingoPrize,
+                pre40Prize: pre40Won ? session.jackpot_pre40 : 0,
+                xpAwarded: xpAmount,
+                type: 'bingo',
+                boleaNumber: currentBall,
+                isJackpot: pre40Won
+              });
+            }
 
             // TRIGGER ACHIEVEMENT: FIRST_WIN & BINGO_KING
             try {

@@ -23,6 +23,7 @@ import SupportModal from './Support/SupportModal';
 import CustomTour from './CustomTour';
 import WithdrawalModal from './Withdrawal/WithdrawalModal';
 import FortuneWheel from './Gamification/FortuneWheel';
+import useSocket from '../hooks/useSocket';
 
 // ... (existing code)
 
@@ -213,10 +214,96 @@ const CasinoLobby = ({ user, onLogout }) => {
   const [lobbyData, setLobbyData] = useState(null);
   const [loadingLobby, setLoadingLobby] = useState(true);
 
+  const socket = useSocket();
+
   // Cargar perfil del usuario
   useEffect(() => {
     loadUserProfile();
   }, []);
+
+  // Escuchar actualizaciones de balance en tiempo real
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleResourcesUpdated = (data) => {
+      console.log('[CasinoLobby] 📡 resources_updated recibido:', data);
+
+      setUserData(prev => {
+        if (!prev) return prev;
+
+        const updated = { ...prev };
+
+        // Actualizar balance si viene
+        if (data.balance !== undefined) {
+          console.log('[CasinoLobby] 💰 Actualizando balance:', prev.balance, '->', data.balance);
+          updated.balance = data.balance;
+        }
+
+        // Actualizar cartones si vienen
+        if (data.cartones || data.tickets) {
+          const cartonesData = data.cartones || data.tickets;
+          console.log('[CasinoLobby] 🎫 Actualizando cartones:', cartonesData);
+
+          // Actualizar en formato cartones
+          updated.cartones = {
+            bronce: cartonesData.bronce || cartonesData.bronze || prev.cartones?.bronce || 0,
+            plata: cartonesData.plata || cartonesData.silver || prev.cartones?.plata || 0,
+            oro: cartonesData.oro || cartonesData.gold || prev.cartones?.oro || 0
+          };
+
+          // También actualizar en formato tickets para compatibilidad
+          updated.tickets = {
+            bronze: cartonesData.bronce || cartonesData.bronze || prev.tickets?.bronze || 0,
+            silver: cartonesData.plata || cartonesData.silver || prev.tickets?.silver || 0,
+            gold: cartonesData.oro || cartonesData.gold || prev.tickets?.gold || 0
+          };
+        }
+
+        return updated;
+      });
+    };
+
+    socket.on('resources_updated', handleResourcesUpdated);
+
+    return () => {
+      socket.off('resources_updated', handleResourcesUpdated);
+    };
+  }, [socket]);
+
+  // Escuchar actualizaciones de pozos en tiempo real
+  useEffect(() => {
+    if (!socket) return;
+
+    const handlePotsUpdated = (data) => {
+      console.log('[CasinoLobby] 📡 pots_updated recibido:', data);
+
+      // Actualizar lobbyData con los nuevos pozos
+      setLobbyData(prevData => {
+        if (!prevData) return prevData;
+
+        const roomData = prevData[data.room];
+        if (!roomData) return prevData;
+
+        return {
+          ...prevData,
+          [data.room]: {
+            ...roomData,
+            pots: {
+              bingo: data.pots.jackpot_bingo,
+              line: data.pots.jackpot_linea,
+              pre40: data.pots.jackpot_pre40
+            }
+          }
+        };
+      });
+    };
+
+    socket.on('pots_updated', handlePotsUpdated);
+
+    return () => {
+      socket.off('pots_updated', handlePotsUpdated);
+    };
+  }, [socket]);
 
   // NUEVO: Cargar datos del lobby al montar componente
   useEffect(() => {

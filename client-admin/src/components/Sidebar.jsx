@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 
 export default function Sidebar({ isOpen, onClose, activeSections, onToggleSection, userRole, userData }) {
@@ -9,19 +9,6 @@ export default function Sidebar({ isOpen, onClose, activeSections, onToggleSecti
     sesiones: true,
     sistema: true
   });
-
-  useEffect(() => {
-    // Obtener rol del usuario desde localStorage
-    const token = localStorage.getItem('adminToken');
-    if (token) {
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        setUserRole(payload.role);
-      } catch (error) {
-        console.error('Error parsing token:', error);
-      }
-    }
-  }, []);
 
   const toggleMenu = (menu) => {
     setExpandedMenus(prev => ({
