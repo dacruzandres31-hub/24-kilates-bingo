@@ -189,6 +189,26 @@ async function buyCard(req, res) {
         [userId, roomType, totalCost, quantity]
       );
 
+      // ====== PASO 4: ACTUALIZAR POZOS (50% Bingo, 15% Línea, 5% Pre-40) ======
+      // Calcular contribución
+      const bingoIncrease = totalCost * 0.50;
+      const lineaIncrease = totalCost * 0.15;
+      const pre40Increase = totalCost * 0.05;
+
+      console.log(`[ShopController] 💰 Actualizando pozos para sala ${roomType}`);
+      console.log(`  Bingo: +$${bingoIncrease}`);
+      console.log(`  Línea: +$${lineaIncrease}`);
+      console.log(`  Pre-40: +$${pre40Increase}`);
+
+      await client.query(`
+        UPDATE game_sessions
+        SET 
+          jackpot_bingo = jackpot_bingo + ?,
+          jackpot_linea = jackpot_linea + ?,
+          jackpot_pre40 = jackpot_pre40 + ?
+        WHERE id = ?
+      `, [bingoIncrease, lineaIncrease, pre40Increase, room.id]);
+
       // AGREGAR XP Y VERIFICAR LEVEL UP
       const xpResult = await gamificationEngine.addXPToPlayer(userId, totalCost);
       let gamificationResult = null;

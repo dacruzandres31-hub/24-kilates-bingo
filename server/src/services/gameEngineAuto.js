@@ -472,6 +472,13 @@ class GameEngineAuto {
       [status, gameSessionId]
     );
 
+    // NUEVO: Marcar cartones de la sesión como JUGADOS (Historial)
+    await pool.query(
+      `UPDATE bingo_cards SET status = 'played' WHERE session_id = ?`,
+      [gameSessionId]
+    );
+    console.log(`[GameEngine] 📜 Cartones de sesión ${gameSessionId} marcados como 'played' (Historial)`);
+
     // LIMPIEZA: Eliminar cartones no asignados a ninguna sesión de esta sala
     // Esto se ejecuta cuando finaliza cada sorteo
     if (gameState.room) {

@@ -105,6 +105,10 @@ router.get('/sessions/history/:id', authenticateToken, isAdmin, sessionHistoryCo
 // ========================================
 router.get('/room-settings/current-pots', authenticateToken, isAdmin, roomSettingsController.getCurrentPots);
 
+// Historial y Estadísticas de Pozos
+router.get('/pot-history/:room', authenticateToken, isAdmin, require('../controllers/potHistoryController').getPotHistory);
+router.get('/pot-stats/:room', authenticateToken, isAdmin, require('../controllers/potHistoryController').getPotStats);
+
 // ========================================
 // 📅 HORARIOS DE SORTEOS
 // Consulta de horarios y próximos sorteos (Admin + SuperAdmin)

@@ -31,15 +31,15 @@ async function emitPotsUpdate() {
     // Obtener pozos actuales
     const pool = require('../db');
     const roomSettingsController = require('../controllers/roomSettingsController');
-    
+
     // Obtener pozos usando el mismo método que el endpoint
     const [moneyPots] = await pool.query(`
       SELECT 
         rs.room,
         rs.card_price,
         rs.accumulated_pot_pre40 AS jackpot,
-        COALESCE(latest.current_pot_linea, 0) AS current_pot_linea,
-        COALESCE(latest.current_pot_bingo, 0) AS current_pot_bingo,
+        COALESCE(latest.jackpot_linea, 0) AS current_pot_linea,
+        COALESCE(latest.jackpot_bingo, 0) AS current_pot_bingo,
         COALESCE(latest.total_cards_validated, 0) AS cards_sold,
         latest.status,
         latest.session_id

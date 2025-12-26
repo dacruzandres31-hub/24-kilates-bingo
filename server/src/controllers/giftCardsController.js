@@ -99,6 +99,57 @@ async function addGiftCards(req, res) {
       [userId]
     );
 
+
+    // ============================================
+    // EMITIR ACTUALIZACIÓN DE RECURSOS (Socket.IO)
+    // ============================================
+    // Fix: Emitir evento ROBUSTO que suma Pagos + Regalos
+    try {
+      const io = req.app.get('io');
+      if (io) {
+        // Obtener inventario detallado fresco (Pagos + Regalos)
+        const [updatedInventory] = await pool.query(`
+          SELECT 
+            COALESCE(SUM(CASE WHEN room = 'bronce' AND is_gift = FALSE THEN quantity ELSE 0 END), 0) as cards_bronce,
+            COALESCE(SUM(CASE WHEN room = 'plata' AND is_gift = FALSE THEN quantity ELSE 0 END), 0) as cards_plata,
+            COALESCE(SUM(CASE WHEN room = 'oro' AND is_gift = FALSE THEN quantity ELSE 0 END), 0) as cards_oro,
+            COALESCE(SUM(CASE WHEN room = 'bronce' AND is_gift = TRUE THEN quantity ELSE 0 END), 0) as gift_bronce,
+            COALESCE(SUM(CASE WHEN room = 'plata' AND is_gift = TRUE THEN quantity ELSE 0 END), 0) as gift_plata,
+            COALESCE(SUM(CASE WHEN room = 'oro' AND is_gift = TRUE THEN quantity ELSE 0 END), 0) as gift_oro
+          FROM user_card_inventory
+          WHERE user_id = ?
+        `, [userId]);
+
+        const inv = updatedInventory[0] || {};
+        const cartonesTotal = {
+          bronce: (parseInt(inv.cards_bronce) || 0) + (parseInt(inv.gift_bronce) || 0),
+          plata: (parseInt(inv.cards_plata) || 0) + (parseInt(inv.gift_plata) || 0),
+          oro: (parseInt(inv.cards_oro) || 0) + (parseInt(inv.gift_oro) || 0)
+        };
+
+        // Obtener balance para consistencia
+        const [userData] = await pool.query('SELECT balance FROM users WHERE id = ?', [userId]);
+
+        io.to(`user_${userId}`).emit('resources_updated', {
+          userId: parseInt(userId),
+          balance: parseFloat(userData[0]?.balance || 0),
+          cartones: cartonesTotal,
+          // Datos extra para consistencia
+          cards_bronce: parseInt(inv.cards_bronce) || 0,
+          cards_plata: parseInt(inv.cards_plata) || 0,
+          cards_oro: parseInt(inv.cards_oro) || 0,
+          gift_bronce: parseInt(inv.gift_bronce) || 0,
+          gift_plata: parseInt(inv.gift_plata) || 0,
+          gift_oro: parseInt(inv.gift_oro) || 0,
+          message: `${quantityNum} cartones de regalo de ${room} agregados`
+        });
+
+        console.log(`📡 [GiftCards] Crédito notificado via Socket a user_${userId} (Total: ${cartonesTotal[room]})`);
+      }
+    } catch (socketError) {
+      console.error('[GiftCards] ⚠️ Error emitiendo socket update en addGiftCards:', socketError);
+    }
+
     res.json({
       success: true,
       message: `${quantityNum} cartones de regalo de ${room} agregados`,
@@ -177,7 +228,7 @@ async function removeGiftCards(req, res) {
 
     for (const record of giftRecords) {
       if (remaining <= 0) break;
-      
+
       const toRemove = Math.min(record.quantity, remaining);
       await pool.query(
         `UPDATE user_card_inventory 
@@ -185,7 +236,7 @@ async function removeGiftCards(req, res) {
          WHERE id = ?`,
         [toRemove, record.id]
       );
-      
+
       remaining -= toRemove;
     }
 
@@ -212,6 +263,56 @@ async function removeGiftCards(req, res) {
        WHERE user_id = ?`,
       [userId]
     );
+
+    // ============================================
+    // EMITIR ACTUALIZACIÓN DE RECURSOS (Socket.IO)
+    // ============================================
+    // Fix: Emitir evento ROBUSTO que suma Pagos + Regalos
+    try {
+      const io = req.app.get('io');
+      if (io) {
+        // Obtener inventario detallado fresco (Pagos + Regalos)
+        const [updatedInventory] = await pool.query(`
+          SELECT 
+            COALESCE(SUM(CASE WHEN room = 'bronce' AND is_gift = FALSE THEN quantity ELSE 0 END), 0) as cards_bronce,
+            COALESCE(SUM(CASE WHEN room = 'plata' AND is_gift = FALSE THEN quantity ELSE 0 END), 0) as cards_plata,
+            COALESCE(SUM(CASE WHEN room = 'oro' AND is_gift = FALSE THEN quantity ELSE 0 END), 0) as cards_oro,
+            COALESCE(SUM(CASE WHEN room = 'bronce' AND is_gift = TRUE THEN quantity ELSE 0 END), 0) as gift_bronce,
+            COALESCE(SUM(CASE WHEN room = 'plata' AND is_gift = TRUE THEN quantity ELSE 0 END), 0) as gift_plata,
+            COALESCE(SUM(CASE WHEN room = 'oro' AND is_gift = TRUE THEN quantity ELSE 0 END), 0) as gift_oro
+          FROM user_card_inventory
+          WHERE user_id = ?
+        `, [userId]);
+
+        const inv = updatedInventory[0] || {};
+        const cartonesTotal = {
+          bronce: (parseInt(inv.cards_bronce) || 0) + (parseInt(inv.gift_bronce) || 0),
+          plata: (parseInt(inv.cards_plata) || 0) + (parseInt(inv.gift_plata) || 0),
+          oro: (parseInt(inv.cards_oro) || 0) + (parseInt(inv.gift_oro) || 0)
+        };
+
+        // Obtener balance para consistencia
+        const [userData] = await pool.query('SELECT balance FROM users WHERE id = ?', [userId]);
+
+        io.to(`user_${userId}`).emit('resources_updated', {
+          userId: parseInt(userId),
+          balance: parseFloat(userData[0]?.balance || 0),
+          cartones: cartonesTotal,
+          // Datos extra para consistencia
+          cards_bronce: parseInt(inv.cards_bronce) || 0,
+          cards_plata: parseInt(inv.cards_plata) || 0,
+          cards_oro: parseInt(inv.cards_oro) || 0,
+          gift_bronce: parseInt(inv.gift_bronce) || 0,
+          gift_plata: parseInt(inv.gift_plata) || 0,
+          gift_oro: parseInt(inv.gift_oro) || 0,
+          message: `${quantityNum} cartones de regalo de ${room} removidos`
+        });
+
+        console.log(`📡 [GiftCards] Débito notificado via Socket a user_${userId} (Total: ${cartonesTotal[room]})`);
+      }
+    } catch (socketError) {
+      console.error('[GiftCards] ⚠️ Error emitiendo socket update en removeGiftCards:', socketError);
+    }
 
     res.json({
       success: true,

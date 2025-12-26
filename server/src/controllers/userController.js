@@ -392,29 +392,42 @@ exports.getUserProfile = async (req, res) => {
     const user = users[0];
     console.log('[getUserProfile] ✅ Usuario encontrado:', user.username);
 
-    // Obtener cartones disponibles del inventario (suma normales + regalo)
-    // Los jugadores ven el total combinado sin discriminación
+    // Obtener cartones disponibles separados por tipo (igual que adminController)
+    // Esto asegura que la suma sea consistente con lo que ve el admin
     const [inventory] = await pool.query(
       `SELECT 
-        COALESCE(SUM(CASE WHEN room = 'bronce' THEN quantity ELSE 0 END), 0) as bronze,
-        COALESCE(SUM(CASE WHEN room = 'plata' THEN quantity ELSE 0 END), 0) as silver,
-        COALESCE(SUM(CASE WHEN room = 'oro' THEN quantity ELSE 0 END), 0) as gold
+        COALESCE(SUM(CASE WHEN room = 'bronce' AND is_gift = FALSE THEN quantity ELSE 0 END), 0) as cards_bronce,
+        COALESCE(SUM(CASE WHEN room = 'plata' AND is_gift = FALSE THEN quantity ELSE 0 END), 0) as cards_plata,
+        COALESCE(SUM(CASE WHEN room = 'oro' AND is_gift = FALSE THEN quantity ELSE 0 END), 0) as cards_oro,
+        COALESCE(SUM(CASE WHEN room = 'bronce' AND is_gift = TRUE THEN quantity ELSE 0 END), 0) as gift_bronce,
+        COALESCE(SUM(CASE WHEN room = 'plata' AND is_gift = TRUE THEN quantity ELSE 0 END), 0) as gift_plata,
+        COALESCE(SUM(CASE WHEN room = 'oro' AND is_gift = TRUE THEN quantity ELSE 0 END), 0) as gift_oro
        FROM user_card_inventory
        WHERE user_id = ?`,
       [userId]
     );
 
-    const tickets = inventory[0] || { bronze: 0, silver: 0, gold: 0 };
-    console.log('[getUserProfile] 🎴 Tickets:', tickets);
+    const data = inventory[0] || {};
+
+    // Sumar normales + regalo para el jugador
+    const bronzeTotal = (parseInt(data.cards_bronce) || 0) + (parseInt(data.gift_bronce) || 0);
+    const silverTotal = (parseInt(data.cards_plata) || 0) + (parseInt(data.gift_plata) || 0);
+    const goldTotal = (parseInt(data.cards_oro) || 0) + (parseInt(data.gift_oro) || 0);
+
+    console.log('[getUserProfile] 🎴 Tickets (N+R):', {
+      bronze: `${data.cards_bronce}+${data.gift_bronce}=${bronzeTotal}`,
+      silver: `${data.cards_plata}+${data.gift_plata}=${silverTotal}`,
+      gold: `${data.cards_oro}+${data.gift_oro}=${goldTotal}`
+    });
 
     const response = {
       username: user.username,
       balance: user.balance || 0,
       tickets: {
         starter: 0, // Starter se maneja aparte
-        bronze: parseInt(tickets.bronze) || 0,
-        silver: parseInt(tickets.silver) || 0,
-        gold: parseInt(tickets.gold) || 0
+        bronze: bronzeTotal,
+        silver: silverTotal,
+        gold: goldTotal
       }
     };
 

@@ -106,9 +106,9 @@ exports.updateRoomPercentages = async (req, res) => {
     }
 
     // Validar que los porcentajes sumen <= 100
-    const total = parseFloat(percentage_linea || 0) + 
-                  parseFloat(percentage_bingo || 0) + 
-                  parseFloat(percentage_acumulado || 0);
+    const total = parseFloat(percentage_linea || 0) +
+      parseFloat(percentage_bingo || 0) +
+      parseFloat(percentage_acumulado || 0);
 
     if (total > 100) {
       return res.status(400).json({
@@ -203,8 +203,8 @@ exports.getCurrentPots = async (req, res) => {
         rs.room,
         rs.card_price,
         rs.accumulated_pot_pre40 AS jackpot,
-        COALESCE(latest.current_pot_linea, 0) AS current_pot_linea,
-        COALESCE(latest.current_pot_bingo, 0) AS current_pot_bingo,
+        COALESCE(latest.jackpot_linea, 0) AS current_pot_linea,
+        COALESCE(latest.jackpot_bingo, 0) AS current_pot_bingo,
         COALESCE(latest.total_cards_validated, 0) AS cards_sold,
         latest.status,
         latest.session_id
@@ -281,8 +281,8 @@ exports.getLobbyData = async (req, res) => {
         rs.room,
         rs.card_price,
         rs.accumulated_pot_pre40 AS current_pot_jackpot,
-        COALESCE(latest.current_pot_linea, 0) AS current_pot_linea,
-        COALESCE(latest.current_pot_bingo, 0) AS current_pot_bingo,
+        COALESCE(latest.jackpot_linea, 0) AS current_pot_linea,
+        COALESCE(latest.jackpot_bingo, 0) AS current_pot_bingo,
         latest.status
       FROM room_settings rs
       LEFT JOIN (
@@ -320,7 +320,7 @@ exports.getLobbyData = async (req, res) => {
       roomSchedules.forEach(schedule => {
         const [hour, minute, second] = schedule.hour.split(':').map(Number);
         const scheduleTime = hour * 3600 + minute * 60 + (second || 0);
-        
+
         // Calcular diferencia en días y segundos
         let dayDiff = schedule.day_of_week - currentDay;
         let timeDiff = scheduleTime - currentTime;
@@ -329,7 +329,7 @@ exports.getLobbyData = async (req, res) => {
         if (dayDiff === 0 && timeDiff <= 0) {
           dayDiff = 7;
         }
-        
+
         // Si es un día anterior de la semana, agregar días hasta la próxima semana
         if (dayDiff < 0) {
           dayDiff += 7;
@@ -426,7 +426,7 @@ exports.getLobbyData = async (req, res) => {
       // - Si tiene próxima sesión (pending/active) → Habilitada (se pueden comprar cartones)
       // - Si no hay sesión → Cerrada
       let computedStatus = 'closed';
-      
+
       if (room.status === 'playing') {
         computedStatus = 'playing'; // Sorteando
       } else if (nextSessionMap[room.room]) {

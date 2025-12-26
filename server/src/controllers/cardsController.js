@@ -619,9 +619,9 @@ exports.selectCards = async (req, res) => {
           const sessionId = sessionResult[0].id;
           await connection.query(
             `UPDATE game_sessions 
-             SET current_pot_bingo = current_pot_bingo + ?,
-                 current_pot_linea = current_pot_linea + ?,
-                 current_pot_jackpot = current_pot_jackpot + ?,
+             SET jackpot_bingo = jackpot_bingo + ?,
+                 jackpot_linea = jackpot_linea + ?,
+                 jackpot_pre40 = jackpot_pre40 + ?,
                  updated_at = NOW()
              WHERE id = ?`,
             [bigoAmount, lineaAmount, jackpotAmount, sessionId]
@@ -647,6 +647,59 @@ exports.selectCards = async (req, res) => {
     );
 
     await connection.commit();
+
+    // ============================================
+    // EMITIR ACTUALIZACIÓN DE RECURSOS (Socket.IO)
+    // ============================================
+    // Esto es crucial para que el header del cliente se actualice
+    // con el nuevo balance y cantidad de tickets
+    try {
+      const io = req.app.get('io');
+      if (io) {
+        // Obtener datos actualizados del usuario
+        const [updatedUser] = await pool.query(
+          'SELECT balance FROM users WHERE id = ?',
+          [userId]
+        );
+
+        const [updatedInventory] = await pool.query(`
+          SELECT 
+            COALESCE(SUM(CASE WHEN room = 'bronce' AND is_gift = FALSE THEN quantity ELSE 0 END), 0) as cards_bronce,
+            COALESCE(SUM(CASE WHEN room = 'plata' AND is_gift = FALSE THEN quantity ELSE 0 END), 0) as cards_plata,
+            COALESCE(SUM(CASE WHEN room = 'oro' AND is_gift = FALSE THEN quantity ELSE 0 END), 0) as cards_oro,
+            COALESCE(SUM(CASE WHEN room = 'bronce' AND is_gift = TRUE THEN quantity ELSE 0 END), 0) as gift_bronce,
+            COALESCE(SUM(CASE WHEN room = 'plata' AND is_gift = TRUE THEN quantity ELSE 0 END), 0) as gift_plata,
+            COALESCE(SUM(CASE WHEN room = 'oro' AND is_gift = TRUE THEN quantity ELSE 0 END), 0) as gift_oro
+          FROM user_card_inventory
+          WHERE user_id = ?
+        `, [userId]);
+
+        const inv = updatedInventory[0] || {};
+
+        // Totales para el usuario
+        const cartonesTotal = {
+          bronce: (parseInt(inv.cards_bronce) || 0) + (parseInt(inv.gift_bronce) || 0),
+          plata: (parseInt(inv.cards_plata) || 0) + (parseInt(inv.gift_plata) || 0),
+          oro: (parseInt(inv.cards_oro) || 0) + (parseInt(inv.gift_oro) || 0)
+        };
+
+        io.to(`user_${userId}`).emit('resources_updated', {
+          userId,
+          balance: parseFloat(updatedUser[0].balance),
+          cartones: cartonesTotal,
+          // Datos extra para consistencia
+          cards_bronce: parseInt(inv.cards_bronce) || 0,
+          gift_bronce: parseInt(inv.gift_bronce) || 0,
+          // etc...
+          message: 'Inventario actualizado'
+        });
+
+        console.log(`📡 [Cards] resources_updated emitido para user_${userId}`);
+      }
+    } catch (socketError) {
+      console.error('[Cards] ⚠️ Error emitiendo socket update:', socketError);
+      // No fallar la request si falla el socket
+    }
 
     // Determinar cuáles son gifts según packageInfo (ya declarado arriba)
 

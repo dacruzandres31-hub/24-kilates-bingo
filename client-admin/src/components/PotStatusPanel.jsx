@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { DollarSign, Wifi, WifiOff, Calendar } from 'lucide-react';
+import { DollarSign, Wifi, WifiOff, Calendar, TrendingUp } from 'lucide-react';
 import { io } from 'socket.io-client';
 import ProximosSorteosModal from './ProximosSorteosModal';
+import PotHistoryModal from './PotHistoryModal';
+import { X } from 'lucide-react';
 
 export default function PotStatusPanel() {
   const [pozos, setPozos] = useState([]);
@@ -11,6 +13,13 @@ export default function PotStatusPanel() {
   const [socket, setSocket] = useState(null);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState(null);
+
+  // History Modal State
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [historyRoom, setHistoryRoom] = useState(null);
+
+  // Toast State
+  const [toast, setToast] = useState(null);
 
   useEffect(() => {
     // Fetch inicial
@@ -42,13 +51,13 @@ export default function PotStatusPanel() {
     // Escuchar actualizaciones de pozos en tiempo real
     socketInstance.on('pots_updated', (data) => {
       console.log('📡 Pozos actualizados via WebSocket:', data);
-      
+
       // Si el evento incluye estructura de rooms (nueva estructura)
       if (data.rooms) {
         const pozosData = data.rooms.map(roomData => {
           const { room, currentSession, prizeConfig } = roomData;
           const isStarter = room === 'starter';
-          
+
           if (isStarter) {
             return {
               room: room,
@@ -66,9 +75,9 @@ export default function PotStatusPanel() {
 
           return {
             room: room,
-            linea: parseFloat(currentSession?.current_pot_linea) || 0,
-            bingo: parseFloat(currentSession?.current_pot_bingo) || 0,
-            jackpot: parseFloat(currentSession?.current_pot_jackpot) || 0,
+            linea: parseFloat(currentSession?.jackpot_linea) || 0,
+            bingo: parseFloat(currentSession?.jackpot_bingo) || 0,
+            jackpot: parseFloat(currentSession?.jackpot_pre40) || 0,
             sessionId: currentSession?.id || null,
             status: currentSession?.status || 'no_session',
             cardsSold: currentSession?.cards_sold || 0,
@@ -78,6 +87,19 @@ export default function PotStatusPanel() {
           };
         });
         setPozos(pozosData);
+
+        // Show Toast Notification
+        setToast({
+          message: '¡Pozos actualizados en tiempo real!',
+          type: 'success',
+          visible: true
+        });
+
+        // Auto-dismiss
+        setTimeout(() => {
+          setToast(prev => prev ? { ...prev, visible: false } : null);
+        }, 3000);
+
       } else {
         // Fallback: estructura antigua con array de pots
         const pozosData = data.pots.map(pot => {
@@ -97,9 +119,9 @@ export default function PotStatusPanel() {
 
           return {
             room: pot.room,
-            linea: parseFloat(pot.current_pot_linea) || 0,
-            bingo: parseFloat(pot.current_pot_bingo) || 0,
-            jackpot: parseFloat(pot.jackpot) || 0,
+            linea: parseFloat(pot.jackpot_linea) || parseFloat(pot.current_pot_linea) || 0,
+            bingo: parseFloat(pot.jackpot_bingo) || parseFloat(pot.current_pot_bingo) || 0,
+            jackpot: parseFloat(pot.jackpot_pre40) || parseFloat(pot.jackpot) || 0,
             sessionId: pot.session_id,
             status: pot.status || 'no_session',
             cardsSold: pot.cards_sold || 0,
@@ -108,6 +130,18 @@ export default function PotStatusPanel() {
           };
         });
         setPozos(pozosData);
+
+        // Show Toast Notification (Fallback)
+        setToast({
+          message: '¡Pozos actualizados en tiempo real!',
+          type: 'success',
+          visible: true
+        });
+
+        // Auto-dismiss
+        setTimeout(() => {
+          setToast(prev => prev ? { ...prev, visible: false } : null);
+        }, 3000);
       }
     });
 
@@ -128,12 +162,12 @@ export default function PotStatusPanel() {
       const response = await axios.get('/api/admin/sessions/active', {
         headers: { Authorization: `Bearer ${getToken()}` }
       });
-      
+
       // Extraer datos de pozos desde el endpoint de sesiones activas
       const pozosData = response.data.rooms.map(roomData => {
         const { room, currentSession, prizeConfig } = roomData;
         const isStarter = room === 'starter';
-        
+
         if (isStarter) {
           // Sala Starter: Premios en tickets
           return {
@@ -153,9 +187,9 @@ export default function PotStatusPanel() {
         // Salas con dinero: Bronce, Plata, Oro
         return {
           room: room,
-          linea: parseFloat(currentSession?.current_pot_linea) || 0,
-          bingo: parseFloat(currentSession?.current_pot_bingo) || 0,
-          jackpot: parseFloat(currentSession?.current_pot_jackpot) || 0,
+          linea: parseFloat(currentSession?.jackpot_linea) || 0,
+          bingo: parseFloat(currentSession?.jackpot_bingo) || 0,
+          jackpot: parseFloat(currentSession?.jackpot_pre40) || 0,
           sessionId: currentSession?.id || null,
           status: currentSession?.status || 'no_session',
           cardsSold: currentSession?.cards_sold || 0,
@@ -164,7 +198,7 @@ export default function PotStatusPanel() {
           isSpecial: false
         };
       });
-      
+
       setPozos(pozosData);
       setLoading(false);
     } catch (error) {
@@ -216,7 +250,7 @@ export default function PotStatusPanel() {
     const now = new Date();
     const startTime = new Date(sessionStartTime);
     const diffMinutes = (startTime - now) / 1000 / 60;
-    
+
     // Starter sortea si falta menos de 5 minutos para la hora programada
     // o si ya pasó la hora pero no más de 10 minutos
     return diffMinutes <= 5 && diffMinutes >= -10;
@@ -230,27 +264,27 @@ export default function PotStatusPanel() {
       }
       return 'HABILITADA (GRATIS)';
     }
-    
+
     // Otras salas: Estado de la sesión
     if (pozo.status === 'playing') {
       return 'SORTEANDO AHORA';
     }
-    
+
     // Siempre habilitadas para comprar (incluso sin sesión creada)
     return 'HABILITADA';
   };
 
   const getStatusColor = (pozo) => {
     const statusText = getSessionStatusText(pozo);
-    
+
     if (statusText === 'SORTEANDO AHORA') {
       return 'bg-red-500/20 text-red-400 animate-pulse';
     }
-    
+
     if (statusText.includes('HABILITADA')) {
       return 'bg-green-500/20 text-green-400';
     }
-    
+
     return 'bg-gray-500/20 text-gray-400';
   };
 
@@ -275,12 +309,31 @@ export default function PotStatusPanel() {
           <DollarSign className="w-8 h-8 text-green-400" />
           Estado de Pozos
         </h2>
+
+        {/* Toast Notification */}
+        {toast && toast.visible && (
+          <div className="fixed top-24 right-8 bg-gray-800 border border-green-500/50 text-white px-6 py-4 rounded-xl shadow-2xl z-50 animate-slide-in flex items-center gap-4">
+            <div className="bg-green-500/20 p-2 rounded-full">
+              <DollarSign className="text-green-400 w-6 h-6 animate-pulse" />
+            </div>
+            <div>
+              <h4 className="font-bold text-green-400">Actualización</h4>
+              <p className="text-sm text-gray-300">{toast.message}</p>
+            </div>
+            <button
+              onClick={() => setToast(null)}
+              className="text-gray-500 hover:text-white transition-colors"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        )}
+
         <div className="flex items-center gap-4">
-          <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm ${
-            socketConnected 
-              ? 'bg-green-500/20 text-green-400' 
-              : 'bg-red-500/20 text-red-400'
-          }`}>
+          <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm ${socketConnected
+            ? 'bg-green-500/20 text-green-400'
+            : 'bg-red-500/20 text-red-400'
+            }`}>
             {socketConnected ? (
               <>
                 <Wifi className="w-4 h-4" />
@@ -384,18 +437,31 @@ export default function PotStatusPanel() {
               )}
             </div>
 
-            {/* Botón Ver Próximos Sorteos */}
-            <div className="mt-4">
+            {/* Botones de Acción */}
+            <div className="mt-4 grid grid-cols-2 gap-3">
               <button
                 onClick={() => {
                   setSelectedRoom(pozo.room);
                   setShowScheduleModal(true);
                 }}
-                className="w-full px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg flex items-center justify-center gap-2 transition-colors"
+                className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg flex items-center justify-center gap-2 transition-colors text-sm"
               >
                 <Calendar className="w-4 h-4" />
-                Ver Próximos Sorteos
+                Sorteos
               </button>
+
+              {!pozo.isSpecial && (
+                <button
+                  onClick={() => {
+                    setHistoryRoom(pozo.room);
+                    setShowHistoryModal(true);
+                  }}
+                  className="px-4 py-2 bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border border-purple-500/30 rounded-lg flex items-center justify-center gap-2 transition-colors text-sm"
+                >
+                  <TrendingUp className="w-4 h-4" />
+                  Historial
+                </button>
+              )}
             </div>
           </div>
         ))}
@@ -415,6 +481,17 @@ export default function PotStatusPanel() {
           onClose={() => {
             setShowScheduleModal(false);
             setSelectedRoom(null);
+          }}
+        />
+      )}
+
+      {/* Modal Historial */}
+      {showHistoryModal && historyRoom && (
+        <PotHistoryModal
+          room={historyRoom}
+          onClose={() => {
+            setShowHistoryModal(false);
+            setHistoryRoom(null);
           }}
         />
       )}

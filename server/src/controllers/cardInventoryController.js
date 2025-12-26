@@ -33,14 +33,14 @@ exports.creditCards = async (req, res) => {
     if (username && !user_id) {
       const db = require('../config/database');
       const [users] = await db.query('SELECT id FROM users WHERE username = ?', [username]);
-      
+
       if (users.length === 0) {
         return res.status(404).json({
           success: false,
           message: `Usuario "${username}" no encontrado`
         });
       }
-      
+
       targetUserId = users[0].id;
     }
 
@@ -67,6 +67,53 @@ exports.creditCards = async (req, res) => {
       req.user.id,  // SuperAdmin que ejecuta
       reason || `Acreditación manual por ${req.user.username}`
     );
+
+    // ============================================
+    // EMITIR ACTUALIZACIÓN DE RECURSOS (Socket.IO)
+    // ============================================
+    // Fix: Emitir evento ROBUSTO que suma Pagos + Regalos
+    try {
+      const db = require('../db');
+      const io = req.app.get('io');
+      if (io) {
+        // Obtener inventario detallado fresco
+        const [updatedInventory] = await db.query(`
+          SELECT 
+            COALESCE(SUM(CASE WHEN room = 'bronce' AND is_gift = FALSE THEN quantity ELSE 0 END), 0) as cards_bronce,
+            COALESCE(SUM(CASE WHEN room = 'plata' AND is_gift = FALSE THEN quantity ELSE 0 END), 0) as cards_plata,
+            COALESCE(SUM(CASE WHEN room = 'oro' AND is_gift = FALSE THEN quantity ELSE 0 END), 0) as cards_oro,
+            COALESCE(SUM(CASE WHEN room = 'bronce' AND is_gift = TRUE THEN quantity ELSE 0 END), 0) as gift_bronce,
+            COALESCE(SUM(CASE WHEN room = 'plata' AND is_gift = TRUE THEN quantity ELSE 0 END), 0) as gift_plata,
+            COALESCE(SUM(CASE WHEN room = 'oro' AND is_gift = TRUE THEN quantity ELSE 0 END), 0) as gift_oro
+          FROM user_card_inventory
+          WHERE user_id = ?
+        `, [targetUserId]);
+
+        const inv = updatedInventory[0] || {};
+        const cartonesTotal = {
+          bronce: (parseInt(inv.cards_bronce) || 0) + (parseInt(inv.gift_bronce) || 0),
+          plata: (parseInt(inv.cards_plata) || 0) + (parseInt(inv.gift_plata) || 0),
+          oro: (parseInt(inv.cards_oro) || 0) + (parseInt(inv.gift_oro) || 0)
+        };
+
+        // Obtener balance para consistencia
+        const [userData] = await db.query('SELECT balance FROM users WHERE id = ?', [targetUserId]);
+
+        io.to(`user_${targetUserId}`).emit('resources_updated', {
+          userId: targetUserId,
+          balance: parseFloat(userData[0]?.balance || 0),
+          cartones: cartonesTotal,
+          // Datos extra para consistencia
+          cards_bronce: parseInt(inv.cards_bronce) || 0,
+          gift_bronce: parseInt(inv.gift_bronce) || 0,
+          message: `Se han acreditado ${quantity} cartones de ${room.toUpperCase()} ${is_gift ? '(Regalo)' : ''}`
+        });
+
+        console.log(`📡 [SuperAdmin] Crédito notificado via Socket a user_${targetUserId} (N+R)`);
+      }
+    } catch (socketError) {
+      console.error('[SuperAdmin] ⚠️ Error emitiendo socket update en creditCards:', socketError);
+    }
 
     res.json(result);
 
@@ -268,6 +315,53 @@ exports.transferCards = async (req, res) => {
       req.user.id  // SuperAdmin que ejecuta
     );
 
+    // ============================================
+    // EMITIR ACTUALIZACIÓN DE RECURSOS (Socket.IO)
+    // ============================================
+    // Fix: Emitir evento para que el jugador vea los cartones recibidos en tiempo real
+    try {
+      const db = require('../db'); // Asegurarnos de tener pool
+      const io = req.app.get('io');
+      if (io) {
+        // 1. Notificar al DESTINATARIO (Jugador)
+        const [userData] = await db.query('SELECT balance FROM users WHERE id = ?', [toUserId]);
+
+        // Obtener inventario detallado para sumar correctamente (Pagos + Regalo)
+        const [updatedInventory] = await db.query(`
+          SELECT 
+            COALESCE(SUM(CASE WHEN room = 'bronce' AND is_gift = FALSE THEN quantity ELSE 0 END), 0) as cards_bronce,
+            COALESCE(SUM(CASE WHEN room = 'plata' AND is_gift = FALSE THEN quantity ELSE 0 END), 0) as cards_plata,
+            COALESCE(SUM(CASE WHEN room = 'oro' AND is_gift = FALSE THEN quantity ELSE 0 END), 0) as cards_oro,
+            COALESCE(SUM(CASE WHEN room = 'bronce' AND is_gift = TRUE THEN quantity ELSE 0 END), 0) as gift_bronce,
+            COALESCE(SUM(CASE WHEN room = 'plata' AND is_gift = TRUE THEN quantity ELSE 0 END), 0) as gift_plata,
+            COALESCE(SUM(CASE WHEN room = 'oro' AND is_gift = TRUE THEN quantity ELSE 0 END), 0) as gift_oro
+          FROM user_card_inventory
+          WHERE user_id = ?
+        `, [toUserId]);
+
+        const inv = updatedInventory[0] || {};
+        const cartonesTotal = {
+          bronce: (parseInt(inv.cards_bronce) || 0) + (parseInt(inv.gift_bronce) || 0),
+          plata: (parseInt(inv.cards_plata) || 0) + (parseInt(inv.gift_plata) || 0),
+          oro: (parseInt(inv.cards_oro) || 0) + (parseInt(inv.gift_oro) || 0)
+        };
+
+        io.to(`user_${toUserId}`).emit('resources_updated', {
+          userId: toUserId,
+          balance: parseFloat(userData[0].balance),
+          cartones: cartonesTotal,
+          // Datos extra para consistencia
+          cards_bronce: parseInt(inv.cards_bronce) || 0,
+          gift_bronce: parseInt(inv.gift_bronce) || 0,
+          message: `Has recibido ${quantity} cartones de ${room.toUpperCase()} 🎁`
+        });
+
+        console.log(`📡 [SuperAdmin] Transferencia notificada via Socket a user_${toUserId}`);
+      }
+    } catch (socketError) {
+      console.error('[SuperAdmin] ⚠️ Error emitiendo socket update:', socketError);
+    }
+
     res.json(result);
 
   } catch (error) {
@@ -287,7 +381,7 @@ exports.getAllInventories = async (req, res) => {
   try {
     const db = require('../db');
     const isSuperAdmin = req.user.role === 'superadmin';
-    
+
     if (isSuperAdmin) {
       // SUPERADMIN: Vista completa con distinción pagos/gratis
       const [inventories] = await db.query(
@@ -339,8 +433,8 @@ exports.getAllInventories = async (req, res) => {
 
       // Calcular promedio de % gratis por usuario
       Object.values(grouped).forEach(user => {
-        user.avg_free_percentage = user.total_all > 0 
-          ? Math.round((user.total_free / user.total_all) * 100) 
+        user.avg_free_percentage = user.total_all > 0
+          ? Math.round((user.total_free / user.total_all) * 100)
           : 0;
       });
 

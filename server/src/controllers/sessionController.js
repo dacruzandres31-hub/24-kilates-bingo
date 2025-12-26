@@ -83,7 +83,7 @@ function getRoomPrizeConfig(room) {
       is_ticket_prize: false
     }
   };
-  
+
   return configs[room] || null;
 }
 
@@ -93,7 +93,7 @@ function getRoomPrizeConfig(room) {
  */
 async function getOrCreateStarterSession() {
   const now = new Date();
-  
+
   // Buscar sesión activa existente
   const [existingSession] = await pool.query(`
     SELECT 
@@ -106,22 +106,22 @@ async function getOrCreateStarterSession() {
     ORDER BY start_time DESC
     LIMIT 1
   `);
-  
+
   if (existingSession.length > 0) {
     return existingSession[0];
   }
-  
+
   // Crear nueva sesión para la próxima hora
   const nextHour = new Date(now);
   nextHour.setMinutes(0, 0, 0);
   nextHour.setHours(now.getHours() + 1);
-  
+
   const [result] = await pool.query(`
     INSERT INTO game_sessions 
-    (room, start_time, status, current_pot_linea, current_pot_bingo, current_pot_jackpot)
+    (room, start_time, status, jackpot_linea, jackpot_bingo, jackpot_pre40)
     VALUES ('starter', ?, 'active', 0, 0, 0)
   `, [nextHour]);
-  
+
   return {
     id: result.insertId,
     room: 'starter',
@@ -147,7 +147,7 @@ exports.getActiveSessions = async (req, res) => {
     for (const room of rooms) {
       let currentSession = null;
       const prizeConfig = getRoomPrizeConfig(room);
-      
+
       // Starter: Siempre tiene sesión activa
       if (room === 'starter') {
         currentSession = await getOrCreateStarterSession();
@@ -159,7 +159,7 @@ exports.getActiveSessions = async (req, res) => {
         const [activeSession] = await pool.query(`
           SELECT 
             id, room, start_time, status,
-            current_pot_linea, current_pot_bingo, current_pot_jackpot,
+            jackpot_linea, jackpot_bingo, jackpot_pre40,
             total_cards_validated, total_paid_cards, total_gift_cards
           FROM game_sessions
           WHERE room = ? AND status IN ('active', 'pending')
@@ -178,9 +178,9 @@ exports.getActiveSessions = async (req, res) => {
               room,
               start_time: nextScheduled[0].start_time,
               status: 'pending',
-              current_pot_linea: 0,
-              current_pot_bingo: 0,
-              current_pot_jackpot: 0,
+              jackpot_linea: 0,
+              jackpot_bingo: 0,
+              jackpot_pre40: 0,
               total_cards_validated: 0,
               total_paid_cards: 0,
               total_gift_cards: 0,
@@ -230,9 +230,9 @@ exports.getRecentSessions = async (req, res) => {
         start_time,
         created_at,
         status,
-        current_pot_linea,
-        current_pot_bingo,
-        current_pot_jackpot,
+        jackpot_linea,
+        jackpot_bingo,
+        jackpot_pre40,
         total_cards_validated,
         total_paid_cards,
         total_gift_cards,
@@ -344,7 +344,7 @@ exports.createSession = async (req, res) => {
       card_price,
       initial_pot_linea = 0,
       initial_pot_bingo = 0,
-      initial_pot_jackpot = 0,
+      initial_pot_pre40 = 0,
       is_preventa = false
     } = req.body;
 
@@ -373,9 +373,9 @@ exports.createSession = async (req, res) => {
         play_date,
         start_time,
         card_price,
-        current_pot_linea,
-        current_pot_bingo,
-        current_pot_jackpot,
+        jackpot_linea,
+        jackpot_bingo,
+        jackpot_pre40,
         is_preventa,
         sale_closes_at,
         status
@@ -387,7 +387,7 @@ exports.createSession = async (req, res) => {
       card_price,
       initial_pot_linea,
       initial_pot_bingo,
-      initial_pot_jackpot,
+      initial_pot_pre40,
       is_preventa ? 1 : 0,
       sale_closes_at
     ]);
