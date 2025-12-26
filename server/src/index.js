@@ -29,7 +29,10 @@ const cardsRoutes = require('./routes/cardsRoutes');
 const gameAdminController = require('./controllers/gameAdminController');
 const cardPoolService = require('./services/cardPoolService');
 const activityHistoryRoutes = require('./routes/activityHistoryRoutes');
+const whatsappRoutes = require('./routes/whatsappRoutes'); // Nueva ruta
 const db = require('./db');
+const fs = require('fs');
+const path = require('path');
 
 // CONFIGURACIÓN INICIAL
 const PORT = process.env.PORT || 3001;
@@ -151,6 +154,7 @@ app.use('/api/winners-payment', winnersPaymentRoutes);
 app.use('/api/superadmin', superAdminRoutes);
 app.use('/api/game-admin', gameAdminRoutes);
 app.use('/api/support', require('./routes/supportRoutes'));
+app.use('/api/whatsapp', whatsappRoutes); // Montar nuevas rutas
 
 // HEALTH CHECK
 app.get('/health', (req, res) => {
@@ -211,9 +215,41 @@ async function loadExistingPools() {
   }
 }
 
+// MIGRACIÓN AUTOMÁTICA DE BASE DE DATOS (IF NOT EXISTS)
+async function updateDatabaseSchema() {
+  try {
+    const sqlPath = path.join(__dirname, '..', 'ADD_WHATSAPP_CONFIGS.sql');
+    if (fs.existsSync(sqlPath)) {
+      console.log('🔄 Verificando esquema de base de datos (WhatsApp)...');
+      const sql = fs.readFileSync(sqlPath, 'utf8');
+      const statements = sql
+        .replace(/\r?\n/g, ' ')
+        .split(';')
+        .filter(st => st.trim().length > 0);
+
+      for (let statement of statements) {
+        try {
+          await db.query(statement);
+        } catch (err) {
+          // Ignorar errores de "ya existe" (IF NOT EXISTS maneja tablas, pero no columnas)
+          if (err.code !== 'ER_DUP_FIELDNAME' && err.code !== 'ER_TABLE_EXISTS_ERROR') {
+            // console.warn(`[Migration] Nota: ${err.message}`);
+          }
+        }
+      }
+      console.log('✅ Esquema de WhatsApp verificado.');
+    }
+  } catch (error) {
+    console.error('❌ Error en auto-migración:', error.message);
+  }
+}
+
 // INICIAR SERVIDOR
 const startServer = async () => {
   try {
+    // Aplicar actualizaciones de esquema si existen
+    await updateDatabaseSchema();
+
     // Cargar pools de cartones existentes desde BD
     await loadExistingPools();
 

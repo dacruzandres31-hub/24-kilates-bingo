@@ -71,6 +71,7 @@ export default function Sidebar({ isOpen, onClose, activeSections, onToggleSecti
       title: '⚙️ Sistema',
       icon: '⚙️',
       sections: [
+        { id: 'whatsapp-config', name: '📱 Configuración WhatsApp' },
         { id: 'alertas', name: 'Alertas del Sistema' },
         { id: 'support', name: 'Soporte Técnico' }
       ]

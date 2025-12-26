@@ -19,6 +19,16 @@ exports.depositChips = async (req, res) => {
       });
     }
 
+    // --- RESTRICCIÓN AGENTES ---
+    // Los agentes no pueden tener dinero/fichas, solo cartones.
+    const [recipientData] = await pool.query('SELECT role FROM users WHERE id = ?', [userId]);
+    if (recipientData.length > 0 && recipientData[0].role === 'agente') {
+      return res.status(400).json({
+        success: false,
+        message: '❌ Operación denegada: Los agentes solo pueden manejar cartones, no dinero.'
+      });
+    }
+
     const result = await ChipsService.depositChips(
       userId,
       parseFloat(amount),
@@ -108,17 +118,17 @@ exports.transferChips = async (req, res) => {
 
   } catch (error) {
     console.error('Error en transferencia de fichas:', error);
-    
+
     // Business logic errors should return 400
-    if (error.message.includes('insuficientes') || 
-        error.message.includes('no encontrado') ||
-        error.message.includes('mismo')) {
+    if (error.message.includes('insuficientes') ||
+      error.message.includes('no encontrado') ||
+      error.message.includes('mismo')) {
       return res.status(400).json({
         success: false,
         message: error.message
       });
     }
-    
+
     res.status(500).json({
       success: false,
       message: error.message
@@ -248,7 +258,7 @@ exports.getMovementStats = async (req, res) => {
 exports.getUserBalance = async (req, res) => {
   try {
     const userId = req.params.userId || req.user.id;
-    
+
     const pool = require('../db');
     const [users] = await pool.query(
       'SELECT id, username, balance FROM users WHERE id = ?',

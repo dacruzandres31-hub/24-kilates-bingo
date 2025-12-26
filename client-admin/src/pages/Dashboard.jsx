@@ -14,6 +14,7 @@ import CardMovementsHistory from '../components/CardMovementsHistory';
 import GamificationStatsPanel from '../components/GamificationStatsPanel';
 import SupportPanel from '../components/SupportPanel';
 import WithdrawalsPanel from '../components/WithdrawalsPanel';
+import WhatsAppConfigPanel from '../components/WhatsAppConfigPanel';
 import { SuperAdminOnly } from '../components/ProtectedContent';
 
 // Paneles de Sesiones y Pozos
@@ -69,7 +70,8 @@ export default function Dashboard() {
     'horarios-config': false,
     'alertas': false,
     'support': false,
-    'withdrawals': false
+    'withdrawals': false,
+    'whatsapp-config': false
   });
 
   useEffect(() => {
@@ -108,28 +110,19 @@ export default function Dashboard() {
       const ts = Date.now();
       console.log('📡 [Dashboard] Fetching resources...');
       const [userRes, finRes, inventoryRes] = await Promise.all([
-        axios.post('/api/admin/refresh/profile', {}, {
+        axios.get('/api/admin/profile', {
           headers: {
-            Authorization: `Bearer ${token}`,
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache',
-            'Expires': '0'
+            Authorization: `Bearer ${token}`
           }
         }),
         axios.get('/api/admin/financial-summary', {
           headers: {
-            Authorization: `Bearer ${token}`,
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache',
-            'Expires': '0'
+            Authorization: `Bearer ${token}`
           }
         }),
-        axios.post('/api/admin/refresh/inventory', {}, {
+        axios.get('/api/admin/cards/inventory', {
           headers: {
-            Authorization: `Bearer ${token}`,
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache',
-            'Expires': '0'
+            Authorization: `Bearer ${token}`
           }
         })
       ]);
@@ -570,6 +563,13 @@ export default function Dashboard() {
             <section className="mb-8">
               <h2 className="text-2xl font-bold text-white mb-6">⚠️ Alertas del Sistema</h2>
               <AlertsList />
+            </section>
+          )}
+
+          {/* Configuración de WhatsApp */}
+          {activeSections['whatsapp-config'] && (
+            <section className="mb-8">
+              <WhatsAppConfigPanel userData={userData} />
             </section>
           )}
 

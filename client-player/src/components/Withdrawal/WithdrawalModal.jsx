@@ -7,6 +7,8 @@ export default function WithdrawalModal({ isOpen, onClose, onWithdrawalSuccess }
     const [activeTab, setActiveTab] = useState('request'); // 'request', 'history'
     const [amount, setAmount] = useState('');
     const [method, setMethod] = useState('cbu');
+    const [bankAccountHolder, setBankAccountHolder] = useState('');
+    const [whatsappNumber, setWhatsappNumber] = useState('');
     const [accountDetails, setAccountDetails] = useState('');
     const [history, setHistory] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -60,7 +62,10 @@ export default function WithdrawalModal({ isOpen, onClose, onWithdrawalSuccess }
             const res = await axios.post('/api/withdrawals/request', {
                 amount: parseFloat(amount),
                 method,
-                notes: accountDetails // Mapping 'notes' to account_details generically if backend expects 'notes' or check backend
+                cbu: accountDetails, // Send as cbu specifically as backend expects it or notes
+                bankAccountHolder,
+                whatsappNumber, // Send new field
+                notes: accountDetails
             }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -68,6 +73,8 @@ export default function WithdrawalModal({ isOpen, onClose, onWithdrawalSuccess }
             alert('Solicitud enviada exitosamente');
             setAmount('');
             setAccountDetails('');
+            setBankAccountHolder('');
+            setWhatsappNumber('');
             fetchBalance();
             setActiveTab('history');
             fetchHistory();
@@ -142,6 +149,28 @@ export default function WithdrawalModal({ isOpen, onClose, onWithdrawalSuccess }
                                     <option value="cbu">Transferencia CBU / CVU</option>
                                     <option value="alias">Alias Bancario / Virtual</option>
                                 </select>
+                            </div>
+
+                            <div className="form-group">
+                                <label>Titular de la Cuenta</label>
+                                <input
+                                    type="text"
+                                    value={bankAccountHolder}
+                                    onChange={e => setBankAccountHolder(e.target.value)}
+                                    placeholder="Nombre y Apellido del Titular"
+                                    required
+                                />
+                            </div>
+
+                            <div className="form-group">
+                                <label>Tu WhatsApp (para enviar el recibo)</label>
+                                <input
+                                    type="tel"
+                                    value={whatsappNumber}
+                                    onChange={e => setWhatsappNumber(e.target.value)}
+                                    placeholder="Ej: +54911..."
+                                    required
+                                />
                             </div>
 
                             <div className="form-group">

@@ -6,6 +6,8 @@
 
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { Copy, Share2 } from 'lucide-react';
+import CardReceiptModal from './CardReceiptModal';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -14,21 +16,22 @@ export default function SolicitudesRetiro({ userData }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filtroEstado, setFiltroEstado] = useState('pending');
-  
+
   // Verificar si el usuario es SuperAdmin (Andy)
   const isSuperAdmin = userData?.role === 'superadmin';
-  
+
   // Modal para procesar/rechazar
-  const [modalAction, setModalAction] = useState({ 
-    isOpen: false, 
+  const [modalAction, setModalAction] = useState({
+    isOpen: false,
     type: '', // 'process' o 'reject'
-    solicitud: null 
+    solicitud: null
   });
   const [actionData, setActionData] = useState({
     transferReceipt: '',
     rejectionReason: ''
   });
   const [actionLoading, setActionLoading] = useState(false);
+  const [modalData, setModalData] = useState(null);
 
   useEffect(() => {
     fetchSolicitudes();
@@ -142,10 +145,45 @@ export default function SolicitudesRetiro({ userData }) {
     });
   };
 
+  const handleCopy = (text) => {
+    navigator.clipboard.writeText(text);
+    alert('Copiado al portapapeles');
+  };
+
+  const handleShareDetails = (req) => {
+    const text = `*SOLICITUD DE RETIRO*\n\n` +
+      `👤 Usu: ${req.username}\n` +
+      `💰 Monto: $${parseFloat(req.amount).toLocaleString()}\n` +
+      `🏦 Banco: ${req.method?.toUpperCase()}\n` +
+      `📋 Datos: ${req.notes || req.account_details || req.cbu}\n` +
+      (req.bank_account_holder ? `👤 Titular: ${req.bank_account_holder}\n` : '') +
+      `\nPor favor procesar pago.`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+  };
+
+  const handleOpenReceipt = (req) => {
+    setModalData({
+      type: 'dinero',
+      operation: 'RETIRO EXITOSO',
+      quantity: parseFloat(req.amount),
+      userName: req.username,
+      recipientId: req.user_id,
+      transactionId: req.transfer_receipt || req.id,
+      timestamp: new Date(req.requested_at || req.created_at).toLocaleString(),
+      extraDetails: {
+        bank: req.bank_name || req.method,
+        cbu: req.cbu || req.account_details,
+        holder: req.bank_account_holder
+      }
+    });
+  };
+
   const getStatusBadge = (status) => {
     const badges = {
       pending: { text: 'Pendiente', color: 'bg-yellow-600', icon: '⏳' },
       processed: { text: 'Procesado', color: 'bg-green-600', icon: '✅' },
+      completed: { text: 'Procesado', color: 'bg-green-600', icon: '✅' },
+      approved: { text: 'Procesado', color: 'bg-green-600', icon: '✅' },
       rejected: { text: 'Rechazado', color: 'bg-red-600', icon: '❌' }
     };
     return badges[status] || badges.pending;
@@ -157,41 +195,37 @@ export default function SolicitudesRetiro({ userData }) {
       <div className="flex items-center gap-4">
         <button
           onClick={() => setFiltroEstado('pending')}
-          className={`px-6 py-2 rounded-lg font-medium transition-all ${
-            filtroEstado === 'pending'
-              ? 'bg-yellow-600 text-white shadow-lg'
-              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-          }`}
+          className={`px-6 py-2 rounded-lg font-medium transition-all ${filtroEstado === 'pending'
+            ? 'bg-yellow-600 text-white shadow-lg'
+            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            }`}
         >
           ⏳ Pendientes
         </button>
         <button
-          onClick={() => setFiltroEstado('processed')}
-          className={`px-6 py-2 rounded-lg font-medium transition-all ${
-            filtroEstado === 'processed'
-              ? 'bg-green-600 text-white shadow-lg'
-              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-          }`}
+          onClick={() => setFiltroEstado('completed')}
+          className={`px-6 py-2 rounded-lg font-medium transition-all ${filtroEstado === 'processed'
+            ? 'bg-green-600 text-white shadow-lg'
+            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            }`}
         >
           ✅ Procesados
         </button>
         <button
           onClick={() => setFiltroEstado('rejected')}
-          className={`px-6 py-2 rounded-lg font-medium transition-all ${
-            filtroEstado === 'rejected'
-              ? 'bg-red-600 text-white shadow-lg'
-              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-          }`}
+          className={`px-6 py-2 rounded-lg font-medium transition-all ${filtroEstado === 'rejected'
+            ? 'bg-red-600 text-white shadow-lg'
+            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            }`}
         >
           ❌ Rechazados
         </button>
         <button
           onClick={() => setFiltroEstado('')}
-          className={`px-6 py-2 rounded-lg font-medium transition-all ${
-            filtroEstado === ''
-              ? 'bg-blue-600 text-white shadow-lg'
-              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-          }`}
+          className={`px-6 py-2 rounded-lg font-medium transition-all ${filtroEstado === ''
+            ? 'bg-blue-600 text-white shadow-lg'
+            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            }`}
         >
           📋 Todos
         </button>
@@ -229,7 +263,7 @@ export default function SolicitudesRetiro({ userData }) {
           <div className="grid grid-cols-1 gap-4">
             {Array.isArray(solicitudes) && solicitudes.map((solicitud) => {
               const badge = getStatusBadge(solicitud.status);
-              
+
               return (
                 <div key={solicitud.id} className="bg-gray-900/50 rounded-lg border border-gray-700 p-6 hover:border-emerald-600/50 transition-all">
                   <div className="flex items-start justify-between mb-4">
@@ -258,7 +292,25 @@ export default function SolicitudesRetiro({ userData }) {
                     </div>
                     <div>
                       <p className="text-gray-400 text-sm mb-1">🏦 CBU</p>
-                      <p className="text-white font-mono">{solicitud.cbu}</p>
+                      <div className="flex items-center gap-2">
+                        <code className="bg-gray-800 px-2 py-1 rounded text-xs font-mono text-white select-all">
+                          {solicitud.cbu || solicitud.account_details || solicitud.notes}
+                        </code>
+                        <button
+                          onClick={() => handleCopy(solicitud.cbu || solicitud.account_details || solicitud.notes)}
+                          className="text-gray-400 hover:text-white transition"
+                          title="Copiar CBU/Alias"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleShareDetails(solicitud)}
+                          className="text-green-500 hover:text-green-400 transition"
+                          title="Enviar por WhatsApp"
+                        >
+                          <Share2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                     <div>
                       <p className="text-gray-400 text-sm mb-1">🏛️ Banco</p>
@@ -266,13 +318,22 @@ export default function SolicitudesRetiro({ userData }) {
                     </div>
                   </div>
 
-                  {solicitud.status === 'processed' && (
+                  {/* Info procesada */}
+                  {(solicitud.status === 'processed' || solicitud.status === 'completed' || solicitud.status === 'approved') && (
                     <div className="bg-green-900/20 border border-green-700 rounded-lg p-4 mb-4">
                       <p className="text-green-400 text-sm mb-1">✅ Procesado por</p>
                       <p className="text-white">{solicitud.processor_username || `Usuario #${solicitud.processor_id}`}</p>
                       <p className="text-gray-400 text-xs mt-1">{formatDate(solicitud.processed_at)}</p>
                       {solicitud.transfer_receipt && (
                         <p className="text-gray-300 text-sm mt-2">📄 Comprobante: {solicitud.transfer_receipt}</p>
+                      )}
+                      {(solicitud.status === 'completed' || solicitud.status === 'approved') && (
+                        <button
+                          onClick={() => handleOpenReceipt(solicitud)}
+                          className="mt-3 w-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2 rounded transition"
+                        >
+                          ℹ️ VER RECIBO / ENVIAR
+                        </button>
                       )}
                     </div>
                   )}
@@ -366,17 +427,25 @@ export default function SolicitudesRetiro({ userData }) {
               <button
                 onClick={modalAction.type === 'process' ? handleProcessWithdrawal : handleRejectWithdrawal}
                 disabled={actionLoading}
-                className={`flex-1 px-6 py-3 ${
-                  modalAction.type === 'process' 
-                    ? 'bg-green-600 hover:bg-green-700' 
-                    : 'bg-red-600 hover:bg-red-700'
-                } text-white rounded-lg font-medium transition-colors disabled:opacity-50`}
+                className={`flex-1 px-6 py-3 ${modalAction.type === 'process'
+                  ? 'bg-green-600 hover:bg-green-700'
+                  : 'bg-red-600 hover:bg-red-700'
+                  } text-white rounded-lg font-medium transition-colors disabled:opacity-50`}
               >
                 {actionLoading ? 'Procesando...' : 'Confirmar'}
               </button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal de Recibo */}
+      {modalData && (
+        <CardReceiptModal
+          isOpen={!!modalData}
+          onClose={() => setModalData(null)}
+          data={modalData}
+        />
       )}
     </div>
   );

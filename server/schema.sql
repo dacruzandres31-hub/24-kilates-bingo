@@ -16,6 +16,7 @@ CREATE TABLE users (
     equipped_avatar_frame_id INT,
     equipped_card_skin_id INT,
     equipped_chat_effect_id INT,
+    phone_number VARCHAR(20),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

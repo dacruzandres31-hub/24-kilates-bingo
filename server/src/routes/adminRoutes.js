@@ -140,8 +140,7 @@ router.get('/metrics', authenticateToken, isAdmin, (req, res) => {
   res.json(metricsService.getMetrics());
 });
 
-router.post('/refresh/profile', authenticateToken, isAdmin, getAdminProfile);
-router.post('/refresh/inventory', authenticateToken, isAdmin, getMyCardInventory);
+// [REMOVED DEBUG ROUTES] - Using standard GET routes instead
 
 // CATCH-ALL 404 FOR ADMIN ROUTES
 router.use((req, res) => {

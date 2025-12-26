@@ -10,7 +10,13 @@ const ChipsService = require('../services/chipsService');
 exports.createWithdrawalRequest = async (req, res) => {
   try {
     const userId = req.user.id; // Usuario autenticado
-    let { amount, bankAccountHolder, cbu, bankName, accountType, notes, method } = req.body;
+    let { amount, bankAccountHolder, cbu, bankName, accountType, notes, method, whatsappNumber } = req.body;
+
+    // Si se proporciona WhatsApp, actualizar perfil del usuario
+    if (whatsappNumber) {
+      const pool = require('../db');
+      await pool.query('UPDATE users SET phone_number = ? WHERE id = ?', [whatsappNumber, userId]);
+    }
 
     console.log('[DEBUG] createWithdrawalRequest - userId:', userId, 'amount:', amount);
 
