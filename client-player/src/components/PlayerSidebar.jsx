@@ -6,6 +6,7 @@ import bronzeIcon from '../assets/bronze_icon.png';
 import audioService from '../services/audioService';
 import useSocket from '../hooks/useSocket';
 import axios from 'axios';
+import DepositModal from './DepositModal';
 
 const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor = '#ff00ff', onLogout }) => {
   const navigate = useNavigate();
@@ -13,6 +14,7 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
   const [audioStatus, setAudioStatus] = useState({ musicEnabled: true, efectosEnabled: true });
   const [audioExpanded, setAudioExpanded] = useState(false); // Colapsable audio
   const [showChangePassword, setShowChangePassword] = useState(false); // Modal cambiar contraseña
+  const [showDepositModal, setShowDepositModal] = useState(false); // Modal depositar
   const [notificationMessage, setNotificationMessage] = useState(null); // Notificación de cambios
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
@@ -312,7 +314,6 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
           </button>
         </div>
 
-        {/* Saldo */}
         <div className="sidebar-section" style={{ borderBottom: `1px solid ${themeColor}30` }}>
           <div className="sidebar-item balance-info">
             <img src={bronzeIcon} alt="Saldo" className="sidebar-balance-icon" style={{ filter: 'sepia(1) saturate(3) hue-rotate(10deg) brightness(0.9)' }} />
@@ -321,6 +322,38 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
               <span className="sidebar-value balance" style={{ color: accentColor }}>{formatCurrency(userData?.balance || 0)}</span>
             </div>
           </div>
+
+          <button
+            onClick={() => setShowDepositModal(true)}
+            style={{
+              width: '100%',
+              marginTop: '12px',
+              padding: '10px',
+              background: `linear-gradient(90deg, ${themeColor}20, ${accentColor}20)`,
+              border: `1px solid ${themeColor}`,
+              borderRadius: '8px',
+              color: 'white',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              transition: 'all 0.2s',
+              boxShadow: `0 0 10px ${themeColor}10`
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.background = `linear-gradient(90deg, ${themeColor}40, ${accentColor}40)`;
+              e.target.style.boxShadow = `0 0 15px ${themeColor}30`;
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background = `linear-gradient(90deg, ${themeColor}20, ${accentColor}20)`;
+              e.target.style.boxShadow = `0 0 10px ${themeColor}10`;
+            }}
+          >
+            <span style={{ fontSize: '1.2rem' }}>💸</span>
+            Cargar Saldo
+          </button>
         </div>
 
         {/* Mis Cartones */}
@@ -653,6 +686,14 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
           </div>
         </div>
       )}
+      {/* Modal de Depósito */}
+      <DepositModal
+        isOpen={showDepositModal}
+        onClose={() => setShowDepositModal(false)}
+        themeColor={themeColor}
+        accentColor={accentColor}
+      />
+
     </>
   );
 };

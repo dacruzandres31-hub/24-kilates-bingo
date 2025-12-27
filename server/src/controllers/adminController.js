@@ -917,7 +917,11 @@ async function createUser(req, res) {
     console.log('🔍 [CREATE-USER] req.user =', JSON.stringify(req.user));
     console.log('🔍 [CREATE-USER] req.body =', JSON.stringify(req.body));
 
-    const { username, password, role, parent_id, nombre_completo, documento, email, telefono } = req.body;
+    const {
+      username, password, role, parent_id,
+      nombre_completo, documento, email, telefono,
+      cbu, alias, bank_name
+    } = req.body;
     const currentUserId = req.user.id;
     const currentUserRole = req.user.role;
 
@@ -990,7 +994,7 @@ async function createUser(req, res) {
     );
 
     // Intentar actualizar campos opcionales si existen
-    if (nombre_completo || documento || email || telefono) {
+    if (nombre_completo || documento || email || telefono || cbu || alias || bank_name) {
       try {
         const updates = [];
         const values = [];
@@ -1010,6 +1014,18 @@ async function createUser(req, res) {
         if (telefono) {
           updates.push('telefono = ?');
           values.push(telefono);
+        }
+        if (cbu) {
+          updates.push('cbu = ?');
+          values.push(cbu);
+        }
+        if (alias) {
+          updates.push('alias = ?');
+          values.push(alias);
+        }
+        if (bank_name) {
+          updates.push('bank_name = ?');
+          values.push(bank_name);
         }
 
         if (updates.length > 0) {
@@ -2100,7 +2116,7 @@ async function changeUserPassword(req, res) {
 async function updateUserPersonalData(req, res) {
   try {
     const { userId } = req.params;
-    const { nombre_completo, documento, email, telefono } = req.body;
+    const { nombre_completo, documento, email, telefono, cbu, alias, bank_name } = req.body;
     const adminId = req.user.id;
     const adminRole = req.user.role;
 
@@ -2160,6 +2176,18 @@ async function updateUserPersonalData(req, res) {
     if (telefono !== undefined) {
       updates.push('telefono = ?');
       values.push(telefono || null);
+    }
+    if (cbu !== undefined) {
+      updates.push('cbu = ?');
+      values.push(cbu || null);
+    }
+    if (alias !== undefined) {
+      updates.push('alias = ?');
+      values.push(alias || null);
+    }
+    if (bank_name !== undefined) {
+      updates.push('bank_name = ?');
+      values.push(bank_name || null);
     }
 
     if (updates.length === 0) {
@@ -2377,6 +2405,131 @@ async function removeCardsFromUser(req, res) {
   }
 }
 
+/**
+ * GET /api/admin/users/superior-info
+ * Obtiene la información del superior inmediato (CBU, Alias, Contacto)
+ */
+async function getSuperiorInfo(req, res) {
+  try {
+    const userId = req.user.userId || req.user.id;
+
+    // Buscar al usuario para saber quién es su padre
+    const [userRows] = await pool.query('SELECT parent_id FROM users WHERE id = ?', [userId]);
+
+    if (userRows.length === 0) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+    let parentId = userRows[0].parent_id;
+
+    // --- FALLBACK LOGIC ---
+    // Si no tiene padre y no es el propio Andy (id=1), el superior por defecto es Andy
+    if (!parentId && userId !== 1) {
+      parentId = 1;
+    }
+
+    // Si sigue sin haber parentId (es el propio Andy), no hay superior
+    if (!parentId) {
+      return res.json({
+        hasSuperior: false,
+        message: 'Eres Andy (SuperAdmin Raíz). No tienes superior para solicitudes.'
+      });
+    }
+
+    // Buscar datos del padre
+    const [parentRows] = await pool.query(
+      'SELECT id, username, email, cbu, alias, bank_name, phone_number FROM users WHERE id = ?',
+      [parentId]
+    );
+
+    if (parentRows.length === 0) return res.status(404).json({ error: 'Superior no encontrado' });
+    const parent = parentRows[0];
+
+    try {
+      const DepositService = require('../services/depositService');
+      const account = await DepositService.getActiveAccount(parentId);
+
+      res.json({
+        hasSuperior: true,
+        superior: {
+          id: parent.id,
+          username: parent.username,
+          cbu: account.cbu || 'No definido',
+          alias: account.alias || 'No definido',
+          bank_name: account.bank_name || 'No definido',
+          holder_name: account.holder_name || parent.username,
+          contact: parent.phone_number || parent.email
+        }
+      });
+    } catch (accountError) {
+      console.warn('⚠️ Superior identified but has no active accounts with limit:', accountError.message);
+      // Retornar información básica del superior aunque no tenga cuenta rotativa activa (puntos de contacto)
+      res.json({
+        hasSuperior: true,
+        error: 'Tu superior no tiene cuentas habilitadas con cupo diario en este momento.',
+        superior: {
+          id: parent.id,
+          username: parent.username,
+          cbu: 'No disponible',
+          alias: 'Sin cupo diario',
+          bank_name: 'Contactar superior',
+          holder_name: parent.username,
+          contact: parent.phone_number || parent.email
+        }
+      });
+    }
+
+  } catch (error) {
+    console.error('Error obteniendo info superior:', error);
+    res.status(500).json({ error: error.message || 'Error interno obteniendo info del superior' });
+  }
+}
+
+/**
+ * POST /api/admin/stock/request
+ * Crea una solicitud de stock B2B hacia el superior
+ */
+async function createStockRequest(req, res) {
+  try {
+    const { room, quantity, items, proofUrl, amount, superiorId } = req.body;
+    const userId = req.user.userId || req.user.id;
+
+    if (!superiorId) return res.status(400).json({ error: 'Superior ID requerido' });
+
+    // Determinar qué guardar en details
+    let detailsObj = null;
+    if (items && Array.isArray(items)) {
+      detailsObj = { items };
+    } else if (room && quantity) {
+      detailsObj = { room, quantity };
+    }
+
+    if (!detailsObj) return res.status(400).json({ error: 'Debe especificar al menos una sala y cantidad' });
+
+    // Insertar solicitud en deposit_requests con tipo 'stock'
+    const [result] = await pool.query(
+      `INSERT INTO deposit_requests 
+       (user_id, target_user_id, amount_declared, proof_image_url, status, details, request_type)
+       VALUES (?, ?, ?, ?, 'pending', ?, 'b2b_stock')`,
+      [
+        userId,
+        superiorId,
+        amount || 0, // El monto en plata
+        proofUrl || null,
+        JSON.stringify(detailsObj) // Detalles del pedido (breakdown)
+      ]
+    );
+
+    res.json({
+      success: true,
+      requestId: result.insertId,
+      message: 'Solicitud enviada al superior'
+    });
+
+  } catch (error) {
+    console.error('Error creando solicitud de stock:', error);
+    res.status(500).json({ error: 'Error al enviar solicitud' });
+  }
+}
+
 module.exports = {
   getAdminProfile,
   getFinancialSummary,
@@ -2399,5 +2552,7 @@ module.exports = {
   changePassword,
   changeUserPassword,
   updateUserPersonalData,
-  bulkTransferCards
+  bulkTransferCards,
+  getSuperiorInfo,
+  createStockRequest
 };

@@ -7,6 +7,7 @@ import useSocket from '../hooks/useSocket';
 import CostCalculatorModal from './CostCalculatorModal';
 import BulkTransferModal from './BulkTransferModal';
 import CardReceiptModal from './CardReceiptModal';
+import WholesaleCalculatorModal from './WholesaleCalculatorModal';
 
 export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, onResourcesUpdate }) {
   // ... (existing state)
@@ -15,6 +16,12 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
   const [showCalculator, setShowCalculator] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [bulkData, setBulkData] = useState(null); // Data from calculator
+
+  // Estado para Modal Mayorista
+  const [modalMayorista, setModalMayorista] = useState({
+    isOpen: false,
+    usuario: null
+  });
 
   // Estado para el Recibo Virtual
   const [modalRecibo, setModalRecibo] = useState({
@@ -210,6 +217,11 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
       documento: '',
       email: '',
       telefono: ''
+    },
+    datosBancarios: {
+      cbu: '',
+      alias: '',
+      bank_name: ''
     }
   });
   const [showPasswordCreate, setShowPasswordCreate] = useState(false);
@@ -245,6 +257,11 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
       documento: '',
       email: '',
       telefono: ''
+    },
+    datosBancarios: {
+      cbu: '',
+      alias: '',
+      bank_name: ''
     },
     isProcessing: false
   });
@@ -655,7 +672,10 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
       const token = localStorage.getItem('adminToken');
       const response = await axios.put(
         `/api/admin/users/${usuario.id}/personal-data`,
-        datosPersonales,
+        {
+          ...datosPersonales,
+          ...modalModificar.datosBancarios
+        },
         {
           headers: { Authorization: `Bearer ${token}` }
         }
@@ -690,6 +710,11 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
             documento: '',
             email: '',
             telefono: ''
+          },
+          datosBancarios: {
+            cbu: '',
+            alias: '',
+            bank_name: ''
           },
           isProcessing: false
         });
@@ -805,13 +830,17 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
       const userData = {
         username: datosIngreso.username,
         password: datosIngreso.password,
-        role: tipoUsuario,
+        role: (tipoUsuario === 'agente' && modalCrearUsuario.isAdmin) ? 'admin' : tipoUsuario,
         parent_id: parentId,
         // Datos personales opcionales
         ...(datosPersonales.nombre_completo && { nombre_completo: datosPersonales.nombre_completo }),
         ...(datosPersonales.documento && { documento: datosPersonales.documento }),
         ...(datosPersonales.email && { email: datosPersonales.email }),
-        ...(datosPersonales.telefono && { telefono: datosPersonales.telefono })
+        ...(datosPersonales.telefono && { telefono: datosPersonales.telefono }),
+        // Datos bancarios
+        ...(modalCrearUsuario.datosBancarios.cbu && { cbu: modalCrearUsuario.datosBancarios.cbu }),
+        ...(modalCrearUsuario.datosBancarios.alias && { alias: modalCrearUsuario.datosBancarios.alias }),
+        ...(modalCrearUsuario.datosBancarios.bank_name && { bank_name: modalCrearUsuario.datosBancarios.bank_name })
       };
 
       const response = await axios.post('/api/admin/users/create', userData, {
@@ -1444,6 +1473,80 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
     }
   };
 
+  // Manejar confirmación de venta mayorista (B2B)
+  const handleConfirmVentaMayorista = async (data) => {
+    const { items, prices, role, superiorId, isRequest } = data;
+    const userId = modalMayorista.usuario?.id;
+
+    if (!userId) return;
+
+    try {
+      const token = localStorage.getItem('adminToken');
+
+      // Si es una solicitud B2B (Auto-compra de stock al superior)
+      if (isRequest) {
+        await axios.post('/api/admin/stock/request', {
+          items: items.map(i => ({ room: i.room, quantity: i.quantity })),
+          amount: prices.net,
+          superiorId: superiorId
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        // Feedback de éxito (Solicitud enviada)
+        setSuccessMessage('Solicitud de stock enviada correctamente a tu superior.');
+        setShowSuccessPopup(true);
+        setTimeout(() => setShowSuccessPopup(false), 3000);
+        return;
+      }
+
+      // --- FLUJO DIRECTO (Manual Add Cards) ---
+      for (const item of items) {
+        await axios.post('/api/admin/users/add-cards', {
+          userId,
+          room: item.room,
+          quantity: item.quantity
+        }, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      }
+
+      // 2. Refresh
+      await cargarUsuarios();
+
+      // 3. Generar Recibo
+      setModalRecibo({
+        isOpen: true,
+        data: {
+          type: 'cartones',
+          operation: `Venta B2B (${role === 'admin' ? '20%' : '15%'} OFF)`,
+          userName: modalMayorista.usuario.username,
+          items: items,
+          timestamp: new Date().toLocaleString(),
+          transactionId: `B2B-${Date.now().toString().slice(-6)}`,
+          recipientId: userId,
+          extraDetails: {
+            totalGross: prices.gross,
+            totalNet: prices.net,
+            discount: prices.discount
+          }
+        }
+      });
+
+      // Mensaje Exito
+      const totalQty = items.reduce((acc, i) => acc + i.quantity, 0);
+      setSuccessMessage(`✅ Venta Exitosa: ${totalQty} Cartones totales a ${modalMayorista.usuario.username}`);
+      setShowSuccessPopup(true);
+      setTimeout(() => setShowSuccessPopup(false), 3000);
+
+    } catch (error) {
+      console.error('Error en venta mayorista:', error);
+      setErrorMessage('❌ Error procesando la venta: ' + (error.response?.data?.message || error.message));
+      setShowErrorPopup(true);
+      setTimeout(() => setShowErrorPopup(false), 4000);
+    }
+  };
+
   // Verificar si un nodo tiene hijos (agentes o jugadores)
   const tieneHijos = (nodoId) => {
     return usuarios.some(u => u.parent_id === nodoId);
@@ -1564,6 +1667,18 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
               <span className="text-xs bg-yellow-500 text-black px-2 py-1 rounded-full font-bold ml-2">SUPERADMIN</span>
             )}
           </h2>
+
+          {/* BOTÓN COMPRAR STOCK (Solo Agentes y Admins) */}
+          {(currentUser.role === 'agente' || currentUser.role === 'admin') && (
+            <button
+              onClick={() => setModalMayorista({ isOpen: true, usuario: currentUser })}
+              className="mb-4 w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02]"
+            >
+              <span className="text-xl">🛒</span>
+              <span>COMPRAR STOCK (Venta Mayorista)</span>
+            </button>
+          )}
+
           <div className={`grid gap-4 ${currentUser.role === 'superadmin' ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2 md:grid-cols-4'}`}>
             {/* Balance - Oculto para Agentes */}
             {currentUser.role !== 'agente' && (
@@ -1875,6 +1990,8 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                             {/* Botones de acción - ocultos si el usuario está bloqueado */}
                             {!usuario.is_blocked && (
                               <>
+                                {/* Venta Mayorista REMOVED */}
+
                                 {/* Ver información */}
                                 <button
                                   onClick={(e) => {
@@ -1918,6 +2035,11 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                                         documento: usuario.documento || '',
                                         email: usuario.email || '',
                                         telefono: usuario.telefono || ''
+                                      },
+                                      datosBancarios: {
+                                        cbu: usuario.cbu || '',
+                                        alias: usuario.alias || '',
+                                        bank_name: usuario.bank_name || ''
                                       },
                                       isProcessing: false
                                     });
@@ -2204,9 +2326,27 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                   } rounded-tr-xl flex items-center justify-center gap-2`}
               >
                 <span>🏢</span>
-                <span>Agente</span>
+                <span>Agente / Admin</span>
               </button>
             </div>
+
+            {/* Checkbox: Es Administrador (Solo visible para Agente) */}
+            {modalCrearUsuario.tipoUsuario === 'agente' && (
+              <div className="bg-gray-800 p-3 border-b border-gray-700 flex items-center justify-center gap-3">
+                <label className="flex items-center gap-2 text-white cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={modalCrearUsuario.isAdmin === true}
+                    onChange={(e) => setModalCrearUsuario({ ...modalCrearUsuario, isAdmin: e.target.checked })}
+                    className="w-5 h-5 accent-purple-600 rounded focus:ring-purple-500"
+                  />
+                  <span className="font-semibold">¿Es Administrador?</span>
+                </label>
+                <span className="text-xs text-gray-400 border border-gray-600 rounded px-2 py-1">
+                  Descuento B2B: {modalCrearUsuario.isAdmin ? '20% (Admin)' : '15% (Agente)'}
+                </span>
+              </div>
+            )}
 
             {/* Tabs: Ingreso / Datos personales */}
             <div className="flex border-b border-gray-700">
@@ -2228,6 +2368,17 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
               >
                 Datos personales
               </button>
+              {modalCrearUsuario.tipoUsuario === 'agente' && (
+                <button
+                  onClick={() => setModalCrearUsuario({ ...modalCrearUsuario, tabActiva: 'datos_bancarios' })}
+                  className={`flex-1 py-3 font-semibold transition-all ${modalCrearUsuario.tabActiva === 'datos_bancarios'
+                    ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white'
+                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                    }`}
+                >
+                  Banco B2B
+                </button>
+              )}
             </div>
 
             {/* Contenido del Modal */}
@@ -2335,6 +2486,47 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                       datosPersonales: { ...modalCrearUsuario.datosPersonales, telefono: e.target.value }
                     })}
                     placeholder="Teléfono (opcional)"
+                    className="w-full px-4 py-2 bg-gray-900/50 border-b-2 border-gray-700 focus:outline-none focus:border-indigo-500 text-white placeholder-gray-500"
+                  />
+                </div>
+              )}
+
+              {/* Tab: Datos bancarios (Solo Agente) */}
+              {modalCrearUsuario.tabActiva === 'datos_bancarios' && (
+                <div className="space-y-4">
+                  <div className="bg-blue-900/20 p-3 rounded-lg border border-blue-500/20 mb-2">
+                    <p className="text-xs text-blue-300">
+                      ℹ️ Estos datos se mostrarán a tus sub-agentes cuando intenten comprar stock.
+                    </p>
+                  </div>
+                  <input
+                    type="text"
+                    value={modalCrearUsuario.datosBancarios.bank_name}
+                    onChange={(e) => setModalCrearUsuario({
+                      ...modalCrearUsuario,
+                      datosBancarios: { ...modalCrearUsuario.datosBancarios, bank_name: e.target.value }
+                    })}
+                    placeholder="Nombre del Banco"
+                    className="w-full px-4 py-2 bg-gray-900/50 border-b-2 border-gray-700 focus:outline-none focus:border-indigo-500 text-white placeholder-gray-500"
+                  />
+                  <input
+                    type="text"
+                    value={modalCrearUsuario.datosBancarios.cbu}
+                    onChange={(e) => setModalCrearUsuario({
+                      ...modalCrearUsuario,
+                      datosBancarios: { ...modalCrearUsuario.datosBancarios, cbu: e.target.value }
+                    })}
+                    placeholder="CBU (22 dígitos)"
+                    className="w-full px-4 py-2 bg-gray-900/50 border-b-2 border-gray-700 focus:outline-none focus:border-indigo-500 text-white placeholder-gray-500"
+                  />
+                  <input
+                    type="text"
+                    value={modalCrearUsuario.datosBancarios.alias}
+                    onChange={(e) => setModalCrearUsuario({
+                      ...modalCrearUsuario,
+                      datosBancarios: { ...modalCrearUsuario.datosBancarios, alias: e.target.value }
+                    })}
+                    placeholder="Alias"
                     className="w-full px-4 py-2 bg-gray-900/50 border-b-2 border-gray-700 focus:outline-none focus:border-indigo-500 text-white placeholder-gray-500"
                   />
                 </div>
@@ -3255,6 +3447,43 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
                   placeholder="Teléfono (opcional)"
                   className="w-full px-4 py-3 bg-gray-700/50 border-b-2 border-gray-600 focus:outline-none focus:border-blue-500 text-white placeholder-gray-400 rounded-b-lg transition-colors"
                 />
+
+                {/* Datos Bancarios (Solo Agentes/Admins) */}
+                {(modalModificar.usuario?.role === 'agente' || modalModificar.usuario?.role === 'admin') && (
+                  <div className="pt-4 space-y-4 border-t border-gray-700">
+                    <p className="text-xs text-blue-400 font-bold uppercase tracking-wider">🏦 Datos Bancarios B2B</p>
+                    <input
+                      type="text"
+                      value={modalModificar.datosBancarios.bank_name}
+                      onChange={(e) => setModalModificar({
+                        ...modalModificar,
+                        datosBancarios: { ...modalModificar.datosBancarios, bank_name: e.target.value }
+                      })}
+                      placeholder="Nombre del Banco"
+                      className="w-full px-4 py-3 bg-gray-700/50 border-b-2 border-gray-600 focus:outline-none focus:border-blue-500 text-white placeholder-gray-400 transition-colors"
+                    />
+                    <input
+                      type="text"
+                      value={modalModificar.datosBancarios.cbu}
+                      onChange={(e) => setModalModificar({
+                        ...modalModificar,
+                        datosBancarios: { ...modalModificar.datosBancarios, cbu: e.target.value }
+                      })}
+                      placeholder="CBU (22 dígitos)"
+                      className="w-full px-4 py-3 bg-gray-700/50 border-b-2 border-gray-600 focus:outline-none focus:border-blue-500 text-white placeholder-gray-400 transition-colors"
+                    />
+                    <input
+                      type="text"
+                      value={modalModificar.datosBancarios.alias}
+                      onChange={(e) => setModalModificar({
+                        ...modalModificar,
+                        datosBancarios: { ...modalModificar.datosBancarios, alias: e.target.value }
+                      })}
+                      placeholder="Alias"
+                      className="w-full px-4 py-3 bg-gray-700/50 border-b-2 border-gray-600 focus:outline-none focus:border-blue-500 text-white placeholder-gray-400 rounded-b-lg transition-colors"
+                    />
+                  </div>
+                )}
               </div>
             </div>
 
@@ -3519,6 +3748,12 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
           }
         }
       `}</style>
+      <WholesaleCalculatorModal
+        isOpen={modalMayorista.isOpen}
+        onClose={() => setModalMayorista({ isOpen: false, usuario: null })}
+        user={modalMayorista.usuario}
+        onConfirm={handleConfirmVentaMayorista}
+      />
     </>
   );
 }

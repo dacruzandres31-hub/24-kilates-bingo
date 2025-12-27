@@ -38,6 +38,7 @@ export default function Sidebar({ isOpen, onClose, activeSections, onToggleSecti
       icon: '💰',
       sections: [
         { id: 'finanzas', name: 'Panel de Finanzas Completo' },
+        { id: 'mis-cuentas', name: '💳 Mis Cuentas' },
         { id: 'withdrawals', name: 'Gestionar Retiros (24Kilates)' },
         { id: 'finanzas-hoy', name: 'Finanzas de Hoy' },
         { id: 'movimientos', name: 'Movimientos del Día' },

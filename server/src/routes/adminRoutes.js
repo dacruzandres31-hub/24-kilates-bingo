@@ -30,7 +30,9 @@ const {
   changeUserPassword,
   updateUserPersonalData,
   bulkTransferCards,
-  getGGRStats
+  getGGRStats,
+  getSuperiorInfo,
+  createStockRequest
 } = require('../controllers/adminController');
 
 const cardInventoryController = require('../controllers/cardInventoryController');
@@ -38,6 +40,7 @@ const sessionController = require('../controllers/sessionController');
 const sessionHistoryController = require('../controllers/sessionHistoryController');
 const roomSettingsController = require('../controllers/roomSettingsController');
 const scheduleController = require('../controllers/scheduleController');
+const paymentAccountsController = require('../controllers/paymentAccountsController');
 
 /**
  * RUTAS DEL DASHBOARD ADMINISTRATIVO
@@ -146,9 +149,21 @@ router.get('/metrics', authenticateToken, isAdmin, (req, res) => {
 // ========================================
 router.get('/finances/ggr', authenticateToken, isAdmin, getGGRStats);
 
-module.exports = router;
+// ========================================
+// 📦 B2B STOCK REQUESTS
+// ========================================
+router.get('/users/superior-info', authenticateToken, isAdmin, getSuperiorInfo);
+router.post('/stock/request', authenticateToken, isAdmin, createStockRequest);
 
 // [REMOVED DEBUG ROUTES] - Using standard GET routes instead
+
+// ========================================
+// 💳 GESTIÓN DE CUENTAS DE PAGO (Multi-Account)
+// ========================================
+router.get('/payment-accounts', authenticateToken, isAdmin, paymentAccountsController.getMyAccounts);
+router.post('/payment-accounts', authenticateToken, isAdmin, paymentAccountsController.createAccount);
+router.put('/payment-accounts/:id', authenticateToken, isAdmin, paymentAccountsController.updateAccount);
+router.delete('/payment-accounts/:id', authenticateToken, isAdmin, paymentAccountsController.deleteAccount);
 
 // CATCH-ALL 404 FOR ADMIN ROUTES
 router.use((req, res) => {

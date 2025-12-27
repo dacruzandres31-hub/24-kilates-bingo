@@ -24,6 +24,7 @@ import SessionControlPanel from '../components/SessionControlPanel';
 import LiveMonitoringPanel from '../components/LiveMonitoringPanel';
 import RoomConfigPanel from '../components/RoomConfigPanel';
 import ScheduleGridPanel from '../components/ScheduleGridPanel';
+import PaymentAccountsPanel from '../components/PaymentAccountsPanel';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 
 export default function Dashboard() {
@@ -71,7 +72,8 @@ export default function Dashboard() {
     'alertas': false,
     'support': false,
     'withdrawals': false,
-    'whatsapp-config': false
+    'whatsapp-config': false,
+    'mis-cuentas': false
   });
 
   useEffect(() => {
@@ -570,6 +572,13 @@ export default function Dashboard() {
           {activeSections['whatsapp-config'] && (
             <section className="mb-8">
               <WhatsAppConfigPanel userData={userData} />
+            </section>
+          )}
+
+          {/* Gestión de Cuentas Propias (Multi-Account) */}
+          {activeSections['mis-cuentas'] && (
+            <section className="mb-8">
+              <PaymentAccountsPanel />
             </section>
           )}
 
