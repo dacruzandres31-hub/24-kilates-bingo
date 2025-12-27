@@ -42,8 +42,17 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 const app = express();
 
 // GLOBAL DEBUG LOGGER
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', serverTime: new Date() });
+});
+
+const logFile = path.join(__dirname, '..', 'live_debug.log');
+const logStream = fs.createWriteStream(logFile, { flags: 'a' });
+
 app.use((req, res, next) => {
-  console.log(`🌍 [Global Request] ${req.method} ${req.originalUrl}`);
+  const logMsg = `[${new Date().toISOString()}] ${req.method} ${req.originalUrl}\n`;
+  logStream.write(logMsg);
+  console.log(logMsg);
   next();
 });
 
@@ -111,6 +120,15 @@ io.on('connection', (socket) => {
       const roomName = `user_${userId}`;
       socket.join(roomName);
       console.log(`[Socket.IO] 📍 Usuario ${userId} unido a room personal: ${roomName}`);
+    }
+  });
+
+  // Handler para unirse a una sala de juego
+  socket.on('join_game', ({ room }) => {
+    if (room) {
+      const roomName = `room_${room}`;
+      socket.join(roomName);
+      console.log(`[Socket.IO] 🎮 Socket ${socket.id} unido a sala de juego: ${roomName}`);
     }
   });
 
