@@ -1,5 +1,6 @@
 const express = require('express');
 const cardsController = require('../controllers/cardsController');
+const cardsControllerV2 = require('../controllers/cardsControllerV2');
 const { authenticateToken, isAdmin, isSuperAdminOrAndy } = require('../middleware/authMiddleware');
 
 const router = express.Router();
@@ -29,6 +30,9 @@ router.post('/unreserve', cardsController.unreserveCard);
 
 // Seleccionar cartones del pool (confirmar selección)
 router.post('/select', cardsController.selectCards);
+
+// Seleccionar cartones del pool V2 (versión refactorizada - TESTING)
+router.post('/select-v2', cardsControllerV2.selectCardsV2);
 
 // Obtener mis cartones seleccionados
 router.get('/my-selected/:room', cardsController.getMySelectedCards);
