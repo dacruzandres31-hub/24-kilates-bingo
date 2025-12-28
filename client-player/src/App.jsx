@@ -71,10 +71,10 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<CasinoLobby user={user} onLogout={handleLogout} />} />
-        <Route path="/sala/starter" element={<StarterRoom user={user} onLogout={handleLogout} />} />
-        <Route path="/sala/bronce" element={<BronzeRoom user={user} onLogout={handleLogout} />} />
-        <Route path="/sala/plata" element={<SilverRoom user={user} onLogout={handleLogout} />} />
-        <Route path="/sala/oro" element={<GoldRoom user={user} onLogout={handleLogout} />} />
+        <Route path="/sala/starter/:sessionId?" element={<StarterRoom user={user} onLogout={handleLogout} />} />
+        <Route path="/sala/bronce/:sessionId?" element={<BronzeRoom user={user} onLogout={handleLogout} />} />
+        <Route path="/sala/plata/:sessionId?" element={<SilverRoom user={user} onLogout={handleLogout} />} />
+        <Route path="/sala/oro/:sessionId?" element={<GoldRoom user={user} onLogout={handleLogout} />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 

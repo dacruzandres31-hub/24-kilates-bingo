@@ -1,0 +1,1 @@
+DESCRIBE player_card_selections;

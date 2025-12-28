@@ -117,3 +117,114 @@ module.exports = {
     closeCardSelection,
     scheduleSessionEvents
 };
+
+/**
+ * AUTO DRAW STARTER
+ * Monitorea sesiones pendientes e inicia sorteos automáticamente cuando llega la hora
+ */
+class AutoDrawStarter {
+    constructor(gameEngine) {
+        this.gameEngine = gameEngine;
+        this.checkInterval = null;
+        this.isChecking = false;
+    }
+
+    /**
+     * Inicia el monitor automático
+     */
+    start() {
+        // Revisar cada minuto
+        this.checkInterval = setInterval(() => {
+            this.checkPendingSessions();
+        }, 60000); // 1 minuto
+
+        // Ejecutar inmediatamente al iniciar
+        this.checkPendingSessions();
+
+        console.log('[AutoDrawStarter] ✅ Iniciado - revisando cada 60 segundos');
+    }
+
+    /**
+     * Revisa sesiones pendientes cuya hora de inicio ya llegó
+     */
+    async checkPendingSessions() {
+        // Evitar ejecuciones concurrentes
+        if (this.isChecking) {
+            return;
+        }
+
+        this.isChecking = true;
+
+        try {
+            // Buscar sesiones pendientes cuya hora de inicio ya pasó
+            const [sessions] = await pool.query(`
+        SELECT id, room, start_time 
+        FROM game_sessions 
+        WHERE status = 'pending' 
+        AND start_time <= NOW()
+        AND room != 'starter'
+        ORDER BY start_time ASC
+      `);
+
+            if (sessions.length > 0) {
+                console.log(`[AutoDrawStarter] 🔍 Encontradas ${sessions.length} sesión(es) para iniciar`);
+
+                for (const session of sessions) {
+                    await this.startScheduledDraw(session);
+                }
+            }
+        } catch (error) {
+            console.error('[AutoDrawStarter] ❌ Error revisando sesiones:', error);
+        } finally {
+            this.isChecking = false;
+        }
+    }
+
+    /**
+     * Inicia un sorteo programado
+     */
+    async startScheduledDraw(session) {
+        try {
+            console.log(`[AutoDrawStarter] 🎮 Iniciando sorteo programado para sesión ${session.id} (${session.room})`);
+            console.log(`[AutoDrawStarter] 📅 Hora programada: ${session.start_time}`);
+
+            // Verificar que el gameEngine existe
+            if (!this.gameEngine) {
+                throw new Error('GameEngine no está disponible');
+            }
+
+            // Iniciar el sorteo
+            await this.gameEngine.startGame(session.id, {
+                drawInterval: 5000,      // 5 segundos entre bolas
+                pauseOnWinner: 2000      // 2 segundos de pausa al cantar línea
+            });
+
+            console.log(`[AutoDrawStarter] ✅ Sorteo iniciado exitosamente para ${session.room}`);
+        } catch (error) {
+            console.error(`[AutoDrawStarter] ❌ Error iniciando sesión ${session.id}:`, error.message);
+        }
+    }
+
+    /**
+     * Detiene el monitor
+     */
+    stop() {
+        if (this.checkInterval) {
+            clearInterval(this.checkInterval);
+            this.checkInterval = null;
+            console.log('[AutoDrawStarter] 🛑 Detenido');
+        }
+    }
+
+    /**
+     * Obtiene el estado
+     */
+    getStatus() {
+        return {
+            running: !!this.checkInterval,
+            checking: this.isChecking
+        };
+    }
+}
+
+module.exports.AutoDrawStarter = AutoDrawStarter;

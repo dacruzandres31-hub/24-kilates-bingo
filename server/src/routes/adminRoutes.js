@@ -41,6 +41,8 @@ const sessionHistoryController = require('../controllers/sessionHistoryControlle
 const roomSettingsController = require('../controllers/roomSettingsController');
 const scheduleController = require('../controllers/scheduleController');
 const paymentAccountsController = require('../controllers/paymentAccountsController');
+const diagnosticsController = require('../controllers/diagnosticsController');
+
 
 /**
  * RUTAS DEL DASHBOARD ADMINISTRATIVO
@@ -164,6 +166,13 @@ router.get('/payment-accounts', authenticateToken, isAdmin, paymentAccountsContr
 router.post('/payment-accounts', authenticateToken, isAdmin, paymentAccountsController.createAccount);
 router.put('/payment-accounts/:id', authenticateToken, isAdmin, paymentAccountsController.updateAccount);
 router.delete('/payment-accounts/:id', authenticateToken, isAdmin, paymentAccountsController.deleteAccount);
+
+// ========================================
+// 🔍 DIAGNOSTICS & MONITORING
+// ========================================
+router.get('/socket-diagnostics', authenticateToken, isAdmin, diagnosticsController.getSocketDiagnostics);
+router.get('/live-sessions', authenticateToken, isAdmin, diagnosticsController.getLiveSessions);
+
 
 // CATCH-ALL 404 FOR ADMIN ROUTES
 router.use((req, res) => {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Clock, ShoppingCart, Calendar, Play, Lock, Unlock } from 'lucide-react';
+import { Clock, ShoppingCart, Calendar, Play, Lock, Unlock, StopCircle } from 'lucide-react';
 import useSocket from '../hooks/useSocket';
 
 export default function SessionStatusPanel() {
@@ -10,11 +10,19 @@ export default function SessionStatusPanel() {
   const socket = useSocket();
   const [animatingPots, setAnimatingPots] = useState({}); // Para animaciones
   const [toast, setToast] = useState(null); // Para notificaciones
+  const [activeGames, setActiveGames] = useState([]);
+  const [userData, setUserData] = useState(null);
 
   useEffect(() => {
     fetchSessions();
-    const interval = setInterval(fetchSessions, 30000);
-    return () => clearInterval(interval);
+    fetchActiveGames();
+    fetchUserData();
+    const sessionsInterval = setInterval(fetchSessions, 30000);
+    const gamesInterval = setInterval(fetchActiveGames, 10000);
+    return () => {
+      clearInterval(sessionsInterval);
+      clearInterval(gamesInterval);
+    };
   }, []);
 
   // Escuchar actualizaciones de pozos en tiempo real
@@ -84,6 +92,75 @@ export default function SessionStatusPanel() {
       setError('Error al cargar sesiones');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchActiveGames = async () => {
+    try {
+      const response = await axios.get('/api/game-admin/status', {
+        headers: { Authorization: `Bearer ${getToken()}` }
+      });
+      setActiveGames(response.data.activeGames || []);
+    } catch (error) {
+      console.error('Error fetching active games:', error);
+    }
+  };
+
+  const fetchUserData = async () => {
+    try {
+      const response = await axios.get('/api/admin/profile', {
+        headers: { Authorization: `Bearer ${getToken()}` }
+      });
+      setUserData(response.data);
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    }
+  };
+
+  const handleStartGame = async (sessionId) => {
+    console.log('[SessionStatus] handleStartGame called with sessionId:', sessionId);
+
+    if (!sessionId) {
+      alert('No se puede iniciar el sorteo: No hay una sesión activa. Por favor, crea una sesión primero en "Control de Sesiones".');
+      return;
+    }
+
+    try {
+      console.log('[SessionStatus] Sending POST to /api/game-admin/start with sessionId:', sessionId);
+      const response = await axios.post('/api/game-admin/start', {
+        gameSessionId: sessionId,
+        drawInterval: 5000,
+        pauseOnWinner: 2000
+      }, {
+        headers: { Authorization: `Bearer ${getToken()}` }
+      });
+
+      console.log('[SessionStatus] Response:', response.data);
+      alert('Sorteo iniciado exitosamente');
+      fetchActiveGames();
+    } catch (error) {
+      console.error('[SessionStatus] Error starting game:', error);
+      console.error('[SessionStatus] Error response:', error.response?.data);
+      alert(error.response?.data?.message || error.message || 'Error al iniciar sorteo');
+    }
+  };
+
+  const handleStopGame = async (sessionId) => {
+    if (!confirm('¿Detener el sorteo automático?')) {
+      return;
+    }
+
+    try {
+      await axios.post('/api/game-admin/stop', {
+        gameSessionId: sessionId
+      }, {
+        headers: { Authorization: `Bearer ${getToken()}` }
+      });
+
+      alert('Sorteo detenido');
+      fetchActiveGames();
+    } catch (error) {
+      alert(error.response?.data?.message || 'Error al detener sorteo');
     }
   };
 
@@ -258,6 +335,46 @@ export default function SessionStatusPanel() {
                       </div>
                     </div>
                   )}
+
+                  {/* Game Control Buttons - Only for Andy */}
+                  {userData?.username === 'Andy' && currentSession && (() => {
+                    const isGameActive = activeGames.some(g => g.sessionId === currentSession.id);
+                    const activeGame = activeGames.find(g => g.sessionId === currentSession.id);
+
+                    if (isGameActive) {
+                      return (
+                        <div className="mt-3 pt-3 border-t border-white/10 space-y-2">
+                          <div className="flex items-center gap-2 text-green-400 text-xs font-semibold">
+                            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                            SORTEO EN VIVO - {activeGame?.ballsDrawn || 0} bolas
+                          </div>
+                          <button
+                            onClick={() => handleStopGame(currentSession.id)}
+                            className="w-full px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center justify-center gap-2 text-sm font-semibold"
+                          >
+                            <StopCircle className="w-4 h-4" />
+                            Detener Sorteo
+                          </button>
+                        </div>
+                      );
+                    }
+
+                    if (currentSession.status === 'pending') {
+                      return (
+                        <div className="mt-3 pt-3 border-t border-white/10">
+                          <button
+                            onClick={() => handleStartGame(currentSession.id)}
+                            className="w-full px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center justify-center gap-2 text-sm font-semibold"
+                          >
+                            <Play className="w-4 h-4" />
+                            Iniciar Sorteo
+                          </button>
+                        </div>
+                      );
+                    }
+
+                    return null;
+                  })()}
                 </div>
               ) : (
                 <div className="bg-black/30 rounded-lg p-4 mb-4 text-center text-gray-400">

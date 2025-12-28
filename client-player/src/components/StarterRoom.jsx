@@ -11,10 +11,12 @@ import BingoCardPreview from './BingoCardPreview';
 import Countdown from './Countdown';
 import ModernBallMachine from './ModernBallMachine';
 import RecentBallsPanel from './RecentBallsPanel';
+import useSocket from '../hooks/useSocket';
 
 export default function StarterRoom({ onLogout }) {
   const { sessionId } = useParams();
   const navigate = useNavigate();
+  const socket = useSocket();
   const [ballsDrawn, setBallsDrawn] = useState([]);
   const [lastBall, setLastBall] = useState(null);
   const [gameStatus, setGameStatus] = useState('waiting'); // waiting, active, ended
@@ -97,6 +99,53 @@ export default function StarterRoom({ onLogout }) {
 
   // Verificar cartones existentes del jugador al montar
   useEffect(() => {
+    // Helper para letra (Starter)
+    const getBallLetter = (num) => {
+      if (num <= 18) return 'B';
+      if (num <= 36) return 'I';
+      if (num <= 54) return 'N';
+      if (num <= 72) return 'G';
+      return 'O';
+    };
+
+    const restoreGameState = async () => {
+      try {
+        console.log('🔄 [StarterRoom] Restaurando estado del juego...');
+        const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
+        const response = await fetch(`/api/game/sessions/${sessionId || 'starter_default'}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const session = data.session;
+
+          if (session.status === 'active') {
+            setGameStatus('active');
+          }
+
+          if (session.drawnNumbers && session.drawnNumbers.length > 0) {
+            const restoredBalls = session.drawnNumbers.map((num, index) => ({
+              number: num,
+              color: getBallColor(num), // Usa la funcion definida fuera del useEffect
+              letter: getBallLetter(num),
+              id: index
+            }));
+
+            setBallsDrawn(restoredBalls);
+
+            if (restoredBalls.length > 0) {
+              const last = restoredBalls[restoredBalls.length - 1];
+              setLastBall(last);
+              setCurrentBall(last);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('❌ [StarterRoom] Error restaurando estado:', error);
+      }
+    };
+
     const checkExistingCards = async () => {
       try {
         const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
@@ -133,6 +182,7 @@ export default function StarterRoom({ onLogout }) {
 
     checkExistingCards();
     loadRoomStatus();
+    restoreGameState();
   }, [sessionId]);
 
   // Cargar estado de la sala (siguiente sorteo)
@@ -322,56 +372,83 @@ export default function StarterRoom({ onLogout }) {
     ballsDrawnRef.current = ballsDrawn;
   }, [ballsDrawn]);
 
-  // Simulación de sorteo BINGO 90 (Optimizado para mantener velocidad constante)
+
+  // Escuchar eventos del servidor (Sincronización v2.0 - Basada en SessionId)
   useEffect(() => {
-    if (gameStatus === 'active') {
-      const drawTimer = setInterval(() => {
-        const currentBalls = ballsDrawnRef.current;
+    if (!socket || !sessionId) return;
 
-        // Generar número del 1 al 90
-        let number;
-        let attempts = 0;
-        do {
-          number = Math.floor(Math.random() * 90) + 1;
-          attempts++;
-        } while (currentBalls.some(b => b.number === number) && attempts < 200);
+    // Unirse a la sesión específica (Sincronización v2.0)
+    socket.emit('join_session', { sessionId });
+    console.log(`[SOCKET] 🟢 Uniendo a sesión: session_${sessionId}`);
 
-        // Si ya salieron todas (o casi todas), detener
-        if (currentBalls.length >= 90 || attempts >= 200) return;
+    const handleBallDrawn = (data) => {
+      console.log('🎱 [SOCKET] Bola recibida:', data);
+      // Ignorar si el sessionId no coincide (doble seguridad)
+      if (data.gameSessionId && String(data.gameSessionId) !== String(sessionId)) {
+        console.warn(`[SOCKET] ⚠️ Bola ignorada: pertenece a sesión ${data.gameSessionId}, estamos en ${sessionId}`);
+        return;
+      }
 
-        // Evitar duplicados (doble check)
-        if (currentBalls.some(b => b.number === number)) return;
+      // data = { number, ballLetter, drawOrder, ... }
+      const newBall = {
+        number: data.number,
+        color: getBallColor(data.number),
+        letter: data.ballLetter || getBallLetter(data.number),
+        id: data.drawOrder,
+        timestamp: Date.now()
+      };
 
-        const newBall = {
-          number,
-          color: getBallColor(number),
-          drawOrder: currentBalls.length + 1,
-          timestamp: Date.now()
-        };
+      setCurrentBall(newBall);
 
-        setCurrentBall(newBall);
-        setTimeout(() => {
-          setBallsDrawn(prev => [...prev, newBall]);
-          setCurrentBall(null);
-        }, 3000);
-      }, 8000); // 8 segundos FIJOS entre bola y bola (Ajustado +3s)
-
-      return () => clearInterval(drawTimer);
-    }
-  }, [gameStatus]); // Dependencia ÚNICA: gameStatus. NO ballsDrawn.
-
-  // Actualizar contadores de columna cuando cambian las bolas
-  useEffect(() => {
-    updateColumnCounts();
-  }, [ballsDrawn]);
-
-  // Reproducir sonido cuando la bola CAE (currentBall se establece)
-  useEffect(() => {
-    if (currentBall) {
-      console.log(`🎱 [SONIDO] Bola cayendo: ${currentBall.number}`);
+      // Reproducir sonido cuando llega el evento
       audioService.playBolaCayendoConPausa();
-    }
-  }, [currentBall]);
+
+      // Agregar a la lista con un pequeño delay para sincro visual
+      setTimeout(() => {
+        setBallsDrawn(prev => {
+          if (prev.some(b => b.number === newBall.number)) return prev;
+          return [...prev, newBall];
+        });
+        setCurrentBall(null);
+      }, 3000);
+    };
+
+    const handleGameStarted = (data) => {
+      console.log('🎮 [SOCKET] Juego iniciado:', data);
+      setGameStatus('active');
+      setBallsDrawn([]);
+      setWinnerCards([]);
+      setLineCelebrated(false);
+      addToast('🎮', 'JUEGO INICIADO', 'El sorteo ha comenzado');
+    };
+
+    const handleGameEnded = (data) => {
+      console.log('🏁 [SOCKET] Juego terminado:', data);
+      setGameStatus('ended');
+      addToast('🏁', 'JUEGO FINALIZADO', 'El sorteo ha terminado');
+    };
+
+    const handlePotUpdate = (data) => {
+      console.log('💰 [SOCKET] Pot update (session specific):', data);
+      setPots({
+        bingo: data.potBingo || 'Ticket Oro',
+        linea: data.potLinea || 'Ticket Bronce',
+        pre40: data.potJackpot || 0
+      });
+    };
+
+    socket.on('number_drawn', handleBallDrawn);
+    socket.on('game_started', handleGameStarted);
+    socket.on('game_ended', handleGameEnded);
+    socket.on('pot_update', handlePotUpdate);
+
+    return () => {
+      socket.off('number_drawn', handleBallDrawn);
+      socket.off('game_started', handleGameStarted);
+      socket.off('game_ended', handleGameEnded);
+      socket.off('pot_update', handlePotUpdate);
+    };
+  }, [socket, sessionId]);
 
   // Animación de entrada de cartones
   useEffect(() => {
@@ -1265,27 +1342,14 @@ export default function StarterRoom({ onLogout }) {
           )}
 
           {/* Botón de control (solo para testing) */}
-          <div className="test-controls">
+          {/* Botón de control (solo para testing - VOZ MANTENIDO) */}
+          <div className="test-controls" style={{ justifyContent: 'center' }}>
             <button
               className="control-btn voice-btn"
               onClick={() => setShowVoiceSelector(true)}
               title="Cambiar voz del anunciador"
             >
               🎤 Voz
-            </button>
-            <button
-              className="control-btn"
-              onClick={() => setGameStatus(gameStatus === 'active' ? 'waiting' : 'active')}
-            >
-              {gameStatus === 'active' ? '⏸️ Pausar' : '▶️ Iniciar'}
-            </button>
-            <button
-              className="control-btn"
-              onClick={() => activateCelebration(50000)}
-              title="Probar modo celebración"
-              style={{ background: 'linear-gradient(135deg, #ffd700, #ffaa00)' }}
-            >
-              🏆 Ganar
             </button>
           </div>
 

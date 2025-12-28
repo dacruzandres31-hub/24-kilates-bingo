@@ -1,27 +1,26 @@
-/**
- * Verificar cartones en BD
- */
-
 const pool = require('./src/db');
 
 async function checkCards() {
   try {
-    const [cards] = await pool.query(`
-      SELECT id, session_id, serial, 
-             numbers IS NULL as numbers_is_null,
-             LENGTH(numbers) as numbers_length,
-             LEFT(numbers, 100) as numbers_sample
-      FROM card_pool 
-      WHERE session_id = 20
-      LIMIT 10
+    const [rows] = await pool.query(`
+      SELECT user_id, status, COUNT(*) as count 
+      FROM bingo_cards_pool 
+      WHERE game_session_id = 59 
+      GROUP BY user_id, status
     `);
 
-    console.log('\n📊 Cartones en sesión 20:');
-    console.log(JSON.stringify(cards, null, 2));
+    console.log('Cartones en bingo_cards_pool para sesión 59:');
+    rows.forEach(r => {
+      console.log(`  User ${r.user_id}, status: ${r.status}, count: ${r.count}`);
+    });
+
+    if (rows.length === 0) {
+      console.log('  (ninguno)');
+    }
 
     process.exit(0);
   } catch (error) {
-    console.error('❌ Error:', error);
+    console.error('Error:', error);
     process.exit(1);
   }
 }

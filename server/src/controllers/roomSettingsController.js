@@ -221,7 +221,7 @@ exports.getCurrentPots = async (req, res) => {
           WHERE status IN ('active', 'playing', 'pending')
           GROUP BY room
         ) gs2 ON gs1.id = gs2.max_id
-      ) latest ON latest.room COLLATE utf8mb4_0900_ai_ci = rs.room COLLATE utf8mb4_0900_ai_ci
+      ) latest ON latest.room COLLATE utf8mb4_unicode_ci = rs.room COLLATE utf8mb4_unicode_ci
       ORDER BY FIELD(rs.room, 'bronce', 'plata', 'oro')
     `);
 
@@ -284,7 +284,8 @@ exports.getLobbyData = async (req, res) => {
         rs.accumulated_pot_pre40 AS current_pot_jackpot,
         COALESCE(latest.jackpot_linea, 0) AS current_pot_linea,
         COALESCE(latest.jackpot_bingo, 0) AS current_pot_bingo,
-        latest.status
+        latest.status,
+        latest.id AS session_id
       FROM room_settings rs
       LEFT JOIN (
         SELECT 
@@ -296,7 +297,7 @@ exports.getLobbyData = async (req, res) => {
           WHERE status IN ('active', 'playing', 'pending')
           GROUP BY room
         ) gs2 ON gs1.id = gs2.max_id
-      ) latest ON latest.room COLLATE utf8mb4_0900_ai_ci = rs.room COLLATE utf8mb4_0900_ai_ci
+      ) latest ON latest.room COLLATE utf8mb4_unicode_ci = rs.room COLLATE utf8mb4_unicode_ci
       WHERE rs.room IN ('bronce', 'plata', 'oro')
       ORDER BY FIELD(rs.room, 'bronce', 'plata', 'oro')
     `);
@@ -377,7 +378,7 @@ exports.getLobbyData = async (req, res) => {
 
     // Obtener status actual de la sala Starter
     const [starterStatus] = await pool.query(`
-      SELECT status
+      SELECT id, status
       FROM game_sessions
       WHERE room = 'free_starter'
         AND status IN ('active', 'playing', 'pending', 'waiting')
@@ -404,6 +405,7 @@ exports.getLobbyData = async (req, res) => {
     // Formatear respuesta para cada sala
     const lobbyData = {
       starter: {
+        sessionId: starterStatus.length > 0 ? starterStatus[0].id : null,
         price: 0,
         prizes: {
           line: {
@@ -435,6 +437,7 @@ exports.getLobbyData = async (req, res) => {
       }
 
       lobbyData[room.room] = {
+        sessionId: room.session_id,
         price: parseFloat(room.card_price),
         pots: {
           bingo: parseFloat(room.current_pot_bingo) || 0,

@@ -13,9 +13,9 @@
  * @param {String} lineType - Tipo de línea ganada
  * @param {Object} winningCard - Datos del cartón ganador (opcional)
  */
-function notifyLineWinner(io, roomId, winner, prizeAmount, lineType, winningCard = null) {
-  // Broadcast a TODOS los jugadores de la sala
-  io.to(`room_${roomId}`).emit('line_winner', {
+function notifyLineWinner(io, targetRoom, winner, prizeAmount, lineType, winningCard = null) {
+  // Broadcast a TODOS los jugadores de la sesión
+  io.to(targetRoom).emit('line_winner', {
     winner: {
       userId: winner.id,
       username: winner.username
@@ -47,9 +47,9 @@ function notifyLineWinner(io, roomId, winner, prizeAmount, lineType, winningCard
  * @param {Number} prizeAmount - Monto del premio
  * @param {Number} gameSessionId - ID de la sesión que finalizó
  */
-function notifyBingoWinner(io, roomId, winner, prizeAmount, gameSessionId) {
-  // Broadcast a TODOS
-  io.to(`room_${roomId}`).emit('bingo_winner', {
+function notifyBingoWinner(io, targetRoom, winner, prizeAmount, gameSessionId) {
+  // Broadcast a TODOS los jugadores de la sesión
+  io.to(targetRoom).emit('bingo_winner', {
     winner: {
       userId: winner.id,
       username: winner.username
@@ -69,8 +69,8 @@ function notifyBingoWinner(io, roomId, winner, prizeAmount, gameSessionId) {
     timestamp: new Date()
   });
 
-  // Notificar fin de juego a toda la sala
-  io.to(`room_${roomId}`).emit('game_ended', {
+  // Notificar fin de juego a toda la sesión
+  io.to(targetRoom).emit('game_ended', {
     gameSessionId: gameSessionId,
     winner: winner.username,
     timestamp: new Date()

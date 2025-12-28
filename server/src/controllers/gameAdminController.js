@@ -8,6 +8,7 @@ let gameEngine = null;
 
 exports.initGameEngine = (io) => {
   gameEngine = new GameEngineAuto(io);
+  exports.gameEngine = gameEngine; // Expose instance for AutoDrawStarter
   console.log('[GameAdmin] Motor de juego automático inicializado');
 };
 
@@ -21,23 +22,30 @@ exports.startAutoGame = async (req, res) => {
     const { gameSessionId, drawInterval, pauseOnWinner } = req.body;
 
     if (!gameSessionId) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'gameSessionId requerido' 
+      return res.status(400).json({
+        success: false,
+        message: 'gameSessionId requerido'
       });
     }
 
     if (!gameEngine) {
-      return res.status(500).json({ 
-        success: false, 
-        message: 'Motor de juego no inicializado' 
+      return res.status(500).json({
+        success: false,
+        message: 'Motor de juego no inicializado'
       });
     }
+
+    console.log(`[GameAdmin] 🎮 Iniciando sorteo para sesión ${gameSessionId}`);
+    console.log(`[GameAdmin] 📊 gameEngine existe:`, !!gameEngine);
+    console.log(`[GameAdmin] 📊 gameEngine.io existe:`, !!gameEngine?.io);
 
     const gameState = await gameEngine.startGame(gameSessionId, {
       drawInterval: drawInterval || 5000,
       pauseOnWinner: pauseOnWinner || 2000
     });
+
+    console.log(`[GameAdmin] ✅ Sorteo iniciado exitosamente`);
+    console.log(`[GameAdmin] 📊 Bolas disponibles:`, gameState.availableBalls.length);
 
     res.json({
       success: true,
@@ -49,10 +57,61 @@ exports.startAutoGame = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[GameAdmin] Error al iniciar juego:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: error.message 
+    console.error('[GameAdmin] ❌ Error al iniciar juego:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+/**
+ * POST /api/game-admin/draw-one
+ * Sortea UNA bola manualmente (para testing)
+ * Body: { gameSessionId }
+ */
+exports.drawOneBall = async (req, res) => {
+  try {
+    const { gameSessionId } = req.body;
+
+    if (!gameSessionId) {
+      return res.status(400).json({
+        success: false,
+        message: 'gameSessionId requerido'
+      });
+    }
+
+    if (!gameEngine) {
+      return res.status(500).json({
+        success: false,
+        message: 'Motor de juego no inicializado'
+      });
+    }
+
+    const gameState = gameEngine.activeGames.get(gameSessionId);
+    if (!gameState) {
+      return res.status(404).json({
+        success: false,
+        message: 'Juego no encontrado. Inicia el sorteo primero.'
+      });
+    }
+
+    console.log(`[GameAdmin] 🎲 Sorteando UNA bola manualmente para sesión ${gameSessionId}`);
+
+    await gameEngine.drawNextBall(gameSessionId, 2000);
+
+    res.json({
+      success: true,
+      message: 'Bola sorteada exitosamente',
+      ballsDrawn: gameState.ballsDrawn.length,
+      availableBalls: gameState.availableBalls.length
+    });
+
+  } catch (error) {
+    console.error('[GameAdmin] ❌ Error al sortear bola:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
     });
   }
 };
@@ -64,35 +123,48 @@ exports.startAutoGame = async (req, res) => {
  */
 exports.stopAutoGame = async (req, res) => {
   try {
-    const { gameSessionId } = req.body;
+    const { gameSessionId, force } = req.body;
+    const pool = require('../db');
 
     if (!gameSessionId) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'gameSessionId requerido' 
+      return res.status(400).json({
+        success: false,
+        message: 'gameSessionId requerido'
       });
     }
 
     if (!gameEngine) {
-      return res.status(500).json({ 
-        success: false, 
-        message: 'Motor de juego no inicializado' 
+      return res.status(500).json({
+        success: false,
+        message: 'Motor de juego no inicializado'
       });
     }
 
-    gameEngine.stopGame(gameSessionId);
+    // 1. Intentar detener en el motor de juego (si está activo)
+    const isInMemory = gameEngine.activeGames.has(gameSessionId);
+    if (isInMemory) {
+      gameEngine.stopGame(gameSessionId);
+    }
+
+    // 2. Asegurar que en BD quede como completada (SIEMPRE que se detiene)
+    await pool.query(
+      'UPDATE game_sessions SET status = ? WHERE id = ?',
+      ['completed', gameSessionId]
+    );
+    console.log(`[GameAdmin] 🛑 Sesión ${gameSessionId} finalizada (Detenida por admin)`);
 
     res.json({
       success: true,
-      message: 'Sorteo automático detenido',
-      gameSessionId
+      message: force ? 'Sesión finalizada (Forzado)' : 'Sorteo automático detenido',
+      gameSessionId,
+      wasInMemory: isInMemory
     });
 
   } catch (error) {
     console.error('[GameAdmin] Error al detener juego:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: error.message 
+    res.status(500).json({
+      success: false,
+      message: error.message
     });
   }
 };
@@ -107,16 +179,16 @@ exports.togglePause = async (req, res) => {
     const { gameSessionId } = req.body;
 
     if (!gameSessionId) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'gameSessionId requerido' 
+      return res.status(400).json({
+        success: false,
+        message: 'gameSessionId requerido'
       });
     }
 
     if (!gameEngine) {
-      return res.status(500).json({ 
-        success: false, 
-        message: 'Motor de juego no inicializado' 
+      return res.status(500).json({
+        success: false,
+        message: 'Motor de juego no inicializado'
       });
     }
 
@@ -131,9 +203,9 @@ exports.togglePause = async (req, res) => {
 
   } catch (error) {
     console.error('[GameAdmin] Error al pausar juego:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: error.message 
+    res.status(500).json({
+      success: false,
+      message: error.message
     });
   }
 };
@@ -145,9 +217,9 @@ exports.togglePause = async (req, res) => {
 exports.getGamesStatus = async (req, res) => {
   try {
     if (!gameEngine) {
-      return res.status(500).json({ 
-        success: false, 
-        message: 'Motor de juego no inicializado' 
+      return res.status(500).json({
+        success: false,
+        message: 'Motor de juego no inicializado'
       });
     }
 
@@ -159,8 +231,8 @@ exports.getGamesStatus = async (req, res) => {
         ballsDrawn: state.ballsDrawn.length,
         availableBalls: state.availableBalls.length,
         isPaused: state.isPaused,
-        lineWinners: state.lineWinnersFound.size,
-        bingoWinner: state.bingoWinner
+        lineWinnersPaid: state.lineWinnersPaid,
+        bingoWinnersPaid: state.bingoWinnersPaid
       });
     });
 
@@ -172,9 +244,9 @@ exports.getGamesStatus = async (req, res) => {
 
   } catch (error) {
     console.error('[GameAdmin] Error al obtener estado:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: error.message 
+    res.status(500).json({
+      success: false,
+      message: error.message
     });
   }
 };

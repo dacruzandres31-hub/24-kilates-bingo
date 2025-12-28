@@ -123,7 +123,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Handler para unirse a una sala de juego
+  // Handler para unirse a una sala de juego (DEPRECATED - Usar join_session)
   socket.on('join_game', ({ room }) => {
     if (room) {
       const roomName = `room_${room}`;
@@ -131,6 +131,34 @@ io.on('connection', (socket) => {
       console.log(`[Socket.IO] 🎮 Socket ${socket.id} unido a sala de juego: ${roomName}`);
     }
   });
+
+  // NEW: Handler para unirse a una sesión específica (Sincronización v2.0)
+  socket.on('join_session', ({ sessionId }) => {
+    if (sessionId) {
+      const sessionRoom = `session_${sessionId}`;
+      socket.join(sessionRoom);
+      console.log(`[Socket.IO] 🎲 Socket ${socket.id} unido a sesión: ${sessionRoom}`);
+    }
+  });
+
+  // NEW: Handler para unirse a sala global como espectador (Transmisión Pública)
+  socket.on('join_room_spectator', ({ room }) => {
+    if (room) {
+      const globalRoom = `room_${room}`;
+      socket.join(globalRoom);
+      console.log(`[Socket.IO] 📺 Socket ${socket.id} unido como espectador a: ${globalRoom}`);
+    }
+  });
+
+  // NEW: Handler para salir de sala global
+  socket.on('leave_room_spectator', ({ room }) => {
+    if (room) {
+      const globalRoom = `room_${room}`;
+      socket.leave(globalRoom);
+      console.log(`[Socket.IO] 👋 Socket ${socket.id} salió de: ${globalRoom}`);
+    }
+  });
+
 
   socket.on('disconnect', () => {
     metricsService.increment('activeConnections', -1);
@@ -278,6 +306,19 @@ const startServer = async () => {
     const cardPoolManager = require('./services/cardPoolManager');
     const initResults = await cardPoolManager.initializeAllRooms();
     console.log('✅ Card Pool Manager inicializado:', initResults);
+    console.log('');
+
+    // Inicializar motor de juego automático
+    const gameAdminController = require('./controllers/gameAdminController');
+    gameAdminController.initGameEngine(io);
+    console.log('✅ Motor de juego automático inicializado');
+    console.log('');
+
+    // Inicializar inicio automático de sorteos programados
+    const { AutoDrawStarter } = require('./services/sessionScheduler');
+    const autoDrawStarter = new AutoDrawStarter(gameAdminController.gameEngine);
+    autoDrawStarter.start();
+    console.log('✅ Inicio automático de sorteos programados activado');
     console.log('');
 
     // Iniciar scheduler

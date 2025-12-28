@@ -1,5 +1,6 @@
-const db = require('../db');
+const pool = require('../db');
 const MoneyMath = require('../utils/moneyMath');
+const websocketService = require('./websocketService');
 
 class CardInventoryService {
   /**
@@ -13,7 +14,7 @@ class CardInventoryService {
    * @param {string} reason - Razón del crédito
    */
   async creditCards(userId, room, quantity, isGift = false, purchasePrice = null, executedBy, reason = null) {
-    const connection = await db.getConnection();
+    const connection = await pool.getConnection();
 
     try {
       await connection.beginTransaction();
@@ -76,7 +77,7 @@ class CardInventoryService {
   async getInventory(userId, isSuperAdmin = false) {
     const view = isSuperAdmin ? 'v_superadmin_inventory' : 'v_admin_inventory';
 
-    const [inventory] = await db.query(
+    const [inventory] = await pool.query(
       `SELECT * FROM ${view} WHERE user_id = ?`,
       [userId]
     );
@@ -93,7 +94,7 @@ class CardInventoryService {
    * @param {number} executedBy - ID de quien ejecuta la transferencia
    */
   async transferCards(fromUserId, toUserId, room, quantity, executedBy) {
-    const connection = await db.getConnection();
+    const connection = await pool.getConnection();
 
     try {
       await connection.beginTransaction();
@@ -145,7 +146,7 @@ class CardInventoryService {
    * @param {number} quantity - Cantidad de cartones a validar
    */
   async validateCards(playerId, gameSessionId, room, quantity) {
-    const connection = await db.getConnection();
+    const connection = await pool.getConnection();
 
     try {
       await connection.beginTransaction();
@@ -176,9 +177,12 @@ class CardInventoryService {
 
       const currentGiftPercentage = parseFloat(giftPercentageResult[0].gift_percentage || 0);
 
-      // 3. Obtener información de la sesión
+      // 3. Obtener información de la sesión y precio (JOIN con room_settings)
       const [session] = await connection.query(
-        `SELECT room, card_price FROM game_sessions WHERE id = ?`,
+        `SELECT gs.room, rs.card_price 
+         FROM game_sessions gs
+         JOIN room_settings rs ON gs.room = rs.room
+         WHERE gs.id = ?`,
         [gameSessionId]
       );
 
@@ -270,6 +274,14 @@ class CardInventoryService {
                WHERE id = ?`,
               [jackpotLinea, jackpotBingo, jackpotPre40, gameSessionId]
             );
+
+            // ACTUALIZACIÓN GLOBAL: Incrementar pozo acumulado de la sala (Pre-40)
+            await connection.query(
+              `UPDATE room_settings 
+               SET accumulated_pot_pre40 = accumulated_pot_pre40 + ?
+               WHERE room = ?`,
+              [jackpotPre40, room]
+            );
           } else {
             await connection.query(
               `UPDATE game_sessions 
@@ -315,28 +327,9 @@ class CardInventoryService {
 
       await connection.commit();
 
-      // Emitir evento Socket.IO para actualizar pozos en admin panel
-      if (global.io) {
-        const [updatedSession] = await db.query(
-          'SELECT jackpot_linea, jackpot_bingo, jackpot_pre40 FROM game_sessions WHERE id = ?',
-          [gameSessionId]
-        );
-
-        if (updatedSession.length > 0) {
-          global.io.emit('pots_updated', {
-            sessionId: gameSessionId,
-            room,
-            pots: {
-              jackpot_linea: parseFloat(updatedSession[0].jackpot_linea),
-              jackpot_bingo: parseFloat(updatedSession[0].jackpot_bingo),
-              jackpot_pre40: parseFloat(updatedSession[0].jackpot_pre40)
-            },
-            message: `Pozos actualizados - ${quantity} cartones validados`
-          });
-
-          console.log(`📡 [Socket.IO] Pozos actualizados para sesión ${gameSessionId}`);
-        }
-      }
+      // Emitir evento Socket.IO para actualizar pozos en tiempo real
+      const websocketService = require('./websocketService');
+      websocketService.emitPotsUpdate();
 
       return {
         success: true,
@@ -366,7 +359,7 @@ class CardInventoryService {
     const serial = `${room.toUpperCase()}-${gameSessionId}-${timestamp}-${random}`;
 
     // Verificar que sea único (muy improbable colisión, pero por seguridad)
-    const [existing] = await db.query(
+    const [existing] = await pool.query(
       'SELECT COUNT(*) AS count FROM validated_cards WHERE serial_number = ?',
       [serial]
     );
@@ -425,7 +418,7 @@ class CardInventoryService {
    * Obtiene historial de movimientos de cartones
    */
   async getMovementsLog(userId, limit = 50) {
-    const [movements] = await db.query(
+    const [movements] = await pool.query(
       `SELECT 
          cm.*,
          u1.username AS user_name,
@@ -450,7 +443,7 @@ class CardInventoryService {
    * Obtiene cartones validados de un jugador para una sesión
    */
   async getValidatedCards(playerId, gameSessionId) {
-    const [cards] = await db.query(
+    const [cards] = await pool.query(
       `SELECT 
          id,
          serial_number,

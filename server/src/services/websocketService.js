@@ -55,7 +55,7 @@ async function emitPotsUpdate() {
           WHERE status IN ('active', 'playing', 'pending')
           GROUP BY room
         ) gs2 ON gs1.id = gs2.max_id
-      ) latest ON latest.room COLLATE utf8mb4_0900_ai_ci = rs.room COLLATE utf8mb4_0900_ai_ci
+      ) latest ON latest.room COLLATE utf8mb4_unicode_ci = rs.room COLLATE utf8mb4_unicode_ci
       ORDER BY FIELD(rs.room, 'bronce', 'plata', 'oro')
     `);
 
@@ -87,13 +87,39 @@ async function emitPotsUpdate() {
 
     const allPots = [starterPot, ...moneyPots];
 
-    // Emitir a todos los clientes conectados
+    // Emitir a todos los clientes conectados (Lobby / Admin)
     io.emit('pots_updated', {
       pots: allPots,
       timestamp: new Date().toISOString()
     });
 
-    console.log('📡 [WebSocket] pots_updated emitido a todos los clientes');
+    // NUEVO: Emitir actualización específica por sala y por sesión para sincronización v2.0
+    moneyPots.forEach(p => {
+      const data = {
+        potBingo: parseFloat(p.current_pot_bingo),
+        potLinea: parseFloat(p.current_pot_linea),
+        potJackpot: parseFloat(p.jackpot)
+      };
+
+      // Emitir a sala genérica (retrocompatibilidad)
+      io.to(`room_${p.room}`).emit('pot_update', data);
+
+      // Emitir a sesión específica (Sincronización v2.0)
+      if (p.session_id) {
+        io.to(`session_${p.session_id}`).emit('pot_update', data);
+      }
+    });
+
+    // Emitir para Starter
+    if (starterPot.session_id) {
+      io.to(`session_${starterPot.session_id}`).emit('pot_update', {
+        potBingo: 'Ticket Oro',
+        potLinea: 'Ticket Bronce',
+        potJackpot: 0
+      });
+    }
+
+    console.log('📡 [WebSocket] pots_updated y pot_update emitidos');
   } catch (error) {
     console.error('❌ [WebSocket] Error al emitir pots_updated:', error);
   }

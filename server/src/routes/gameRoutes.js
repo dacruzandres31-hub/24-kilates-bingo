@@ -2,6 +2,7 @@ const express = require('express');
 const gameController = require('../controllers/gameController');
 const roomSettingsController = require('../controllers/roomSettingsController');
 const authMiddleware = require('../middleware/authMiddleware');
+const diagnosticsController = require('../controllers/diagnosticsController');
 
 const router = express.Router();
 
@@ -14,6 +15,7 @@ const router = express.Router();
  * GET    /game/sessions/:id          - Estado de sesión
  * GET    /game/sessions              - Sesiones activas
  * POST   /game/end-free-game         - Procesar premios Sala Starter
+ * GET    /game/session-status/:sessionId - Estado detallado de sesión (para jugadores)
  */
 
 // ENDPOINT PÚBLICO (sin autenticación)
@@ -43,6 +45,10 @@ router.post('/finish-session', gameController.finishSession);
 // Estado de sesión específica
 router.get('/sessions/:sessionId', gameController.getSessionStatus);
 
+// Estado detallado de sesión (para jugadores y monitoreo)
+router.get('/session-status/:sessionId', diagnosticsController.getSessionStatus);
+
+
 // Sesiones activas
 router.get('/sessions', gameController.getActiveSessions);
 
@@ -65,5 +71,8 @@ router.get('/my-cards-analysis/:gameSessionId', gameController.getMyCardsAnalysi
 router.post('/validate-cards', gameController.validateCardsForSession);
 router.get('/my-validated-cards/:sessionId', gameController.getMyValidatedCards);
 router.get('/my-inventory', gameController.getMyCardInventory);
+
+// TEST: Gatillar notificación de ganador
+router.post('/test-winner-notification', gameController.testWinnerNotification);
 
 module.exports = router;

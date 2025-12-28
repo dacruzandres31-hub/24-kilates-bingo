@@ -35,9 +35,9 @@ async function archiveSession(gameSessionId) {
 
     const session = sessions[0];
 
-    // Verificar que esté completada
-    if (session.status !== 'completed' && session.status !== 'finished') {
-      throw new Error(`Sesión ${gameSessionId} no está completada (status: ${session.status})`);
+    // Verificar que esté completada (o en proceso de finalización)
+    if (session.status !== 'completed' && session.status !== 'finished' && session.status !== 'playing') {
+      throw new Error(`Sesión ${gameSessionId} no está completada/finalizada (status: ${session.status})`);
     }
 
     // Verificar que no haya sido archivada antes
@@ -49,40 +49,52 @@ async function archiveSession(gameSessionId) {
       };
     }
 
-    // Obtener cartones participantes
-    const [cards] = await pool.query(`
-      SELECT 
-        c.id as card_id,
-        c.user_id,
-        u.username,
-        c.payment_type
-      FROM bingo_cards c
-      LEFT JOIN users u ON c.user_id = u.id
-      WHERE c.game_session_id = ?
+    // Obtener cartones participantes (soporte para diferentes sistemas de cartones)
+    // 1. De bingo_cards (Usado en Lobby/Auto)
+    const [lobbyCards] = await pool.query(`
+      SELECT bc.id as card_id, bc.user_id, u.username, 'fichas' as payment_type
+      FROM bingo_cards bc
+      LEFT JOIN users u ON bc.user_id = u.id
+      WHERE bc.session_id = ?
     `, [gameSessionId]);
 
-    const participatingCards = cards.map(card => ({
-      card_id: card.card_id,
-      user_id: card.user_id,
-      username: card.username || 'Desconocido',
-      payment_type: card.payment_type
-    }));
-
-    // Buscar ganadores (si hay cartones ganadores guardados)
-    const [winnerLineaCards] = await pool.query(`
-      SELECT user_id FROM bingo_cards 
-      WHERE game_session_id = ? AND is_winner_linea = 1
-      LIMIT 1
+    // 2. De validated_cards (Nuevo sistema de inventario)
+    const [validatedCards] = await pool.query(`
+      SELECT vc.id as card_id, vc.player_id as user_id, u.username, 'fichas' as payment_type
+      FROM validated_cards vc
+      LEFT JOIN users u ON vc.player_id = u.id
+      WHERE vc.game_session_id = ?
     `, [gameSessionId]);
 
-    const [winnerBingoCards] = await pool.query(`
-      SELECT user_id FROM bingo_cards 
-      WHERE game_session_id = ? AND is_winner_bingo = 1
-      LIMIT 1
+    // 3. De daily_stock_cards (Sistema de stock diario/manual)
+    // Usamos room y play_date para vincular si no hay session_id
+    const [stockCards] = await pool.query(`
+      SELECT sc.id as card_id, sc.buyer_id as user_id, u.username, 'fichas' as payment_type
+      FROM daily_stock_cards sc
+      LEFT JOIN users u ON sc.buyer_id = u.id
+      WHERE sc.room = ? AND sc.play_date = DATE(?) AND sc.status = 'sold'
+    `, [session.room, session.start_time]);
+
+    // Combinar todos los cartones encontrados
+    const allCards = [...lobbyCards, ...validatedCards, ...stockCards];
+
+    // Eliminar duplicados si los hay (por id de cartón si vinieran de la misma tabla)
+    const participatingCards = Array.from(new Map(allCards.map(c => [c.card_id, c])).values());
+
+    // Buscar ganadores de línea
+    let winnerLineaUserId = null;
+
+    // Buscar en game_winners (más fiable)
+    const [winnersProcessed] = await pool.query(`
+      SELECT user_id, prize_type FROM game_winners 
+      WHERE game_session_id = ?
     `, [gameSessionId]);
 
-    const winnerLineaUserId = winnerLineaCards.length > 0 ? winnerLineaCards[0].user_id : null;
-    const winnerBingoUserId = winnerBingoCards.length > 0 ? winnerBingoCards[0].user_id : null;
+    const lineaWinnerRec = winnersProcessed.find(w => w.prize_type === 'linea');
+    const bingoWinnerRec = winnersProcessed.find(w => w.prize_type === 'bingo');
+
+    winnerLineaUserId = lineaWinnerRec ? lineaWinnerRec.user_id : null;
+    const winnerBingoUserId = bingoWinnerRec ? bingoWinnerRec.user_id : null;
 
     // Obtener usernames de ganadores
     let winnerLineaUsername = null;

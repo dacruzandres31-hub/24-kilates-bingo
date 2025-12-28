@@ -10,6 +10,7 @@ const CardAnalyzer = require('../services/cardAnalyzer');
 const cardInventoryService = require('../services/cardInventoryService');
 const websocketService = require('../services/websocketService');
 const drawScheduleService = require('../services/drawScheduleService');
+const sessionHistoryService = require('../services/sessionHistoryService');
 
 // COMPRAR CARTÓN - Agregar a session del usuario
 exports.buyCard = async (req, res) => {
@@ -96,12 +97,20 @@ exports.buyCard = async (req, res) => {
         const sessionId = sessionResult[0].id;
         await connection.query(
           `UPDATE game_sessions 
-           SET current_pot_bingo = current_pot_bingo + ?,
-               current_pot_linea = current_pot_linea + ?,
-               current_pot_jackpot = current_pot_jackpot + ?,
+           SET jackpot_bingo = jackpot_bingo + ?,
+               jackpot_linea = jackpot_linea + ?,
+               jackpot_pre40 = jackpot_pre40 + ?,
                updated_at = NOW()
            WHERE id = ?`,
           [bigoAmount, lineaAmount, jackpotAmount, sessionId]
+        );
+
+        // ACTUALIZACIÓN GLOBAL: Incrementar pozo acumulado de la sala (Pre-40)
+        await connection.query(
+          `UPDATE room_settings 
+           SET accumulated_pot_pre40 = accumulated_pot_pre40 + ?
+           WHERE room = ?`,
+          [jackpotAmount, roomType]
         );
       }
 
@@ -311,6 +320,15 @@ exports.finishSession = async (req, res) => {
       console.log(`[GameController] 🧹 Limpieza post-finalización sala ${room}: ${cleanupResult.affectedRows} cartones huérfanos eliminados`);
     }
 
+    // ARCHIVAR SESIÓN AUTOMÁTICAMENTE
+    try {
+      await sessionHistoryService.archiveSession(sessionId);
+      console.log(`[GameController] ✅ Sesión ${sessionId} archivada exitosamente.`);
+    } catch (archiveError) {
+      console.error(`[GameController] ❌ Error archivando sesión ${sessionId}:`, archiveError);
+      // No bloqueamos la respuesta al cliente si el archivado falla, pero lo logueamos
+    }
+
     res.json({
       success: true,
       gameResult,
@@ -329,7 +347,8 @@ exports.getSessionStatus = async (req, res) => {
 
     const [result] = await pool.query(
       `SELECT id, room, status, current_pot_bingo, current_pot_linea, 
-              current_pot_jackpot, is_preventa FROM game_sessions WHERE id = ?`,
+              current_pot_jackpot, is_preventa, ball_sequence 
+       FROM game_sessions WHERE id = ?`,
       [sessionId]
     );
 
@@ -337,7 +356,24 @@ exports.getSessionStatus = async (req, res) => {
       return res.status(404).json({ error: 'Sesión no encontrada' });
     }
 
-    res.json({ session: result[0] });
+    const session = result[0];
+
+    // Si no hay ball_sequence persistido (en sesiones viejas o activas), 
+    // buscar en la tabla de bolillas
+    if (!session.ball_sequence || session.ball_sequence.length === 0) {
+      const [balls] = await pool.query(
+        `SELECT ball_number FROM game_session_balls 
+         WHERE game_session_id = ? ORDER BY draw_order ASC`,
+        [sessionId]
+      );
+      session.drawnNumbers = balls.map(b => b.ball_number);
+    } else {
+      session.drawnNumbers = typeof session.ball_sequence === 'string'
+        ? JSON.parse(session.ball_sequence)
+        : session.ball_sequence;
+    }
+
+    res.json({ session });
   } catch (error) {
     console.error('Get session status error:', error);
     res.status(500).json({ error: 'Error obteniendo estado de sesión' });
@@ -1487,6 +1523,40 @@ exports.getMyCardInventory = async (req, res) => {
       success: false,
       message: error.message || 'Error obteniendo inventario'
     });
+  }
+};
+
+/**
+ * TEST: Gatillar notificación de ganador para pruebas de UI
+ * Permite simular que alguien ganó sin tener que jugar todo el sorteo
+ */
+exports.testWinnerNotification = async (req, res) => {
+  try {
+    const { room, type, username, amount } = req.body;
+    const io = req.app.get('io');
+
+    if (!room || !type) {
+      return res.status(400).json({ error: 'Room y Type son requeridos' });
+    }
+
+    const winnerName = username || 'Jugador de Prueba';
+    const prizeAmount = amount || (type === 'linea' ? 2500 : 25000);
+    const fakeWinnerId = 999;
+
+    const { notifyLineWinner, notifyBingoWinner } = require('../socket/winnerEvents');
+
+    console.log(`[Test] Emitiendo notificación ${type} en sala ${room} para ${winnerName}`);
+
+    if (type === 'linea') {
+      notifyLineWinner(io, room, { id: fakeWinnerId, username: winnerName }, prizeAmount, 'horizontal_1');
+    } else if (type === 'bingo') {
+      notifyBingoWinner(io, room, { id: fakeWinnerId, username: winnerName }, prizeAmount, 0); // sessionId 0
+    }
+
+    res.json({ success: true, message: `Evento ${type} emitido para sala ${room}` });
+  } catch (error) {
+    console.error('Test notification error:', error);
+    res.status(500).json({ error: error.message });
   }
 };
 

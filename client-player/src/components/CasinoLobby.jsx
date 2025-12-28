@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import '../styles/CasinoLobby.css';
 import '../styles/Countdown.css';
+import '../styles/LiveDrawBadge.css';
 import Countdown from './Countdown';
 import PlayerActivityHistory from './PlayerActivityHistory';
 import { FaClock, FaUsers, FaMoneyBillWave, FaTrophy, FaStar, FaGlassCheers, FaGift, FaHeadset, FaTicketAlt, FaEye, FaEyeSlash, FaMusic, FaVolumeUp, FaVolumeMute, FaUser, FaKey, FaSignOutAlt, FaMapMarkedAlt } from 'react-icons/fa';
@@ -69,6 +70,15 @@ const RoomCard = ({ room }) => {
             <div className="ribbon">GRATIS</div>
           </div>
         )}
+
+        {/* Badge EN VIVO */}
+        {room.isLive && (
+          <div className="live-draw-badge">
+            <span className="live-dot"></span>
+            EN VIVO
+          </div>
+        )}
+
         <div className="room-particles">{renderParticles()}</div>
         <div className="room-texture"></div>
         <div className="room-shine"></div>
@@ -215,6 +225,14 @@ const CasinoLobby = ({ user, onLogout }) => {
   const [loadingLobby, setLoadingLobby] = useState(true);
 
   const socket = useSocket();
+
+  // Estado para rastrear sorteos en vivo por sala
+  const [liveDraws, setLiveDraws] = useState({
+    starter: false,
+    bronce: false,
+    plata: false,
+    oro: false
+  });
 
   // Cargar perfil del usuario
   useEffect(() => {
@@ -460,6 +478,7 @@ const CasinoLobby = ({ user, onLogout }) => {
 
       return {
         ...room,
+        path: roomData.sessionId ? `${room.path}/${roomData.sessionId}` : room.path,
         targetTime,
         status: roomData.status || 'no_session',
         price: room.id === 'starter' ? 'Tickets' : formatMoney(roomData.price),
@@ -767,7 +786,14 @@ const CasinoLobby = ({ user, onLogout }) => {
       {/* Grid de Salas */}
       <div className="rooms-grid" id="rooms-grid">
         {roomsData.map((room, index) => (
-          <RoomCard key={room.id} room={room} style={{ animationDelay: `${index * 100}ms` }} />
+          <RoomCard
+            key={room.id}
+            room={{
+              ...room,
+              isLive: liveDraws[room.backendId] || false
+            }}
+            style={{ animationDelay: `${index * 100}ms` }}
+          />
         ))}
       </div>
 

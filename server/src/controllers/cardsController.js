@@ -637,10 +637,80 @@ exports.selectCards = async (req, res) => {
       }
     }
 
-    // Emitir actualización de pozos
+    // ============================================
+    // ACTUALIZAR POZOS Y CONTEO DE CARTONES
+    // ============================================
     if (roomDB !== 'starter') {
-      websocketService.emitPotsUpdate();
+      try {
+        // 1. Obtener sesión activa
+        const [activeSession] = await pool.query(
+          "SELECT id FROM game_sessions WHERE room = ? AND status IN ('pending', 'active') ORDER BY created_at DESC LIMIT 1",
+          [roomDB]
+        );
+
+        if (activeSession.length > 0) {
+          const sessionId = activeSession[0].id;
+
+          // 2. Calcular contribución al pozo (solo cartones pagos)
+          const [roomSettings] = await pool.query(
+            "SELECT card_price FROM room_settings WHERE room = ?",
+            [roomDB]
+          );
+
+          const cardPrice = parseFloat(roomSettings[0]?.card_price || 0);
+          const potContribution = cardPrice * purchasedCount; // Solo cartones pagos, NO gift cards
+
+          console.log(`[Cards] 💰 Contribución al pozo: ${purchasedCount} cartones × $${cardPrice} = $${potContribution}`);
+
+          // 3. Actualizar contador de cartones en la sesión
+          await pool.query(
+            "UPDATE game_sessions SET total_cards_validated = total_cards_validated + ? WHERE id = ?",
+            [cardIds.length, sessionId]
+          );
+          console.log(`[Cards] 📊 Contador de cartones actualizado: +${cardIds.length} en sesión ${sessionId}`);
+
+          // 4. Actualizar pozos (esto ya llama emitPotsUpdate internamente)
+          if (potContribution > 0) {
+            const potAccumulationService = require('../services/potAccumulationService');
+            await potAccumulationService.updateSessionPots(sessionId, potContribution);
+            console.log(`[Cards] ✅ Pozos actualizados y emitidos para sesión ${sessionId}`);
+          } else {
+            // Si no hay contribución (ej: todos gift cards), solo emitir actualización
+            websocketService.emitPotsUpdate();
+            console.log(`[Cards] 📡 Pozos emitidos sin cambios (sin contribución monetaria)`);
+          }
+        } else {
+          console.warn(`[Cards] ⚠️ No se encontró sesión activa para sala ${roomDB}`);
+          // Emitir de todas formas para actualizar contadores
+          websocketService.emitPotsUpdate();
+        }
+      } catch (potError) {
+        console.error('[Cards] ❌ Error actualizando pozos:', potError);
+        // Intentar emitir de todas formas
+        websocketService.emitPotsUpdate();
+      }
+    } else {
+      // Sala Starter: solo actualizar contador de cartones, no pozos monetarios
+      try {
+        const [activeSession] = await pool.query(
+          "SELECT id FROM game_sessions WHERE room = 'starter' AND status IN ('pending', 'active') ORDER BY created_at DESC LIMIT 1"
+        );
+
+        if (activeSession.length > 0) {
+          await pool.query(
+            "UPDATE game_sessions SET total_cards_validated = total_cards_validated + ? WHERE id = ?",
+            [cardIds.length, activeSession[0].id]
+          );
+          console.log(`[Cards] 📊 Starter: Contador de cartones actualizado: +${cardIds.length}`);
+        }
+
+        // Emitir actualización para que el conteo se vea en tiempo real
+        websocketService.emitPotsUpdate();
+      } catch (starterError) {
+        console.error('[Cards] ❌ Error actualizando contador Starter:', starterError);
+      }
     }
+
 
     // ============================================
     // EMITIR ACTUALIZACIÓN DE RECURSOS (Socket.IO)

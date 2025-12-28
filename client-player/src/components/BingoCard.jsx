@@ -12,16 +12,30 @@ import '../styles/BingoCard.css';
  */
 
 const BingoCard = forwardRef((props, ref) => {
-  const { gridNumbers, cardNumber, isSelected, onSelect, equippedSkin, missingNumbers = [] } = props;
+  const {
+    gridNumbers,
+    cardNumber,
+    isSelected,
+    onSelect,
+    equippedSkin,
+    missingNumbers = [],
+    markedNumbers: propMarkedNumbers // NUEVO
+  } = props;
 
-  const [markedNumbers, setMarkedNumbers] = useState(new Set());
+  const [internalMarkedNumbers, setInternalMarkedNumbers] = useState(new Set());
+
+  // Usar marcado de props si existe, sino el interno
+  const currentMarkedNumbers = propMarkedNumbers || internalMarkedNumbers;
 
   // Método público para marcar números
   useImperativeHandle(ref, () => ({
     markNumber: (number) => {
-      setMarkedNumbers(prev => new Set(prev).add(number));
+      if (propMarkedNumbers) {
+        console.warn('BingoCard: Usando markedNumbers reactivo desde props, ignore markNumber interno');
+      }
+      setInternalMarkedNumbers(prev => new Set(prev).add(number));
     },
-    getMarkedNumbers: () => markedNumbers,
+    getMarkedNumbers: () => currentMarkedNumbers,
     gridNumbers: gridNumbers
   }));
 
@@ -29,36 +43,43 @@ const BingoCard = forwardRef((props, ref) => {
   const checkWin = () => {
     if (!gridNumbers || gridNumbers.length === 0) return null;
 
+    const rows = gridNumbers.length;
+    const cols = gridNumbers[0].length;
+
     // Convertir a array plano para validación (solo números, no nulls)
-    const allNumbers = gridNumbers.flat().filter(n => n !== null && n !== undefined);
+    const allNumbersCount = gridNumbers.flat().filter(n => n !== null && n !== 0 && n !== 'FREE').length;
 
-    // Check BINGO: todos los 15 números marcados
-    const totalMarked = Array.from(markedNumbers).filter(n =>
-      allNumbers.includes(n)
-    ).length;
+    // Check BINGO: todos los números marcados
+    let totalMarked = 0;
+    gridNumbers.flat().forEach(n => {
+      if (n !== null && n !== 0) {
+        if (n === 'FREE' || currentMarkedNumbers.has(n)) {
+          totalMarked++;
+        }
+      }
+    });
 
-    if (totalMarked === 15) {
+    if (totalMarked === gridNumbers.flat().filter(n => n !== null && n !== 0).length) {
       return 'bingo';
     }
 
-    // Check LÍNEA horizontal: cualquiera de las 3 filas completa (5 números)
-    for (let row = 0; row < 3; row++) {
+    // Check LÍNEA horizontal
+    for (let row = 0; row < rows; row++) {
       let lineMarked = 0;
       let lineTotal = 0;
 
-      for (let col = 0; col < 9; col++) {
+      for (let col = 0; col < cols; col++) {
         const num = gridNumbers[row][col];
 
-        if (num !== null && num !== undefined) {
+        if (num !== null && num !== 0) {
           lineTotal++;
-          if (markedNumbers.has(num)) {
+          if (num === 'FREE' || currentMarkedNumbers.has(num)) {
             lineMarked++;
           }
         }
       }
 
-      // Línea completa: 5 números marcados
-      if (lineMarked === 5 && lineTotal === 5) {
+      if (lineMarked === lineTotal && lineTotal > 0) {
         return 'linea';
       }
     }
@@ -92,21 +113,22 @@ const BingoCard = forwardRef((props, ref) => {
       {/* Número de serie */}
       <div className="card-number">#{cardNumber}</div>
 
-      {/* Grilla 3x9 */}
-      <div className="card-grid card-grid-90">
+      {/* Grilla dinámica */}
+      <div className={`card-grid ${gridNumbers.length === 5 ? 'card-grid-75' : 'card-grid-90'}`}>
         {gridNumbers.map((row, rowIdx) => (
           <div key={`row-${rowIdx}`} className="card-row">
             {row.map((number, colIdx) => {
-              const isMarked = number !== null && markedNumbers.has(number);
-              const isEmpty = number === null || number === undefined;
+              const isFree = number === 'FREE' || (gridNumbers.length === 5 && rowIdx === 2 && colIdx === 2);
+              const isMarked = isFree || (number !== null && number !== 0 && currentMarkedNumbers.has(number));
+              const isEmpty = !isFree && (number === null || number === undefined || number === 0);
               const isMissing = !isEmpty && !isMarked && missingNumbers.includes(number);
 
               return (
                 <div
                   key={`${rowIdx}-${colIdx}`}
-                  className={`cell ${isMarked ? 'marked' : ''} ${isEmpty ? 'empty' : ''} ${isMissing ? 'missing-for-win' : ''}`}
+                  className={`cell ${isMarked ? 'marked' : ''} ${isEmpty ? 'empty' : ''} ${isMissing ? 'missing-for-win' : ''} ${isFree ? 'free' : ''}`}
                 >
-                  {isEmpty ? '' : number}
+                  {isFree ? '★' : (isEmpty ? '' : number)}
                 </div>
               );
             })}

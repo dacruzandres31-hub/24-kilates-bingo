@@ -1,0 +1,323 @@
+[2025-12-27T20:15:14.109Z] DB INSERT ERROR: Número de bola no corresponde a su letra (B:1-15, I:16-30, N:31-45, G:46-60, O:61-75)
+Query: INSERT INTO game_session_balls... 31, 1
+
+[2025-12-27T20:15:14.112Z] CRASH in drawNextBall: Número de bola no corresponde a su letra (B:1-15, I:16-30, N:31-45, G:46-60, O:61-75)
+STACK: Error: Número de bola no corresponde a su letra (B:1-15, I:16-30, N:31-45, G:46-60, O:61-75)
+    at PromisePool.query (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\node_modules\mysql2\lib\promise\pool.js:36:22)
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:179:18)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T20:16:10.469Z] DB INSERT ERROR: Número de bola no corresponde a su letra (B:1-15, I:16-30, N:31-45, G:46-60, O:61-75)
+Query: INSERT INTO game_session_balls... 71, 3
+
+[2025-12-27T20:16:10.470Z] CRASH in drawNextBall: Número de bola no corresponde a su letra (B:1-15, I:16-30, N:31-45, G:46-60, O:61-75)
+STACK: Error: Número de bola no corresponde a su letra (B:1-15, I:16-30, N:31-45, G:46-60, O:61-75)
+    at PromisePool.query (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\node_modules\mysql2\lib\promise\pool.js:36:22)
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:179:18)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T20:55:23.361Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T20:55:28.362Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T20:55:33.374Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T20:55:38.379Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T20:55:43.385Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T20:55:48.392Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T20:55:53.398Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T20:57:38.567Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T20:57:43.582Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T20:57:48.597Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T20:57:53.611Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T21:01:23.899Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T21:01:28.907Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T21:01:33.918Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T21:01:38.926Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T21:01:43.931Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T21:01:48.935Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T21:01:53.945Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T21:02:13.961Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T21:02:18.972Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T21:02:23.980Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T21:02:28.994Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T21:02:34.003Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T21:02:39.011Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T21:02:44.013Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T21:02:49.022Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T21:02:54.022Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T21:04:04.147Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T21:04:09.147Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T21:04:14.152Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T21:04:19.158Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T21:04:24.172Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T21:04:29.177Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T21:04:54.223Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T21:05:14.262Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T21:05:19.271Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T21:05:24.277Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T21:05:29.278Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T21:05:34.277Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T21:05:39.286Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T21:05:44.301Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T21:05:49.313Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-27T21:05:54.317Z] CRASH in drawNextBall: Juego no encontrado
+STACK: Error: Juego no encontrado
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:161:27)
+    at Timeout._onTimeout (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:116:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+

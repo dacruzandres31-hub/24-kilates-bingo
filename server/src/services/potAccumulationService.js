@@ -60,14 +60,30 @@ async function updateSessionPots(sessionId, potContribution) {
             throw new Error(`Session ${sessionId} not found`);
         }
 
+        const room = session[0].room;
+
+        // ACTUALIZACIÓN GLOBAL: Incrementar pozo acumulado de la sala (Pre-40) en room_settings
+        if (['bronce', 'plata', 'oro'].includes(room)) {
+            await pool.query(
+                `UPDATE room_settings 
+                 SET accumulated_pot_pre40 = accumulated_pot_pre40 + ?
+                 WHERE room = ?`,
+                [pre40Increase, room]
+            );
+        }
+
         const updatedPots = {
             jackpot_bingo: parseFloat(session[0].jackpot_bingo),
             jackpot_linea: parseFloat(session[0].jackpot_linea),
             jackpot_pre40: parseFloat(session[0].jackpot_pre40),
-            room: session[0].room
+            room: room
         };
 
-        console.log(`[PotAccumulation] Updated pots:`, updatedPots);
+        // Emitir actualización en tiempo real
+        const websocketService = require('./websocketService');
+        websocketService.emitPotsUpdate();
+
+        console.log(`[PotAccumulation] Updated pots and broadcasted:`, updatedPots);
 
         return updatedPots;
 

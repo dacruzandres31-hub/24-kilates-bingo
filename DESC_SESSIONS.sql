@@ -1,0 +1,1 @@
+DESCRIBE game_sessions;

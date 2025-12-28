@@ -353,14 +353,47 @@ class GameEngine {
         }
       }
 
+      // Preparar datos para persistencia
+      const ballSequence = Array.from(drawnNumbers);
+      const lineaWinner = winners.find(w => w.type === 'linea');
+      const bingoWinner = winners.find(w => w.type === 'bingo');
+
+      const lineaBallNumber = lineaWinner ? lineaWinner.boleaNumber : null;
+      const lineaBallIndex = lineaBallNumber !== null ? ballSequence.indexOf(lineaBallNumber) : null;
+
+      const bingoBallNumber = bingoWinner ? bingoWinner.boleaNumber : null;
+      const bingoBallIndex = bingoBallNumber !== null ? ballSequence.indexOf(bingoBallNumber) : null;
+
+      // Persistir resultados en la base de datos (game_sessions)
+      // Esto es CRÍTICO para que el servicio de historial pueda archivar correctamente
+      await pool.query(`
+        UPDATE game_sessions SET 
+          ball_sequence = ?,
+          linea_ball_number = ?,
+          linea_ball_index = ?,
+          bingo_ball_number = ?,
+          bingo_ball_index = ?,
+          updated_at = NOW()
+        WHERE id = ?
+      `, [
+        JSON.stringify(ballSequence),
+        lineaBallNumber,
+        lineaBallIndex,
+        bingoBallNumber,
+        bingoBallIndex,
+        sessionId
+      ]);
+
+      console.log(`💾 [GameEngine] Resultados persistidos para sesión ${sessionId}. Bolillas: ${ballSequence.length}`);
+
       // Retornar resultado del game
       return {
         sessionId,
-        drawnNumbers: Array.from(drawnNumbers),
+        drawnNumbers: ballSequence,
         winners,
-        totalBallsDrawn: drawnNumbers.size,
-        bingoWinner: winners.find(w => w.type === 'bingo'),
-        lineaWinner: winners.find(w => w.type === 'linea'),
+        totalBallsDrawn: ballSequence.length,
+        bingoWinner,
+        lineaWinner,
         jackpotTriggered: winners.some(w => w.isJackpot && w.type === 'bingo')
       };
     } catch (error) {

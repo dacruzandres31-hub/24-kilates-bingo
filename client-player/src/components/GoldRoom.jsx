@@ -16,6 +16,7 @@ import useSocket from '../hooks/useSocket';
 export default function GoldRoom({ onLogout }) {
   const { sessionId } = useParams();
   const navigate = useNavigate();
+  const socket = useSocket();
   const [ballsDrawn, setBallsDrawn] = useState([]);
   const [lastBall, setLastBall] = useState(null);
   const [gameStatus, setGameStatus] = useState('waiting'); // waiting, active, ended
@@ -79,7 +80,7 @@ export default function GoldRoom({ onLogout }) {
   const checkExistingCards = async () => {
     try {
       const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
-      const response = await fetch(`/api/cards/my-selected/gold`, {
+      const response = await fetch(`/api/cards/my-selected/gold${sessionId ? `?sessionId=${sessionId}` : ''}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -153,10 +154,62 @@ export default function GoldRoom({ onLogout }) {
     };
   }, [nextDrawTime]);
 
+  // Helper para letra (necesario para restoreGameState)
+  const getBallLetter = (num) => {
+    if (num <= 18) return 'B';
+    if (num <= 36) return 'I';
+    if (num <= 54) return 'N';
+    if (num <= 72) return 'G';
+    return 'O';
+  };
+
+  // RESTAURAR ESTADO DEL JUEGO
+  const restoreGameState = async () => {
+    try {
+      console.log('🔄 [GoldRoom] Restaurando estado del juego...');
+      const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
+      const response = await fetch(`/api/game/sessions/${sessionId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const session = data.session;
+
+        // 1. Restaurar estado de sesión (activa/pendiente)
+        if (session.status === 'active') {
+          setGameStatus('active');
+        }
+
+        // 2. Restaurar bolas sorteadas
+        if (session.drawnNumbers && session.drawnNumbers.length > 0) {
+
+          const restoredBalls = session.drawnNumbers.map((num, index) => ({
+            number: num,
+            color: getBallColor(num),
+            letter: getBallLetter(num),
+            id: index
+          }));
+
+          setBallsDrawn(restoredBalls);
+
+          if (restoredBalls.length > 0) {
+            const last = restoredBalls[restoredBalls.length - 1];
+            setLastBall(last);
+            setCurrentBall(last);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('❌ [GoldRoom] Error restaurando estado:', error);
+    }
+  };
+
   // Verificar cartones existentes del jugador al montar
   useEffect(() => {
     checkExistingCards();
     loadRoomStatus();
+    restoreGameState();
   }, [sessionId]);
 
   // Generar número de serie del cartón: DDMMYY-S0001
@@ -305,7 +358,7 @@ export default function GoldRoom({ onLogout }) {
   }, []);
 
   // Listen for Global Ticker / Gamification Events
-  const socket = useSocket();
+  // socket defined at top
   useEffect(() => {
     if (!socket) return;
 
@@ -323,35 +376,104 @@ export default function GoldRoom({ onLogout }) {
     };
   }, [socket]);
 
-  // Simulación de sorteo BINGO 90 (reemplazar con Socket.IO en producción)
+  // Escuchar eventos del servidor (Sincronización v2.0 - Basada en SessionId)
   useEffect(() => {
-    if (gameStatus === 'active') {
-      const drawTimer = setInterval(() => {
-        // Generar número del 1 al 90
-        const number = Math.floor(Math.random() * 90) + 1;
+    if (!socket || !sessionId) return;
 
-        // Evitar duplicados
-        if (ballsDrawn.some(b => b.number === number)) {
-          return;
+    // Unirse a la sesión específica (Sincronización v2.0)
+    socket.emit('join_session', { sessionId });
+    console.log(`[SOCKET] 🟢 Uniendo a sesión: session_${sessionId}`);
+
+    const handleBallDrawn = (data) => {
+      console.log('🎱 [SOCKET] Bola recibida:', data);
+      // Ignorar si el sessionId no coincide (doble seguridad)
+      if (data.gameSessionId && String(data.gameSessionId) !== String(sessionId)) {
+        console.warn(`[SOCKET] ⚠️ Bola ignorada: pertenece a sesión ${data.gameSessionId}, estamos en ${sessionId}`);
+        return;
+      }
+
+      // data = { number, ballLetter, drawOrder, ... }
+      const newBall = {
+        number: data.number,
+        color: getBallColor(data.number),
+        letter: data.ballLetter || getBallLetter(data.number),
+        id: data.drawOrder,
+        timestamp: Date.now()
+      };
+
+      setCurrentBall(newBall);
+
+      // Reproducir sonido cuando llega el evento
+      audioService.playBolaCayendoConPausa();
+
+      // Agregar a la lista con un pequeño delay para sincro visual
+      setTimeout(() => {
+        setBallsDrawn(prev => {
+          if (prev.some(b => b.number === newBall.number)) return prev;
+          return [...prev, newBall];
+        });
+        setCurrentBall(null);
+      }, 3000);
+    };
+
+    const handleGameStarted = (data) => {
+      console.log('🎮 [SOCKET] Juego iniciado:', data);
+      setGameStatus('active');
+      setBallsDrawn([]);
+      setWinnerCards([]);
+      addToast('🎮', 'JUEGO INICIADO', 'El sorteo ha comenzado');
+
+      if (data.pots) {
+        setPots({
+          bingo: parseFloat(data.pots.bingo || data.pots.jackpot_bingo || 0),
+          linea: parseFloat(data.pots.line || data.pots.jackpot_linea || 0),
+          pre40: parseFloat(data.pots.pre40 || data.pots.jackpot_pre40 || 0)
+        });
+      }
+    };
+
+    const handleGameEnded = (data) => {
+      console.log('🏁 [SOCKET] Juego terminado:', data);
+      setGameStatus('ended');
+      addToast('🏁', 'JUEGO FINALIZADO', 'El sorteo ha terminado');
+    };
+
+    const handlePotUpdate = (data) => {
+      console.log('💰 [SOCKET] Pot update (session specific):', data);
+      setPots({
+        bingo: parseFloat(data.potBingo || 0),
+        linea: parseFloat(data.potLinea || 0),
+        pre40: parseFloat(data.potJackpot || 0)
+      });
+    };
+
+    socket.on('number_drawn', handleBallDrawn);
+    socket.on('game_started', handleGameStarted);
+    socket.on('game_ended', handleGameEnded);
+    socket.on('pot_update', handlePotUpdate);
+
+    // Escuchar actualizaciones globales de pozos (fallback)
+    socket.on('pots_updated', (data) => {
+      if (data.pots && Array.isArray(data.pots)) {
+        const myPot = data.pots.find(p => String(p.session_id) === String(sessionId));
+        if (myPot) {
+          setPots({
+            bingo: parseFloat(myPot.current_pot_bingo || 0),
+            linea: parseFloat(myPot.current_pot_linea || 0),
+            pre40: parseFloat(myPot.jackpot || 0)
+          });
         }
+      }
+    });
 
-        const newBall = {
-          number,
-          color: getBallColor(number),
-          drawOrder: ballsDrawn.length + 1,
-          timestamp: Date.now()
-        };
-
-        setCurrentBall(newBall);
-        setTimeout(() => {
-          setBallsDrawn(prev => [...prev, newBall]);
-          setCurrentBall(null);
-        }, 3000);
-      }, 5000);
-
-      return () => clearInterval(drawTimer);
-    }
-  }, [gameStatus, ballsDrawn]);
+    return () => {
+      socket.off('number_drawn', handleBallDrawn);
+      socket.off('game_started', handleGameStarted);
+      socket.off('game_ended', handleGameEnded);
+      socket.off('pot_update', handlePotUpdate);
+      socket.off('pots_updated');
+    };
+  }, [socket, sessionId]);
 
   // Actualizar contadores de columna cuando cambian las bolas
   useEffect(() => {
@@ -1334,27 +1456,14 @@ export default function GoldRoom({ onLogout }) {
           )}
 
           {/* Botón de control (solo para testing) */}
-          <div className="test-controls">
+          {/* Botón de control (solo para testing - VOZ MANTENIDO) */}
+          <div className="test-controls" style={{ justifyContent: 'center' }}>
             <button
               className="control-btn voice-btn"
               onClick={() => setShowVoiceSelector(true)}
               title="Cambiar voz del anunciador"
             >
               🎤 Voz
-            </button>
-            <button
-              className="control-btn"
-              onClick={() => setGameStatus(gameStatus === 'active' ? 'waiting' : 'active')}
-            >
-              {gameStatus === 'active' ? '⏸️ Pausar' : '▶️ Iniciar'}
-            </button>
-            <button
-              className="control-btn"
-              onClick={() => activateCelebration(50000)}
-              title="Probar modo celebración"
-              style={{ background: 'linear-gradient(135deg, #ffd700, #ffaa00)' }}
-            >
-              🏆 Ganar
             </button>
           </div>
 

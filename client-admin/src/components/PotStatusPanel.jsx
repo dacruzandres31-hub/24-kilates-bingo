@@ -192,7 +192,7 @@ export default function PotStatusPanel() {
           jackpot: parseFloat(currentSession?.jackpot_pre40) || 0,
           sessionId: currentSession?.id || null,
           status: currentSession?.status || 'no_session',
-          cardsSold: currentSession?.cards_sold || 0,
+          cardsSold: currentSession?.total_paid_cards || 0,
           cardPrice: parseFloat(currentSession?.card_price) || 0,
           startTime: currentSession?.start_time || null,
           isSpecial: false

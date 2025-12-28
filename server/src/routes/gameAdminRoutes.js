@@ -9,6 +9,9 @@ router.use(authenticateToken);
 // Iniciar sorteo automático
 router.post('/start', gameAdminController.startAutoGame);
 
+// Sortear UNA bola manualmente (testing)
+router.post('/draw-one', gameAdminController.drawOneBall);
+
 // Detener sorteo
 router.post('/stop', gameAdminController.stopAutoGame);
 

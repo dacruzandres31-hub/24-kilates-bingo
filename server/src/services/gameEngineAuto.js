@@ -11,12 +11,15 @@
  * 7. Al terminar → muestra formularios de pago
  */
 const pool = require('../db');
+const fs = require('fs');
+const path = require('path');
 const {
   notifyLineWinner,
   notifyBingoWinner,
   showPaymentForms
 } = require('../socket/winnerEvents');
-const metricsService = require('./metricsService'); // Add import
+const metricsService = require('./metricsService');
+const sessionHistoryService = require('./sessionHistoryService');
 
 class GameEngineAuto {
   constructor(io) {
@@ -28,82 +31,132 @@ class GameEngineAuto {
    * Inicia un sorteo automático
    */
   async startGame(gameSessionId, options = {}) {
-    const {
-      drawInterval = 5000,      // 5 segundos entre números
-      pauseOnWinner = 2000      // 2 segundos de pausa al cantar línea
-    } = options;
+    try {
+      console.log(`\n${'='.repeat(60)}`);
+      console.log(`[GameEngine] 🚀 INICIANDO SORTEO - Session ${gameSessionId}`);
+      console.log(`${'='.repeat(60)}`);
 
-    const [sessions] = await pool.query(
-      'SELECT * FROM game_sessions WHERE id = ? AND status = ?',
-      [gameSessionId, 'active']
-    );
+      const {
+        drawInterval = 5000,      // 5 segundos entre números
+        pauseOnWinner = 2000      // 2 segundos de pausa al cantar línea
+      } = options;
 
-    if (sessions.length === 0) {
-      throw new Error('Sesión no encontrada o no está activa');
-    }
-
-    const session = sessions[0];
-
-    // LIMPIEZA Y REGENERACIÓN: Al iniciar sorteo
-    // Eliminar cartones no usados y generar 1000 nuevos para próxima sesión
-    const cardPoolManager = require('./cardPoolManager');
-    cardPoolManager.cleanAndRegenerateForSession(session.room).catch(err => {
-      console.error('[GameEngine] Error en limpieza/regeneración al iniciar:', err);
-    });
-
-    // Estado del juego
-    const gameState = {
-      sessionId: gameSessionId,
-      roomId: session.room,
-      ballsDrawn: [],
-      availableBalls: this.generateBallPool(),
-      interval: null,
-      isPaused: false,
-      lineWinnersPaid: false,           // Solo se paga UNA VEZ la primera línea
-      lineWinnersThisBall: [],          // Ganadores de línea en esta bolilla
-      bingoWinnersPaid: false,          // Control de BINGO pagado
-      bingoWinnersThisBall: []          // Ganadores de BINGO en esta bolilla
-    };
-
-    this.activeGames.set(gameSessionId, gameState);
-
-    // Obtener números ya cantados
-    const [existingBalls] = await pool.query(
-      'SELECT ball_number FROM game_session_balls WHERE game_session_id = ? ORDER BY draw_order',
-      [gameSessionId]
-    );
-
-    gameState.ballsDrawn = existingBalls.map(b => b.ball_number);
-    gameState.availableBalls = gameState.availableBalls.filter(
-      b => !gameState.ballsDrawn.includes(b)
-    );
-
-    // Iniciar sorteo automático
-    gameState.interval = setInterval(async () => {
-      if (gameState.isPaused) return;
-
-      try {
-        await this.drawNextBall(gameSessionId, pauseOnWinner);
-      } catch (error) {
-        console.error(`[GameEngine] Error en sorteo ${gameSessionId}:`, error);
-        this.stopGame(gameSessionId);
+      // Validar que Socket.IO está inicializado
+      if (!this.io) {
+        throw new Error('Socket.IO no está inicializado en gameEngine');
       }
-    }, drawInterval);
+      console.log(`[GameEngine] ✅ Socket.IO está inicializado`);
+      console.log(`[GameEngine] 📊 Sockets conectados: ${this.io.engine.clientsCount || 0}`);
 
-    console.log(`[GameEngine] 🎮 Juego ${gameSessionId} iniciado (sala: ${session.room})`);
+      const [sessions] = await pool.query(
+        'SELECT * FROM game_sessions WHERE id = ? AND status IN (?, ?)',
+        [gameSessionId, 'active', 'pending']
+      );
 
-    this.io.to(`game_${session.room}`).emit('game_started', {
-      gameSessionId,
-      drawInterval,
-      totalBalls: 75
-    });
+      if (sessions.length === 0) {
+        throw new Error('Sesión no encontrada o no está activa');
+      }
 
-    return gameState;
+      const session = sessions[0];
+      console.log(`[GameEngine] ✅ Sesión encontrada: ${session.room}`);
+      console.log(`[GameEngine] 🎯 Room de WebSocket: session_${gameSessionId}`);
+
+      // LIMPIEZA Y REGENERACIÓN: Al iniciar sorteo
+      // Eliminar cartones no usados y generar 1000 nuevos para próxima sesión
+      const cardPoolManager = require('./cardPoolManager');
+      cardPoolManager.cleanAndRegenerateForSession(session.room).catch(err => {
+        console.error('[GameEngine] Error en limpieza/regeneración al iniciar:', err);
+      });
+
+      // Estado del juego
+      const gameState = {
+        sessionId: gameSessionId,
+        roomId: session.room,
+        ballsDrawn: [],
+        availableBalls: this.generateBallPool(),
+        interval: null,
+        isPaused: false,
+        lineWinnersPaid: false,           // Solo se paga UNA VEZ la primera línea
+        lineWinnersThisBall: [],          // Ganadores de línea en esta bolilla
+        bingoWinnersPaid: false,          // Control de BINGO pagado
+        bingoWinnersThisBall: []          // Ganadores de BINGO en esta bolilla
+      };
+
+      this.activeGames.set(gameSessionId, gameState);
+      console.log(`[GameEngine] ✅ GameState creado y guardado`);
+
+      // LIMPIAR bolas de sorteos anteriores si la sesión se está reiniciando
+      await pool.query(
+        'DELETE FROM game_session_balls WHERE game_session_id = ?',
+        [gameSessionId]
+      );
+      console.log(`[GameEngine] 🧹 Bolas anteriores eliminadas para sesión ${gameSessionId}`);
+
+      // Obtener números ya cantados (debería estar vacío después de la limpieza)
+      const [existingBalls] = await pool.query(
+        'SELECT ball_number FROM game_session_balls WHERE game_session_id = ? ORDER BY draw_order',
+        [gameSessionId]
+      );
+
+      gameState.ballsDrawn = existingBalls.map(b => b.ball_number);
+      gameState.availableBalls = gameState.availableBalls.filter(
+        b => !gameState.ballsDrawn.includes(b)
+      );
+
+      // Cambiar estado de la sesión a 'playing' para indicar que está en sorteo
+      await pool.query(
+        'UPDATE game_sessions SET status = ? WHERE id = ?',
+        ['playing', gameSessionId]
+      );
+      console.log(`[GameEngine] 📝 Sesión ${gameSessionId} cambiada a estado 'playing'`);
+
+      // Iniciar sorteo automático
+      console.log(`[GameEngine] ⏱️ Configurando intervalo de ${drawInterval}ms para sesión ${gameSessionId}`);
+      gameState.interval = setInterval(async () => {
+        console.log(`[GameEngine] 🔄 Intervalo ejecutándose para sesión ${gameSessionId}, isPaused: ${gameState.isPaused}`);
+        if (gameState.isPaused) return;
+
+        try {
+          await this.drawNextBall(gameSessionId, pauseOnWinner);
+        } catch (error) {
+          console.error(`[GameEngine] ❌ Error en sorteo ${gameSessionId}:`, error);
+          try {
+            fs.appendFileSync(
+              path.join(__dirname, '../../critical_errors.txt'),
+              `[${new Date().toISOString()}] CRASH in drawNextBall: ${error.message}\nSTACK: ${error.stack}\n\n`
+            );
+          } catch (logErr) { console.error('Error writing log:', logErr); }
+
+          this.stopGame(gameSessionId);
+        }
+      }, drawInterval);
+
+      console.log(`[GameEngine] 🎮 Juego ${gameSessionId} iniciado (sala: ${session.room})`);
+      console.log(`[GameEngine] 📊 Estado inicial: ${gameState.ballsDrawn.length} bolas sorteadas, ${gameState.availableBalls.length} disponibles`);
+
+      this.io.to(`session_${gameSessionId}`).emit('game_started', {
+        gameSessionId,
+        drawInterval,
+        totalBalls: 90,
+        pots: {
+          bingo: session.jackpot_bingo,
+          line: session.jackpot_linea,
+          pre40: session.jackpot_pre40
+        }
+      });
+      console.log(`[GameEngine] 📡 Evento 'game_started' emitido a session_${gameSessionId}`);
+
+      return gameState;
+    } catch (error) {
+      console.error(`[GameEngine] ❌❌❌ ERROR CRÍTICO en startGame:`, error);
+      console.error(`[GameEngine] ❌ Stack trace:`, error.stack);
+      throw error;
+    }
   }
 
   generateBallPool() {
     const balls = [];
-    for (let i = 1; i <= 75; i++) {
+    for (let i = 1; i <= 90; i++) {
       balls.push(i);
     }
     return balls;
@@ -131,26 +184,65 @@ class GameEngineAuto {
     const ballLetter = this.getBallLetter(ballNumber);
     const drawOrder = gameState.ballsDrawn.length;
 
-    await pool.query(
-      `INSERT INTO game_session_balls (game_session_id, ball_number, ball_letter, draw_order)
-       VALUES (?, ?, ?, ?)`,
-      [gameSessionId, ballNumber, ballLetter, drawOrder]
-    );
+    try {
+      await pool.query(
+        `INSERT INTO game_session_balls (game_session_id, ball_number, ball_letter, draw_order)
+         VALUES (?, ?, ?, ?)`,
+        [gameSessionId, ballNumber, ballLetter, drawOrder]
+      );
+    } catch (dbErr) {
+      console.error('[GameEngine] ❌ Error insertando bola:', dbErr);
+      try {
+        fs.appendFileSync(
+          path.join(__dirname, '../../critical_errors.txt'),
+          `[${new Date().toISOString()}] DB INSERT ERROR: ${dbErr.message}\nQuery: INSERT INTO game_session_balls... ${ballNumber}, ${drawOrder}\n\n`
+        );
+      } catch (e) { }
+      throw dbErr; // Re-throw to trigger stopGame if critical
+    }
 
-    console.log(`[GameEngine] 🎱 ${ballLetter}-${ballNumber} (#${drawOrder})`);
+    console.log(`\n[GameEngine] 🎱 BOLILLA SORTEADA: ${ballLetter}-${ballNumber} (#${drawOrder})`);
 
-    // Emitir a todos los jugadores
-    this.io.to(`game_${gameState.roomId}`).emit('ball_drawn', {
+    // Emitir a todos los jugadores de esta sesión
+    const sessionRoom = `session_${gameSessionId}`;
+    const eventData = {
       gameSessionId,
+      number: ballNumber, // Usar 'number' para coincidir con el frontend
       ballNumber,
       ballLetter,
       drawOrder,
-      totalDrawn: gameState.ballsDrawn.length
-    });
+      totalDrawn: gameState.ballsDrawn.length,
+      room: gameState.roomId // Agregar info de sala
+    };
+
+    console.log(`[GameEngine] 📡 EMITIENDO 'number_drawn' a room: ${sessionRoom}`);
+    console.log(`[GameEngine] 📦 Datos del evento:`, JSON.stringify(eventData));
+
+    // Verificar cuántos clientes están en el room de sesión
+    const room = this.io.sockets.adapter.rooms.get(sessionRoom);
+    const clientsInRoom = room ? room.size : 0;
+    console.log(`[GameEngine] 👥 Clientes conectados en ${sessionRoom}: ${clientsInRoom}`);
+
+    // EMISIÓN 1: A la sesión específica (participantes con cartones)
+    this.io.to(sessionRoom).emit('number_drawn', eventData);
+    console.log(`[GameEngine] ✅ Evento 'number_drawn' emitido a ${sessionRoom}`);
+
+    // EMISIÓN 2: A la sala global (espectadores públicos)
+    const globalRoom = `room_${gameState.roomId}`;
+    const globalRoomClients = this.io.sockets.adapter.rooms.get(globalRoom);
+    const spectators = globalRoomClients ? globalRoomClients.size : 0;
+
+    this.io.to(globalRoom).emit('number_drawn', eventData);
+    console.log(`[GameEngine] 📺 Evento 'number_drawn' emitido a ${globalRoom} (${spectators} espectadores)`);
+
     metricsService.increment('eventsEmitted');
 
     // VALIDAR AUTOMÁTICAMENTE TODOS LOS CARTONES
-    await this.validateAllCards(gameSessionId, pauseOnWinner);
+    try {
+      await this.validateAllCards(gameSessionId, pauseOnWinner);
+    } catch (valError) {
+      console.error(`[GameEngine] ⚠️ Error en validación de cartones (no fatal):`, valError);
+    }
 
     // EMITIR REORDENAMIENTO DE CARTONES (para usuarios con múltiples cartones)
     await this.emitCardsReordering(gameSessionId);
@@ -165,20 +257,25 @@ class GameEngineAuto {
 
       // Obtener todos los usuarios con cartones activos en esta sesión
       const [users] = await pool.query(
-        `SELECT DISTINCT user_id FROM bingo_cards 
-         WHERE session_id = ? AND status = 'active'`,
+        `SELECT DISTINCT user_id FROM validated_cards 
+         WHERE session_id = ?`,
         [gameSessionId]
       );
 
       // Para cada usuario, analizar sus cartones y emitir evento personal
       for (const { user_id } of users) {
         // Obtener cartones del usuario
-        const [userCards] = await pool.query(
-          `SELECT * FROM bingo_cards 
-           WHERE user_id = ? AND session_id = ? AND status = 'active'
+        const [userCardsRaw] = await pool.query(
+          `SELECT id, grid_numbers as numbers FROM validated_cards 
+           WHERE user_id = ? AND session_id = ?
            ORDER BY id ASC`,
           [user_id, gameSessionId]
         );
+
+        const userCards = userCardsRaw.map(c => ({
+          ...c,
+          numbers: typeof c.numbers === 'string' ? JSON.parse(c.numbers) : c.numbers
+        }));
 
         if (userCards.length <= 1) continue; // Skip si tiene 1 o menos cartones
 
@@ -225,10 +322,10 @@ class GameEngineAuto {
     const gameState = this.activeGames.get(gameSessionId);
 
     const [cards] = await pool.query(
-      `SELECT bc.*, u.username 
-       FROM bingo_cards bc
-       JOIN users u ON bc.user_id = u.id
-       WHERE bc.session_id = ? AND bc.status = 'active'`,
+      `SELECT vc.id, vc.player_id as user_id, u.username, vc.grid_numbers as grid_data
+       FROM validated_cards vc
+       JOIN users u ON vc.player_id = u.id
+       WHERE vc.game_session_id = ?`,
       [gameSessionId]
     );
 
@@ -247,12 +344,18 @@ class GameEngineAuto {
         const username = card.username;
 
         let cardNumbers;
-        if (card.numbers) {
-          cardNumbers = typeof card.numbers === 'string' ? JSON.parse(card.numbers) : card.numbers;
-        } else if (card.grid_data) {
-          const gridData = typeof card.grid_data === 'string' ? JSON.parse(card.grid_data) : card.grid_data;
-          cardNumbers = this.convertGridDataToMatrix(gridData);
-        } else {
+        try {
+          if (card.grid_data) {
+            const gridData = typeof card.grid_data === 'string' ? JSON.parse(card.grid_data) : card.grid_data;
+            // Si viene de validated_cards (card_matrix), ya suele ser matriz 5x5
+            // Si no, intentar convertir
+            cardNumbers = Array.isArray(gridData[0]) ? gridData : this.convertGridDataToMatrix(gridData);
+          } else {
+            console.warn(`[GameEngine] ⚠️ Cartón ${card.id} sin grid_data`);
+            continue;
+          }
+        } catch (parseErr) {
+          console.error(`[GameEngine] ❌ Error parseando datos de cartón ${card.id}:`, parseErr);
           continue;
         }
 
@@ -290,12 +393,17 @@ class GameEngineAuto {
         const username = card.username;
 
         let cardNumbers;
-        if (card.numbers) {
-          cardNumbers = typeof card.numbers === 'string' ? JSON.parse(card.numbers) : card.numbers;
-        } else if (card.grid_data) {
-          const gridData = typeof card.grid_data === 'string' ? JSON.parse(card.grid_data) : card.grid_data;
-          cardNumbers = this.convertGridDataToMatrix(gridData);
-        } else {
+        try {
+          if (card.numbers) {
+            cardNumbers = typeof card.numbers === 'string' ? JSON.parse(card.numbers) : card.numbers;
+          } else if (card.grid_data) {
+            const gridData = typeof card.grid_data === 'string' ? JSON.parse(card.grid_data) : card.grid_data;
+            cardNumbers = this.convertGridDataToMatrix(gridData);
+          } else {
+            continue;
+          }
+        } catch (parseErr) {
+          console.error(`[GameEngine] ❌ Error parseando datos de cartón ${card.id} (Bingo Check):`, parseErr);
           continue;
         }
 
@@ -332,6 +440,11 @@ class GameEngineAuto {
       { type: 'horizontal_4', row: 3 },
       { type: 'horizontal_5', row: 4 }
     ];
+
+    if (!cardNumbers || !Array.isArray(cardNumbers) || cardNumbers.length < 5) {
+      // console.warn('Inválida estructura de cartón en checkHorizontalLines', cardNumbers);
+      return { hasLine: false };
+    }
 
     for (const line of horizontalLines) {
       const winningNumbers = [];
@@ -403,7 +516,7 @@ class GameEngineAuto {
 
       notifyLineWinner(
         this.io,
-        gameState.roomId,
+        `session_${gameSessionId}`,
         { id: winner.userId, username: winner.username },
         prizePerWinner,
         winner.lineType,
@@ -443,7 +556,7 @@ class GameEngineAuto {
 
       notifyBingoWinner(
         this.io,
-        gameState.roomId,
+        `session_${gameSessionId}`,
         { id: winner.userId, username: winner.username },
         prizePerWinner,
         gameSessionId
@@ -467,9 +580,41 @@ class GameEngineAuto {
       gameState.interval = null;
     }
 
+    // PERSISTIR RESULTADOS EN game_sessions antes de archivar
+    const ballSequence = gameState.ballsDrawn;
+    const [winners] = await pool.query(
+      'SELECT user_id, prize_type, prize_amount, bolea_number FROM game_winners WHERE game_session_id = ?',
+      [gameSessionId]
+    );
+
+    const lineaWinner = winners.find(w => w.prize_type === 'linea');
+    const bingoWinner = winners.find(w => w.prize_type === 'bingo');
+
+    const lineaBallNumber = lineaWinner ? lineaWinner.bolea_number : null;
+    const lineaBallIndex = lineaBallNumber !== null ? ballSequence.indexOf(lineaBallNumber) : null;
+
+    const bingoBallNumber = bingoWinner ? bingoWinner.bolea_number : null;
+    const bingoBallIndex = bingoBallNumber !== null ? ballSequence.indexOf(bingoBallNumber) : null;
+
     await pool.query(
-      'UPDATE game_sessions SET status = ? WHERE id = ?',
-      [status, gameSessionId]
+      `UPDATE game_sessions SET 
+        status = ?, 
+        ball_sequence = ?,
+        linea_ball_number = ?,
+        linea_ball_index = ?,
+        bingo_ball_number = ?,
+        bingo_ball_index = ?,
+        updated_at = NOW() 
+       WHERE id = ?`,
+      [
+        status,
+        JSON.stringify(ballSequence),
+        lineaBallNumber,
+        lineaBallIndex,
+        bingoBallNumber,
+        bingoBallIndex,
+        gameSessionId
+      ]
     );
 
     // NUEVO: Marcar cartones de la sesión como JUGADOS (Historial)
@@ -494,11 +639,19 @@ class GameEngineAuto {
 
     console.log(`[GameEngine] 🏁 Juego ${gameSessionId} terminado`);
 
-    this.io.to(`game_${gameState.roomId}`).emit('game_ended', {
+    this.io.to(`session_${gameSessionId}`).emit('game_ended', {
       gameSessionId,
       status,
       totalBallsDrawn: gameState.ballsDrawn.length
     });
+
+    // ARCHIVAR SESIÓN AUTOMÁTICAMENTE
+    try {
+      await sessionHistoryService.archiveSession(gameSessionId);
+      console.log(`[GameEngine] ✅ Sesión ${gameSessionId} archivada exitosamente.`);
+    } catch (archiveError) {
+      console.error(`[GameEngine] ❌ Error archivando sesión ${gameSessionId}:`, archiveError);
+    }
 
     // Formularios de pago después de 5 segundos
     setTimeout(async () => {
@@ -520,6 +673,16 @@ class GameEngineAuto {
       gameState.interval = null;
     }
 
+    // Volver estado a 'pending' para permitir compra de cartones nuevamente
+    pool.query(
+      'UPDATE game_sessions SET status = ? WHERE id = ?',
+      ['pending', gameSessionId]
+    ).then(() => {
+      console.log(`[GameEngine] 📝 Sesión ${gameSessionId} cambiada a estado 'pending'`);
+    }).catch(err => {
+      console.error(`[GameEngine] Error actualizando estado de sesión ${gameSessionId}:`, err);
+    });
+
     console.log(`[GameEngine] 🛑 Juego ${gameSessionId} detenido`);
     this.activeGames.delete(gameSessionId);
   }
@@ -536,11 +699,11 @@ class GameEngineAuto {
   // ===== FUNCIONES DE VALIDACIÓN =====
 
   getBallLetter(number) {
-    if (number >= 1 && number <= 15) return 'B';
-    if (number >= 16 && number <= 30) return 'I';
-    if (number >= 31 && number <= 45) return 'N';
-    if (number >= 46 && number <= 60) return 'G';
-    if (number >= 61 && number <= 75) return 'O';
+    if (number >= 1 && number <= 18) return 'B';
+    if (number >= 19 && number <= 36) return 'I';
+    if (number >= 37 && number <= 54) return 'N';
+    if (number >= 55 && number <= 72) return 'G';
+    if (number >= 73 && number <= 90) return 'O';
     return '?';
   }
 
@@ -575,7 +738,19 @@ class GameEngineAuto {
     const winningNumbers = [];
     const missingNumbers = [];
 
+    if (!cardNumbers || !Array.isArray(cardNumbers) || cardNumbers.length < 5) {
+      return {
+        isValid: false,
+        winningNumbers: [],
+        missingNumbers: [],
+        totalMarked: 0,
+        totalNeeded: 24
+      };
+    }
+
     for (let row = 0; row < 5; row++) {
+      if (!cardNumbers[row] || !Array.isArray(cardNumbers[row]) || cardNumbers[row].length < 5) continue;
+
       for (let col = 0; col < 5; col++) {
         const number = cardNumbers[row][col];
 

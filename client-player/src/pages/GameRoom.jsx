@@ -97,69 +97,60 @@ export default function GameRoom() {
       }));
     });
 
-    // Escuchar ganador detectado
-    socket.on('winner_detected', (data) => {
-      // Verificar si soy yo el ganador
-      if (currentUser && data.userId === currentUser.id) {
-        const prizeType = data.type?.toUpperCase(); // 'LINEA', 'BINGO', 'POZO'
+    // Escuchar ganador de LÍNEA
+    socket.on('line_winner', (data) => {
+      const isMe = currentUser && data.winner.userId === currentUser.id;
 
+      if (isMe) {
         setPrizeData({
-          type: prizeType,
-          amount: data.amount || data.prizeAmount || 0,
-          sessionId: gameState.sessionId
+          type: 'LINEA',
+          amount: data.prizeAmount,
+          sessionId: gameState.sessionId,
+          winningCard: data.winningCard
         });
-
-        // Si es LÍNEA → Modal simple de notificación
-        if (prizeType === 'LINEA') {
-          triggerHaptic('success');
-
-          // Encontrar el cartón ganador para mostrarlo
-          const winnerCardId = data.cardId; // Asegurarse que el backend mande cardId
-          const winnerCard = myCards.find(c => c.id === winnerCardId);
-
-          if (winnerCard) {
-            // Decorar con números marcados
-            winnerCard.markedNumbers = new Set(gameState.drawnNumbers);
-            setPrizeData(prev => ({ ...prev, winningCard }));
-          }
-
-          setShowLineaNotification(true);
-        }
-        // Si es BINGO o POZO → Modal con formulario de retiro
-        else if (prizeType === 'BINGO' || prizeType === 'POZO') {
-          triggerHaptic('celebrate');
-          setShowPrizeClaimModal(true);
-          // CELEBRATION!
-          confetti({
-            particleCount: 150,
-            spread: 70,
-            origin: { y: 0.6 }
-          });
-        }
+        triggerHaptic('success');
+        setShowLineaNotification(true);
       } else {
-        // Si gana OTRO, también celebrar BINGO
-        const prizeType = data.type?.toUpperCase();
-        if (prizeType === 'BINGO' || prizeType === 'POZO') {
-          confetti({
-            particleCount: 100,
-            spread: 100,
-            origin: { y: 0.6 },
-            colors: ['#bb0000', '#ffffff']
-          });
-        }
+        // Notification for others
+        setWinnerData({
+          ...data,
+          userId: data.winner.userId,
+          username: data.winner.username,
+          type: 'linea'
+        });
+        setShowWinnerModal(true);
       }
+    });
 
-      // Mostrar también el modal general de ganadores (para todos)
-      // EXCEPTO si soy yo Y es línea (porque ya muestro la notificación especial)
-      // Si soy yo Y es línea -> mostrar SÓLO notificación especial
-      // Si soy yo Y es bingo -> mostrar SÓLO claim modal
-      // Si es otro -> mostrar WinnerModal
+    // Escuchar ganador de BINGO
+    socket.on('bingo_winner', (data) => {
+      const isMe = currentUser && data.winner.userId === currentUser.id;
 
-      const isMe = currentUser && data.userId === currentUser.id;
-      const isLine = data.type?.toUpperCase() === 'LINEA';
+      // Celebración general (confetti)
+      confetti({
+        particleCount: isMe ? 200 : 100,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: isMe ? undefined : ['#bb0000', '#ffffff']
+      });
 
-      if (!isMe || !isLine) {
-        setWinnerData(data);
+      if (isMe) {
+        setPrizeData({
+          type: 'BINGO',
+          amount: data.prizeAmount,
+          sessionId: data.gameSessionId
+        });
+        triggerHaptic('celebrate');
+        setShowPrizeClaimModal(true);
+      } else {
+        // Modal general para el resto
+        setWinnerData({
+          ...data,
+          userId: data.winner.userId,
+          username: data.winner.username,
+          type: 'bingo',
+          amount: data.prizeAmount
+        });
         setShowWinnerModal(true);
       }
     });
@@ -186,11 +177,66 @@ export default function GameRoom() {
     return () => {
       socket.off('number_drawn');
       socket.off('pot_update');
-      socket.off('winner_detected');
+      socket.off('line_winner');
+      socket.off('bingo_winner');
       socket.off('cascade_transfer');
       socket.off('global_ticker_message');
     };
   }, [socket, roomType, selectedCard, currentUser]);
+
+  // NUEVO: Efecto para recuperar sesión activa y cartones al cargar
+  useEffect(() => {
+    const initRoom = async () => {
+      if (!roomType) return;
+
+      try {
+        const token = localStorage.getItem('token');
+        const headers = { 'Authorization': `Bearer ${token}` };
+
+        // 1. Obtener estado de la sala (ID de sesión activa)
+        const roomRes = await fetch(`/api/game/room-status/${roomType}`, { headers });
+        const roomData = await roomRes.json();
+
+        if (roomData.success && roomData.sessionId) {
+          const sessionId = roomData.sessionId;
+
+          // 2. Obtener estado completo de la sesión (bolillas, pots)
+          const sessionRes = await fetch(`/api/game/sessions/${sessionId}`, { headers });
+          const sessionData = await sessionRes.json();
+
+          if (sessionData.session) {
+            const s = sessionData.session;
+            setGameState(prev => ({
+              ...prev,
+              sessionId: s.id,
+              status: s.status,
+              potBingo: parseFloat(s.current_pot_bingo || 0),
+              potLinea: parseFloat(s.current_pot_linea || 0),
+              potJackpot: parseFloat(s.current_pot_jackpot || 0),
+              drawnNumbers: s.drawnNumbers || [],
+              latestNumber: s.drawnNumbers?.length > 0 ? s.drawnNumbers[s.drawnNumbers.length - 1] : null
+            }));
+          }
+
+          // 3. Obtener cartones validados del usuario para esta sesión
+          const cardsRes = await fetch(`/api/game/my-validated-cards/${sessionId}`, { headers });
+          const cardsData = await cardsRes.json();
+
+          if (cardsData.success && cardsData.cards) {
+            setMyCards(cardsData.cards);
+            // Seleccionar el primer cartón por defecto si no hay uno seleccionado
+            if (cardsData.cards.length > 0 && !selectedCard) {
+              setSelectedCard(cardsData.cards[0]);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error recuperando sesión:', error);
+      }
+    };
+
+    initRoom();
+  }, [roomType]);
 
   // Manejar reclamación de premio
   const handleClaimPrize = async (formData) => {

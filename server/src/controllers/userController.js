@@ -374,7 +374,7 @@ exports.getNetworkStats = async (req, res) => {
  */
 exports.getUserProfile = async (req, res) => {
   try {
-    const userId = req.user.id; // El token contiene 'id', no 'userId'
+    const userId = req.user.id || req.user.userId;
 
     console.log('[getUserProfile] 🔍 Buscando usuario ID:', userId);
 
@@ -394,18 +394,22 @@ exports.getUserProfile = async (req, res) => {
 
     // Obtener cartones disponibles separados por tipo (igual que adminController)
     // Esto asegura que la suma sea consistente con lo que ve el admin
+    console.log('[getUserProfile] 🔍 Buscando inventario para usuario:', userId);
+
     const [inventory] = await pool.query(
       `SELECT 
-        COALESCE(SUM(CASE WHEN room = 'bronce' AND is_gift = FALSE THEN quantity ELSE 0 END), 0) as cards_bronce,
-        COALESCE(SUM(CASE WHEN room = 'plata' AND is_gift = FALSE THEN quantity ELSE 0 END), 0) as cards_plata,
-        COALESCE(SUM(CASE WHEN room = 'oro' AND is_gift = FALSE THEN quantity ELSE 0 END), 0) as cards_oro,
-        COALESCE(SUM(CASE WHEN room = 'bronce' AND is_gift = TRUE THEN quantity ELSE 0 END), 0) as gift_bronce,
-        COALESCE(SUM(CASE WHEN room = 'plata' AND is_gift = TRUE THEN quantity ELSE 0 END), 0) as gift_plata,
-        COALESCE(SUM(CASE WHEN room = 'oro' AND is_gift = TRUE THEN quantity ELSE 0 END), 0) as gift_oro
+        COALESCE(SUM(CASE WHEN room = 'bronce' AND is_gift = 0 THEN quantity ELSE 0 END), 0) as cards_bronce,
+        COALESCE(SUM(CASE WHEN room = 'plata' AND is_gift = 0 THEN quantity ELSE 0 END), 0) as cards_plata,
+        COALESCE(SUM(CASE WHEN room = 'oro' AND is_gift = 0 THEN quantity ELSE 0 END), 0) as cards_oro,
+        COALESCE(SUM(CASE WHEN room = 'bronce' AND is_gift = 1 THEN quantity ELSE 0 END), 0) as gift_bronce,
+        COALESCE(SUM(CASE WHEN room = 'plata' AND is_gift = 1 THEN quantity ELSE 0 END), 0) as gift_plata,
+        COALESCE(SUM(CASE WHEN room = 'oro' AND is_gift = 1 THEN quantity ELSE 0 END), 0) as gift_oro
        FROM user_card_inventory
        WHERE user_id = ?`,
       [userId]
     );
+
+    console.log('[getUserProfile] 📦 Inventario RAW:', inventory);
 
     const data = inventory[0] || {};
 
