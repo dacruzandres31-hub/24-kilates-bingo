@@ -174,9 +174,9 @@ exports.getActiveSessions = async (req, res) => {
             gs.id, gs.room, gs.start_time, gs.status,
             gs.jackpot_linea, gs.jackpot_bingo, gs.jackpot_pre40,
             gs.total_cards_validated, gs.total_paid_cards, gs.total_gift_cards,
-            rs.card_price
+            rs.card_price as cost
           FROM game_sessions gs
-          LEFT JOIN room_settings rs ON gs.room COLLATE utf8mb4_unicode_ci = rs.room COLLATE utf8mb4_unicode_ci
+          LEFT JOIN room_settings rs ON gs.room = rs.room
           WHERE gs.room = ? AND gs.status IN ('active', 'pending', 'playing')
           ORDER BY gs.start_time DESC
           LIMIT 1
@@ -402,7 +402,7 @@ exports.createSession = async (req, res) => {
         room,
         play_date,
         start_time,
-        card_price,
+        cost,
         jackpot_linea,
         jackpot_bingo,
         jackpot_pre40,
@@ -483,7 +483,7 @@ exports.updateSession = async (req, res) => {
       values.push(start_time);
     }
     if (card_price !== undefined) {
-      updates.push('card_price = ?');
+      updates.push('cost = ?');
       values.push(card_price);
     }
     if (is_preventa !== undefined) {

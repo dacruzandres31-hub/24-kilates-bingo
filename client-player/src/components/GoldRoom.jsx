@@ -12,6 +12,7 @@ import Countdown from './Countdown';
 import ModernBallMachine from './ModernBallMachine';
 import RecentBallsPanel from './RecentBallsPanel';
 import useSocket from '../hooks/useSocket';
+import useBingoTerminal from '../hooks/useBingoTerminal';
 
 export default function GoldRoom({ onLogout }) {
   const { sessionId } = useParams();
@@ -41,6 +42,15 @@ export default function GoldRoom({ onLogout }) {
   const [sidebarOpen, setSidebarOpen] = useState(false); // Estado del sidebar
   const [showCardSelection, setShowCardSelection] = useState(false); // Mostrar lobby de selección de cartones
   const [selectedPlayerCards, setSelectedPlayerCards] = useState([]); // Cartones seleccionados por el jugador
+
+  // --- TERMINAL AUTOMÁTICA ---
+  const { alreadyClaimedLine, alreadyClaimedBingo } = useBingoTerminal(
+    selectedPlayerCards,
+    ballsDrawn,
+    sessionId,
+    socket,
+    'gold'
+  );
   const [cardsRemaining, setCardsRemaining] = useState(20); // Cartones que faltan por seleccionar
   const [showReadyModal, setShowReadyModal] = useState(false); // Modal "¡¡Todo Listo!!"
   const [timeRemaining, setTimeRemaining] = useState(null);

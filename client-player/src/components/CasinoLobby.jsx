@@ -5,6 +5,7 @@ import axios from 'axios';
 import '../styles/CasinoLobby.css';
 import '../styles/Countdown.css';
 import '../styles/LiveDrawBadge.css';
+import '../styles/LobbyCompact.css';
 import Countdown from './Countdown';
 import PlayerActivityHistory from './PlayerActivityHistory';
 import { FaClock, FaUsers, FaMoneyBillWave, FaTrophy, FaStar, FaGlassCheers, FaGift, FaHeadset, FaTicketAlt, FaEye, FaEyeSlash, FaMusic, FaVolumeUp, FaVolumeMute, FaUser, FaKey, FaSignOutAlt, FaMapMarkedAlt } from 'react-icons/fa';
@@ -200,7 +201,29 @@ const CasinoLobby = ({ user, onLogout }) => {
     if (!hasSeenTour) {
       setTimeout(() => setRunTour(true), 1500); // Small delay for loading
     }
+
+    // Check Fortune Wheel Cooldown
+    checkWheelCooldown();
+    const interval = setInterval(checkWheelCooldown, 60000); // Check every minute
+    return () => clearInterval(interval);
   }, []);
+
+  const checkWheelCooldown = () => {
+    const lastSpin = localStorage.getItem('last_wheel_spin');
+    if (!lastSpin) {
+      setWheelReady(true);
+      return;
+    }
+
+    const diff = Date.now() - parseInt(lastSpin);
+    const cooldown = 60 * 60 * 1000; // 60 minutes
+    setWheelReady(diff >= cooldown);
+  };
+
+  const handleSpinComplete = () => {
+    localStorage.setItem('last_wheel_spin', Date.now().toString());
+    setWheelReady(false);
+  };
 
   const handleTourEnd = () => {
     setRunTour(false);
@@ -600,6 +623,22 @@ const CasinoLobby = ({ user, onLogout }) => {
 
   return (
     <div className="casino-lobby" style={{ '--lobby-bg-image': `url(${lobbyBackground})` }}>
+      {/* Hidden target for Tour - Central Ghost Logo */}
+      <div
+        id="tour-start-logo"
+        style={{
+          position: 'fixed',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: '375px',
+          height: '375px',
+          pointerEvents: 'none',
+          zIndex: 9999, // Ensure tour can find it, although react-joyride handles z-index
+          visibility: 'hidden' // Hidden but present in DOM
+        }}
+      />
+
       {/* Top User Bar */}
       <div className="user-top-bar" id="user-main-bar">
         <div className="user-info-section">
@@ -1113,6 +1152,16 @@ const CasinoLobby = ({ user, onLogout }) => {
         )
       }
 
+      {/* Modal de Rueda de la Fortuna */}
+      {
+        showWheel && createPortal(
+          <FortuneWheel
+            onClose={() => setShowWheel(false)}
+            onSpinComplete={handleSpinComplete}
+          />,
+          document.body
+        )
+      }
       {/* Modal de Retiro */}
       {
         showWithdrawal && (

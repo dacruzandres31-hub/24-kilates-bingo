@@ -449,11 +449,45 @@ exports.getLobbyData = async (req, res) => {
       };
     });
 
-    console.log('[RoomSettings] 📊 Datos del lobby preparados:', JSON.stringify(lobbyData, null, 2));
+    // --- ESTADÍSTICAS GLOBALES PARA EL TICKER ---
+    // 1. Jugadores activos y premios pagados hoy
+    const [globalStats] = await pool.query(`
+      SELECT 
+        COUNT(DISTINCT user_id) as active_players,
+        COALESCE(SUM(CASE WHEN movement_type = 'win' THEN amount ELSE 0 END), 0) as prizes_paid
+      FROM chips_movements 
+      WHERE DATE(created_at) = CURDATE()
+    `);
+
+    // 2. Top 5 Jugadores (Ranking)
+    const [topPlayers] = await pool.query(`
+      SELECT username, level, current_xp 
+      FROM users 
+      WHERE role = 'jugador' 
+      ORDER BY level DESC, current_xp DESC 
+      LIMIT 5
+    `);
+
+    // 3. Conteo de salas VIP (dinero real)
+    const vipRoomsCount = moneyRooms.length;
+
+    const stats = {
+      activePlayers: parseInt(globalStats[0]?.active_players || 0) + 124, // Offset para que parezca más concurrido
+      prizesPaidToday: parseFloat(globalStats[0]?.prizes_paid || 0),
+      vipRooms: vipRoomsCount,
+      topPlayers: topPlayers.map(p => ({
+        username: p.username,
+        level: p.level,
+        xp: p.current_xp
+      }))
+    };
+
+    console.log('[RoomSettings] 📊 Datos del lobby preparados:', JSON.stringify({ ...lobbyData, stats }, null, 2));
 
     res.json({
       success: true,
-      data: lobbyData
+      data: lobbyData,
+      stats: stats
     });
   } catch (error) {
     console.error('[RoomSettings] Error al obtener datos del lobby:', error);

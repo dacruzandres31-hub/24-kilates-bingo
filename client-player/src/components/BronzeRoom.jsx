@@ -13,6 +13,7 @@ import ModernBallMachine from './ModernBallMachine';
 import RecentBallsPanel from './RecentBallsPanel';
 import JackpotDisplay from './JackpotDisplay';
 import useSocket from '../hooks/useSocket';
+import useBingoTerminal from '../hooks/useBingoTerminal';
 
 export default function BronzeRoom({ onLogout }) {
   const { sessionId } = useParams();
@@ -38,7 +39,16 @@ export default function BronzeRoom({ onLogout }) {
   const [audioStatus, setAudioStatus] = useState({ musicEnabled: true, efectosEnabled: true }); // Estado UI audio
   const [pauseTimeout, setPauseTimeout] = useState(null); // Controlar pausa automática
   const [highlightedLine, setHighlightedLine] = useState(null); // Línea a resaltar
-  const [cardWinningLines, setCardWinningLines] = useState({}); // {cardId: [0,1,2]} líneas ganadoras por cartón
+  const [cardWinningLines, setCardWinningLines] = useState({}); // líneas ganadoras por cartón
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+
+  // --- TERMINAL AUTOMÁTICA ---
+  const { alreadyClaimedLine, alreadyClaimedBingo } = useBingoTerminal(
+    selectedPlayerCards,
+    ballsDrawn,
+    sessionId,
+    socket
+  );
   const [sidebarOpen, setSidebarOpen] = useState(false); // Estado del sidebar
   const [showCardSelection, setShowCardSelection] = useState(false); // Mostrar lobby de selección de cartones
   const [selectedPlayerCards, setSelectedPlayerCards] = useState([]); // Cartones seleccionados por el jugador
@@ -103,6 +113,10 @@ export default function BronzeRoom({ onLogout }) {
         console.log('🔍 DEBUG - Cartones cargados (Activos):', currentCards);
 
         setSelectedPlayerCards(currentCards);
+
+        // Integrar Terminal Automática (Cantar premios)
+        // (El hook ya se encarga de monitorear ballsDrawn)
+
         // Calcular restantes excluyendo cartones de regalo (isGift=true)
         const nonGiftCards = currentCards.filter(c => !c.isGift);
         const remaining = 20 - nonGiftCards.length;

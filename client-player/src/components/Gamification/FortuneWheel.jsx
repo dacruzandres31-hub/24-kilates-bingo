@@ -5,7 +5,7 @@ import { FaTimes, FaGift, FaLock } from 'react-icons/fa';
 import audioService from '../../services/audioService';
 import './FortuneWheel.css';
 
-const FortuneWheel = ({ isOpen, onClose, onPrizeClaimed }) => {
+const FortuneWheel = ({ isOpen, onClose, onPrizeClaimed, onSpinComplete }) => {
     const [canSpin, setCanSpin] = useState(false);
     const [nextSpinTime, setNextSpinTime] = useState(null);
     const [isSpinning, setIsSpinning] = useState(false);
@@ -138,6 +138,7 @@ const FortuneWheel = ({ isOpen, onClose, onPrizeClaimed }) => {
                     setNextSpinTime(d.toISOString());
 
                     if (onPrizeClaimed) onPrizeClaimed(prize);
+                    if (onSpinComplete) onSpinComplete();
                     audioService.playBolaCayendo();
                 }
             });

@@ -1,0 +1,285 @@
+/* Hide redundant stats - info is already in Noticias 24K ticker */
+.header-stats {
+    display: none !important;
+}
+
+.footer-info {
+    display: none !important;
+}
+
+/* Hide ALL leaderboard/top players elements */
+.leaderboard-widget,
+.leaderboard-container,
+.leaderboard-section,
+[class*="leaderboard"],
+[class*="top-players"],
+.lobby-footer>div:not(.winners-ticker) {
+    display: none !important;
+}
+
+/* Hide header logo - will show ghost logo instead */
+.lobby-header .logo-container {
+    visibility: hidden !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* NO SCROLL FIX */
+html,
+body,
+#root,
+.lobby-container {
+    height: 100vh !important;
+    min-height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* Increase room card height by 10% */
+.room-card {
+    height: 77vh !important;
+    /* Use VH instead of pixels for better fit */
+    min-height: 750px !important;
+    max-height: 800px !important;
+    width: 100% !important;
+    /* Take full width of parent link */
+    max-width: none !important;
+    /* Remove constraints */
+    padding: 10px 10px 5px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+}
+
+/* COMPACT CONTENT INSIDE CARD */
+
+/* Smaller room logos */
+.room-icon-img {
+    width: 45px !important;
+    height: 45px !important;
+    margin: 5px 0 2px !important;
+}
+
+/* Compact room name */
+.room-name {
+    font-size: 2.8rem !important;
+    /* DOUBLED size (was 1.4rem) */
+    margin-bottom: 2px !important;
+    margin-top: 0 !important;
+}
+
+/* DATA VISIBILITY - INCREASED SIZES */
+
+/* Cartón Price */
+.room-price-section {
+    margin-bottom: 5px !important;
+    gap: 4px !important;
+}
+
+.price-label {
+    font-size: 0.9rem !important;
+    font-weight: 700 !important;
+    color: #ccc !important;
+}
+
+.room-price {
+    font-size: 2.8rem !important;
+    /* DOUBLED size */
+    font-weight: 800 !important;
+    color: #10B981 !important;
+    text-shadow: 0 4px 8px rgba(0, 0, 0, 0.6);
+    line-height: 1 !important;
+    margin: 5px 0 !important;
+}
+
+/* Pots Container */
+.room-pots-container {
+    gap: 8px !important;
+    flex: 1;
+    /* Allow it to take available space */
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+/* Main Pot (Bingo) */
+.pot-main {
+    padding: 8px !important;
+    background: rgba(212, 175, 55, 0.1) !important;
+    border: 1px solid rgba(212, 175, 55, 0.3) !important;
+}
+
+.pot-label {
+    font-size: 0.85rem !important;
+    font-weight: 700 !important;
+    margin-bottom: 2px !important;
+    letter-spacing: 1px !important;
+}
+
+.pot-amount {
+    font-size: 1.8rem !important;
+    line-height: 1.1 !important;
+    text-shadow: 0 2px 10px rgba(212, 175, 55, 0.5);
+}
+
+/* Secondary Pots (Linea, Pre-40) */
+.pots-secondary {
+    gap: 8px !important;
+    margin-top: 5px !important;
+}
+
+.pot-secondary {
+    padding: 6px !important;
+    background: rgba(0, 0, 0, 0.3) !important;
+}
+
+.pot-secondary-label {
+    font-size: 0.7rem !important;
+    font-weight: 600 !important;
+    color: #aaa !important;
+}
+
+.pot-secondary-amount {
+    font-size: 1.3rem !important;
+    font-weight: 700 !important;
+    color: #fff !important;
+}
+
+/* Move button up */
+.room-enter-btn {
+    margin-top: auto !important;
+    /* Push to bottom of available space */
+    margin-bottom: 5px !important;
+    padding: 10px 25px !important;
+    font-size: 0.9rem !important;
+    font-weight: 800 !important;
+}
+
+/* Add margin to rooms grid */
+.rooms-grid {
+    margin-top: 60px !important;
+    margin-bottom: 40px !important;
+    height: calc(100vh - 120px) !important;
+    overflow: visible !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 110vw !important;
+    /* 10% wider than screen */
+    margin-left: 0 !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    /* Perfect centering */
+    padding: 0 5px !important;
+    /* Minimized side padding */
+    box-sizing: border-box !important;
+}
+
+/* Force links (room containers) to expand */
+.room-link {
+    flex: 1 !important;
+    margin: 0 2px !important;
+    /* Minimal gap between rooms */
+    min-width: 0 !important;
+    /* Allow flex shrinking if needed */
+    width: auto !important;
+    max-width: none !important;
+}
+
+/* ROOM SEPARATION - GAP FOR LOGO */
+/* Re-introduce gap but balanced to show logo without covering too much */
+
+/* Reset transforms from previous attempts */
+.rooms-grid> :nth-child(1),
+.rooms-grid> :nth-child(2),
+.rooms-grid> :nth-child(3),
+.rooms-grid> :nth-child(4) {
+    transform: none !important;
+}
+
+/* Central Gap: Reduced to 100px total (50px + 50px) to widen rooms */
+.rooms-grid> :nth-child(2) {
+    margin-right: 50px !important;
+}
+
+.rooms-grid> :nth-child(3) {
+    margin-left: 50px !important;
+}
+
+/* Keep hover effects simple (visual pop) */
+.room-card:hover {
+    transform: translateY(-10px) !important;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5) !important;
+}
+
+
+/* Adjust lobby layout for compact view */
+.lobby-header {
+    padding: 5px 0 !important;
+    min-height: auto !important;
+}
+
+.lobby-footer {
+    padding: 0 !important;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    z-index: 1000 !important;
+    background: rgba(0, 0, 0, 0.95) !important;
+}
+
+/* Move ticker to very bottom */
+.winners-ticker {
+    margin: 0 !important;
+    padding: 5px 0 !important;
+}
+
+/* Create centered logo - FRONT AND SHINY */
+body::after {
+    content: '';
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 375px;
+    height: 375px;
+    background-image: url('/logo.png');
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    opacity: 1 !important;
+    z-index: 2000 !important;
+    pointer-events: none;
+    filter: drop-shadow(0 0 30px rgba(212, 175, 55, 0.8));
+    animation: shiny-pulse 2.5s ease-in-out infinite;
+}
+
+@keyframes shiny-pulse {
+
+    0%,
+    100% {
+        filter: drop-shadow(0 0 30px rgba(212, 175, 55, 0.8)) brightness(1.1);
+        transform: translate(-50%, -50%) scale(1);
+    }
+
+    50% {
+        filter: drop-shadow(0 0 60px rgba(212, 175, 55, 1)) brightness(1.5);
+        transform: translate(-50%, -50%) scale(1.05);
+    }
+}
+
+/* Ensure rooms are below ghost logo but still interactive */
+.rooms-grid {
+    position: relative;
+    z-index: 2;
+}
+
+/* Top bar and ticker above logo */
+.top-bar,
+.winners-ticker {
+    position: relative;
+    z-index: 10;
+}

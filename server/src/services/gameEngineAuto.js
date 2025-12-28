@@ -237,7 +237,8 @@ class GameEngineAuto {
 
     metricsService.increment('eventsEmitted');
 
-    // VALIDAR AUTOMÁTICAMENTE TODOS LOS CARTONES
+    /* 
+    // VALIDAR AUTOMÁTICAMENTE TODOS LOS CARTONES (Desabilitado para flujo Tradicional - Se usa claimPrize)
     try {
       await this.validateAllCards(gameSessionId, pauseOnWinner);
     } catch (valError) {
@@ -246,6 +247,7 @@ class GameEngineAuto {
 
     // EMITIR REORDENAMIENTO DE CARTONES (para usuarios con múltiples cartones)
     await this.emitCardsReordering(gameSessionId);
+    */
   }
 
   /**

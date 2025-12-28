@@ -11,6 +11,7 @@ const cardInventoryService = require('../services/cardInventoryService');
 const websocketService = require('../services/websocketService');
 const drawScheduleService = require('../services/drawScheduleService');
 const sessionHistoryService = require('../services/sessionHistoryService');
+const bingoValidator = require('../utils/bingoValidator');
 
 // COMPRAR CARTÓN - Agregar a session del usuario
 exports.buyCard = async (req, res) => {
@@ -778,161 +779,9 @@ exports.end_free_game = async (req, res) => {
 // ============================================
 exports.claimLine = async (req, res) => {
   try {
-    const { gameSessionId, cardId, lineType } = req.body;
-    const userId = req.user.id;
-
-    // Validar parámetros
-    if (!gameSessionId || !cardId || !lineType) {
-      return res.status(400).json({
-        success: false,
-        message: 'Parámetros requeridos: gameSessionId, cardId, lineType'
-      });
-    }
-
-    const validLineTypes = ['horizontal_1', 'horizontal_2', 'horizontal_3', 'vertical_1', 'vertical_2', 'vertical_3', 'vertical_4', 'vertical_5', 'diagonal_1', 'diagonal_2', 'four_corners'];
-    if (!validLineTypes.includes(lineType)) {
-      return res.status(400).json({
-        success: false,
-        message: `lineType inválido. Opciones: ${validLineTypes.join(', ')}`
-      });
-    }
-
-    // 1. Obtener sesión de juego
-    const [sessions] = await pool.query(
-      `SELECT * FROM game_sessions WHERE id = ?`,
-      [gameSessionId]
-    );
-
-    if (sessions.length === 0) {
-      return res.status(404).json({ success: false, message: 'Sesión no encontrada' });
-    }
-
-    const session = sessions[0];
-
-    // Solo permitir en salas monetizadas (Bronce, Plata, Oro)
-    const monetizedRooms = ['Bronce', 'Plata', 'Oro'];
-    const isMonetized = monetizedRooms.includes(session.room);
-
-    if (!isMonetized) {
-      return res.status(400).json({
-        success: false,
-        message: 'Solo se puede cantar línea en salas monetizadas (Bronce, Plata, Oro)'
-      });
-    }
-
-    // Verificar que la sesión esté activa
-    if (session.status !== 'active') {
-      return res.status(400).json({
-        success: false,
-        message: `Sesión no está activa (estado actual: ${session.status})`
-      });
-    }
-
-    // 2. Obtener cartón del usuario
-    const [cards] = await pool.query(
-      `SELECT * FROM bingo_cards 
-       WHERE id = ? AND user_id = ? AND session_id = ?`,
-      [cardId, userId, gameSessionId]
-    );
-
-    if (cards.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Cartón no encontrado o no pertenece al usuario'
-      });
-    }
-
-    const card = cards[0];
-
-    // Obtener números del cartón
-    let cardNumbers;
-    if (card.numbers) {
-      cardNumbers = typeof card.numbers === 'string' ? JSON.parse(card.numbers) : card.numbers;
-    } else if (card.grid_data) {
-      const gridData = typeof card.grid_data === 'string' ? JSON.parse(card.grid_data) : card.grid_data;
-      cardNumbers = convertGridDataToMatrix(gridData);
-    } else {
-      return res.status(500).json({ success: false, message: 'Cartón sin datos' });
-    }
-
-    // 3. Obtener números cantados en esta sesión
-    const [balls] = await pool.query(
-      `SELECT ball_number FROM game_session_balls 
-       WHERE game_session_id = ? 
-       ORDER BY draw_order`,
-      [gameSessionId]
-    );
-
-    const calledNumbers = balls.map(b => b.ball_number);
-
-    // 4. Validar línea
-    const validation = validateLine(cardNumbers, calledNumbers, lineType);
-
-    if (!validation.isValid) {
-      return res.status(400).json({
-        success: false,
-        message: validation.message || 'Línea inválida - verifica los números'
-      });
-    }
-
-    // 5. Verificar que no haya ganado ya esta línea
-    const [existing] = await pool.query(
-      `SELECT id FROM game_winners 
-       WHERE game_session_id = ? AND user_id = ? AND card_id = ? 
-         AND prize_type = 'linea' AND line_type = ?`,
-      [gameSessionId, userId, cardId, lineType]
-    );
-
-    if (existing.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Ya cantaste esta línea'
-      });
-    }
-
-    // 6. Registrar ganador
-    const prizeAmount = session.line_prize || 2500;
-
-    const [insertResult] = await pool.query(
-      `INSERT INTO game_winners 
-       (game_session_id, user_id, card_id, prize_type, prize_amount, line_type, winning_numbers, verified) 
-       VALUES (?, ?, ?, 'linea', ?, ?, ?, TRUE)`,
-      [gameSessionId, userId, cardId, prizeAmount, lineType, JSON.stringify(validation.winningNumbers)]
-    );
-
-    // 7. Emitir eventos Socket.IO
-    const io = req.app.get('io');
-    const winner = {
-      id: userId,
-      username: req.user.username
-    };
-
-    const { notifyLineWinner } = require('../socket/winnerEvents');
-    notifyLineWinner(io, session.room_id, winner, prizeAmount, lineType);
-
-    res.json({
-      success: true,
-      prizeAmount,
-      lineType,
-      winningNumbers: validation.winningNumbers,
-      message: `¡Línea ${lineType} válida! Ganaste $${prizeAmount.toLocaleString()}`
-    });
-
-  } catch (error) {
-    console.error('Error en claimLine:', error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-// ============================================
-// CANTAR BINGO (Salas Monetizadas)
-// ============================================
-exports.claimBingo = async (req, res) => {
-  try {
     const { gameSessionId, cardId } = req.body;
     const userId = req.user.id;
 
-    // Validar parámetros
     if (!gameSessionId || !cardId) {
       return res.status(400).json({
         success: false,
@@ -952,29 +801,23 @@ exports.claimBingo = async (req, res) => {
 
     const session = sessions[0];
 
-    // Solo permitir en salas monetizadas (Bronce, Plata, Oro)
-    const monetizedRooms = ['Bronce', 'Plata', 'Oro'];
-    const isMonetized = monetizedRooms.includes(session.room);
+    // Verificar si ya hubo un ganador de línea para esta sesión
+    const [prevWinner] = await pool.query(
+      `SELECT id FROM game_winners WHERE game_session_id = ? AND prize_type = 'linea'`,
+      [gameSessionId]
+    );
 
-    if (!isMonetized) {
+    if (prevWinner.length > 0) {
       return res.status(400).json({
         success: false,
-        message: 'Solo se puede cantar BINGO en salas monetizadas'
+        message: 'La línea ya ha sido ganada en este sorteo'
       });
     }
 
-    // Verificar que la sesión esté activa
-    if (session.status !== 'active') {
-      return res.status(400).json({
-        success: false,
-        message: `Sesión no está activa (estado actual: ${session.status})`
-      });
-    }
-
-    // 2. Obtener cartón del usuario
+    // 2. Obtener cartón validado del usuario
     const [cards] = await pool.query(
-      `SELECT * FROM bingo_cards 
-       WHERE id = ? AND user_id = ? AND session_id = ?`,
+      `SELECT * FROM validated_cards 
+       WHERE id = ? AND player_id = ? AND game_session_id = ?`,
       [cardId, userId, gameSessionId]
     );
 
@@ -986,17 +829,122 @@ exports.claimBingo = async (req, res) => {
     }
 
     const card = cards[0];
+    const cardNumbers = typeof card.grid_numbers === 'string' ? JSON.parse(card.grid_numbers) : card.grid_numbers;
 
-    // Obtener números del cartón
-    let cardNumbers;
-    if (card.numbers) {
-      cardNumbers = typeof card.numbers === 'string' ? JSON.parse(card.numbers) : card.numbers;
-    } else if (card.grid_data) {
-      const gridData = typeof card.grid_data === 'string' ? JSON.parse(card.grid_data) : card.grid_data;
-      cardNumbers = convertGridDataToMatrix(gridData);
-    } else {
-      return res.status(500).json({ success: false, message: 'Cartón sin datos' });
+    // 3. Obtener números cantados en esta sesión
+    const [balls] = await pool.query(
+      `SELECT ball_number FROM game_session_balls 
+       WHERE game_session_id = ? 
+       ORDER BY draw_order`,
+      [gameSessionId]
+    );
+
+    const calledNumbers = balls.map(b => b.ball_number);
+
+    // 4. Validar línea con el utilitario centralizado
+    const validation = bingoValidator.checkHorizontalLines(cardNumbers, calledNumbers);
+
+    if (!validation.hasLine) {
+      return res.status(400).json({
+        success: false,
+        message: 'Línea inválida - Verifica tus números marcados'
+      });
     }
+
+    // 5. Registrar ganador
+    const prizeAmount = parseFloat(session.jackpot_linea || 0);
+
+    await pool.query(
+      `INSERT INTO game_winners 
+       (game_session_id, user_id, card_id, prize_type, prize_amount, line_type, winning_numbers, verified) 
+       VALUES (?, ?, ?, 'linea', ?, ?, ?, TRUE)`,
+      [gameSessionId, userId, cardId, prizeAmount, `horizontal_${validation.row + 1}`, JSON.stringify(validation.winningNumbers)]
+    );
+
+    // Resetear pozo de línea en la sesión
+    await pool.query('UPDATE game_sessions SET jackpot_linea = 0 WHERE id = ?', [gameSessionId]);
+
+    // 6. Emitir eventos Socket.IO
+    const io = req.app.get('io');
+    const { notifyLineWinner } = require('../socket/winnerEvents');
+
+    notifyLineWinner(io, `session_${gameSessionId}`, {
+      id: userId,
+      username: req.user.username
+    }, prizeAmount, `Fila ${validation.row + 1}`, {
+      numbers: cardNumbers,
+      winningNumbers: validation.winningNumbers
+    });
+
+    res.json({
+      success: true,
+      prizeAmount,
+      winningNumbers: validation.winningNumbers,
+      message: `¡FELICIDADES! Ganaste la LÍNEA de $${prizeAmount.toLocaleString()}`
+    });
+
+  } catch (error) {
+    console.error('Error en claimLine:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ============================================
+// CANTAR BINGO (Salas Monetizadas)
+// ============================================
+exports.claimBingo = async (req, res) => {
+  try {
+    const { gameSessionId, cardId } = req.body;
+    const userId = req.user.id;
+
+    if (!gameSessionId || !cardId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Parámetros requeridos: gameSessionId, cardId'
+      });
+    }
+
+    // 1. Obtener sesión de juego
+    const [sessions] = await pool.query(
+      `SELECT * FROM game_sessions WHERE id = ?`,
+      [gameSessionId]
+    );
+
+    if (sessions.length === 0) {
+      return res.status(404).json({ success: false, message: 'Sesión no encontrada' });
+    }
+
+    const session = sessions[0];
+
+    // Verificar si ya hubo un ganador de BINGO para esta sesión
+    const [prevWinner] = await pool.query(
+      `SELECT id FROM game_winners WHERE game_session_id = ? AND prize_type = 'bingo'`,
+      [gameSessionId]
+    );
+
+    if (prevWinner.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'El BINGO ya ha sido ganado en este sorteo'
+      });
+    }
+
+    // 2. Obtener cartón validado del usuario
+    const [cards] = await pool.query(
+      `SELECT * FROM validated_cards 
+       WHERE id = ? AND player_id = ? AND game_session_id = ?`,
+      [cardId, userId, gameSessionId]
+    );
+
+    if (cards.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Cartón no encontrado o no pertenece al usuario'
+      });
+    }
+
+    const card = cards[0];
+    const cardNumbers = typeof card.grid_numbers === 'string' ? JSON.parse(card.grid_numbers) : card.grid_numbers;
 
     // 3. Obtener números cantados
     const [balls] = await pool.query(
@@ -1008,80 +956,74 @@ exports.claimBingo = async (req, res) => {
 
     const calledNumbers = balls.map(b => b.ball_number);
 
-    // 4. Validar BINGO completo (24 números, excluyendo el centro FREE)
-    const validation = validateBingo(cardNumbers, calledNumbers);
+    // 4. Validar BINGO con el utilitario centralizado
+    const validation = bingoValidator.checkBingo(cardNumbers, calledNumbers);
 
     if (!validation.isValid) {
       return res.status(400).json({
         success: false,
-        message: validation.message || 'BINGO inválido - faltan números'
+        message: 'BINGO inválido - Faltan números en tu cartón'
       });
     }
 
-    // 5. Verificar que no haya ganado ya BINGO
-    const [existing] = await pool.query(
-      `SELECT id FROM game_winners 
-       WHERE game_session_id = ? AND user_id = ? AND card_id = ? AND prize_type = 'bingo'`,
-      [gameSessionId, userId, cardId]
-    );
+    // 5. Registrar ganador de BINGO
+    let bingoPrize = parseFloat(session.jackpot_bingo || 0);
+    let pre40Prize = 0;
 
-    if (existing.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Ya cantaste BINGO con este cartón'
-      });
+    // Si ganó antes de bolilla 40, sumar pozo Pre-40
+    if (calledNumbers.length <= 40 && session.jackpot_pre40 > 0) {
+      pre40Prize = parseFloat(session.jackpot_pre40);
+      console.log(`🎰 [BINGO PRE-40] Usuario ${userId} ganó Bingo + Pre-40 ($${pre40Prize})`);
     }
 
-    // 6. Registrar ganador de BINGO
-    const prizeAmount = session.bingo_prize || 25000;
+    const totalPrize = bingoPrize + pre40Prize;
 
     await pool.query(
       `INSERT INTO game_winners 
        (game_session_id, user_id, card_id, prize_type, prize_amount, winning_numbers, verified) 
        VALUES (?, ?, ?, 'bingo', ?, ?, TRUE)`,
-      [gameSessionId, userId, cardId, prizeAmount, JSON.stringify(validation.winningNumbers)]
+      [gameSessionId, userId, cardId, totalPrize, JSON.stringify(validation.winningNumbers)]
     );
 
-    // 7. Finalizar sesión (primer BINGO termina el juego)
+    // 6. Finalizar sesión inmediatamente
     await pool.query(
       `UPDATE game_sessions SET status = 'completed', updated_at = NOW() WHERE id = ?`,
       [gameSessionId]
     );
 
-    // LIMPIEZA: Eliminar cartones no asignados a ninguna sesión de esta sala
-    const [cleanupResult] = await pool.query(`
-      DELETE FROM bingo_cards_pool 
-      WHERE room = ? 
-      AND status = 'selected' 
-      AND game_session_id IS NULL
-    `, [session.room]);
+    // Detener el motor de sorteo si está activo
+    const gameEngineAuto = req.app.get('gameEngineAuto');
+    if (gameEngineAuto) {
+      gameEngineAuto.endGame(gameSessionId, 'completed');
+    }
 
-    console.log(`[GameController] 🧹 Limpieza BINGO sala ${session.room}: ${cleanupResult.affectedRows} cartones huérfanos eliminados`);
-
-    // 8. Emitir eventos Socket.IO
+    // 7. Emitir eventos Socket.IO
     const io = req.app.get('io');
-    const winner = {
-      id: userId,
-      username: req.user.username
-    };
-
     const { notifyBingoWinner, showPaymentForms } = require('../socket/winnerEvents');
 
-    // Notificar BINGO ganador
-    notifyBingoWinner(io, session.room_id, winner, prizeAmount, gameSessionId);
+    notifyBingoWinner(io, `session_${gameSessionId}`, {
+      id: userId,
+      username: req.user.username
+    }, totalPrize, gameSessionId);
 
-    // Obtener TODOS los ganadores de esta sesión (líneas + bingo)
+    // Mostrar formularios de pago después de 5 segundos
     setTimeout(async () => {
       const winners = await getGameWinners(gameSessionId);
       showPaymentForms(io, gameSessionId, winners);
-    }, 5000); // Esperar 5 segundos antes de mostrar formularios
+    }, 5000);
+
+    // 8. AUTOMATIC ROTATION: Crear la siguiente sesión
+    const sessionService = require('../services/sessionService');
+    sessionService.getOrCreateActiveSession(session.room).catch(err => {
+      console.error('[GameController] Error rotando sesión tras BINGO:', err);
+    });
 
     res.json({
       success: true,
-      prizeAmount,
+      prizeAmount: totalPrize,
       winningNumbers: validation.winningNumbers,
       gameEnded: true,
-      message: `¡BINGO! Ganaste $${prizeAmount.toLocaleString()}`
+      message: `¡BINGO! Ganaste $${totalPrize.toLocaleString()}`
     });
 
   } catch (error) {

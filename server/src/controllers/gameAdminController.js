@@ -2,6 +2,7 @@
  * Controlador para administración de juegos automáticos
  */
 const GameEngineAuto = require('../services/gameEngineAuto');
+const sessionService = require('../services/sessionService');
 
 // Instancia global del motor (se inicializa en index.js)
 let gameEngine = null;
@@ -19,12 +20,12 @@ exports.initGameEngine = (io) => {
  */
 exports.startAutoGame = async (req, res) => {
   try {
-    const { gameSessionId, drawInterval, pauseOnWinner } = req.body;
+    let { gameSessionId, drawInterval, pauseOnWinner, room } = req.body;
 
-    if (!gameSessionId) {
+    if (!gameSessionId && !room) {
       return res.status(400).json({
         success: false,
-        message: 'gameSessionId requerido'
+        message: 'gameSessionId o room requerido'
       });
     }
 
@@ -33,6 +34,18 @@ exports.startAutoGame = async (req, res) => {
         success: false,
         message: 'Motor de juego no inicializado'
       });
+    }
+
+    // [MOD] Si gameSessionId es nulo o string no-numérico (como nombre de sala), 
+    // intentar crear/obtener sesión real
+    if (!gameSessionId || isNaN(gameSessionId)) {
+      const roomToUse = room || gameSessionId;
+      console.log(`[GameAdmin] 🔄 Intentando iniciar sesión virtual para sala: ${roomToUse}`);
+      const session = await sessionService.getOrCreateActiveSession(roomToUse);
+      if (!session) {
+        throw new Error(`No se pudo crear sesión para la sala ${roomToUse}`);
+      }
+      gameSessionId = session.id;
     }
 
     console.log(`[GameAdmin] 🎮 Iniciando sorteo para sesión ${gameSessionId}`);

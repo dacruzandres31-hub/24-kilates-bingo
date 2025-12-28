@@ -570,7 +570,7 @@ const CardSelectionLobby = ({
       <div className="cards-grid">
         {/* Cartones normales disponibles para seleccionar */}
         {availableCards.map((card) => {
-          console.log('[CardSelection] Rendering card:', card.id, 'serial:', card.serial, 'numbers:', card.numbers);
+          console.log('[CardSelection] Rendering card:', card.id, 'serial:', card.card_serial || card.serial, 'numbers:', card.numbers);
           const selected = isCardSelected(card);
 
           // Parsear números si vienen como string JSON
@@ -589,7 +589,7 @@ const CardSelectionLobby = ({
             <BingoCardPreview
               key={card.id}
               card={{
-                card_serial: card.serial,
+                card_serial: card.card_serial || card.serial,
                 numbers: parsedNumbers
               }}
               room={roomTheme}

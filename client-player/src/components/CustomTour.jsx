@@ -4,64 +4,65 @@ import { FaChevronRight, FaChevronLeft, FaTimes } from 'react-icons/fa';
 
 const tourSteps = [
     {
-        target: '#lobby-header-logo',
-        title: '¡Bienvenido a Casino 24 Kilates!',
+        target: '#tour-start-logo',
+        title: '¡Bienvenido a Bingo 24 Kilates!',
         content: 'La experiencia de Bingo Virtual más premium. Déjanos mostrarte el lugar.',
         position: 'bottom'
     },
     {
         target: '#user-main-bar',
         title: 'Tus Recursos',
-        content: 'Aquí verás tu nombre, tu saldo disponible en tiempo real y tus cartones (Bronce, Plata, Oro).',
-        position: 'bottom'
-    },
-    {
-        target: '#profile-section',
-        title: 'Tu Perfil',
-        content: 'Configura tu cuenta, cambia tu contraseña y gestiona tus sesiones.',
+        content: 'Aquí verás tu balance disponible y tus monedas (Bronce, Plata, Oro).',
         position: 'bottom'
     },
     {
         target: '#btn-history',
-        title: 'Tu Historial',
-        content: 'Consulta tus últimas partidas, jugadas y transacciones importantes.',
+        title: 'Mi Historial',
+        content: 'Consulta tus últimas jugadas, transacciones y detalle de partidas.',
         position: 'bottom'
     },
     {
         target: '#btn-support',
         title: 'Soporte Técnico',
-        content: '¿Problemas? Contacta con nuestro equipo de soporte 24/7.',
+        content: '¿Necesitas ayuda? Contacta con nuestro equipo de soporte disponible 24/7.',
         position: 'bottom'
     },
     {
         target: '#withdraw-btn',
-        title: 'Retiros',
-        content: 'Solicita el retiro de tus ganancias de forma rápida y segura.',
+        title: 'Retirar Premios',
+        content: 'Solicita el retiro de tus ganancias acumuladas de forma rápida y segura.',
         position: 'bottom'
     },
     {
         target: '#battlepass-btn',
         title: 'BINGO PASS',
-        content: 'Acumula puntos jugando y desbloquea recompensas de nivel en cada temporada.',
+        content: 'Completa desafíos semanales para subir de nivel y ganar recompensas exclusivas.',
         position: 'bottom'
     },
     {
         target: '#wheel-btn',
-        title: 'Fortuna',
-        content: '¡Gira la rueda gratis cada 4 horas y gana premios increíbles! Mantente atento al brillo dorado.',
+        title: 'Rueda de la Fortuna',
+        content: '¡Gira GRATIS cada 60 minutos! Atento al brillo dorado para reclamar tus premios.',
+        position: 'bottom'
+    },
+    {
+        target: '#profile-section',
+        title: 'Tu Perfil',
+        content: 'Gestiona tu cuenta, cambia tu contraseña y configura tus preferencias.',
         position: 'bottom'
     },
     {
         target: '#rooms-grid',
         title: 'Salas de Juego',
-        content: 'Selecciona una sala para jugar. ¡Cada una tiene diferentes premios y costos!',
+        content: 'Selecciona una sala (Starter, Bronce, Plata, Oro). ¡Cada una con distintos premios!',
         position: 'top',
-        scrollBlock: 'start' // Custom property
+        scrollBlock: 'center',
+        customHeight: 525
     },
     {
-        target: '#leaderboard-widget',
-        title: 'Ranking Global',
-        content: 'Compite con los mejores jugadores y demuestra que eres el número 1.',
+        target: '.winners-ticker',
+        title: 'Noticias 24K',
+        content: 'Mantente informado con actualizaciones en tiempo real y el ranking de ganadores.',
         position: 'top'
     }
 ];
@@ -89,12 +90,28 @@ const CustomTour = ({ runTour, onTourEnd }) => {
 
             if (element) {
                 const rect = element.getBoundingClientRect();
-                // Use Viewport Coordinates (no scrollX/Y addition) because overlay is fixed
+                let width = rect.width;
+                let height = rect.height;
+                let top = rect.top;
+                let left = rect.left;
+
+                // Support for custom spotlight dimensions (centered)
+                if (step.customWidth) {
+                    const diffW = width - step.customWidth;
+                    width = step.customWidth;
+                    left += diffW / 2;
+                }
+                if (step.customHeight) {
+                    const diffH = height - step.customHeight;
+                    height = step.customHeight;
+                    top += diffH / 2;
+                }
+
                 setCoords({
-                    top: rect.top,
-                    left: rect.left,
-                    width: rect.width,
-                    height: rect.height,
+                    top,
+                    left,
+                    width,
+                    height,
                     position: step.position
                 });
             }
