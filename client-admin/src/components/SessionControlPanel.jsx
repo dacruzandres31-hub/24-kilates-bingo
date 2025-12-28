@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Plus, Edit, Trash2, Calendar, Clock, DollarSign, Save, X } from 'lucide-react';
+import { Plus, Edit, Trash2, Calendar, Clock, DollarSign, Save, X, Play, StopCircle } from 'lucide-react';
 
 export default function SessionControlPanel() {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingSession, setEditingSession] = useState(null);
+  const [activeGames, setActiveGames] = useState([]);
+  const [userData, setUserData] = useState(null);
   const [formData, setFormData] = useState({
     room: 'bronce',
     play_date: '',
@@ -20,6 +22,11 @@ export default function SessionControlPanel() {
 
   useEffect(() => {
     fetchSessions();
+    fetchActiveGames();
+    fetchUserData();
+    // Poll active games every 10 seconds
+    const interval = setInterval(fetchActiveGames, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   const getToken = () => localStorage.getItem('adminToken');
@@ -30,11 +37,105 @@ export default function SessionControlPanel() {
       const response = await axios.get('/api/admin/sessions/active', {
         headers: { Authorization: `Bearer ${getToken()}` }
       });
-      setSessions([...response.data.active, ...response.data.upcoming]);
+
+      const allSessions = [];
+      if (response.data.rooms) {
+        response.data.rooms.forEach(roomData => {
+          if (roomData.currentSession) {
+            allSessions.push(roomData.currentSession);
+          }
+          if (roomData.upcomingSessions) {
+            // Filter out duplicates (if current session is also in upcoming)
+            // Use date matching for virtual sessions vs real ones
+            const upcomingNotCurrent = roomData.upcomingSessions.filter(u => {
+              if (!roomData.currentSession) return true;
+
+              // If it's a real session vs virtual, they might have the same start_time
+              const virtualTime = u.start_time?.slice(0, 5);
+              const currentTime = roomData.currentSession.start_time?.includes('T') || roomData.currentSession.start_time?.includes(' ')
+                ? new Date(roomData.currentSession.start_time).toLocaleTimeString('es-ES', { hour12: false }).slice(0, 5)
+                : roomData.currentSession.start_time?.slice(0, 5);
+
+              return virtualTime !== currentTime;
+            });
+            allSessions.push(...upcomingNotCurrent);
+          }
+        });
+      }
+
+      setSessions(allSessions);
     } catch (error) {
       console.error('Error fetching sessions:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchActiveGames = async () => {
+    try {
+      const response = await axios.get('/api/game-admin/status', {
+        headers: { Authorization: `Bearer ${getToken()}` }
+      });
+      setActiveGames(response.data.activeGames || []);
+    } catch (error) {
+      console.error('Error fetching active games:', error);
+    }
+  };
+
+  const fetchUserData = async () => {
+    try {
+      const response = await axios.get('/api/admin/profile', {
+        headers: { Authorization: `Bearer ${getToken()}` }
+      });
+      setUserData(response.data);
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    }
+  };
+
+  const handleStartGame = async (sessionId) => {
+    if (!confirm('¿Iniciar el sorteo automático para esta sesión?')) {
+      return;
+    }
+
+    try {
+      await axios.post('/api/game-admin/start', {
+        gameSessionId: sessionId,
+        drawInterval: 5000,
+        pauseOnWinner: 2000
+      }, {
+        headers: { Authorization: `Bearer ${getToken()}` }
+      });
+
+      alert('Sorteo iniciado exitosamente');
+      fetchActiveGames();
+    } catch (error) {
+      alert(error.response?.data?.message || 'Error al iniciar sorteo');
+    }
+  };
+
+  const handleStopGame = async (sessionId, force = false) => {
+    const message = force
+      ? '¿FORZAR la finalización de esta sesión? Esto la marcará como completada en la base de datos.'
+      : '¿Detener el sorteo automático?';
+
+    if (!confirm(message)) {
+      return;
+    }
+
+    try {
+      await axios.post('/api/game-admin/stop', {
+        gameSessionId: sessionId,
+        force
+      }, {
+        headers: { Authorization: `Bearer ${getToken()}` }
+      });
+
+      alert(force ? 'Sesión finalizada forzosamente' : 'Sorteo detenido');
+      fetchActiveGames();
+      fetchSessions();
+    } catch (error) {
+      alert(error.response?.data?.message || 'Error al detener sorteo');
     }
   };
 
@@ -44,7 +145,7 @@ export default function SessionControlPanel() {
       await axios.post('/api/superadmin/sessions/create', formData, {
         headers: { Authorization: `Bearer ${getToken()}` }
       });
-      
+
       alert('Sesión creada exitosamente');
       setShowCreateModal(false);
       resetForm();
@@ -65,7 +166,7 @@ export default function SessionControlPanel() {
       }, {
         headers: { Authorization: `Bearer ${getToken()}` }
       });
-      
+
       alert('Sesión actualizada exitosamente');
       setEditingSession(null);
       resetForm();
@@ -84,7 +185,7 @@ export default function SessionControlPanel() {
       await axios.delete(`/api/superadmin/sessions/${sessionId}`, {
         headers: { Authorization: `Bearer ${getToken()}` }
       });
-      
+
       alert('Sesión eliminada exitosamente');
       fetchSessions();
     } catch (error) {
@@ -125,7 +226,7 @@ export default function SessionControlPanel() {
   };
 
   const getRoomIcon = (room) => {
-    const icons = { bronce: '🥉', plata: '🥈', oro: '🥇', free_starter: '🎁' };
+    const icons = { bronce: '🥉', plata: '🥈', oro: '🥇', starter: '🎁', free_starter: '🎁' };
     return icons[room] || '🎲';
   };
 
@@ -143,7 +244,7 @@ export default function SessionControlPanel() {
             <option value="bronce">🥉 Bronce</option>
             <option value="plata">🥈 Plata</option>
             <option value="oro">🥇 Oro</option>
-            <option value="free_starter">🎁 Free Starter</option>
+            <option value="starter">🎁 Free Starter</option>
           </select>
         </div>
 
@@ -319,7 +420,7 @@ export default function SessionControlPanel() {
                     <p className="text-xs text-gray-400">ID: {session.id}</p>
                   </div>
                 </div>
-                
+
                 {!['active', 'playing', 'completed'].includes(session.status) && (
                   <div className="flex gap-2">
                     <button
@@ -347,22 +448,90 @@ export default function SessionControlPanel() {
                 </div>
                 <div className="flex items-center gap-2 text-gray-300">
                   <Clock className="w-4 h-4" />
-                  <span>{session.start_time?.slice(0, 5)}</span>
+                  <span>
+                    {session.start_time?.includes('T') || session.start_time?.includes(' ')
+                      ? new Date(session.start_time).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', hour12: false })
+                      : session.start_time?.slice(0, 5)}
+                  </span>
                 </div>
                 <div className="flex items-center gap-2 text-gray-300">
                   <DollarSign className="w-4 h-4" />
                   <span>{formatMoney(session.card_price)}</span>
                 </div>
-                
+
                 {session.is_preventa === 1 && (
                   <span className="inline-block bg-purple-500 text-white px-2 py-1 rounded text-xs">
                     Pre-venta Activa
                   </span>
                 )}
-                
+
                 <div className="pt-2 text-xs text-gray-400">
                   Cartones vendidos: {session.total_cards_sold || 0}
                 </div>
+
+                {/* Game Control Buttons - For SuperAdmin or Andy */}
+                {(() => {
+                  const isGameInMem = activeGames.some(g => g.sessionId === session.id);
+                  const activeGame = activeGames.find(g => g.sessionId === session.id);
+                  const isStuck = session.status === 'playing' && !isGameInMem;
+
+                  // Debug helper
+                  if (!isGameInMem && !isStuck && !['pending', 'active'].includes(session.status)) {
+                    // console.log(`Session ${session.id} (${session.room}) status: ${session.status}`);
+                  }
+
+                  if (isGameInMem) {
+                    return (
+                      <div className="pt-3 space-y-2">
+                        <div className="flex items-center gap-2 text-green-400 text-xs font-semibold">
+                          <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                          SORTEO EN VIVO - {activeGame?.ballsDrawn || 0} bolas
+                        </div>
+                        <button
+                          onClick={() => handleStopGame(session.id)}
+                          className="w-full px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center justify-center gap-2 text-sm font-semibold"
+                        >
+                          <StopCircle className="w-4 h-4" />
+                          Detener Sorteo
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  if (isStuck) {
+                    return (
+                      <div className="pt-3 space-y-2">
+                        <div className="flex items-center gap-2 text-yellow-400 text-xs font-semibold">
+                          <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
+                          SESIÓN TRABADA (STUCK)
+                        </div>
+                        <button
+                          onClick={() => handleStopGame(session.id, true)}
+                          className="w-full px-3 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors flex items-center justify-center gap-2 text-sm font-semibold"
+                        >
+                          <StopCircle className="w-4 h-4" />
+                          Forzar Finalización
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  if (session.status === 'pending' || session.status === 'active') {
+                    return (
+                      <div className="pt-3">
+                        <button
+                          onClick={() => handleStartGame(session.id)}
+                          className="w-full px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center justify-center gap-2 text-sm font-semibold"
+                        >
+                          <Play className="w-4 h-4" />
+                          Iniciar Sorteo
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  return null;
+                })()}
               </div>
             </div>
           ))}

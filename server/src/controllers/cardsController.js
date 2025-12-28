@@ -1,5 +1,6 @@
 const pool = require('../db');
 const websocketService = require('../services/websocketService');
+const cardPoolService = require('../services/cardPoolService');
 
 /**
  * Mapeo de nombres de salas (inglés → español para BD)
@@ -438,7 +439,7 @@ exports.selectCards = async (req, res) => {
     console.log(`[Cards] 🔍 Verificando disponibilidad de cartones para userId=${userId}, room=${roomDB}, cardIds=`, cardIds);
 
     const [cardsCheck] = await connection.query(
-      `SELECT id, card_serial, status, selected_by FROM bingo_cards_pool
+      `SELECT id, serial as card_serial, status, selected_by FROM bingo_cards_pool
        WHERE id IN (?) AND room = ? 
        AND (status = 'available' 
             OR (status = 'reserved' AND selected_by = ?)
@@ -450,7 +451,7 @@ exports.selectCards = async (req, res) => {
     if (cardsCheck.length !== cardIds.length) {
       // Mostrar cuáles están ocupados
       const [allCards] = await connection.query(
-        `SELECT id, card_serial, status, selected_by FROM bingo_cards_pool WHERE id IN (?) AND room = ?`,
+        `SELECT id, serial as card_serial, status, selected_by FROM bingo_cards_pool WHERE id IN (?) AND room = ?`,
         [cardIds, roomDB]
       );
 
@@ -541,10 +542,10 @@ exports.selectCards = async (req, res) => {
         const lineaAmount = totalRevenue * 0.15;
         const jackpotAmount = totalRevenue * 0.05;
 
-        // Encontrar sesión pendiente (sin filtro de fecha para permitir acumulación en sesiones existentes)
+        // Encontrar sesión pendiente o activa (para que los pozos se actualicen incluso si ya empezó)
         const [sessionResult] = await connection.query(
           `SELECT id FROM game_sessions 
-           WHERE room = ? AND status = 'pending' 
+           WHERE room = ? AND status IN ('pending', 'active') 
            ORDER BY created_at DESC LIMIT 1`,
           [roomDB]
         );
@@ -564,14 +565,77 @@ exports.selectCards = async (req, res) => {
             [jackpotAmount, roomDB]
           );
 
+          // ACTUALIZAR CONTADORES DE CARTONES EN LA SESIÓN (Incluyendo total_cards_validated)
+          await connection.query(
+            `UPDATE game_sessions 
+             SET total_paid_cards = total_paid_cards + ?, 
+                 total_gift_cards = total_gift_cards + ?,
+                 total_cards_validated = total_cards_validated + ?,
+                 updated_at = NOW()
+             WHERE id = ?`,
+            [purchasedCount, giftCount, cardIds.length, sessionId]
+          );
+
           console.log(`[Cards] ✅ Pozos actualizados para sala ${roomDB}`);
         }
       }
     }
 
     // Finalizar transacción
-    const [selectedCards] = await connection.query(`SELECT id, card_serial, numbers, selected_at FROM bingo_cards_pool WHERE id IN (?)`, [cardIds]);
+    const [selectedCards] = await connection.query(`SELECT id, serial as card_serial, numbers, selected_at FROM bingo_cards_pool WHERE id IN (?)`, [cardIds]);
     await connection.commit();
+
+    // ============================================
+    // SINCRONIZACIÓN ESPECIAL SALA STARTER
+    // ============================================
+    if (roomDB === 'starter') {
+      try {
+        console.log(`[Cards] 🔄 Sincronizando selección Starter en cardPoolService para usuario ${userId}`);
+
+        // 1. Buscar sesión activa de starter
+        const [activeSession] = await pool.query(
+          "SELECT id FROM game_sessions WHERE room = 'starter' AND status IN ('pending', 'active') ORDER BY created_at DESC LIMIT 1"
+        );
+
+        if (activeSession.length > 0) {
+          const sessionId = activeSession[0].id;
+
+          // 2. Formatear cartones para cardPoolService
+          const cardsForPool = selectedCards.map(c => ({
+            id: c.id,
+            serial: c.card_serial,
+            numbers: typeof c.numbers === 'string' ? JSON.parse(c.numbers) : c.numbers
+          }));
+
+          // 3. Registrar en card_pool para que StarterRoom pueda verlos después de un refresh
+          // Primero borramos si tenía algo previo en esta sesión para evitar duplicados
+          await pool.query("DELETE FROM card_pool WHERE session_id = ? AND reserved_by = ?", [sessionId, userId]);
+
+          const values = cardsForPool.map(c => [
+            c.id,
+            sessionId,
+            c.serial,
+            JSON.stringify(c.numbers),
+            'reserved',
+            userId
+          ]);
+
+          if (values.length > 0) {
+            await pool.query(
+              "INSERT INTO card_pool (id, session_id, serial, numbers, status, reserved_by, reserved_at) VALUES ?",
+              [values]
+            );
+
+            // 4. Forzar recarga del pool de memoria para esta sesión
+            await cardPoolService.loadPoolFromDB(sessionId);
+            console.log(`[Cards] ✅ Sincronización Starter exitosa para sesión ${sessionId}`);
+          }
+        }
+      } catch (syncError) {
+        console.error('[Cards] ❌ Error en sincronización Starter:', syncError);
+        // No bloqueamos la respuesta al usuario ya que bingo_cards_pool ya se guardó
+      }
+    }
 
     // Emitir actualización de pozos
     if (roomDB !== 'starter') {
@@ -718,31 +782,71 @@ exports.selectCards = async (req, res) => {
 exports.getMySelectedCards = async (req, res) => {
   try {
     const { room } = req.params;
+    const { sessionId: querySessionId } = req.query;
     const userId = req.user.id;
 
     // Mapear nombre de sala
     const roomDB = ROOM_MAP[room] || room;
 
-    // Incluir is_gift en la consulta
-    const [cards] = await pool.query(
-      `SELECT id, card_serial, numbers, selected_at, game_session_id, is_gift
-       FROM bingo_cards_pool
-       WHERE selected_by = ? AND room = ? AND status IN ('selected', 'used')
-       ORDER BY selected_at DESC`,
-      [userId, roomDB]
-    );
+    // 1. Intentar obtener cartones VALIDADOS de la sesión ACTIVA o una específica
+    let sessionId = querySessionId;
+
+    if (!sessionId) {
+      const [activeSession] = await pool.query(
+        'SELECT id FROM game_sessions WHERE room = ? AND status IN ("active", "playing", "pending") ORDER BY id DESC LIMIT 1',
+        [roomDB]
+      );
+      if (activeSession.length > 0) {
+        sessionId = activeSession[0].id;
+      }
+    }
+
+    let cards = [];
+    let source = '';
+
+    if (sessionId) {
+      // Obtener cartones de la tabla de juego (validated_cards)
+      // Nota: validated_cards usa serial_number y grid_numbers
+      const [validated] = await pool.query(
+        `SELECT id, serial_number as card_serial, grid_numbers as numbers, created_at as selected_at, game_session_id, is_gift
+         FROM validated_cards
+         WHERE player_id = ? AND game_session_id = ?`,
+        [userId, sessionId]
+      );
+
+      if (validated.length > 0) {
+        cards = validated;
+        source = 'validated';
+      }
+    }
+
+    // 2. Si no hay validados, buscar en el pool (fallback para Lobby o Pending)
+    if (cards.length === 0) {
+      // Buscar cartones 'selected' recientes (últimas 24h)
+      // Nota: bingo_cards_pool usa serial y numbers
+      const [poolCards] = await pool.query(
+        `SELECT id, serial as card_serial, numbers, selected_at, game_session_id, is_gift
+         FROM bingo_cards_pool
+         WHERE selected_by = ? AND room = ? AND status = 'selected'
+         AND selected_at > NOW() - INTERVAL 24 HOUR
+         ORDER BY selected_at DESC`,
+        [userId, roomDB]
+      );
+      cards = poolCards;
+      source = 'pool';
+    }
 
     const formattedCards = cards.map(card => ({
       id: card.id,
       serial: card.card_serial,
-      numbers: safeParseNumbers(card.numbers),
+      numbers: typeof card.numbers === 'string' ? safeParseNumbers(card.numbers) : card.numbers, // Handle JSON vs String
       selectedAt: card.selected_at,
       sessionId: card.game_session_id,
-      status: card.game_session_id ? 'used' : 'selected',
-      isGift: !!card.is_gift // Mapear a booleano
+      status: source === 'validated' ? 'selected' : 'selected', // Always return selected so frontend renders them
+      isGift: !!card.is_gift
     }));
 
-    res.json({ cards: formattedCards });
+    res.json({ cards: formattedCards, source });
   } catch (error) {
     console.error('[Cards] ❌ Error obteniendo cartones seleccionados:', error);
     res.status(500).json({ error: 'Error al obtener cartones seleccionados' });

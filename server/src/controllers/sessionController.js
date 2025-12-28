@@ -94,7 +94,7 @@ function getRoomPrizeConfig(room) {
 async function getOrCreateStarterSession() {
   const now = new Date();
 
-  // Buscar sesión activa existente
+  // 1. Buscar sesión activa/pendiente existente
   const [existingSession] = await pool.query(`
     SELECT 
       id, room, start_time, status,
@@ -103,7 +103,7 @@ async function getOrCreateStarterSession() {
     WHERE room = 'starter' 
     AND status IN ('active', 'pending')
     AND start_time > DATE_SUB(NOW(), INTERVAL 1 HOUR)
-    ORDER BY start_time DESC
+    ORDER BY start_time ASC
     LIMIT 1
   `);
 
@@ -111,21 +111,28 @@ async function getOrCreateStarterSession() {
     return existingSession[0];
   }
 
-  // Crear nueva sesión para la próxima hora
-  const nextHour = new Date(now);
-  nextHour.setMinutes(0, 0, 0);
-  nextHour.setHours(now.getHours() + 1);
+  // 2. Determinar el próximo horario según la configuración (schedule_settings)
+  const upcoming = await calculateUpcomingSessions('starter', 1);
 
+  if (upcoming.length === 0) {
+    // Si no hay nada programado, fallback de seguridad (opcional) o retornar null
+    console.warn('⚠️ [Starter] No hay horarios programados para Starter');
+    return null;
+  }
+
+  const nextValidTime = upcoming[0].start_time;
+
+  // 3. Crear sesión para el próximo horario válido
   const [result] = await pool.query(`
     INSERT INTO game_sessions 
     (room, start_time, status, jackpot_linea, jackpot_bingo, jackpot_pre40)
     VALUES ('starter', ?, 'active', 0, 0, 0)
-  `, [nextHour]);
+  `, [nextValidTime]);
 
   return {
     id: result.insertId,
     room: 'starter',
-    start_time: nextHour,
+    start_time: nextValidTime,
     status: 'active',
     total_cards_validated: 0,
     total_paid_cards: 0,
@@ -151,19 +158,27 @@ exports.getActiveSessions = async (req, res) => {
       // Starter: Siempre tiene sesión activa
       if (room === 'starter') {
         currentSession = await getOrCreateStarterSession();
-        currentSession.prize_linea = prizeConfig.prize_linea;
-        currentSession.prize_bingo = prizeConfig.prize_bingo;
-        currentSession.has_jackpot = false;
+        if (currentSession) {
+          currentSession.card_price = 0;
+          currentSession.jackpot_linea = 0;
+          currentSession.jackpot_bingo = 0;
+          currentSession.jackpot_pre40 = 0;
+          currentSession.prize_linea = prizeConfig.prize_linea;
+          currentSession.prize_bingo = prizeConfig.prize_bingo;
+          currentSession.has_jackpot = false;
+        }
       } else {
         // Otras salas: Buscar sesión activa o crear una "virtual" habilitada
         const [activeSession] = await pool.query(`
           SELECT 
-            id, room, start_time, status,
-            jackpot_linea, jackpot_bingo, jackpot_pre40,
-            total_cards_validated, total_paid_cards, total_gift_cards
-          FROM game_sessions
-          WHERE room = ? AND status IN ('active', 'pending')
-          ORDER BY start_time DESC
+            gs.id, gs.room, gs.start_time, gs.status,
+            gs.jackpot_linea, gs.jackpot_bingo, gs.jackpot_pre40,
+            gs.total_cards_validated, gs.total_paid_cards, gs.total_gift_cards,
+            rs.card_price
+          FROM game_sessions gs
+          LEFT JOIN room_settings rs ON gs.room COLLATE utf8mb4_unicode_ci = rs.room COLLATE utf8mb4_unicode_ci
+          WHERE gs.room = ? AND gs.status IN ('active', 'pending', 'playing')
+          ORDER BY gs.start_time DESC
           LIMIT 1
         `, [room]);
 
@@ -356,11 +371,26 @@ exports.createSession = async (req, res) => {
       });
     }
 
-    if (!['bronce', 'plata', 'oro', 'free_starter'].includes(room)) {
+    // Mapear 'free_starter' a 'starter' para consistencia en BD
+    const roomDB = room === 'free_starter' ? 'starter' : room;
+
+    if (!['bronce', 'plata', 'oro', 'starter'].includes(roomDB)) {
       return res.status(400).json({
         success: false,
-        message: 'Sala inválida'
+        message: `Sala inválida: ${room}`
       });
+    }
+
+    // Verificar si ya existe una sesión pendiente o activa para esta sala
+    const [existing] = await pool.query(
+      'SELECT id FROM game_sessions WHERE room = ? AND status IN ("pending", "playing")',
+      [roomDB]
+    );
+
+    if (existing.length > 0 && roomDB !== 'starter') {
+      // Para starter permitimos múltiples porque rotan cada hora, 
+      // pero para las monetizadas mejor evitar duplicados activos
+      console.warn(`[SessionController] Ya existe una sesión activa para ${roomDB} (ID: ${existing[0].id})`);
     }
 
     // Calcular sale_closes_at (5 minutos antes del start_time)
@@ -381,7 +411,7 @@ exports.createSession = async (req, res) => {
         status
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
     `, [
-      room,
+      roomDB,
       play_date,
       start_time,
       card_price,
