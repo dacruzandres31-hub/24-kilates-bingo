@@ -237,6 +237,13 @@ class GameEngineAuto {
 
     metricsService.increment('eventsEmitted');
 
+    // ✅ NUEVO: Verificar TODOS los cartones (conectados y offline)
+    try {
+      await this.checkAllCardsForWinners(gameSessionId, ballNumber);
+    } catch (offlineError) {
+      console.error(`[GameEngine] ⚠️ Error en verificación offline (no fatal):`, offlineError);
+    }
+
     /* 
     // VALIDAR AUTOMÁTICAMENTE TODOS LOS CARTONES (Desabilitado para flujo Tradicional - Se usa claimPrize)
     try {
@@ -903,6 +910,231 @@ class GameEngineAuto {
     });
 
     return { success: true, message: 'Juego reanudado' };
+  }
+
+  /**
+   * ========================================
+   * MÉTODOS DE VERIFICACIÓN OFFLINE
+   * ========================================
+   */
+
+  /**
+   * Verifica TODOS los cartones de la sesión (conectados y offline)
+   * Se ejecuta después de cada bolilla salida
+   */
+  async checkAllCardsForWinners(gameSessionId, currentBall) {
+    try {
+      const gameState = this.activeGames.get(gameSessionId);
+      if (!gameState) return;
+
+      console.log(`\n🔍 [OfflineWinners] Verificando todos los cartones para bolilla ${currentBall}`);
+
+      // 1. Obtener TODOS los cartones de la sesión (activos)
+      const [cards] = await pool.query(`
+        SELECT 
+          pcs.id as card_id,
+          pcs.user_id,
+          pcs.card_data,
+          pcs.line_won,
+          pcs.bingo_won,
+          u.username
+        FROM player_card_selections pcs
+        JOIN users u ON pcs.user_id = u.id
+        WHERE pcs.session_id = ?
+        AND pcs.status = 'active'
+      `, [gameSessionId]);
+
+      console.log(`🔍 [OfflineWinners] Verificando ${cards.length} cartones`);
+
+      // 2. Verificar cada cartón
+      for (const card of cards) {
+        try {
+          const cardData = JSON.parse(card.card_data);
+          const cardNumbers = this.convertGridDataToMatrix(cardData);
+
+          // Verificar Línea (si aún no ganó)
+          if (!card.line_won) {
+            const hasLine = this.checkHorizontalLines(cardNumbers, gameState.ballsDrawn);
+            if (hasLine) {
+              await this.registerLineWinner(gameSessionId, card.user_id, card.card_id, currentBall, card.username);
+            }
+          }
+
+          // Verificar Bingo (si aún no ganó)
+          if (!card.bingo_won) {
+            const hasBingo = this.validateBingo(cardNumbers, gameState.ballsDrawn);
+            if (hasBingo) {
+              await this.registerBingoWinner(gameSessionId, card.user_id, card.card_id, currentBall, card.username);
+            }
+          }
+        } catch (cardError) {
+          console.error(`❌ [OfflineWinners] Error verificando cartón ${card.card_id}:`, cardError);
+        }
+      }
+
+    } catch (error) {
+      console.error('❌ [OfflineWinners] Error verificando ganadores:', error);
+    }
+  }
+
+  /**
+   * Registra un ganador de LÍNEA (conectado o offline)
+   */
+  async registerLineWinner(gameSessionId, userId, cardId, ballNumber, username) {
+    try {
+      const gameState = this.activeGames.get(gameSessionId);
+
+      console.log(`🎉 [OfflineWinners] LÍNEA! Usuario ${username} (${userId}) - Cartón ${cardId} - Bolilla ${ballNumber}`);
+
+      // 1. Marcar cartón como ganador de línea
+      await pool.query(`
+        UPDATE player_card_selections 
+        SET line_won = TRUE, line_ball_number = ?
+        WHERE id = ?
+      `, [ballNumber, cardId]);
+
+      // 2. Contar cuántos ganadores de línea hay en esta sesión
+      const [winners] = await pool.query(`
+        SELECT COUNT(*) as count
+        FROM player_card_selections
+        WHERE session_id = ? AND line_won = TRUE
+      `, [gameSessionId]);
+
+      const shareCount = winners[0].count;
+
+      // 3. Obtener pozo de línea
+      const [session] = await pool.query(`
+        SELECT jackpot_linea FROM game_sessions WHERE id = ?
+      `, [gameSessionId]);
+
+      const totalPrize = parseFloat(session[0].jackpot_linea) || 0;
+      const individualPrize = totalPrize / shareCount;
+
+      // 4. Acreditar al balance del usuario
+      await pool.query(`
+        UPDATE users 
+        SET balance = balance + ?
+        WHERE id = ?
+      `, [individualPrize, userId]);
+
+      console.log(`💰 [OfflineWinners] Premio acreditado: $${individualPrize.toFixed(2)} (${shareCount} ganadores)`);
+
+      // 5. Registrar en tabla de ganadores
+      await pool.query(`
+        INSERT INTO game_winners 
+        (session_id, user_id, card_id, prize_type, ball_number, balls_drawn, prize_amount, share_count, balance_credited)
+        VALUES (?, ?, ?, 'linea', ?, ?, ?, ?, TRUE)
+      `, [gameSessionId, userId, cardId, ballNumber, JSON.stringify(gameState.ballsDrawn), individualPrize, shareCount]);
+
+      // 6. Emitir evento a jugadores conectados
+      this.io.to(`session_${gameSessionId}`).emit('line_winner', {
+        userId,
+        username,
+        cardId,
+        ballNumber,
+        prize: individualPrize,
+        shareCount,
+        timestamp: new Date()
+      });
+
+      // También emitir a la sala global
+      this.io.to(`room_${gameState.roomId}`).emit('line_winner', {
+        userId,
+        username,
+        cardId,
+        ballNumber,
+        prize: individualPrize,
+        shareCount,
+        timestamp: new Date()
+      });
+
+      console.log(`📡 [OfflineWinners] Evento 'line_winner' emitido`);
+
+    } catch (error) {
+      console.error('❌ [OfflineWinners] Error registrando ganador de línea:', error);
+    }
+  }
+
+  /**
+   * Registra un ganador de BINGO (conectado o offline)
+   */
+  async registerBingoWinner(gameSessionId, userId, cardId, ballNumber, username) {
+    try {
+      const gameState = this.activeGames.get(gameSessionId);
+
+      console.log(`🏆 [OfflineWinners] BINGO! Usuario ${username} (${userId}) - Cartón ${cardId} - Bolilla ${ballNumber}`);
+
+      // 1. Marcar cartón como ganador de bingo
+      await pool.query(`
+        UPDATE player_card_selections 
+        SET bingo_won = TRUE, bingo_ball_number = ?
+        WHERE id = ?
+      `, [ballNumber, cardId]);
+
+      // 2. Contar cuántos ganadores de bingo hay (puede haber múltiples en la misma bolilla)
+      const [winners] = await pool.query(`
+        SELECT COUNT(*) as count
+        FROM player_card_selections
+        WHERE session_id = ? AND bingo_won = TRUE
+      `, [gameSessionId]);
+
+      const shareCount = winners[0].count;
+
+      // 3. Obtener pozo de bingo
+      const [session] = await pool.query(`
+        SELECT jackpot_bingo FROM game_sessions WHERE id = ?
+      `, [gameSessionId]);
+
+      const totalPrize = parseFloat(session[0].jackpot_bingo) || 0;
+      const individualPrize = totalPrize / shareCount;
+
+      // 4. Acreditar al balance del usuario
+      await pool.query(`
+        UPDATE users 
+        SET balance = balance + ?
+        WHERE id = ?
+      `, [individualPrize, userId]);
+
+      console.log(`💰 [OfflineWinners] Premio BINGO acreditado: $${individualPrize.toFixed(2)} (${shareCount} ganadores)`);
+
+      // 5. Registrar en tabla de ganadores
+      await pool.query(`
+        INSERT INTO game_winners 
+        (session_id, user_id, card_id, prize_type, ball_number, balls_drawn, prize_amount, share_count, balance_credited)
+        VALUES (?, ?, ?, 'bingo', ?, ?, ?, ?, TRUE)
+      `, [gameSessionId, userId, cardId, ballNumber, JSON.stringify(gameState.ballsDrawn), individualPrize, shareCount]);
+
+      // 6. Emitir evento a jugadores conectados
+      this.io.to(`session_${gameSessionId}`).emit('bingo_winner', {
+        userId,
+        username,
+        cardId,
+        ballNumber,
+        prize: individualPrize,
+        shareCount,
+        timestamp: new Date()
+      });
+
+      // También emitir a la sala global
+      this.io.to(`room_${gameState.roomId}`).emit('bingo_winner', {
+        userId,
+        username,
+        cardId,
+        ballNumber,
+        prize: individualPrize,
+        shareCount,
+        timestamp: new Date()
+      });
+
+      console.log(`📡 [OfflineWinners] Evento 'bingo_winner' emitido`);
+
+      // 7. TERMINAR EL JUEGO
+      console.log(`🏁 [OfflineWinners] Terminando juego por BINGO`);
+      await this.endGame(gameSessionId, 'completed');
+
+    } catch (error) {
+      console.error('❌ [OfflineWinners] Error registrando ganador de bingo:', error);
+    }
   }
 }
 
