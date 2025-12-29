@@ -22,7 +22,7 @@ export default function Login({ onLogin }) {
         password
       });
 
-      const { token, user } = response.data;
+      const { token, user } = response.data.data;
 
       // Verificar que sea admin, superadmin o agente
       if (user.role !== 'admin' && user.role !== 'superadmin' && user.role !== 'agente') {
@@ -42,7 +42,7 @@ export default function Login({ onLogin }) {
         setLoading(false);
         return;
       }
-      
+
       setError(err.response?.data?.message || 'Error de autenticación');
       setLoading(false);
     }
@@ -54,9 +54,9 @@ export default function Login({ onLogin }) {
         {/* Logo y Título */}
         <div className="text-center">
           <div className="flex justify-center mb-4">
-            <img 
-              src="/logo.png" 
-              alt="Bingo 24K" 
+            <img
+              src="/logo.png"
+              alt="Bingo 24K"
               className="h-32 w-auto object-contain"
               style={{ filter: 'drop-shadow(0 0 20px rgba(255, 215, 0, 0.3))' }}
             />

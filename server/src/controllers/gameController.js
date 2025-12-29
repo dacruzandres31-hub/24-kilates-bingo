@@ -1,4 +1,6 @@
-const pool = require('../db');
+const dbHelper = require('../helpers/dbHelper');
+const responseHelper = require('../helpers/responseHelper');
+const validationHelper = require('../helpers/validationHelper');
 const gameEngine = require('../services/gameEngine');
 const cascadeLogic = require('../services/cascadeLogic');
 const gamificationEngine = require('../services/gamification_engine');
@@ -19,45 +21,41 @@ exports.buyCard = async (req, res) => {
     const userId = req.user.id;
     const { cardId, roomType, playDate } = req.body;
 
-    if (!cardId || !roomType || !playDate) {
-      return res.status(400).json({ error: 'Parámetros requeridos' });
+    const missingField = validationHelper.checkRequired(req.body, ['cardId', 'roomType', 'playDate']);
+    if (missingField) {
+      return responseHelper.error(res, 400, `Requerido: ${missingField}`);
     }
 
-    // Obtener usuario y su balance
-    const [userResult] = await pool.query(
+    // Obtener usuario
+    const user = await dbHelper.queryOne(
       'SELECT id, balance, parent_id, role FROM users WHERE id = ?',
-      [userId]
+      [userId],
+      'BuyCardGetUser'
     );
 
-    if (userResult.length === 0) {
-      return res.status(404).json({ error: 'Usuario no encontrado' });
+    if (!user) {
+      return responseHelper.notFound(res, 'Usuario no encontrado');
     }
-
-    const user = userResult[0];
 
     // Obtener cartón y su precio
-    const [cardResult] = await pool.query(
+    const card = await dbHelper.queryOne(
       `SELECT id, price, status FROM daily_stock_cards 
        WHERE id = ? AND status = 'available' AND room = ?`,
-      [cardId, roomType]
+      [cardId, roomType],
+      'BuyCardGetCard'
     );
 
-    if (cardResult.length === 0) {
-      return res.status(404).json({ error: 'Cartón no disponible' });
+    if (!card) {
+      return responseHelper.notFound(res, 'Cartón no disponible');
     }
-
-    const card = cardResult[0];
 
     // Validar balance suficiente
     if (user.balance < card.price) {
-      return res.status(400).json({ error: 'Balance insuficiente' });
+      return responseHelper.error(res, 400, 'Balance insuficiente');
     }
 
-    // Iniciar transacción
-    const connection = await pool.getConnection();
-    try {
-      await connection.query('START TRANSACTION');
-
+    // Iniciar transacción usando Helper
+    await dbHelper.transaction(async (connection) => {
       // 1. Marcar cartón como vendido
       await connection.query(
         `UPDATE daily_stock_cards 
@@ -80,11 +78,10 @@ exports.buyCard = async (req, res) => {
         [userId, JSON.stringify(agent_path), card.price, 'card_purchase']
       );
 
-      // 4. Distribuir comisiones (50% Bingo, 15% Línea, 5% Jackpot, 30% House)
+      // 4. Distribuir comisiones
       const bigoAmount = card.price * 0.50;
       const lineaAmount = card.price * 0.15;
       const jackpotAmount = card.price * 0.05;
-      // 30% se queda en house (no entra aquí)
 
       // Actualizar pots de la sesión
       const [sessionResult] = await connection.query(
@@ -114,74 +111,51 @@ exports.buyCard = async (req, res) => {
           [jackpotAmount, roomType]
         );
       }
+    });
 
-      await connection.query('COMMIT');
+    // ===== EMITIR ACTUALIZACIÓN DE POZOS EN VIVO =====
+    websocketService.emitPotsUpdate();
 
-      // ===== EMITIR ACTUALIZACIÓN DE POZOS EN VIVO =====
-      websocketService.emitPotsUpdate();
+    // ===== GAMIFICACIÓN: Agregar XP al jugador =====
+    let xpResult = { xpAdded: 0, leveledUp: false };
+    try {
+      xpResult = await gamificationEngine.addXPToPlayer(userId, card.price);
 
-      // ===== GAMIFICACIÓN: Agregar XP al jugador =====
-      try {
-        const xpResult = await gamificationEngine.addXPToPlayer(userId, card.price);
-
-        // Registrar compra en sala para misión "Explorador"
-        if (user.role === 'jugador') {
-          await questManager.recordRoomPlay(userId, roomType);
-        }
-
-        // Si es agente, registrar venta para ranking
-        if (user.role === 'agente' && user.parent_id) {
-          await rankingEngine.recordSale(user.parent_id, 1, card.price, roomType);
-        }
-
-        // Broadcast si hay level-up
-        if (xpResult.leveledUp && xpResult.newLevel) {
-          const levelNames = {
-            1: 'Novato',
-            2: 'Cobre',
-            3: 'Plata Fina',
-            4: 'Oro Puro',
-            5: 'Diamante 24K'
-          };
-          const rankName = levelNames[xpResult.newLevel] || `Nivel ${xpResult.newLevel}`;
-          notificationService.broadcastLevelUp(user.username, xpResult.newLevel, rankName);
-        }
-
-        res.json({
-          success: true,
-          message: 'Cartón comprado exitosamente',
-          card: {
-            id: card.id,
-            price: card.price
-          },
-          gamification: {
-            xpAdded: xpResult.xpAdded,
-            leveledUp: xpResult.leveledUp,
-            newLevel: xpResult.newLevel,
-            rewards: xpResult.rewards
-          }
-        });
-      } catch (gamError) {
-        console.error('Gamification error (non-critical):', gamError);
-        res.json({
-          success: true,
-          message: 'Cartón comprado exitosamente',
-          card: {
-            id: card.id,
-            price: card.price
-          }
-        });
+      if (user.role === 'jugador') {
+        await questManager.recordRoomPlay(userId, roomType);
       }
 
-    } catch (error) {
-      await connection.query('ROLLBACK');
-      throw error;
-    } finally {
-      connection.release();
+      if (user.role === 'agente' && user.parent_id) {
+        await rankingEngine.recordSale(user.parent_id, 1, card.price, roomType);
+      }
+
+      if (xpResult.leveledUp && xpResult.newLevel) {
+        const levelNames = {
+          1: 'Novato', 2: 'Cobre', 3: 'Plata Fina', 4: 'Oro Puro', 5: 'Diamante 24K'
+        };
+        const rankName = levelNames[xpResult.newLevel] || `Nivel ${xpResult.newLevel}`;
+        notificationService.broadcastLevelUp(user.username, xpResult.newLevel, rankName);
+      }
+    } catch (gamError) {
+      console.error('Gamification error (non-critical):', gamError);
     }
+
+    return responseHelper.success(res, {
+      message: 'Cartón comprado exitosamente',
+      card: {
+        id: card.id,
+        price: card.price
+      },
+      gamification: {
+        xpAdded: xpResult.xpAdded,
+        leveledUp: xpResult.leveledUp,
+        newLevel: xpResult.newLevel,
+        rewards: xpResult.rewards
+      }
+    });
+
   } catch (error) {
-    console.error('Buy card error:', error);
-    res.status(500).json({ error: 'Error comprando cartón' });
+    return responseHelper.error(res, 500, 'Error comprando cartón', error.message);
   }
 };
 
@@ -208,15 +182,14 @@ exports.getPlayerCards = async (req, res) => {
 
     query += ` ORDER BY created_at DESC`;
 
-    const [result] = await pool.query(query, params);
+    const result = await dbHelper.query(query, params, 'GetPlayerCards');
 
-    res.json({
+    return responseHelper.success(res, {
       cards: result,
       total: result.length
     });
   } catch (error) {
-    console.error('Get player cards error:', error);
-    res.status(500).json({ error: 'Error obteniendo cartones' });
+    return responseHelper.error(res, 500, 'Error obteniendo cartones', error.message);
   }
 };
 
@@ -226,21 +199,19 @@ exports.finishSession = async (req, res) => {
     const { sessionId } = req.body;
 
     if (!sessionId) {
-      return res.status(400).json({ error: 'Session ID requerido' });
+      return responseHelper.error(res, 400, 'Session ID requerido');
     }
 
     // Obtener sesión
-    const [sessionResult] = await pool.query(
+    const session = await dbHelper.queryOne(
       `SELECT id, room, current_pot_bingo, current_pot_linea, 
               current_pot_jackpot, is_preventa FROM game_sessions WHERE id = ?`,
-      [sessionId]
+      [sessionId], 'FinishSessionGet'
     );
 
-    if (sessionResult.length === 0) {
-      return res.status(404).json({ error: 'Sesión no encontrada' });
+    if (!session) {
+      return responseHelper.notFound(res, 'Sesión no encontrada');
     }
-
-    const session = sessionResult[0];
 
     // Ejecutar game engine (sorteo y detección de ganadores)
     const gameResult = await gameEngine.executeGame(session);
@@ -254,71 +225,65 @@ exports.finishSession = async (req, res) => {
     for (const winner of gameResult.winners) {
       const { userId, amount, type } = winner;
 
-      const connection = await pool.getConnection();
       try {
-        await connection.query('START TRANSACTION');
+        await dbHelper.transaction(async (connection) => {
+          // Acreditar al jugador
+          await connection.query(
+            `UPDATE users SET balance = balance + ? WHERE id = ?`,
+            [amount, userId]
+          );
 
-        // Acreditar al jugador
-        await connection.query(
-          `UPDATE users SET balance = balance + ? WHERE id = ?`,
-          [amount, userId]
-        );
+          // Registrar claim
+          await connection.query(
+            `INSERT INTO prize_claims (user_id, amount, status)
+             VALUES (?, ?, 'completed')`,
+            [userId, amount]
+          );
 
-        // Registrar claim
-        await connection.query(
-          `INSERT INTO prize_claims (user_id, amount, status)
-           VALUES (?, ?, 'completed')`,
-          [userId, amount]
-        );
-
-        // Auditoría
-        await connection.query(
-          `INSERT INTO audit_revenue (player_id, amount, transaction_type)
-           VALUES (?, ?, ?)`,
-          [userId, amount, `prize_${type}`]
-        );
-
-        await connection.query('COMMIT');
+          // Auditoría
+          await connection.query(
+            `INSERT INTO audit_revenue (player_id, amount, transaction_type)
+             VALUES (?, ?, ?)`,
+            [userId, amount, `prize_${type}`]
+          );
+        });
 
         // Broadcast de big win a todos los jugadores
-        const [userRes] = await pool.query('SELECT username FROM users WHERE id = ?', [userId]);
-        if (userRes.length > 0) {
-          const username = userRes[0].username;
-          notificationService.broadcastBigWin(username, amount, session.room, type);
+        const userRes = await dbHelper.queryOne('SELECT username FROM users WHERE id = ?', [userId], 'FinishSessionGetUser');
+        if (userRes) {
+          notificationService.broadcastBigWin(userRes.username, amount, session.room, type);
         }
-
-      } catch (error) {
-        await connection.query('ROLLBACK');
-        throw error;
-      } finally {
-        connection.release();
+      } catch (innerError) {
+        console.error(`Error processing winner ${userId}:`, innerError);
       }
     }
 
     // Marcar sesión como finalizada
-    await pool.query(
-      `UPDATE game_sessions SET status = 'completed', updated_at = NOW()
-       WHERE id = ?`,
-      [sessionId]
-    );
-
-    // Obtener la sala de esta sesión para limpieza
-    const [sessionData] = await pool.query(
-      'SELECT room FROM game_sessions WHERE id = ?',
-      [sessionId]
+    await dbHelper.query(
+      `UPDATE game_sessions SET status = 'completed', updated_at = NOW() WHERE id = ?`,
+      [sessionId], 'FinishSessionComplete'
     );
 
     // LIMPIEZA: Eliminar cartones no asignados a ninguna sesión de esta sala
-    if (sessionData.length > 0) {
-      const room = sessionData[0].room;
-      const [cleanupResult] = await pool.query(`
-        DELETE FROM bingo_cards_pool 
-        WHERE room = ? 
-        AND status = 'selected' 
-        AND game_session_id IS NULL
-      `, [room]);
+    try {
+      const sessionData = await dbHelper.queryOne(
+        'SELECT room FROM game_sessions WHERE id = ?',
+        [sessionId], 'FinishSessionGetRoom'
+      );
 
-      console.log(`[GameController] 🧹 Limpieza post-finalización sala ${room}: ${cleanupResult.affectedRows} cartones huérfanos eliminados`);
+      if (sessionData) {
+        const room = sessionData.room;
+        const cleanupResult = await dbHelper.query(`
+          DELETE FROM bingo_cards_pool 
+          WHERE room = ? 
+          AND status = 'selected' 
+          AND game_session_id IS NULL
+        `, [room], 'FinishSessionCleanup');
+
+        console.log(`[GameController] 🧹 Limpieza post-finalización sala ${room}: ${cleanupResult.affectedRows} cartones huérfanos eliminados`);
+      }
+    } catch (cleanupError) {
+      console.warn('Cleanup error:', cleanupError);
     }
 
     // ARCHIVAR SESIÓN AUTOMÁTICAMENTE
@@ -327,17 +292,15 @@ exports.finishSession = async (req, res) => {
       console.log(`[GameController] ✅ Sesión ${sessionId} archivada exitosamente.`);
     } catch (archiveError) {
       console.error(`[GameController] ❌ Error archivando sesión ${sessionId}:`, archiveError);
-      // No bloqueamos la respuesta al cliente si el archivado falla, pero lo logueamos
     }
 
-    res.json({
-      success: true,
+    return responseHelper.success(res, {
       gameResult,
       winners: gameResult.winners
     });
+
   } catch (error) {
-    console.error('Finish session error:', error);
-    res.status(500).json({ error: 'Error finalizando sesión' });
+    return responseHelper.error(res, 500, 'Error finalizando sesión', error.message);
   }
 };
 
@@ -346,26 +309,23 @@ exports.getSessionStatus = async (req, res) => {
   try {
     const { sessionId } = req.params;
 
-    const [result] = await pool.query(
+    const session = await dbHelper.queryOne(
       `SELECT id, room, status, current_pot_bingo, current_pot_linea, 
               current_pot_jackpot, is_preventa, ball_sequence 
        FROM game_sessions WHERE id = ?`,
-      [sessionId]
+      [sessionId], 'GetSessionStatus'
     );
 
-    if (result.length === 0) {
-      return res.status(404).json({ error: 'Sesión no encontrada' });
+    if (!session) {
+      return responseHelper.notFound(res, 'Sesión no encontrada');
     }
 
-    const session = result[0];
-
-    // Si no hay ball_sequence persistido (en sesiones viejas o activas), 
-    // buscar en la tabla de bolillas
+    // Si no hay ball_sequence persistido, buscar en tabla de bolillas
     if (!session.ball_sequence || session.ball_sequence.length === 0) {
-      const [balls] = await pool.query(
+      const balls = await dbHelper.query(
         `SELECT ball_number FROM game_session_balls 
          WHERE game_session_id = ? ORDER BY draw_order ASC`,
-        [sessionId]
+        [sessionId], 'GetSessionBalls'
       );
       session.drawnNumbers = balls.map(b => b.ball_number);
     } else {
@@ -374,10 +334,9 @@ exports.getSessionStatus = async (req, res) => {
         : session.ball_sequence;
     }
 
-    res.json({ session });
+    return responseHelper.success(res, { session });
   } catch (error) {
-    console.error('Get session status error:', error);
-    res.status(500).json({ error: 'Error obteniendo estado de sesión' });
+    return responseHelper.error(res, 500, 'Error obteniendo estado de sesión', error.message);
   }
 };
 
@@ -386,25 +345,17 @@ exports.getRoomStatus = async (req, res) => {
   try {
     const { room } = req.params;
 
-    // Mapear nombres de sala si es necesario
-    const roomMap = {
-      'bronze': 'bronce',
-      'silver': 'plata',
-      'gold': 'oro',
-      'starter': 'starter'
-    };
+    const roomMap = { 'bronze': 'bronce', 'silver': 'plata', 'gold': 'oro', 'starter': 'starter' };
     const roomDB = roomMap[room] || room;
 
     const status = await drawScheduleService.getNextDraw(roomDB);
 
-    res.json({
-      success: true,
+    return responseHelper.success(res, {
       room: roomDB,
       ...status
     });
   } catch (error) {
-    console.error('Get room status error:', error);
-    res.status(500).json({ error: 'Error obteniendo estado de la sala' });
+    return responseHelper.error(res, 500, 'Error obteniendo estado de la sala', error.message);
   }
 };
 
@@ -426,12 +377,11 @@ exports.getActiveSessions = async (req, res) => {
 
     query += ` ORDER BY start_time DESC LIMIT 10`;
 
-    const [result] = await pool.query(query, params);
+    const result = await dbHelper.query(query, params, 'GetActiveSessions');
 
-    res.json({ sessions: result });
+    return responseHelper.success(res, { sessions: result });
   } catch (error) {
-    console.error('Get active sessions error:', error);
-    res.status(500).json({ error: 'Error obteniendo sesiones' });
+    return responseHelper.error(res, 500, 'Error obteniendo sesiones', error.message);
   }
 };
 
@@ -441,43 +391,39 @@ exports.buyCardFree = async (req, res) => {
     const userId = req.user.id;
     const { cardId, playDate } = req.body;
 
-    if (!cardId || !playDate) {
-      return res.status(400).json({ error: 'Parámetros requeridos' });
+    const missingField = validationHelper.checkRequired(req.body, ['cardId', 'playDate']);
+    if (missingField) {
+      return responseHelper.error(res, 400, `Requerido: ${missingField}`);
     }
 
     // Verificar que sea sala STARTER
-    const [cardResult] = await pool.query(
+    const card = await dbHelper.queryOne(
       `SELECT id, price, status, room FROM daily_stock_cards 
        WHERE id = ? AND status = 'available'`,
-      [cardId]
+      [cardId], 'BuyCardFreeGetCard'
     );
 
-    if (cardResult.length === 0) {
-      return res.status(404).json({ error: 'Cartón no disponible' });
+    if (!card) {
+      return responseHelper.notFound(res, 'Cartón no disponible');
     }
 
-    const card = cardResult[0];
-
     if (card.room !== 'free_starter') {
-      return res.status(400).json({ error: 'Este cartón no es de sala gratis' });
+      return responseHelper.error(res, 400, 'Este cartón no es de sala gratis');
     }
 
     // Verificar límite de 20 cartones
-    const [countResult] = await pool.query(
+    const countResult = await dbHelper.queryOne(
       `SELECT COUNT(*) as count FROM daily_stock_cards 
        WHERE buyer_id = ? AND play_date = ? AND room = 'free_starter'`,
-      [userId, playDate]
+      [userId, playDate], 'BuyCardFreeCount'
     );
 
-    if (parseInt(countResult[0].count) >= 20) {
-      return res.status(400).json({ error: 'Alcanzaste el límite de 20 cartones en Sala Starter' });
+    if (parseInt(countResult.count) >= 20) {
+      return responseHelper.error(res, 400, 'Alcanzaste el límite de 20 cartones en Sala Starter');
     }
 
     // Comprar cartón (sin restar balance)
-    const connection = await pool.getConnection();
-    try {
-      await connection.query('START TRANSACTION');
-
+    await dbHelper.transaction(async (connection) => {
       // 1. Marcar cartón como vendido
       await connection.query(
         `UPDATE daily_stock_cards 
@@ -492,27 +438,18 @@ exports.buyCardFree = async (req, res) => {
          VALUES (?, ?, ?)`,
         [userId, 0, 'free_starter_card']
       );
+    });
 
-      await connection.query('COMMIT');
+    return responseHelper.success(res, {
+      message: 'Cartón adquirido gratuitamente',
+      card: {
+        id: card.id,
+        price: 0
+      }
+    });
 
-      res.json({
-        success: true,
-        message: 'Cartón adquirido gratuitamente',
-        card: {
-          id: card.id,
-          price: 0
-        }
-      });
-
-    } catch (error) {
-      await connection.query('ROLLBACK');
-      throw error;
-    } finally {
-      connection.release();
-    }
   } catch (error) {
-    console.error('❌ buyCardFree error:', error);
-    res.status(500).json({ error: 'Error comprando cartón gratis' });
+    return responseHelper.error(res, 500, 'Error comprando cartón gratis', error.message);
   }
 };
 
@@ -522,33 +459,27 @@ exports.claimFreePrize = async (req, res) => {
     const userId = req.user.id;
     const { sessionId, type } = req.body;
 
-    if (!sessionId || !type) {
-      return res.status(400).json({ error: 'Parámetros requeridos' });
-    }
+    const missingField = validationHelper.checkRequired(req.body, ['sessionId', 'type']);
+    if (missingField) return responseHelper.error(res, 400, `Requerido: ${missingField}`);
 
     // Verificar que es sala STARTER
-    const [sessionResult] = await pool.query(
+    const session = await dbHelper.queryOne(
       `SELECT id, room FROM game_sessions WHERE id = ?`,
-      [sessionId]
+      [sessionId], 'ClaimFreePrizeGetSession'
     );
 
-    if (sessionResult.length === 0) {
-      return res.status(404).json({ error: 'Sesión no encontrada' });
-    }
+    if (!session) return responseHelper.notFound(res, 'Sesión no encontrada');
 
-    if (sessionResult[0].room !== 'free_starter') {
-      return res.status(400).json({ error: 'Esta sesión no es Sala Starter' });
+    if (session.room !== 'free_starter') {
+      return responseHelper.error(res, 400, 'Esta sesión no es Sala Starter');
     }
 
     // Drop aleatorio de NFT
     const item = await inventoryService.dropRandomItem(userId);
 
-    if (!item) {
-      return res.status(500).json({ error: 'Error al procesar el premio' });
-    }
+    if (!item) return responseHelper.error(res, 500, 'Error al procesar el premio');
 
-    res.json({
-      success: true,
+    return responseHelper.success(res, {
       message: `¡Ganaste un NFT: ${item.name}!`,
       item: {
         id: item.id,
@@ -559,14 +490,13 @@ exports.claimFreePrize = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ claimFreePrize error:', error);
-    res.status(500).json({ error: 'Error procesando premio' });
+    return responseHelper.error(res, 500, 'Error procesando premio', error.message);
   }
 };
 
 // HELPER: Obtener cadena de agentes (agent_path)
 async function getAgentPath(userId) {
-  const [result] = await pool.query(
+  const result = await dbHelper.query(
     `WITH RECURSIVE agent_chain AS (
        SELECT id, parent_id, role, 1 as depth
        FROM users WHERE id = ?
@@ -577,7 +507,7 @@ async function getAgentPath(userId) {
      )
      SELECT JSON_ARRAYAGG(JSON_OBJECT('userId', id, 'role', role)) as agent_path
      FROM agent_chain`,
-    [userId]
+    [userId], 'GetAgentPath'
   );
 
   return result[0];
@@ -591,24 +521,19 @@ async function getAgentPath(userId) {
  * 
  * Versión: 1.3.0
  */
+// end_free_game: Procesar premio cuando termina partida Sala Starter
 exports.end_free_game = async (req, res) => {
   try {
     const userId = req.user.id;
     const { gameSessionId, winType } = req.body;
-    // winType: 'linea' | 'bingo'
 
-    if (!gameSessionId || !winType) {
-      return res.status(400).json({
-        success: false,
-        message: 'gameSessionId y winType son requeridos'
-      });
-    }
+    const missingField = validationHelper.checkRequired(req.body, ['gameSessionId', 'winType']);
+    if (missingField) return responseHelper.error(res, 400, `Requerido: ${missingField}`);
 
-    const connection = await pool.getConnection();
-    try {
-      await connection.query('START TRANSACTION');
+    let responsePayload = {};
 
-      // ====== Validar que sea Sala Starter (19:00) ======
+    await dbHelper.transaction(async (connection) => {
+      // ====== Validar que sea Sala Starter ======
       const [sessionResult] = await connection.query(
         `SELECT id, room, status FROM game_sessions 
          WHERE id = ? AND room = 'free_starter'`,
@@ -619,106 +544,70 @@ exports.end_free_game = async (req, res) => {
         throw new Error('Sesión no válida para premios gratis');
       }
 
-      const session = sessionResult[0];
-
       let rewardMessage = '';
       let rewardData = {};
 
       if (winType === 'linea') {
-        // ======= GANADOR DE LÍNEA =======
-        // Obtener skill visual aleatorio (no legendario)
         const [skinResult] = await connection.query(
           `SELECT * FROM cosmetic_items 
            WHERE type IN ('avatar_frame', 'card_skin', 'chat_effect')
-           AND is_free_available = TRUE
-           AND rarity != 'legendary'
-           AND is_consumable = FALSE
-           ORDER BY RAND() 
-           LIMIT 1`
+           AND is_free_available = TRUE AND rarity != 'legendary' AND is_consumable = FALSE
+           ORDER BY RAND() LIMIT 1`
         );
 
-        if (skinResult.length === 0) {
-          throw new Error('No hay skins disponibles');
-        }
+        if (skinResult.length === 0) throw new Error('No hay skins disponibles');
 
         const skin = skinResult[0];
-        const skinId = skin.id;
-        const skinName = skin.name;
-        const skinType = skin.type;
-
-        // Insertar en inventario
         await connection.query(
           `INSERT INTO user_inventory (user_id, item_id, equipped, is_consumable_type)
            VALUES (?, ?, FALSE, FALSE)
            ON DUPLICATE KEY UPDATE user_id = user_id`,
-          [userId, skinId]
+          [userId, skin.id]
         );
 
-        rewardMessage = `¡Ganaste un nuevo ${skinType === 'avatar_frame' ? 'Marco' : 'Skin'}!`;
-        rewardData = {
-          type: 'skin',
-          name: skinName,
-          rarity: skin.rarity,
-          description: `${skinType} ${skin.rarity}`
-        };
+        rewardMessage = `¡Ganaste un nuevo ${skin.type === 'avatar_frame' ? 'Marco' : 'Skin'}!`;
+        rewardData = { type: 'skin', name: skin.name, rarity: skin.rarity, description: skin.rarity };
 
-        // Logging
         await connection.query(
-          `INSERT INTO game_events 
-           (user_id, session_id, event_type, details)
+          `INSERT INTO game_events (user_id, session_id, event_type, details)
            VALUES (?, ?, 'win_linea_free', ?)`,
           [userId, gameSessionId, JSON.stringify(rewardData)]
         );
 
-        console.log(`✅ [end_free_game] LÍNEA - Usuario ${userId} ganó: ${skinName}`);
-
       } else if (winType === 'bingo') {
-        // ======= GANADOR DE BINGO =======
-        // 1. Asignar Skill Legendaria
+        // Skill Legendaria
         const [legendaryResult] = await connection.query(
           `SELECT * FROM cosmetic_items 
            WHERE type IN ('avatar_frame', 'card_skin', 'chat_effect')
-           AND rarity = 'legendary'
-           AND is_consumable = FALSE
-           AND is_free_available = TRUE
-           ORDER BY RAND() 
-           LIMIT 1`
+           AND rarity = 'legendary' AND is_free_available = TRUE AND is_consumable = FALSE
+           ORDER BY RAND() LIMIT 1`
         );
 
         let legendaryName = null;
         if (legendaryResult.length > 0) {
           const legendary = legendaryResult[0];
-
           await connection.query(
             `INSERT INTO user_inventory (user_id, item_id, equipped, is_consumable_type)
              VALUES (?, ?, FALSE, FALSE)
              ON DUPLICATE KEY UPDATE user_id = user_id`,
             [userId, legendary.id]
           );
-
           legendaryName = legendary.name;
         }
 
-        // 2. Asignar Ticket Sala Bronce (Consumible)
+        // Ticket Bronce
         const [ticketResult] = await connection.query(
-          `SELECT * FROM cosmetic_items 
-           WHERE type = 'ticket' 
-           AND ticket_room = 'bronce'
-           LIMIT 1`
+          `SELECT * FROM cosmetic_items WHERE type = 'ticket' AND ticket_room = 'bronce' LIMIT 1`
         );
-
         let ticketName = null;
         if (ticketResult.length > 0) {
           const ticket = ticketResult[0];
-          const ticketId = ticket.id;
           ticketName = ticket.name;
-
-          // Insertar o incrementar cantidad
           await connection.query(
             `INSERT INTO user_inventory (user_id, item_id, quantity, is_consumable_type)
              VALUES (?, ?, 1, TRUE)
              ON DUPLICATE KEY UPDATE quantity = quantity + 1`,
-            [userId, ticketId]
+            [userId, ticket.id]
           );
         }
 
@@ -731,49 +620,30 @@ exports.end_free_game = async (req, res) => {
           ]
         };
 
-        // Logging
         await connection.query(
-          `INSERT INTO game_events 
-           (user_id, session_id, event_type, details)
+          `INSERT INTO game_events (user_id, session_id, event_type, details)
            VALUES (?, ?, 'win_bingo_free', ?)`,
           [userId, gameSessionId, JSON.stringify(rewardData)]
         );
-
-        console.log(`✅ [end_free_game] BINGO - Usuario ${userId} ganó: ${legendaryName} + ${ticketName}`);
       }
 
-      await connection.query('COMMIT');
-
-      // TODO: Notificación en tiempo real (Socket.IO si está disponible)
-      // if (io) {
-      //   io.to(`user_${userId}`).emit('prize_claimed', {
-      //     success: true,
-      //     message: rewardMessage,
-      //     reward: rewardData
-      //   });
-      // }
-
-      res.json({
+      responsePayload = {
         success: true,
         message: rewardMessage,
         reward: rewardData
-      });
-
-    } catch (error) {
-      await connection.query('ROLLBACK');
-      throw error;
-    } finally {
-      connection.release();
-    }
-  } catch (error) {
-    console.error('❌ Error en end_free_game:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message
+      };
     });
+
+    return responseHelper.success(res, responsePayload);
+
+  } catch (error) {
+    return responseHelper.error(res, 500, error.message);
   }
 };
 
+// ============================================
+// CANTAR LÍNEA (Salas Monetizadas)
+// ============================================
 // ============================================
 // CANTAR LÍNEA (Salas Monetizadas)
 // ============================================
@@ -782,61 +652,46 @@ exports.claimLine = async (req, res) => {
     const { gameSessionId, cardId } = req.body;
     const userId = req.user.id;
 
-    if (!gameSessionId || !cardId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Parámetros requeridos: gameSessionId, cardId'
-      });
-    }
+    const missingField = validationHelper.checkRequired(req.body, ['gameSessionId', 'cardId']);
+    if (missingField) return responseHelper.error(res, 400, `Requerido: ${missingField}`);
 
     // 1. Obtener sesión de juego
-    const [sessions] = await pool.query(
+    const session = await dbHelper.queryOne(
       `SELECT * FROM game_sessions WHERE id = ?`,
-      [gameSessionId]
+      [gameSessionId], 'ClaimLineGetSession'
     );
 
-    if (sessions.length === 0) {
-      return res.status(404).json({ success: false, message: 'Sesión no encontrada' });
-    }
-
-    const session = sessions[0];
+    if (!session) return responseHelper.notFound(res, 'Sesión no encontrada');
 
     // Verificar si ya hubo un ganador de línea para esta sesión
-    const [prevWinner] = await pool.query(
+    const prevWinner = await dbHelper.queryOne(
       `SELECT id FROM game_winners WHERE game_session_id = ? AND prize_type = 'linea'`,
-      [gameSessionId]
+      [gameSessionId], 'ClaimLineCheckWinner'
     );
 
-    if (prevWinner.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'La línea ya ha sido ganada en este sorteo'
-      });
+    if (prevWinner) {
+      return responseHelper.error(res, 400, 'La línea ya ha sido ganada en este sorteo');
     }
 
     // 2. Obtener cartón validado del usuario
-    const [cards] = await pool.query(
+    const card = await dbHelper.queryOne(
       `SELECT * FROM validated_cards 
        WHERE id = ? AND player_id = ? AND game_session_id = ?`,
-      [cardId, userId, gameSessionId]
+      [cardId, userId, gameSessionId], 'ClaimLineGetCard'
     );
 
-    if (cards.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Cartón no encontrado o no pertenece al usuario'
-      });
+    if (!card) {
+      return responseHelper.notFound(res, 'Cartón no encontrado o no pertenece al usuario');
     }
 
-    const card = cards[0];
     const cardNumbers = typeof card.grid_numbers === 'string' ? JSON.parse(card.grid_numbers) : card.grid_numbers;
 
     // 3. Obtener números cantados en esta sesión
-    const [balls] = await pool.query(
+    const balls = await dbHelper.query(
       `SELECT ball_number FROM game_session_balls 
        WHERE game_session_id = ? 
        ORDER BY draw_order`,
-      [gameSessionId]
+      [gameSessionId], 'ClaimLineGetBalls'
     );
 
     const calledNumbers = balls.map(b => b.ball_number);
@@ -845,24 +700,23 @@ exports.claimLine = async (req, res) => {
     const validation = bingoValidator.checkHorizontalLines(cardNumbers, calledNumbers);
 
     if (!validation.hasLine) {
-      return res.status(400).json({
-        success: false,
-        message: 'Línea inválida - Verifica tus números marcados'
-      });
+      return responseHelper.error(res, 400, 'Línea inválida - Verifica tus números marcados');
     }
 
-    // 5. Registrar ganador
+    // 5. Registrar ganador (Transactional)
     const prizeAmount = parseFloat(session.jackpot_linea || 0);
 
-    await pool.query(
-      `INSERT INTO game_winners 
-       (game_session_id, user_id, card_id, prize_type, prize_amount, line_type, winning_numbers, verified) 
-       VALUES (?, ?, ?, 'linea', ?, ?, ?, TRUE)`,
-      [gameSessionId, userId, cardId, prizeAmount, `horizontal_${validation.row + 1}`, JSON.stringify(validation.winningNumbers)]
-    );
+    await dbHelper.transaction(async (connection) => {
+      await connection.query(
+        `INSERT INTO game_winners 
+         (game_session_id, user_id, card_id, prize_type, prize_amount, line_type, winning_numbers, verified) 
+         VALUES (?, ?, ?, 'linea', ?, ?, ?, TRUE)`,
+        [gameSessionId, userId, cardId, prizeAmount, `horizontal_${validation.row + 1}`, JSON.stringify(validation.winningNumbers)]
+      );
 
-    // Resetear pozo de línea en la sesión
-    await pool.query('UPDATE game_sessions SET jackpot_linea = 0 WHERE id = ?', [gameSessionId]);
+      // Resetear pozo de línea en la sesión
+      await connection.query('UPDATE game_sessions SET jackpot_linea = 0 WHERE id = ?', [gameSessionId]);
+    });
 
     // 6. Emitir eventos Socket.IO
     const io = req.app.get('io');
@@ -876,19 +730,20 @@ exports.claimLine = async (req, res) => {
       winningNumbers: validation.winningNumbers
     });
 
-    res.json({
-      success: true,
+    return responseHelper.success(res, {
       prizeAmount,
       winningNumbers: validation.winningNumbers,
       message: `¡FELICIDADES! Ganaste la LÍNEA de $${prizeAmount.toLocaleString()}`
     });
 
   } catch (error) {
-    console.error('Error en claimLine:', error);
-    res.status(500).json({ success: false, message: error.message });
+    return responseHelper.error(res, 500, error.message);
   }
 };
 
+// ============================================
+// CANTAR BINGO (Salas Monetizadas)
+// ============================================
 // ============================================
 // CANTAR BINGO (Salas Monetizadas)
 // ============================================
@@ -897,61 +752,44 @@ exports.claimBingo = async (req, res) => {
     const { gameSessionId, cardId } = req.body;
     const userId = req.user.id;
 
-    if (!gameSessionId || !cardId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Parámetros requeridos: gameSessionId, cardId'
-      });
-    }
+    const missingField = validationHelper.checkRequired(req.body, ['gameSessionId', 'cardId']);
+    if (missingField) return responseHelper.error(res, 400, `Requerido: ${missingField}`);
 
     // 1. Obtener sesión de juego
-    const [sessions] = await pool.query(
+    const session = await dbHelper.queryOne(
       `SELECT * FROM game_sessions WHERE id = ?`,
-      [gameSessionId]
+      [gameSessionId], 'ClaimBingoGetSession'
     );
 
-    if (sessions.length === 0) {
-      return res.status(404).json({ success: false, message: 'Sesión no encontrada' });
-    }
-
-    const session = sessions[0];
+    if (!session) return responseHelper.notFound(res, 'Sesión no encontrada');
 
     // Verificar si ya hubo un ganador de BINGO para esta sesión
-    const [prevWinner] = await pool.query(
+    const prevWinner = await dbHelper.queryOne(
       `SELECT id FROM game_winners WHERE game_session_id = ? AND prize_type = 'bingo'`,
-      [gameSessionId]
+      [gameSessionId], 'ClaimBingoCheckWinner'
     );
 
-    if (prevWinner.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'El BINGO ya ha sido ganado en este sorteo'
-      });
+    if (prevWinner) {
+      return responseHelper.error(res, 400, 'El BINGO ya ha sido ganado en este sorteo');
     }
 
     // 2. Obtener cartón validado del usuario
-    const [cards] = await pool.query(
+    const card = await dbHelper.queryOne(
       `SELECT * FROM validated_cards 
        WHERE id = ? AND player_id = ? AND game_session_id = ?`,
-      [cardId, userId, gameSessionId]
+      [cardId, userId, gameSessionId], 'ClaimBingoGetCard'
     );
 
-    if (cards.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Cartón no encontrado o no pertenece al usuario'
-      });
-    }
+    if (!card) return responseHelper.notFound(res, 'Cartón no encontrado o no pertenece al usuario');
 
-    const card = cards[0];
     const cardNumbers = typeof card.grid_numbers === 'string' ? JSON.parse(card.grid_numbers) : card.grid_numbers;
 
     // 3. Obtener números cantados
-    const [balls] = await pool.query(
+    const balls = await dbHelper.query(
       `SELECT ball_number FROM game_session_balls 
        WHERE game_session_id = ? 
        ORDER BY draw_order`,
-      [gameSessionId]
+      [gameSessionId], 'ClaimBingoGetBalls'
     );
 
     const calledNumbers = balls.map(b => b.ball_number);
@@ -960,10 +798,7 @@ exports.claimBingo = async (req, res) => {
     const validation = bingoValidator.checkBingo(cardNumbers, calledNumbers);
 
     if (!validation.isValid) {
-      return res.status(400).json({
-        success: false,
-        message: 'BINGO inválido - Faltan números en tu cartón'
-      });
+      return responseHelper.error(res, 400, 'BINGO inválido - Faltan números en tu cartón');
     }
 
     // 5. Registrar ganador de BINGO
@@ -978,18 +813,21 @@ exports.claimBingo = async (req, res) => {
 
     const totalPrize = bingoPrize + pre40Prize;
 
-    await pool.query(
-      `INSERT INTO game_winners 
-       (game_session_id, user_id, card_id, prize_type, prize_amount, winning_numbers, verified) 
-       VALUES (?, ?, ?, 'bingo', ?, ?, TRUE)`,
-      [gameSessionId, userId, cardId, totalPrize, JSON.stringify(validation.winningNumbers)]
-    );
+    // Transactional Update
+    await dbHelper.transaction(async (connection) => {
+      await connection.query(
+        `INSERT INTO game_winners 
+         (game_session_id, user_id, card_id, prize_type, prize_amount, winning_numbers, verified) 
+         VALUES (?, ?, ?, 'bingo', ?, ?, TRUE)`,
+        [gameSessionId, userId, cardId, totalPrize, JSON.stringify(validation.winningNumbers)]
+      );
 
-    // 6. Finalizar sesión inmediatamente
-    await pool.query(
-      `UPDATE game_sessions SET status = 'completed', updated_at = NOW() WHERE id = ?`,
-      [gameSessionId]
-    );
+      // 6. Finalizar sesión inmediatamente
+      await connection.query(
+        `UPDATE game_sessions SET status = 'completed', updated_at = NOW() WHERE id = ?`,
+        [gameSessionId]
+      );
+    });
 
     // Detener el motor de sorteo si está activo
     const gameEngineAuto = req.app.get('gameEngineAuto');
@@ -1008,7 +846,7 @@ exports.claimBingo = async (req, res) => {
 
     // Mostrar formularios de pago después de 5 segundos
     setTimeout(async () => {
-      const winners = await getGameWinners(gameSessionId);
+      const winners = await getGameWinners(gameSessionId); // Helper function usage at bottom of file
       showPaymentForms(io, gameSessionId, winners);
     }, 5000);
 
@@ -1018,8 +856,7 @@ exports.claimBingo = async (req, res) => {
       console.error('[GameController] Error rotando sesión tras BINGO:', err);
     });
 
-    res.json({
-      success: true,
+    return responseHelper.success(res, {
       prizeAmount: totalPrize,
       winningNumbers: validation.winningNumbers,
       gameEnded: true,
@@ -1027,8 +864,7 @@ exports.claimBingo = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error en claimBingo:', error);
-    res.status(500).json({ success: false, message: error.message });
+    return responseHelper.error(res, 500, error.message);
   }
 };
 
@@ -1171,8 +1007,13 @@ function validateBingo(cardNumbers, calledNumbers) {
  * @param {Number} gameSessionId 
  * @returns {Array} Array de objetos con userId, username, prizes
  */
+/**
+ * Obtiene todos los ganadores de una sesión agrupados por usuario
+ * @param {Number} gameSessionId 
+ * @returns {Array} Array de objetos con userId, username, prizes
+ */
 async function getGameWinners(gameSessionId) {
-  const [winners] = await pool.query(
+  const winners = await dbHelper.query(
     `SELECT 
        gw.user_id,
        u.username,
@@ -1182,7 +1023,7 @@ async function getGameWinners(gameSessionId) {
      JOIN users u ON gw.user_id = u.id
      WHERE gw.game_session_id = ?
      ORDER BY gw.claimed_at`,
-    [gameSessionId]
+    [gameSessionId], 'GetGameWinners'
   );
 
   // Agrupar premios por usuario
@@ -1259,38 +1100,34 @@ function convertGridDataToMatrix(gridData) {
  * - Alertas: "4 cartones a 2 números de línea"
  * - Configuración para vista apilada
  */
+// GET /api/game/my-cards-analysis/:gameSessionId
 exports.getMyCardsAnalysis = async (req, res) => {
   try {
     const { gameSessionId } = req.params;
     const userId = req.user.id;
 
     // Obtener cartones del usuario en esta sesión
-    const [cards] = await pool.query(
+    const cards = await dbHelper.query(
       `SELECT * FROM bingo_cards 
        WHERE user_id = ? AND session_id = ? AND status = 'active'
        ORDER BY id ASC`,
-      [userId, gameSessionId]
+      [userId, gameSessionId], 'GetMyCardsAnalysis'
     );
 
     if (cards.length === 0) {
-      return res.json({
-        success: true,
+      return responseHelper.success(res, {
         cards: [],
         alerts: [],
-        summary: {
-          totalCards: 0,
-          totalMarked: 0,
-          averageProgress: 0
-        }
+        summary: { totalCards: 0, totalMarked: 0, averageProgress: 0 }
       });
     }
 
     // Obtener números cantados en la sesión
-    const [balls] = await pool.query(
+    const balls = await dbHelper.query(
       `SELECT ball_number FROM game_session_balls 
        WHERE game_session_id = ? 
        ORDER BY draw_order`,
-      [gameSessionId]
+      [gameSessionId], 'GetMyCardsAnalysisBalls'
     );
 
     const calledNumbers = balls.map(b => b.ball_number);
@@ -1301,8 +1138,7 @@ exports.getMyCardsAnalysis = async (req, res) => {
     // Generar vista apilada
     const stackedCards = CardAnalyzer.generateStackedView(analysis.cards);
 
-    res.json({
-      success: true,
+    return responseHelper.success(res, {
       cards: stackedCards,
       alerts: analysis.alerts,
       summary: analysis.summary,
@@ -1315,11 +1151,7 @@ exports.getMyCardsAnalysis = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[GameController] Error en análisis de cartones:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
+    return responseHelper.error(res, 500, error.message);
   }
 };
 
@@ -1330,58 +1162,39 @@ exports.getMyCardsAnalysis = async (req, res) => {
  * - Verifica límite del 10% de cartones de regalo
  * - Distribuye a jackpots si es cartón pago (15% línea, 50% bingo, 5% pre-40)
  */
+// POST /api/game/validate-cards
 exports.validateCardsForSession = async (req, res) => {
   try {
     const userId = req.user.id;
     const { game_session_id, room, quantity } = req.body;
 
-    // Validaciones
-    if (!game_session_id || !room || !quantity) {
-      return res.status(400).json({
-        success: false,
-        message: 'Faltan campos requeridos: game_session_id, room, quantity'
-      });
-    }
+    const missingField = validationHelper.checkRequired(req.body, ['game_session_id', 'room', 'quantity']);
+    if (missingField) return responseHelper.error(res, 400, `Requerido: ${missingField}`);
 
     if (!['bronce', 'plata', 'oro'].includes(room)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Sala inválida. Debe ser: bronce, plata u oro'
-      });
+      return responseHelper.error(res, 400, 'Sala inválida. Debe ser: bronce, plata u oro');
     }
 
     if (quantity <= 0 || quantity > 20) {
-      return res.status(400).json({
-        success: false,
-        message: 'La cantidad debe ser entre 1 y 20 cartones'
-      });
+      return responseHelper.error(res, 400, 'La cantidad debe ser entre 1 y 20 cartones');
     }
 
     // Verificar que la sesión existe y está pendiente
-    const [session] = await pool.query(
+    const session = await dbHelper.queryOne(
       `SELECT id, status, room, play_date FROM game_sessions WHERE id = ?`,
-      [game_session_id]
+      [game_session_id], 'ValidateCardsSessionCheck'
     );
 
-    if (session.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Sesión de juego no encontrada'
-      });
+    if (!session) {
+      return responseHelper.notFound(res, 'Sesión de juego no encontrada');
     }
 
-    if (session[0].status !== 'pending') {
-      return res.status(400).json({
-        success: false,
-        message: `La sesión está en estado: ${session[0].status}. Solo se pueden validar cartones en sesiones pendientes`
-      });
+    if (session.status !== 'pending') {
+      return responseHelper.error(res, 400, `La sesión está en estado: ${session.status}. Solo se pueden validar cartones en sesiones pendientes`);
     }
 
-    if (session[0].room !== room) {
-      return res.status(400).json({
-        success: false,
-        message: `La sesión es de sala ${session[0].room}, no ${room}`
-      });
+    if (session.room !== room) {
+      return responseHelper.error(res, 400, `La sesión es de sala ${session.room}, no ${room}`);
     }
 
     // Validar cartones usando el servicio
@@ -1392,14 +1205,10 @@ exports.validateCardsForSession = async (req, res) => {
       quantity
     );
 
-    res.json(result);
+    return res.json(result); // Service likely returns strict format, keep as is or wrap in success
 
   } catch (error) {
-    console.error('[GameController] Error validando cartones:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Error validando cartones'
-    });
+    return responseHelper.error(res, 500, error.message || 'Error validando cartones');
   }
 };
 
@@ -1407,64 +1216,42 @@ exports.validateCardsForSession = async (req, res) => {
  * GET /api/game/my-validated-cards/:sessionId
  * Obtiene los cartones validados del jugador para una sesión específica
  */
+// GET /api/game/my-validated-cards/:sessionId
 exports.getMyValidatedCards = async (req, res) => {
   try {
     const userId = req.user.id;
     const { sessionId } = req.params;
 
     if (!sessionId) {
-      return res.status(400).json({
-        success: false,
-        message: 'session_id es requerido'
-      });
+      return responseHelper.error(res, 400, 'session_id es requerido');
     }
 
-    const cards = await cardInventoryService.getValidatedCards(
-      userId,
-      parseInt(sessionId)
-    );
+    const cards = await cardInventoryService.getValidatedCards(userId, parseInt(sessionId));
 
-    res.json({
-      success: true,
+    return responseHelper.success(res, {
       game_session_id: parseInt(sessionId),
       total_cards: cards.length,
       cards: cards
     });
 
   } catch (error) {
-    console.error('[GameController] Error obteniendo cartones validados:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Error obteniendo cartones validados'
-    });
+    return responseHelper.error(res, 500, error.message || 'Error obteniendo cartones validados');
   }
 };
 
-/**
- * GET /api/game/my-inventory
- * Obtiene el inventario de cartones del jugador (vista jugador - solo totales)
- */
+// GET /api/game/my-inventory
 exports.getMyCardInventory = async (req, res) => {
   try {
     const userId = req.user.id;
+    const inventory = await cardInventoryService.getInventory(userId, false);
 
-    const inventory = await cardInventoryService.getInventory(
-      userId,
-      false  // isSuperAdmin = false
-    );
-
-    res.json({
-      success: true,
+    return responseHelper.success(res, {
       user_id: userId,
       inventory: inventory
     });
 
   } catch (error) {
-    console.error('[GameController] Error obteniendo inventario:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Error obteniendo inventario'
-    });
+    return responseHelper.error(res, 500, error.message || 'Error obteniendo inventario');
   }
 };
 
@@ -1472,13 +1259,14 @@ exports.getMyCardInventory = async (req, res) => {
  * TEST: Gatillar notificación de ganador para pruebas de UI
  * Permite simular que alguien ganó sin tener que jugar todo el sorteo
  */
+// TEST: Gatillar notificación de ganador para pruebas de UI
 exports.testWinnerNotification = async (req, res) => {
   try {
     const { room, type, username, amount } = req.body;
     const io = req.app.get('io');
 
     if (!room || !type) {
-      return res.status(400).json({ error: 'Room y Type son requeridos' });
+      return responseHelper.error(res, 400, 'Room y Type son requeridos');
     }
 
     const winnerName = username || 'Jugador de Prueba';
@@ -1487,18 +1275,15 @@ exports.testWinnerNotification = async (req, res) => {
 
     const { notifyLineWinner, notifyBingoWinner } = require('../socket/winnerEvents');
 
-    console.log(`[Test] Emitiendo notificación ${type} en sala ${room} para ${winnerName}`);
-
     if (type === 'linea') {
       notifyLineWinner(io, room, { id: fakeWinnerId, username: winnerName }, prizeAmount, 'horizontal_1');
     } else if (type === 'bingo') {
-      notifyBingoWinner(io, room, { id: fakeWinnerId, username: winnerName }, prizeAmount, 0); // sessionId 0
+      notifyBingoWinner(io, room, { id: fakeWinnerId, username: winnerName }, prizeAmount, 0);
     }
 
-    res.json({ success: true, message: `Evento ${type} emitido para sala ${room}` });
+    return responseHelper.success(res, { message: `Evento ${type} emitido para sala ${room}` });
   } catch (error) {
-    console.error('Test notification error:', error);
-    res.status(500).json({ error: error.message });
+    return responseHelper.error(res, 500, error.message);
   }
 };
 

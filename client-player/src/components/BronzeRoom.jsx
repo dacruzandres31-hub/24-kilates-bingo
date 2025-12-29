@@ -540,14 +540,32 @@ export default function BronzeRoom({ onLogout }) {
         const session = data.session;
 
         // 1. Restaurar estado de sesión
-        if (session.status === 'active') {
+        // 'playing' es el estado interno del engine cuando está sorteando
+        // 'active' es cuando está abierta (pero quizás en pausa o previo)
+        if (session.status === 'active' || session.status === 'playing') {
+          console.log(`🔄 [BronzeRoom] Estado restaurado: ${session.status} -> active`);
           setGameStatus('active');
+          // Forzar inicio de audio si ya está activo
+          audioService.startBolilleroGirando();
+          audioService.lowerMusicVolume();
+        } else if (session.status === 'ended' || session.status === 'completed') {
+          setGameStatus('ended');
+          audioService.stopBolilleroGirando();
+          audioService.restoreMusicVolume();
         }
 
         // 2. Restaurar bolas sorteadas
-        if (session.drawnNumbers && session.drawnNumbers.length > 0) {
+        // Check both drawnNumbers (array) and ball_sequence (stringified JSON potentially)
+        // Adjust based on what API returns.
+        let nums = session.drawnNumbers || [];
+        // If API returns ball_sequence string, parse it
+        if (!nums.length && session.ball_sequence) {
+          try { nums = typeof session.ball_sequence === 'string' ? JSON.parse(session.ball_sequence) : session.ball_sequence; }
+          catch (e) { console.error('Error parsing ball_sequence', e); }
+        }
 
-          const restoredBalls = session.drawnNumbers.map((num, index) => ({
+        if (nums && nums.length > 0) {
+          const restoredBalls = nums.map((num, index) => ({
             number: num,
             color: getBallColor(num),
             letter: getBallLetter(num),
@@ -555,6 +573,7 @@ export default function BronzeRoom({ onLogout }) {
           }));
 
           setBallsDrawn(restoredBalls);
+          console.log(`🎱 [BronzeRoom] ${restoredBalls.length} bolillas restauradas.`);
 
           if (restoredBalls.length > 0) {
             const last = restoredBalls[restoredBalls.length - 1];
@@ -562,9 +581,16 @@ export default function BronzeRoom({ onLogout }) {
             setCurrentBall(last);
           }
 
-          // Efecto de fast-forward marcar cartones (sin sonido)
-          // Esto es implícito porque los cartones leen de 'ballsDrawn' o 'markedNumbers'
-          // Si usan 'ballsDrawn', ya está listo.
+          // IMPORTANTE: Actualizar contadores de columnas para que se vean marcadas en el grid
+          const newColumnCounts = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+          restoredBalls.forEach(ball => {
+            const columnIndex = Math.floor((ball.number - 1) / 10);
+            if (columnIndex >= 0 && columnIndex < 9) {
+              newColumnCounts[columnIndex]++;
+            }
+          });
+          setColumnCounts(newColumnCounts);
+          console.log(`📊 [BronzeRoom] Contadores de columnas actualizados:`, newColumnCounts);
         }
       }
     } catch (error) {
@@ -577,6 +603,14 @@ export default function BronzeRoom({ onLogout }) {
     checkExistingCards();
     loadRoomStatus();
     restoreGameState(); // <--- Agregar llamada aquí (o en un effect separado)
+
+    // Cleanup: Detener TODOS los audios al desmontar el componente
+    return () => {
+      console.log('🧹 [BronzeRoom] Limpiando audio al salir de la sala...');
+      audioService.stopBolilleroGirando();
+      audioService.restoreMusicVolume();
+      audioService.stop(); // Detener música de fondo
+    };
   }, [sessionId]);
 
   // Organizar bolillas por decenas para el grid

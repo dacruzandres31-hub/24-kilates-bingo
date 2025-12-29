@@ -321,3 +321,21 @@ STACK: Error: Juego no encontrado
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 
+[2025-12-29T01:07:42.598Z] CRASH in drawNextBall: Unknown column 'bolea_number' in 'field list'
+STACK: Error: Unknown column 'bolea_number' in 'field list'
+    at PromisePool.query (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\node_modules\mysql2\lib\promise\pool.js:36:22)
+    at GameEngineAuto.endGame (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:587:34)
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:174:18)
+    at Timeout.<anonymous> (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:120:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+[2025-12-29T01:15:42.642Z] CRASH in drawNextBall: Unknown column 'bolea_number' in 'field list'
+STACK: Error: Unknown column 'bolea_number' in 'field list'
+    at PromisePool.query (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\node_modules\mysql2\lib\promise\pool.js:36:22)
+    at GameEngineAuto.endGame (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:587:34)
+    at GameEngineAuto.drawNextBall (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:174:18)
+    at Timeout.<anonymous> (C:\Users\User\Documents\24 Kilates Antigravity\Proyecto-antigravity\server\src\services\gameEngineAuto.js:120:22)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+

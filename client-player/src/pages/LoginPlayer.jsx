@@ -29,7 +29,7 @@ export default function LoginPlayer({ onLogin }) {
         password
       });
 
-      const { token, user, gamification } = response.data;
+      const { token, user, gamification } = response.data.data;
 
       // Verificar que sea jugador
       if (user.role !== 'jugador') {

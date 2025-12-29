@@ -47,7 +47,8 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
       });
 
       // Calculate normalized users
-      const normalizedUsers = (res.data.all || []).map(user => ({
+      const responseData = res.data.data || res.data; // Support both formats
+      const normalizedUsers = (responseData.all || []).map(user => ({
         ...user,
         balance: parseFloat(user.balance) || 0,
         cards_bronce: parseInt(user.cards_bronce) || 0,
@@ -58,7 +59,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         gift_oro: parseInt(user.gift_oro) || 0
       }));
 
-      setArbolJerarquico(res.data.tree || []);
+      setArbolJerarquico(responseData.tree || []);
       setUsuarios(normalizedUsers);
       setAllUsersHierarchy(normalizedUsers);
 
@@ -400,7 +401,8 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
       });
 
       // Normalizar datos: convertir balance a número y mantener cartones separados
-      const normalizedUsers = (response.data.all || []).map(user => ({
+      const responseData = response.data.data || response.data; // Support both formats
+      const normalizedUsers = (responseData.all || []).map(user => ({
         ...user,
         balance: parseFloat(user.balance) || 0,
         cards_bronce: parseInt(user.cards_bronce) || 0,
@@ -411,16 +413,16 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         gift_oro: parseInt(user.gift_oro) || 0
       }));
 
-      setArbolJerarquico(response.data.tree || []);
+      setArbolJerarquico(responseData.tree || []);
       setUsuarios(normalizedUsers);
       setAllUsersHierarchy(normalizedUsers); // Guardar TODOS para búsqueda
 
       // Guardar información del usuario actual (dueño del panel)
-      if (response.data.currentUser) {
+      if (responseData.currentUser) {
         // Buscar el usuario completo con balance en la lista
-        const currentUserComplete = normalizedUsers.find(u => u.id === response.data.currentUser.id);
+        const currentUserComplete = normalizedUsers.find(u => u.id === responseData.currentUser.id);
         const updatedUser = {
-          ...response.data.currentUser,
+          ...responseData.currentUser,
           balance: currentUserComplete?.balance || 0,
           cards_bronce: currentUserComplete?.cards_bronce || 0,
           cards_plata: currentUserComplete?.cards_plata || 0,
@@ -435,7 +437,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         // Actualizar recursos compartidos con el Dashboard
         // Para agentes: sumar normales + regalo, para SuperAdmin: solo normales
         if (onResourcesUpdate) {
-          const role = response.data.currentUser.role;
+          const role = responseData.currentUser.role;
           onResourcesUpdate(updatedUser, {
             bronce: role === 'agente'
               ? (updatedUser.cards_bronce || 0) + (updatedUser.gift_bronce || 0)
@@ -450,14 +452,14 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         }
 
         // Si es superadmin o agente principal, seleccionarlo automáticamente
-        if (response.data.currentUser.role === 'superadmin' || response.data.currentUser.role === 'agente') {
+        if (responseData.currentUser.role === 'superadmin' || responseData.currentUser.role === 'agente') {
           setAgenteSeleccionado({
-            ...response.data.currentUser,
+            ...responseData.currentUser,
             balance: currentUserComplete?.balance || 0
           });
-          cargarUsuariosDelAgente(response.data.currentUser.id, normalizedUsers);
+          cargarUsuariosDelAgente(responseData.currentUser.id, normalizedUsers);
           // Expandir automáticamente el nodo raíz
-          setNodosExpandidos(new Set([response.data.currentUser.id]));
+          setNodosExpandidos(new Set([responseData.currentUser.id]));
         }
       }
       return normalizedUsers;

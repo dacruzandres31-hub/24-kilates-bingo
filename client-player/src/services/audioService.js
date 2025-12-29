@@ -9,7 +9,7 @@ class AudioService {
     this.currentRoom = null;
     this.volume = 0.15;
     this.normalVolume = 0.15; // Volumen normal
-    this.lowerVolume = 0.075; // 50% del volumen normal (0.15 * 0.5 = 0.075)
+    this.lowerVolume = 0.04; // ~25% del volumen normal (más agresivo para que se escuche el bolillero)
     this.enabled = true;
     this.audioCache = {}; // Cache de audios precargados
     this.isDrawing = false; // Estado del sorteo

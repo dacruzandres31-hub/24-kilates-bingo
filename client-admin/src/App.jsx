@@ -15,27 +15,28 @@ function App() {
 
   const handleLogout = () => {
     localStorage.removeItem('adminToken');
+    localStorage.removeItem('adminUser'); // También eliminar datos del usuario
     setIsAuthenticated(false);
   };
 
   return (
     <Router>
       <Routes>
-        <Route 
-          path="/login" 
+        <Route
+          path="/login"
           element={
-            isAuthenticated ? 
-              <Navigate to="/dashboard" replace /> : 
+            isAuthenticated ?
+              <Navigate to="/dashboard" replace /> :
               <Login onLogin={handleLogin} />
-          } 
+          }
         />
-        <Route 
-          path="/dashboard" 
+        <Route
+          path="/dashboard"
           element={
-            isAuthenticated ? 
-              <Dashboard onLogout={handleLogout} /> : 
+            isAuthenticated ?
+              <Dashboard onLogout={handleLogout} /> :
               <Navigate to="/login" replace />
-          } 
+          }
         />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
       </Routes>

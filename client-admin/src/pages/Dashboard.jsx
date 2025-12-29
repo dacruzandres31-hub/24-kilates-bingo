@@ -130,11 +130,12 @@ export default function Dashboard() {
       ]);
       console.log('✅ [Dashboard] Resources fetched successfully');
 
-      setUserData(userRes.data);
-      setFinancialData(finRes.data);
+      setUserData(userRes.data.data || userRes.data); // Support both formats
+      setFinancialData(finRes.data.data || finRes.data);
 
       // Convertir inventario a formato de stock
-      const inventory = inventoryRes.data.inventory || [];
+      const inventoryData = inventoryRes.data.data || inventoryRes.data;
+      const inventory = inventoryData.inventory || [];
       setCartonesStock({
         bronce: parseInt(inventory.find(i => i.room === 'bronce')?.total_cards || 0),
         plata: parseInt(inventory.find(i => i.room === 'plata')?.total_cards || 0),
@@ -153,6 +154,7 @@ export default function Dashboard() {
 
   const handleLogout = () => {
     localStorage.removeItem('adminToken');
+    localStorage.removeItem('adminUser'); // También eliminar datos del usuario
     window.location.href = '/login';
   };
 

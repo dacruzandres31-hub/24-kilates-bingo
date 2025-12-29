@@ -26,6 +26,7 @@ import CustomTour from './CustomTour';
 import WithdrawalModal from './Withdrawal/WithdrawalModal';
 import FortuneWheel from './Gamification/FortuneWheel';
 import useSocket from '../hooks/useSocket';
+import uiHelper from '../helpers/uiHelper';
 
 // ... (existing code)
 
@@ -400,18 +401,7 @@ const CasinoLobby = ({ user, onLogout }) => {
   }, []);
 
   // NUEVO: Función para formatear valores monetarios
-  const formatMoney = (amount) => {
-    if (typeof amount === 'string') return amount; // Para tickets (ej: "Ticket Oro")
 
-    const num = parseFloat(amount);
-    if (isNaN(num)) return '$0';
-
-    // Formatear con separadores de miles y decimales
-    return '$' + num.toLocaleString('es-CO', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    });
-  };
 
   // NUEVO: Construir roomsData dinámicamente con datos del backend
   const getRoomsData = () => {
@@ -504,12 +494,12 @@ const CasinoLobby = ({ user, onLogout }) => {
         path: roomData.sessionId ? `${room.path}/${roomData.sessionId}` : room.path,
         targetTime,
         status: roomData.status || 'no_session',
-        price: room.id === 'starter' ? 'Tickets' : formatMoney(roomData.price),
+        price: room.id === 'starter' ? 'Tickets' : uiHelper.formatCurrency(roomData.price),
         prizes: room.id === 'starter' ? roomData.prizes : undefined,
         pots: room.id !== 'starter' ? {
-          bingo: formatMoney(roomData.pots.bingo),
-          line: formatMoney(roomData.pots.line),
-          pre40: formatMoney(roomData.pots.pre40),
+          bingo: uiHelper.formatCurrency(roomData.pots.bingo),
+          line: uiHelper.formatCurrency(roomData.pots.line),
+          pre40: uiHelper.formatCurrency(roomData.pots.pre40),
         } : undefined
       };
     });
@@ -645,7 +635,7 @@ const CasinoLobby = ({ user, onLogout }) => {
           <span className="user-name">👤 {user?.username || 'Usuario'}</span>
           <div className="user-resources">
             <span className="balance">
-              💰 ${userData?.balance ? parseFloat(userData.balance).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) : '0'}
+              💰 {uiHelper.formatCurrencyFlexible(userData?.balance)}
             </span>
             <div className="tickets-display">
               <span className="ticket-item">🎴 Bronce: {userData?.tickets?.bronze || 0}</span>

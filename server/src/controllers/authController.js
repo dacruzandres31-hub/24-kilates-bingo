@@ -1,15 +1,16 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const pool = require('../db');
+const dbHelper = require('../helpers/dbHelper');
+const responseHelper = require('../helpers/responseHelper');
+const validationHelper = require('../helpers/validationHelper');
 const gamificationEngine = require('../services/gamification_engine');
 
 const SECRET = process.env.JWT_SECRET || 'tu_super_secret_key_24k';
 
 // Generar JWT
-// Generar JWT
 const generateToken = (userId, role, username) => {
   const token = jwt.sign({ id: userId, role, username }, SECRET, { expiresIn: '30d' });
-  console.log('🔑 [TOKEN-GEN] Generated token payload:', { id: userId, role, username });
+  // console.log('🔑 [TOKEN-GEN] Generated token payload:', { id: userId, role, username });
   return token;
 };
 
@@ -18,25 +19,26 @@ exports.login = async (req, res) => {
   try {
     const { username, password } = req.body;
 
-    if (!username || !password) {
-      return res.status(400).json({ error: 'Username y password requeridos' });
+    const missingField = validationHelper.checkRequired(req.body, ['username', 'password']);
+    if (missingField) {
+      return responseHelper.error(res, 400, `Campo requerido faltante: ${missingField}`);
     }
 
     // Buscar usuario
-    const [userResult] = await pool.query(
+    const user = await dbHelper.queryOne(
       'SELECT id, username, role, password_hash, balance, is_blocked, block_reason FROM users WHERE username = ?',
-      [username]
+      [username],
+      'LoginUserSearch'
     );
 
-    if (userResult.length === 0) {
-      return res.status(401).json({ error: 'Usuario o contraseña inválidos' });
+    if (!user) {
+      return responseHelper.unauthorized(res, 'Usuario o contraseña inválidos');
     }
-
-    const user = userResult[0];
 
     // Verificar si el usuario está bloqueado
     if (user.is_blocked) {
       return res.status(403).json({
+        success: false,
         error: 'Usuario bloqueado',
         blocked: true,
         reason: user.block_reason,
@@ -47,7 +49,7 @@ exports.login = async (req, res) => {
     // Comparar contraseña
     const passwordMatch = await bcrypt.compare(password, user.password_hash);
     if (!passwordMatch) {
-      return res.status(401).json({ error: 'Usuario o contraseña inválidos' });
+      return responseHelper.unauthorized(res, 'Usuario o contraseña inválidos');
     }
 
     // Generar token
@@ -61,7 +63,7 @@ exports.login = async (req, res) => {
       console.error('Login streak error:', e);
     }
 
-    res.json({
+    return responseHelper.success(res, {
       token,
       user: {
         id: user.id,
@@ -72,10 +74,10 @@ exports.login = async (req, res) => {
       gamification: {
         streak: streakData
       }
-    });
+    }, 'Login exitoso');
+
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ error: 'Error en login' });
+    return responseHelper.error(res, 500, 'Error en login', error.message);
   }
 };
 
@@ -84,61 +86,67 @@ exports.register = async (req, res) => {
   try {
     const { username, password, role = 'jugador', parent_id } = req.body;
 
-    if (!username || !password) {
-      return res.status(400).json({ error: 'Username y password requeridos' });
+    const missingField = validationHelper.checkRequired(req.body, ['username', 'password']);
+    if (missingField) {
+      return responseHelper.error(res, 400, `Campo requerido faltante: ${missingField}`);
     }
 
     // Validar rol
     const validRoles = ['superadmin', 'agente', 'jugador'];
     if (!validRoles.includes(role)) {
-      return res.status(400).json({ error: 'Rol inválido' });
+      return responseHelper.error(res, 400, 'Rol inválido');
     }
 
     // Verificar duplicado
-    const [existingUser] = await pool.query(
+    const existingUser = await dbHelper.queryOne(
       'SELECT id FROM users WHERE username = ?',
-      [username]
+      [username],
+      'RegisterCheckDuplicate'
     );
 
-    if (existingUser.length > 0) {
-      return res.status(409).json({ error: 'Usuario ya existe' });
+    if (existingUser) {
+      return responseHelper.error(res, 409, 'Usuario ya existe');
     }
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Insertar usuario
-    const [result] = await pool.query(
+    const result = await dbHelper.query(
       `INSERT INTO users (username, password_hash, role, parent_id, balance)
        VALUES (?, ?, ?, ?, ?)`,
-      [username, hashedPassword, role, parent_id || null, 0.00]
+      [username, hashedPassword, role, parent_id || null, 0.00],
+      'RegisterInsertUser'
     );
 
+    const newUserId = result.insertId;
+
     // Obtener el usuario recién creado
-    const [newUserResult] = await pool.query(
+    const newUser = await dbHelper.queryOne(
       'SELECT id, username, role, balance FROM users WHERE id = ?',
-      [result.insertId]
+      [newUserId],
+      'RegisterGetUser'
     );
-    const newUser = newUserResult[0];
 
     // Auto-inicializar gamificación para jugadores
     if (role === 'jugador') {
       try {
-        // Crear progreso
-        await pool.query(`
-          INSERT INTO gamification_progress (user_id, current_level, xp_current, xp_lifetime)
-          VALUES (?, 1, 0, 0)
-        `, [newUser.id]);
+        await dbHelper.transaction(async (connection) => {
+          // Crear progreso
+          await connection.execute(`
+            INSERT INTO gamification_progress (user_id, current_level, xp_current, xp_lifetime)
+            VALUES (?, 1, 0, 0)
+          `, [newUser.id]);
 
-        // Crear quests iniciales
-        await pool.query(`
-          INSERT INTO daily_quests (user_id, quest_name, quest_type, target_value, xp_reward)
-          VALUES 
-            (?, 'Primera victoria', 'WIN', 1, 100),
-            (?, 'Jugar 3 partidas', 'PLAY', 3, 50),
-            (?, 'Completar un cartón', 'COMPLETE_CARD', 1, 75)
-        `, [newUser.id, newUser.id, newUser.id]);
-
+          // Crear quests iniciales
+          await connection.execute(`
+            INSERT INTO daily_quests (user_id, quest_name, quest_type, target_value, xp_reward)
+            VALUES 
+              (?, 'Primera victoria', 'WIN', 1, 100),
+              (?, 'Jugar 3 partidas', 'PLAY', 3, 50),
+              (?, 'Completar un cartón', 'COMPLETE_CARD', 1, 75)
+          `, [newUser.id, newUser.id, newUser.id]);
+        });
         console.log(`✓ Gamificación inicializada para ${newUser.username}`);
       } catch (gamErr) {
         console.error('⚠️ Error inicializando gamificación:', gamErr.message);
@@ -148,7 +156,7 @@ exports.register = async (req, res) => {
 
     const token = generateToken(newUser.id, newUser.role, newUser.username);
 
-    res.status(201).json({
+    return responseHelper.created(res, {
       token,
       user: {
         id: newUser.id,
@@ -156,51 +164,52 @@ exports.register = async (req, res) => {
         role: newUser.role,
         balance: newUser.balance
       }
-    });
+    }, 'Usuario registrado exitosamente');
+
   } catch (error) {
-    console.error('Register error:', error);
-    res.status(500).json({ error: 'Error en registro' });
+    return responseHelper.error(res, 500, 'Error en registro', error.message);
   }
 };
 
 // REFRESH TOKEN - Renovar token expirado
 exports.refreshToken = async (req, res) => {
   try {
-    const { id, role } = req.user; // Corregido: id en lugar de userId
+    const { id, role } = req.user;
 
     // Obtener username actualizado de la BD
-    const [userResult] = await pool.query('SELECT username, role, is_blocked FROM users WHERE id = ?', [id]);
+    const user = await dbHelper.queryOne(
+      'SELECT username, role, is_blocked FROM users WHERE id = ?',
+      [id],
+      'RefreshTokenGetUser'
+    );
 
-    if (userResult.length === 0 || userResult[0].is_blocked) {
-      return res.status(401).json({ error: 'Usuario no válido o bloqueado' });
+    if (!user || user.is_blocked) {
+      return responseHelper.unauthorized(res, 'Usuario no válido o bloqueado');
     }
 
-    const user = userResult[0];
     const newToken = generateToken(id, user.role, user.username);
 
-    res.json({ token: newToken });
+    return responseHelper.success(res, { token: newToken }, 'Token renovado');
   } catch (error) {
-    console.error('Token refresh error:', error);
-    res.status(500).json({ error: 'Error renovando token' });
+    return responseHelper.error(res, 500, 'Error renovando token', error.message);
   }
 };
 
-// LOGOUT - Invalidar token (opcional, depende de tu arquitectura)
+// LOGOUT - Invalidar token
 exports.logout = async (req, res) => {
-  // En un setup con blacklist o Redis, aquí se invalidaría el token
-  res.json({ message: 'Logout exitoso' });
+  return responseHelper.success(res, null, 'Logout exitoso');
 };
 
 // VERIFY TOKEN - Verificar si el token es válido
 exports.verifyToken = async (req, res) => {
   try {
     const { userId, role } = req.user;
-    res.json({
+    return responseHelper.success(res, {
       valid: true,
       user: { userId, role }
-    });
+    }, 'Token válido');
   } catch (error) {
-    res.status(401).json({ valid: false, error: 'Token inválido' });
+    return responseHelper.unauthorized(res, 'Token inválido');
   }
 };
 
@@ -210,48 +219,46 @@ exports.changePassword = async (req, res) => {
     const { userId } = req.user;
     const { currentPassword, newPassword } = req.body;
 
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({ error: 'Contraseña actual y nueva requeridas' });
+    const missingField = validationHelper.checkRequired(req.body, ['currentPassword', 'newPassword']);
+    if (missingField) {
+      return responseHelper.error(res, 400, `Requerido: ${missingField}`);
     }
 
     if (newPassword.length < 6) {
-      return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 6 caracteres' });
+      return responseHelper.error(res, 400, 'La nueva contraseña debe tener al menos 6 caracteres');
     }
 
     // Obtener contraseña actual del usuario
-    const [userResult] = await pool.query(
+    const user = await dbHelper.queryOne(
       'SELECT password_hash FROM users WHERE id = ?',
-      [userId]
+      [userId],
+      'ChangePassGetUser'
     );
 
-    if (userResult.length === 0) {
-      return res.status(404).json({ error: 'Usuario no encontrado' });
+    if (!user) {
+      return responseHelper.notFound(res, 'Usuario no encontrado');
     }
-
-    const user = userResult[0];
 
     // Verificar contraseña actual
     const passwordMatch = await bcrypt.compare(currentPassword, user.password_hash);
     if (!passwordMatch) {
-      return res.status(401).json({ error: 'Contraseña actual incorrecta' });
+      return responseHelper.unauthorized(res, 'Contraseña actual incorrecta');
     }
 
     // Hash de la nueva contraseña
     const newPasswordHash = await bcrypt.hash(newPassword, 10);
 
     // Actualizar contraseña en la base de datos
-    await pool.query(
+    await dbHelper.query(
       'UPDATE users SET password_hash = ? WHERE id = ?',
-      [newPasswordHash, userId]
+      [newPasswordHash, userId],
+      'ChangePassUpdate'
     );
 
-    res.json({
-      success: true,
-      message: 'Contraseña actualizada exitosamente'
-    });
+    return responseHelper.success(res, null, 'Contraseña actualizada exitosamente');
+
   } catch (error) {
-    console.error('Error cambiando contraseña:', error);
-    res.status(500).json({ error: 'Error al cambiar contraseña' });
+    return responseHelper.error(res, 500, 'Error al cambiar contraseña', error.message);
   }
 };
 
