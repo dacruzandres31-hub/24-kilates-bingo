@@ -1287,4 +1287,75 @@ exports.testWinnerNotification = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/game/pending-prizes
+ * Obtiene premios no notificados del jugador
+ * Se llama cuando el jugador se conecta para mostrar premios ganados mientras estaba offline
+ */
+exports.getPendingPrizes = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    console.log(`🔍 [PendingPrizes] Verificando premios pendientes para usuario ${userId}`);
+
+    // Obtener premios no notificados
+    const prizes = await dbHelper.query(
+      `SELECT 
+        gw.id,
+        gw.prize_type,
+        gw.prize_amount,
+        gw.ball_number,
+        gw.share_count,
+        gw.created_at,
+        gs.room,
+        pcs.card_data
+      FROM game_winners gw
+      JOIN game_sessions gs ON gw.session_id = gs.id
+      JOIN player_card_selections pcs ON gw.card_id = pcs.id
+      WHERE gw.user_id = ?
+      AND gw.notified = FALSE
+      ORDER BY gw.created_at DESC`,
+      [userId],
+      'GetPendingPrizes'
+    );
+
+    console.log(`🎁 [PendingPrizes] Encontrados ${prizes.length} premios pendientes`);
+
+    // Marcar como notificados
+    if (prizes.length > 0) {
+      const prizeIds = prizes.map(p => p.id);
+      await dbHelper.query(
+        `UPDATE game_winners 
+         SET notified = TRUE, notified_at = NOW()
+         WHERE id IN (?)`,
+        [prizeIds],
+        'MarkPrizesAsNotified'
+      );
+
+      console.log(`✅ [PendingPrizes] ${prizes.length} premios marcados como notificados`);
+    }
+
+    // Formatear respuesta
+    const formattedPrizes = prizes.map(p => ({
+      id: p.id,
+      prizeType: p.prize_type,
+      prizeAmount: parseFloat(p.prize_amount),
+      ballNumber: p.ball_number,
+      shareCount: p.share_count,
+      createdAt: p.created_at,
+      room: p.room,
+      cardData: JSON.parse(p.card_data)
+    }));
+
+    return responseHelper.success(res, {
+      prizes: formattedPrizes,
+      totalPrizes: formattedPrizes.length,
+      totalAmount: formattedPrizes.reduce((sum, p) => sum + p.prizeAmount, 0)
+    });
+
+  } catch (error) {
+    console.error('❌ [PendingPrizes] Error obteniendo premios pendientes:', error);
+    return responseHelper.error(res, 500, error.message);
+  }
+};
 

@@ -75,4 +75,7 @@ router.get('/my-inventory', gameController.getMyCardInventory);
 // TEST: Gatillar notificación de ganador
 router.post('/test-winner-notification', gameController.testWinnerNotification);
 
+// NUEVO: Obtener premios pendientes (ganados mientras estaba offline)
+router.get('/pending-prizes', gameController.getPendingPrizes);
+
 module.exports = router;
