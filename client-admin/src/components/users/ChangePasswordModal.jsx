@@ -26,8 +26,8 @@ const ChangePasswordModal = ({
     isProcessing,
     onNewPasswordChange,
     onConfirmPasswordChange,
-    onToggleShowPassword,
-    onSubmit
+    onPasswordVisibilityToggle,
+    onConfirm
 }) => {
     if (!isOpen) return null;
 
@@ -70,7 +70,7 @@ const ChangePasswordModal = ({
                             />
                             <button
                                 type="button"
-                                onClick={onToggleShowPassword}
+                                onClick={onPasswordVisibilityToggle}
                                 className="absolute right-3 top-3.5 text-gray-400 hover:text-white transition-colors"
                             >
                                 {showPassword ? '👁️' : '👁️‍🗨️'}
@@ -129,7 +129,7 @@ const ChangePasswordModal = ({
                         CANCELAR
                     </button>
                     <button
-                        onClick={onSubmit}
+                        onClick={onConfirm}
                         disabled={isProcessing}
                         className={`flex-1 py-3 text-white font-bold rounded-xl transition-all ${isProcessing
                             ? 'opacity-50 cursor-not-allowed bg-gray-600'
