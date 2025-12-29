@@ -24,7 +24,7 @@ const ChangePasswordModal = ({
     confirmPassword,
     showPassword,
     isProcessing,
-    onPasswordChange,
+    onNewPasswordChange,
     onConfirmPasswordChange,
     onToggleShowPassword,
     onSubmit
@@ -64,7 +64,7 @@ const ChangePasswordModal = ({
                             <input
                                 type={showPassword ? 'text' : 'password'}
                                 value={newPassword}
-                                onChange={(e) => onPasswordChange(e.target.value)}
+                                onChange={(e) => onNewPasswordChange(e.target.value)}
                                 className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
                                 placeholder="Mínimo 6 caracteres"
                             />
