@@ -1,0 +1,155 @@
+.hot-pot-notification {
+    position: fixed;
+    top: 100px;
+    right: 20px;
+    width: 320px;
+    background: linear-gradient(135deg, #1a1a1a 0%, #000000 100%);
+    border-radius: 12px;
+    padding: 15px;
+    z-index: 10000;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+    border: 2px solid transparent;
+}
+
+/* Room Specific Glows */
+.hot-pot-notification.bronce {
+    border-color: #cd7f32;
+    box-shadow: 0 0 20px rgba(205, 127, 50, 0.4);
+}
+
+.hot-pot-notification.plata {
+    border-color: #c0c0c0;
+    box-shadow: 0 0 20px rgba(192, 192, 192, 0.4);
+}
+
+.hot-pot-notification.oro {
+    border-color: #ffd700;
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
+}
+
+.hot-pot-glow {
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255, 69, 0, 0.15) 0%, transparent 70%);
+    animation: glow-rotate 5s linear infinite;
+    pointer-events: none;
+}
+
+@keyframes glow-rotate {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.hot-pot-content {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    position: relative;
+    z-index: 1;
+}
+
+.hot-pot-icon-container {
+    width: 50px;
+    height: 50px;
+    background: rgba(255, 69, 0, 0.1);
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border: 1px solid rgba(255, 69, 0, 0.3);
+}
+
+.fire-icon {
+    font-size: 24px;
+    color: #ff4500;
+    filter: drop-shadow(0 0 5px #ff4500);
+}
+
+.hot-pot-text {
+    flex: 1;
+}
+
+.hot-pot-title {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #ff4500;
+    letter-spacing: 1px;
+    text-shadow: 0 0 10px rgba(255, 69, 0, 0.3);
+}
+
+.hot-pot-subtitle {
+    margin: 2px 0 5px;
+    font-size: 0.85rem;
+    color: #aaa;
+    font-weight: 600;
+}
+
+.hot-pot-amount-box {
+    display: flex;
+    flex-direction: column;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 5px 10px;
+    border-radius: 6px;
+    border-left: 3px solid #ff4500;
+}
+
+.hot-pot-type {
+    font-size: 0.7rem;
+    color: #888;
+    text-transform: uppercase;
+    font-weight: 700;
+    margin-bottom: 2px;
+}
+
+.hot-pot-amount {
+    font-size: 1.3rem;
+    font-weight: 900;
+    color: #fff;
+    font-family: 'Roboto', sans-serif;
+}
+
+.hot-pot-close {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: none;
+    border: none;
+    color: #555;
+    font-size: 20px;
+    cursor: pointer;
+    transition: color 0.3s;
+}
+
+.hot-pot-close:hover {
+    color: #fff;
+}
+
+/* Animation for the amount box */
+.hot-pot-notification.oro .hot-pot-amount-box {
+    border-left-color: #ffd700;
+    animation: gold-shimmer 2s infinite;
+}
+
+@keyframes gold-shimmer {
+    0% {
+        background: rgba(255, 215, 0, 0.05);
+    }
+
+    50% {
+        background: rgba(255, 215, 0, 0.15);
+    }
+
+    100% {
+        background: rgba(255, 215, 0, 0.05);
+    }
+}

@@ -83,6 +83,25 @@ async function updateSessionPots(sessionId, potContribution) {
         const websocketService = require('./websocketService');
         websocketService.emitPotsUpdate();
 
+        // VERIFICACIÓN DE POZOS CALIENTES
+        const thresholds = {
+            'bronce': 100000,
+            'plata': 500000,
+            'oro': 1000000
+        };
+
+        const threshold = thresholds[room];
+        if (threshold) {
+            // Verificar Pozo Bingo
+            if (updatedPots.jackpot_bingo >= threshold) {
+                websocketService.emitHotPotAlert(room, 'bingo', updatedPots.jackpot_bingo);
+            }
+            // Verificar Pozo Pre-40
+            if (updatedPots.jackpot_pre40 >= threshold) {
+                websocketService.emitHotPotAlert(room, 'pre40', updatedPots.jackpot_pre40);
+            }
+        }
+
         console.log(`[PotAccumulation] Updated pots and broadcasted:`, updatedPots);
 
         return updatedPots;

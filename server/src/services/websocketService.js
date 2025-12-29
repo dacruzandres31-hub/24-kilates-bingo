@@ -185,10 +185,30 @@ function emitPersonalNotification(userId, data) {
   console.log(`📡 [WebSocket] personal_notification enviada a usuario ${userId}`);
 }
 
+/**
+ * Emitir alerta de pozo caliente
+ * @param {string} room 
+ * @param {string} type - 'bingo' | 'pre40'
+ * @param {number} amount 
+ */
+function emitHotPotAlert(room, type, amount) {
+  if (!io) return;
+
+  io.emit('hot_pot_alert', {
+    room,
+    type,
+    amount,
+    timestamp: new Date().toISOString()
+  });
+
+  console.log(`🔥 [WebSocket] hot_pot_alert emitida para ${room}: ${type} $${amount}`);
+}
+
 module.exports = {
   initialize,
   emitPotsUpdate,
   emitSessionUpdate,
   emitGlobalNotification,
-  emitPersonalNotification
+  emitPersonalNotification,
+  emitHotPotAlert
 };

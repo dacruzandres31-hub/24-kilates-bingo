@@ -27,6 +27,7 @@ import WithdrawalModal from './Withdrawal/WithdrawalModal';
 import FortuneWheel from './Gamification/FortuneWheel';
 import useSocket from '../hooks/useSocket';
 import uiHelper from '../helpers/uiHelper';
+import HotPotNotification from './Notifications/HotPotNotification';
 
 // ... (existing code)
 
@@ -195,6 +196,7 @@ const CasinoLobby = ({ user, onLogout }) => {
   const [showBattlePass, setShowBattlePass] = useState(false);
   const [showWheel, setShowWheel] = useState(false);
   const [runTour, setRunTour] = useState(false);
+  const [activeHotPot, setActiveHotPot] = useState(null);
 
   useEffect(() => {
     // Check if tour has been seen
@@ -342,8 +344,16 @@ const CasinoLobby = ({ user, onLogout }) => {
 
     socket.on('pots_updated', handlePotsUpdated);
 
+    const handleHotPotAlert = (data) => {
+      console.log('[CasinoLobby] 🔥 hot_pot_alert recibido:', data);
+      setActiveHotPot(data);
+    };
+
+    socket.on('hot_pot_alert', handleHotPotAlert);
+
     return () => {
       socket.off('pots_updated', handlePotsUpdated);
+      socket.off('hot_pot_alert', handleHotPotAlert);
     };
   }, [socket]);
 
@@ -1160,6 +1170,12 @@ const CasinoLobby = ({ user, onLogout }) => {
           />
         )
       }
+
+      {/* Alerta de Pozo Caliente */}
+      <HotPotNotification
+        alert={activeHotPot}
+        onClose={() => setActiveHotPot(null)}
+      />
     </div >
   );
 };
