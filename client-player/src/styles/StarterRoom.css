@@ -4,6 +4,7 @@
    ============================================ */
 
 .starter-room {
+  height: 100vh;
   min-height: 100vh;
   background: #000000;
   background-image:
@@ -14,9 +15,48 @@
   display: flex;
   flex-direction: column;
   padding: 15px;
-  overflow-x: hidden;
+  overflow: hidden;
+  position: relative;
+  /* Context for absolute logo */
   animation: room-fade-in 0.8s ease-out;
   text-shadow: 0 0 15px rgba(0, 255, 255, 0.6);
+}
+
+/* Ghost Logo Background */
+.starter-room::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 1200px;
+  height: 1200px;
+  background-image: url('../assets/logo.png');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  opacity: 0.4;
+  filter: blur(0.5px);
+  z-index: 0;
+  pointer-events: none;
+  animation: bg-logo-pulse 4s ease-in-out infinite;
+}
+
+@keyframes bg-logo-pulse {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.2;
+  }
+
+  50% {
+    transform: translate(-50%, -50%) scale(1.05);
+    opacity: 0.25;
+  }
+
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.2;
+  }
 }
 
 @keyframes room-fade-in {

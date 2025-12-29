@@ -238,7 +238,7 @@ body,
 }
 
 /* Create centered logo - FRONT AND SHINY */
-body::after {
+.casino-lobby::after {
     content: '';
     position: fixed;
     top: 50%;

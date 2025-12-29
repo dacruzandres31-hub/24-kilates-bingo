@@ -42,13 +42,7 @@ export default function BronzeRoom({ onLogout }) {
   const [cardWinningLines, setCardWinningLines] = useState({}); // líneas ganadoras por cartón
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
-  // --- TERMINAL AUTOMÁTICA ---
-  const { alreadyClaimedLine, alreadyClaimedBingo } = useBingoTerminal(
-    selectedPlayerCards,
-    ballsDrawn,
-    sessionId,
-    socket
-  );
+  // --- STATE DECLARATIONS (MOVED UP FOR HOOK DEPENDENCIES) ---
   const [sidebarOpen, setSidebarOpen] = useState(false); // Estado del sidebar
   const [showCardSelection, setShowCardSelection] = useState(false); // Mostrar lobby de selección de cartones
   const [selectedPlayerCards, setSelectedPlayerCards] = useState([]); // Cartones seleccionados por el jugador
@@ -56,6 +50,14 @@ export default function BronzeRoom({ onLogout }) {
   const [showReadyModal, setShowReadyModal] = useState(false); // Modal "¡¡Todo Listo!!"
   const [timeRemaining, setTimeRemaining] = useState(null);
   const [nextDrawTime, setNextDrawTime] = useState(null);
+
+  // --- TERMINAL AUTOMÁTICA ---
+  const { alreadyClaimedLine, alreadyClaimedBingo } = useBingoTerminal(
+    selectedPlayerCards,
+    ballsDrawn,
+    sessionId,
+    socket
+  );
 
   // Auto-cerrar modal "¡¡Todo Listo!!" después de 5 segundos
   useEffect(() => {

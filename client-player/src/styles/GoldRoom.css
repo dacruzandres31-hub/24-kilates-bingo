@@ -4,6 +4,7 @@
    ============================================ */
 
 .gold-room {
+  height: 100vh;
   min-height: 100vh;
   background: #000000;
   background-image:
@@ -14,9 +15,48 @@
   display: flex;
   flex-direction: column;
   padding: 15px;
-  overflow-x: hidden;
+  overflow: hidden;
+  position: relative;
+  /* Context for absolute logo */
   animation: room-fade-in 0.8s ease-out;
   text-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
+}
+
+/* Ghost Logo Background */
+.gold-room::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 1200px;
+  height: 1200px;
+  background-image: url('../assets/logo.png');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  opacity: 0.4;
+  filter: blur(0.5px);
+  z-index: 0;
+  pointer-events: none;
+  animation: bg-logo-pulse 4s ease-in-out infinite;
+}
+
+@keyframes bg-logo-pulse {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.2;
+  }
+
+  50% {
+    transform: translate(-50%, -50%) scale(1.05);
+    opacity: 0.25;
+  }
+
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.2;
+  }
 }
 
 @keyframes room-fade-in {
@@ -4485,21 +4525,18 @@
   box-shadow: 0 0 20px rgba(255, 215, 0, 0.5) !important;
 }
 
-/* Sección derecha - Fondo negro con resplandor dorado */
+/* Sección derecha - Fondo transparente para Gold */
 .gold-room .right-section {
-  background: rgba(0, 0, 0, 0.95) !important;
-  border: 2px solid rgba(255, 215, 0, 0.4) !important;
-  border-radius: 15px !important;
-  box-shadow:
-    0 0 30px rgba(255, 215, 0, 0.4),
-    inset 0 0 40px rgba(255, 215, 0, 0.1) !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 
 .gold-room .side-info {
-  background: rgba(0, 0, 0, 0.7) !important;
+  background: transparent !important;
   padding: 10px !important;
   border-radius: 12px !important;
-  box-shadow: 0 0 20px rgba(255, 215, 0, 0.3) !important;
+  box-shadow: none !important;
 }
 
 .gold-room .modern-bingo-machine {

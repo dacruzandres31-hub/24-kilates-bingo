@@ -15,6 +15,43 @@
   overflow: hidden;
 }
 
+/* Ghost Logo Background */
+.card-selection-lobby::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 1200px;
+  height: 1200px;
+  background-image: url('../assets/logo.png');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  opacity: 0.4;
+  filter: blur(0.5px);
+  z-index: 0;
+  pointer-events: none;
+  animation: bg-logo-pulse 4s ease-in-out infinite;
+}
+
+@keyframes bg-logo-pulse {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.4;
+  }
+
+  50% {
+    transform: translate(-50%, -50%) scale(1.05);
+    opacity: 0.45;
+  }
+
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.4;
+  }
+}
+
 .card-selection-lobby.loading,
 .card-selection-lobby.closed {
   display: flex;
@@ -101,6 +138,8 @@
   border-bottom: 2px solid rgba(0, 212, 255, 0.3);
   background: rgba(0, 212, 255, 0.05);
   backdrop-filter: blur(10px);
+  position: relative;
+  z-index: 1;
 }
 
 .header-content {
@@ -235,6 +274,8 @@
 
 /* Selection Counter */
 .selection-counter {
+  position: relative;
+  z-index: 1;
   padding: 15px 20px;
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(0, 212, 255, 0.3);
@@ -309,6 +350,8 @@
   padding: 15px 30px;
   background: rgba(0, 0, 0, 0.4);
   border-top: 1px solid rgba(0, 212, 255, 0.2);
+  position: relative;
+  z-index: 1;
 }
 
 .refresh-cards-btn {
@@ -393,7 +436,10 @@
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 25px;
+  gap: 25px;
   align-content: start;
+  position: relative;
+  z-index: 1;
 }
 
 .cards-grid::-webkit-scrollbar {
@@ -569,7 +615,10 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  align-items: center;
   gap: 20px;
+  position: relative;
+  z-index: 1;
 }
 
 .selection-info {
