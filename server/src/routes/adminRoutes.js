@@ -32,7 +32,9 @@ const {
   bulkTransferCards,
   getGGRStats,
   getSuperiorInfo,
-  createStockRequest
+  createStockRequest,
+  getAuditLogs,
+  getSystemHealth
 } = require('../controllers/adminController');
 
 const cardInventoryController = require('../controllers/cardInventoryController');

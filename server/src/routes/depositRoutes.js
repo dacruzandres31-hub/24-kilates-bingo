@@ -1,6 +1,8 @@
 
+
 const express = require('express');
 const router = express.Router();
+const pool = require('../db');
 const DepositService = require('../services/depositService');
 const { authenticateToken, isAdmin, isCajeroOrAdmin } = require('../middleware/authMiddleware');
 
