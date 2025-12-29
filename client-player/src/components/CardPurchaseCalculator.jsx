@@ -48,10 +48,14 @@ const CardPurchaseCalculator = ({ isOpen, onClose }) => {
             });
             if (data.success) {
                 setSuperiorInfo(data.data);
+            } else {
+                throw new Error(data.message || 'No se pudo obtener la información');
             }
         } catch (error) {
             console.error('Error fetching superior info:', error);
-            alert('❌ No se pudo obtener la información de tu agente. Contacta a soporte.');
+            const errorMsg = error.response?.data?.message || error.message;
+            alert(`❌ Error: ${errorMsg}\n\nPor favor contacta a tu agente o soporte.`);
+            setStep(1); // Volver al paso 1
         } finally {
             setLoading(false);
         }
@@ -229,19 +233,20 @@ const CardPurchaseCalculator = ({ isOpen, onClose }) => {
                                             <input
                                                 type="number"
                                                 min="0"
-                                                value={quantities[room]}
+                                                value={quantities[room] === 0 ? '' : quantities[room]}
                                                 onChange={(e) => setQuantities({ ...quantities, [room]: parseInt(e.target.value) || 0 })}
                                                 style={{
-                                                    width: '100%',
-                                                    padding: '0.75rem',
+                                                    width: '120px',
+                                                    padding: '0.5rem',
                                                     background: '#0f172a',
                                                     border: '1px solid #334155',
                                                     borderRadius: '0.5rem',
                                                     color: 'white',
                                                     fontSize: '1rem',
-                                                    outline: 'none'
+                                                    outline: 'none',
+                                                    textAlign: 'center'
                                                 }}
-                                                placeholder="Cantidad"
+                                                placeholder="0"
                                             />
                                         </div>
                                     );
