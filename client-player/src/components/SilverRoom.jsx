@@ -13,6 +13,8 @@ import ModernBallMachine from './ModernBallMachine';
 import RecentBallsPanel from './RecentBallsPanel';
 import useSocket from '../hooks/useSocket';
 import useBingoTerminal from '../hooks/useBingoTerminal';
+import PendingPrizesModal from './PendingPrizesModal';
+import { checkPendingPrizes } from '../helpers/pendingPrizesHelper';
 
 export default function SilverRoom({ onLogout }) {
   const { sessionId } = useParams();
@@ -42,6 +44,8 @@ export default function SilverRoom({ onLogout }) {
   const [sidebarOpen, setSidebarOpen] = useState(false); // Estado del sidebar
   const [showCardSelection, setShowCardSelection] = useState(false); // Mostrar lobby de selección de cartones
   const [selectedPlayerCards, setSelectedPlayerCards] = useState([]); // Cartones seleccionados por el jugador
+  const [pendingPrizes, setPendingPrizes] = useState(null); // Premios pendientes
+  const [showPrizesModal, setShowPrizesModal] = useState(false); // Modal de premios
 
   // --- TERMINAL AUTOMÁTICA ---
   const { alreadyClaimedLine, alreadyClaimedBingo } = useBingoTerminal(
@@ -256,6 +260,26 @@ export default function SilverRoom({ onLogout }) {
       audioService.stop(); // Detener música de fondo
     };
   }, [sessionId]);
+
+  // Verificar premios pendientes al conectarse
+  useEffect(() => {
+    const verifyPendingPrizes = async () => {
+      const result = await checkPendingPrizes();
+      if (result && result.prizes.length > 0) {
+        console.log(`🎁 [SilverRoom] Encontrados ${result.prizes.length} premios pendientes`);
+        setPendingPrizes(result.prizes);
+        setShowPrizesModal(true);
+      }
+    };
+
+    verifyPendingPrizes();
+  }, []); // Solo se ejecuta al montar el componente
+
+  // Handler para cerrar modal de premios
+  const handleClosePrizesModal = () => {
+    setShowPrizesModal(false);
+    setPendingPrizes(null);
+  };
 
   // Generar número de serie del cartón: DDMMYY-S0001
   const generateCardSerial = (cardIndex, roomLetter = 'S') => {
@@ -1020,62 +1044,11 @@ export default function SilverRoom({ onLogout }) {
                       <div
                         className="column-letter"
                         style={{
-                          color: getBallColor(start),
-                          textShadow: `0 0 20px ${getBallColor(start)}`
-                        }}
-                      >
-                        {columnLabel}
-                        {columnCount > 0 && (
-                          <div className="column-counter">{columnCount}</div>
-                        )}
-                      </div>
-                      <div className="column-numbers">
-                        {Array.from({ length: 10 }, (_, i) => {
-                          const number = start + i;
-                          const isCalled = ballsDrawn.some(b => b.number === number);
-                          const isRecent = ballsDrawn.length > 0 &&
-                            ballsDrawn[ballsDrawn.length - 1]?.number === number;
-
-                          return (
-                            <div
-                              key={number}
-                              className={`grid-number ${isCalled ? 'called' : ''} ${isRecent ? 'recent' : ''}`}
-                              style={isCalled ? {
-                                backgroundColor: getBallColor(number),
-                                boxShadow: `0 0 20px ${getBallColor(number)}`
-                              } : {}}
-                            >
-                              {number}
-                              {isCalled && (
-                                <div className="number-glow-ring" style={{ borderColor: getBallColor(number) }}></div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* FILA 2: 31-40, 41-50, 51-60 */}
-              <div className="grid-row">
-                {[3, 4, 5].map(columnIndex => {
-                  const start = columnIndex * 10 + 1;
-                  const end = (columnIndex + 1) * 10;
-                  const columnLabel = `${start}-${end}`;
-                  const columnCount = columnCounts[columnIndex] || 0;
-
-                  return (
-                    <div key={columnIndex} className="grid-column">
-                      <div
-                        className="column-letter"
-                        style={{
                           color: '#c0c0c0',
                           textShadow: '0 0 8px rgba(192, 192, 192, 0.7)',
-                          background: 'linear-gradient(180deg, rgba(192, 192, 192, 0.3), rgba(160, 160, 160, 0.3))',
+                          background: 'linear-gradient(180deg, rgba(192, 192, 192, 0.3), rgba(128, 128, 128, 0.3))',
                           borderRadius: '6px',
-                          border: '2px solid #a0a0a0',
+                          border: '2px solid #808080',
                           fontFamily: "Georgia, 'Times New Roman', serif",
                           padding: '4px 0',
                           fontWeight: 700,
@@ -1101,10 +1074,10 @@ export default function SilverRoom({ onLogout }) {
                               key={number}
                               className={`grid-number ${isCalled ? 'called' : ''} ${isRecent ? 'recent' : ''}`}
                               style={isCalled ? {
-                                background: 'linear-gradient(135deg, #d0d0d0, #e8e8e8)',
+                                background: 'linear-gradient(135deg, #e0e0e0, #c0c0c0)',
                                 color: '#1a1a1a',
                                 fontWeight: 900,
-                                border: '2px solid #c0c0c0',
+                                border: '2px solid #808080',
                                 boxShadow: '0 0 15px rgba(192, 192, 192, 0.9), inset 0 0 10px rgba(255, 255, 255, 0.3)',
                                 fontFamily: "Georgia, 'Times New Roman', serif",
                                 borderRadius: '4px',
@@ -1114,7 +1087,86 @@ export default function SilverRoom({ onLogout }) {
                                 textShadow: '1px 1px 2px rgba(255, 255, 255, 0.5), -1px -1px 2px rgba(0, 0, 0, 0.3)'
                               } : {
                                 background: 'rgba(40, 40, 40, 0.7)',
-                                border: '1px solid rgba(160, 160, 160, 0.3)',
+                                border: '1px solid rgba(192, 192, 192, 0.3)',
+                                borderRadius: '4px',
+                                color: '#808080',
+                                fontFamily: "Georgia, 'Times New Roman', serif",
+                                padding: '6px 3px',
+                                textAlign: 'center',
+                                fontSize: '1.2rem',
+                                fontWeight: 600
+                              }}
+                            >
+                              {number}
+                              {isCalled && (
+                                <div className="number-glow-ring" style={{ borderColor: '#c0c0c0' }}></div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* FILA 2: 31-40, 41-50, 51-60 */}
+              <div className="grid-row">
+                {[3, 4, 5].map(columnIndex => {
+                  const start = columnIndex * 10 + 1;
+                  const end = (columnIndex + 1) * 10;
+                  const columnLabel = `${start}-${end}`;
+                  const columnCount = columnCounts[columnIndex] || 0;
+
+                  return (
+                    <div key={columnIndex} className="grid-column">
+                      <div
+                        className="column-letter"
+                        style={{
+                          color: '#c0c0c0',
+                          textShadow: '0 0 8px rgba(192, 192, 192, 0.7)',
+                          background: 'linear-gradient(180deg, rgba(192, 192, 192, 0.3), rgba(128, 128, 128, 0.3))',
+                          borderRadius: '6px',
+                          border: '2px solid #808080',
+                          fontFamily: "Georgia, 'Times New Roman', serif",
+                          padding: '4px 0',
+                          fontWeight: 700,
+                          textAlign: 'center',
+                          fontSize: '1rem',
+                          letterSpacing: '2px'
+                        }}
+                      >
+                        {columnLabel}
+                        {columnCount > 0 && (
+                          <div className="column-counter">{columnCount}</div>
+                        )}
+                      </div>
+                      <div className="column-numbers">
+                        {Array.from({ length: 10 }, (_, i) => {
+                          const number = start + i;
+                          const isCalled = ballsDrawn.some(b => b.number === number);
+                          const isRecent = ballsDrawn.length > 0 &&
+                            ballsDrawn[ballsDrawn.length - 1]?.number === number;
+
+                          return (
+                            <div
+                              key={number}
+                              className={`grid-number ${isCalled ? 'called' : ''} ${isRecent ? 'recent' : ''}`}
+                              style={isCalled ? {
+                                background: 'linear-gradient(135deg, #e0e0e0, #c0c0c0)',
+                                color: '#1a1a1a',
+                                fontWeight: 900,
+                                border: '2px solid #808080',
+                                boxShadow: '0 0 15px rgba(192, 192, 192, 0.9), inset 0 0 10px rgba(255, 255, 255, 0.3)',
+                                fontFamily: "Georgia, 'Times New Roman', serif",
+                                borderRadius: '4px',
+                                padding: '6px 3px',
+                                textAlign: 'center',
+                                fontSize: '1.2rem',
+                                textShadow: '1px 1px 2px rgba(255, 255, 255, 0.5), -1px -1px 2px rgba(0, 0, 0, 0.3)'
+                              } : {
+                                background: 'rgba(40, 40, 40, 0.7)',
+                                border: '1px solid rgba(192, 192, 192, 0.3)',
                                 borderRadius: '4px',
                                 color: '#808080',
                                 fontFamily: "Georgia, 'Times New Roman', serif",
@@ -1152,9 +1204,9 @@ export default function SilverRoom({ onLogout }) {
                         style={{
                           color: '#c0c0c0',
                           textShadow: '0 0 8px rgba(192, 192, 192, 0.7)',
-                          background: 'linear-gradient(180deg, rgba(192, 192, 192, 0.3), rgba(160, 160, 160, 0.3))',
+                          background: 'linear-gradient(180deg, rgba(192, 192, 192, 0.3), rgba(128, 128, 128, 0.3))',
                           borderRadius: '6px',
-                          border: '2px solid #a0a0a0',
+                          border: '2px solid #808080',
                           fontFamily: "Georgia, 'Times New Roman', serif",
                           padding: '4px 0',
                           fontWeight: 700,
@@ -1180,10 +1232,10 @@ export default function SilverRoom({ onLogout }) {
                               key={number}
                               className={`grid-number ${isCalled ? 'called' : ''} ${isRecent ? 'recent' : ''}`}
                               style={isCalled ? {
-                                background: 'linear-gradient(135deg, #d0d0d0, #e8e8e8)',
+                                background: 'linear-gradient(135deg, #e0e0e0, #c0c0c0)',
                                 color: '#1a1a1a',
                                 fontWeight: 900,
-                                border: '2px solid #c0c0c0',
+                                border: '2px solid #808080',
                                 boxShadow: '0 0 15px rgba(192, 192, 192, 0.9), inset 0 0 10px rgba(255, 255, 255, 0.3)',
                                 fontFamily: "Georgia, 'Times New Roman', serif",
                                 borderRadius: '4px',
@@ -1193,7 +1245,7 @@ export default function SilverRoom({ onLogout }) {
                                 textShadow: '1px 1px 2px rgba(255, 255, 255, 0.5), -1px -1px 2px rgba(0, 0, 0, 0.3)'
                               } : {
                                 background: 'rgba(40, 40, 40, 0.7)',
-                                border: '1px solid rgba(160, 160, 160, 0.3)',
+                                border: '1px solid rgba(192, 192, 192, 0.3)',
                                 borderRadius: '4px',
                                 color: '#808080',
                                 fontFamily: "Georgia, 'Times New Roman', serif",
@@ -1550,6 +1602,14 @@ export default function SilverRoom({ onLogout }) {
             </div>
           )}
         </>
+      )}
+
+      {/* Modal de premios pendientes */}
+      {showPrizesModal && pendingPrizes && (
+        <PendingPrizesModal
+          prizes={pendingPrizes}
+          onClose={handleClosePrizesModal}
+        />
       )}
     </div>
   );

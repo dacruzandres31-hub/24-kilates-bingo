@@ -439,49 +439,50 @@ class GameEngineAuto {
 
   /**
    * Verifica si el cartón tiene alguna línea HORIZONTAL completa
-   * (Solo líneas horizontales según nuevas reglas)
+   * BINGO 90: 3 filas x 9 columnas, 15 números (5 per fila)
    */
   checkHorizontalLines(cardNumbers, calledNumbers) {
-    const horizontalLines = [
-      { type: 'horizontal_1', row: 0 },
-      { type: 'horizontal_2', row: 1 },
-      { type: 'horizontal_3', row: 2 },
-      { type: 'horizontal_4', row: 3 },
-      { type: 'horizontal_5', row: 4 }
-    ];
+    if (!cardNumbers || !Array.isArray(cardNumbers)) return { hasLine: false };
 
-    if (!cardNumbers || !Array.isArray(cardNumbers) || cardNumbers.length < 5) {
-      // console.warn('Inválida estructura de cartón en checkHorizontalLines', cardNumbers);
-      return { hasLine: false };
-    }
+    for (let r = 0; r < cardNumbers.length; r++) {
+      const row = cardNumbers[r];
+      const rowNumbers = row.filter(n => n !== null && n !== undefined && n !== 'FREE');
 
-    for (const line of horizontalLines) {
-      const winningNumbers = [];
-      let isComplete = true;
+      if (rowNumbers.length === 0) continue;
 
-      for (let col = 0; col < 5; col++) {
-        const number = cardNumbers[line.row][col];
-
-        if (line.row === 2 && col === 2) {
-          winningNumbers.push('FREE');
-        } else if (calledNumbers.includes(number)) {
-          winningNumbers.push(number);
-        } else {
-          isComplete = false;
-          break;
-        }
-      }
+      const isComplete = rowNumbers.every(num => calledNumbers.includes(num));
 
       if (isComplete) {
         return {
           hasLine: true,
-          lineType: line.type,
-          winningNumbers
+          row: r,
+          winningNumbers: rowNumbers
         };
       }
     }
-
     return { hasLine: false };
+  }
+
+  /**
+   * Verifica si el cartón tiene BINGO completo (todos los números)
+   */
+  validateBingo(cardNumbers, calledNumbers) {
+    if (!cardNumbers || !Array.isArray(cardNumbers)) {
+      return { isValid: false, winningNumbers: [], totalMarked: 0 };
+    }
+
+    const allNumbers = cardNumbers.flat().filter(n => n !== null && n !== undefined && n !== 'FREE');
+    if (allNumbers.length === 0) return { isValid: false, winningNumbers: [], totalMarked: 0 };
+
+    const markedNumbers = allNumbers.filter(num => calledNumbers.includes(num));
+    const isComplete = markedNumbers.length === allNumbers.length;
+
+    return {
+      isValid: isComplete,
+      winningNumbers: allNumbers,
+      totalMarked: markedNumbers.length,
+      totalNeeded: allNumbers.length
+    };
   }
 
   /**
@@ -592,17 +593,17 @@ class GameEngineAuto {
     // PERSISTIR RESULTADOS EN game_sessions antes de archivar
     const ballSequence = gameState.ballsDrawn;
     const [winners] = await pool.query(
-      'SELECT user_id, prize_type, prize_amount, bolea_number FROM game_winners WHERE game_session_id = ?',
+      'SELECT user_id, prize_type, prize_amount, ball_number FROM game_winners WHERE game_session_id = ?',
       [gameSessionId]
     );
 
     const lineaWinner = winners.find(w => w.prize_type === 'linea');
-    const bingoWinner = winners.find(w => w.prize_type === 'bingo');
+    const bingoWinner = winners.find(w => (w.prize_type === 'bingo' || w.prize_type === 'bingo_pre40'));
 
-    const lineaBallNumber = lineaWinner ? lineaWinner.bolea_number : null;
+    const lineaBallNumber = lineaWinner ? lineaWinner.ball_number : null;
     const lineaBallIndex = lineaBallNumber !== null ? ballSequence.indexOf(lineaBallNumber) : null;
 
-    const bingoBallNumber = bingoWinner ? bingoWinner.bolea_number : null;
+    const bingoBallNumber = bingoWinner ? bingoWinner.ball_number : null;
     const bingoBallIndex = bingoBallNumber !== null ? ballSequence.indexOf(bingoBallNumber) : null;
 
     await pool.query(
@@ -743,47 +744,7 @@ class GameEngineAuto {
     };
   }
 
-  validateBingo(cardNumbers, calledNumbers) {
-    const winningNumbers = [];
-    const missingNumbers = [];
 
-    if (!cardNumbers || !Array.isArray(cardNumbers) || cardNumbers.length < 5) {
-      return {
-        isValid: false,
-        winningNumbers: [],
-        missingNumbers: [],
-        totalMarked: 0,
-        totalNeeded: 24
-      };
-    }
-
-    for (let row = 0; row < 5; row++) {
-      if (!cardNumbers[row] || !Array.isArray(cardNumbers[row]) || cardNumbers[row].length < 5) continue;
-
-      for (let col = 0; col < 5; col++) {
-        const number = cardNumbers[row][col];
-
-        if (row === 2 && col === 2) {
-          winningNumbers.push('FREE');
-          continue;
-        }
-
-        if (calledNumbers.includes(number)) {
-          winningNumbers.push(number);
-        } else {
-          missingNumbers.push(number);
-        }
-      }
-    }
-
-    return {
-      isValid: missingNumbers.length === 0,
-      winningNumbers,
-      missingNumbers,
-      totalMarked: winningNumbers.length,
-      totalNeeded: 24
-    };
-  }
 
   getLinePositions(lineType) {
     switch (lineType) {
@@ -805,13 +766,21 @@ class GameEngineAuto {
   }
 
   convertGridDataToMatrix(gridData) {
-    if (Array.isArray(gridData) && gridData.length === 5) {
+    // Si ya es una matriz 3x9 o 5x5
+    if (Array.isArray(gridData) && gridData.length > 0 && Array.isArray(gridData[0])) {
       return gridData;
     }
 
+    // Caso Bingo 90 (3x9) almacenado como objeto con filas
+    if (typeof gridData === 'object' && gridData.rows) {
+      return gridData.rows;
+    }
+
+    // Caso Bingo 75 (B,I,N,G,O object)
     if (typeof gridData === 'object' && gridData.B && gridData.I && gridData.N && gridData.G && gridData.O) {
       const matrix = [];
-      for (let row = 0; row < 5; row++) {
+      const rowCount = Array.isArray(gridData.B) ? gridData.B.length : 5;
+      for (let row = 0; row < rowCount; row++) {
         matrix.push([
           gridData.B[row],
           gridData.I[row],
@@ -823,6 +792,7 @@ class GameEngineAuto {
       return matrix;
     }
 
+    // Caso Array plano de 25 (Bingo 75)
     if (Array.isArray(gridData) && gridData.length === 25) {
       const matrix = [];
       for (let i = 0; i < 5; i++) {
@@ -831,7 +801,16 @@ class GameEngineAuto {
       return matrix;
     }
 
-    return [[0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]];
+    // Caso Array plano de 27 (Bingo 90: 3x9)
+    if (Array.isArray(gridData) && gridData.length === 27) {
+      const matrix = [];
+      for (let i = 0; i < 3; i++) {
+        matrix.push(gridData.slice(i * 9, (i + 1) * 9));
+      }
+      return matrix;
+    }
+
+    return [];
   }
 
   async getGameWinners(gameSessionId) {
@@ -927,213 +906,195 @@ class GameEngineAuto {
       const gameState = this.activeGames.get(gameSessionId);
       if (!gameState) return;
 
-      console.log(`\n🔍 [OfflineWinners] Verificando todos los cartones para bolilla ${currentBall}`);
+      // 1. Verificar si la LÍNEA ya fue ganada en bolillas anteriores
+      // Revisamos en ambas tablas
+      const [lineInPaid] = await pool.query(`SELECT COUNT(*) as count FROM validated_cards WHERE game_session_id = ? AND line_won = TRUE AND line_ball_number < ?`, [gameSessionId, currentBall]);
+      const [lineInStarter] = await pool.query(`SELECT COUNT(*) as count FROM card_pool WHERE session_id = ? AND line_won = TRUE AND line_ball_number < ?`, [gameSessionId, currentBall]);
 
-      // 1. Obtener TODOS los cartones de la sesión (activos)
-      const [cards] = await pool.query(`
-        SELECT 
-          pcs.id as card_id,
-          pcs.user_id,
-          pcs.card_data,
-          pcs.line_won,
-          pcs.bingo_won,
-          u.username
-        FROM player_card_selections pcs
-        JOIN users u ON pcs.user_id = u.id
-        WHERE pcs.session_id = ?
-        AND pcs.status = 'active'
+      const lineAlreadyWon = (lineInPaid[0].count + lineInStarter[0].count) > 0;
+
+      // 2. Obtener cartones de SALAS PAGAS
+      const [paidCards] = await pool.query(`
+        SELECT id as card_id, player_id as user_id, grid_numbers as card_data, line_won, bingo_won, 'paga' as room_type
+        FROM validated_cards
+        WHERE game_session_id = ?
       `, [gameSessionId]);
 
-      console.log(`🔍 [OfflineWinners] Verificando ${cards.length} cartones`);
+      // 3. Obtener cartones de SALA STARTER
+      const [starterCards] = await pool.query(`
+        SELECT id as card_id, reserved_by as user_id, numbers as card_data, line_won, bingo_won, 'starter' as room_type
+        FROM card_pool
+        WHERE session_id = ? AND reserved_by IS NOT NULL
+      `, [gameSessionId]);
 
-      // 2. Verificar cada cartón
-      for (const card of cards) {
+      const allCards = [...paidCards, ...starterCards];
+      if (allCards.length === 0) return;
+
+      const newLineWinners = [];
+      const newBingoWinners = [];
+
+      // 4. Evaluar cada cartón
+      for (const card of allCards) {
         try {
-          const cardData = JSON.parse(card.card_data);
+          const cardData = typeof card.card_data === 'string' ? JSON.parse(card.card_data) : card.card_data;
           const cardNumbers = this.convertGridDataToMatrix(cardData);
 
-          // Verificar Línea (si aún no ganó)
-          if (!card.line_won) {
-            const hasLine = this.checkHorizontalLines(cardNumbers, gameState.ballsDrawn);
-            if (hasLine) {
-              await this.registerLineWinner(gameSessionId, card.user_id, card.card_id, currentBall, card.username);
+          // Evaluar LÍNEA
+          if (!lineAlreadyWon && !card.line_won) {
+            const lineResult = this.checkHorizontalLines(cardNumbers, gameState.ballsDrawn);
+            if (lineResult.hasLine) {
+              newLineWinners.push({ ...card, cardData });
             }
           }
 
-          // Verificar Bingo (si aún no ganó)
+          // Evaluar BINGO
           if (!card.bingo_won) {
-            const hasBingo = this.validateBingo(cardNumbers, gameState.ballsDrawn);
-            if (hasBingo) {
-              await this.registerBingoWinner(gameSessionId, card.user_id, card.card_id, currentBall, card.username);
+            const bingoResult = this.validateBingo(cardNumbers, gameState.ballsDrawn);
+            if (bingoResult.isValid) {
+              console.log(`🎯 [OfflineWinners] BINGO DETECTADO para cartón ${card.card_id}`);
+              newBingoWinners.push({ ...card, cardData });
             }
           }
-        } catch (cardError) {
-          console.error(`❌ [OfflineWinners] Error verificando cartón ${card.card_id}:`, cardError);
+        } catch (err) {
+          console.error(`❌ [OfflineWinners] Error procesando cartón ${card.card_id}:`, err);
         }
       }
 
+      // 5. Registrar ganadores
+      if (newLineWinners.length > 0) {
+        await this.registerLineWinners(gameSessionId, newLineWinners, currentBall);
+      }
+
+      if (newBingoWinners.length > 0) {
+        await this.registerBingoWinners(gameSessionId, newBingoWinners, currentBall);
+      }
+
     } catch (error) {
-      console.error('❌ [OfflineWinners] Error verificando ganadores:', error);
+      console.error('❌ [OfflineWinners] Error en verificación general:', error);
     }
   }
 
   /**
-   * Registra un ganador de LÍNEA (conectado o offline)
+   * Registra múltiples ganadores de LÍNEA en la misma bolilla
    */
-  async registerLineWinner(gameSessionId, userId, cardId, ballNumber, username) {
+  async registerLineWinners(gameSessionId, winners, ballNumber) {
     try {
       const gameState = this.activeGames.get(gameSessionId);
+      const shareCount = winners.length;
 
-      console.log(`🎉 [OfflineWinners] LÍNEA! Usuario ${username} (${userId}) - Cartón ${cardId} - Bolilla ${ballNumber}`);
-
-      // 1. Marcar cartón como ganador de línea
-      await pool.query(`
-        UPDATE player_card_selections 
-        SET line_won = TRUE, line_ball_number = ?
-        WHERE id = ?
-      `, [ballNumber, cardId]);
-
-      // 2. Contar cuántos ganadores de línea hay en esta sesión
-      const [winners] = await pool.query(`
-        SELECT COUNT(*) as count
-        FROM player_card_selections
-        WHERE session_id = ? AND line_won = TRUE
-      `, [gameSessionId]);
-
-      const shareCount = winners[0].count;
-
-      // 3. Obtener pozo de línea
-      const [session] = await pool.query(`
-        SELECT jackpot_linea FROM game_sessions WHERE id = ?
-      `, [gameSessionId]);
-
+      // Obtener pozo actual
+      const [session] = await pool.query(`SELECT jackpot_linea, room FROM game_sessions WHERE id = ?`, [gameSessionId]);
       const totalPrize = parseFloat(session[0].jackpot_linea) || 0;
       const individualPrize = totalPrize / shareCount;
 
-      // 4. Acreditar al balance del usuario
-      await pool.query(`
-        UPDATE users 
-        SET balance = balance + ?
-        WHERE id = ?
-      `, [individualPrize, userId]);
+      console.log(`🎉 [OfflineWinners] ${shareCount} GANADORES DE LÍNEA en bolilla ${ballNumber}. Pozo: $${totalPrize} -> $${individualPrize} c/u`);
 
-      console.log(`💰 [OfflineWinners] Premio acreditado: $${individualPrize.toFixed(2)} (${shareCount} ganadores)`);
+      for (const winner of winners) {
+        // Obtener nombre de usuario
+        const [u] = await pool.query(`SELECT username FROM users WHERE id = ?`, [winner.user_id]);
+        const username = u[0]?.username || 'Usuario';
 
-      // 5. Registrar en tabla de ganadores
-      await pool.query(`
-        INSERT INTO game_winners 
-        (session_id, user_id, card_id, prize_type, ball_number, balls_drawn, prize_amount, share_count, balance_credited)
-        VALUES (?, ?, ?, 'linea', ?, ?, ?, ?, TRUE)
-      `, [gameSessionId, userId, cardId, ballNumber, JSON.stringify(gameState.ballsDrawn), individualPrize, shareCount]);
+        // Marcar cartón en la tabla correspondiente
+        if (winner.room_type === 'paga') {
+          await pool.query(`UPDATE validated_cards SET line_won = TRUE, line_ball_number = ? WHERE id = ?`, [ballNumber, winner.card_id]);
+        } else {
+          await pool.query(`UPDATE card_pool SET line_won = TRUE, line_ball_number = ? WHERE id = ?`, [ballNumber, winner.card_id]);
+        }
 
-      // 6. Emitir evento a jugadores conectados
-      this.io.to(`session_${gameSessionId}`).emit('line_winner', {
-        userId,
-        username,
-        cardId,
-        ballNumber,
-        prize: individualPrize,
-        shareCount,
-        timestamp: new Date()
-      });
+        // Acreditar balance
+        await pool.query(`UPDATE users SET balance = balance + ? WHERE id = ?`, [individualPrize, winner.user_id]);
 
-      // También emitir a la sala global
-      this.io.to(`room_${gameState.roomId}`).emit('line_winner', {
-        userId,
-        username,
-        cardId,
-        ballNumber,
-        prize: individualPrize,
-        shareCount,
-        timestamp: new Date()
-      });
+        // Registrar en historial con card_data
+        await pool.query(`
+          INSERT INTO game_winners 
+          (game_session_id, user_id, card_id, card_data, prize_type, ball_number, balls_drawn, prize_amount, share_count, balance_credited)
+          VALUES (?, ?, ?, ?, 'linea', ?, ?, ?, ?, TRUE)
+        `, [gameSessionId, winner.user_id, winner.card_id, JSON.stringify(winner.cardData), ballNumber, JSON.stringify(gameState.ballsDrawn), individualPrize, shareCount]);
 
-      console.log(`📡 [OfflineWinners] Evento 'line_winner' emitido`);
+        // Notificar via Socket
+        const eventData = { userId: winner.user_id, username, cardId: winner.card_id, ballNumber, prize: individualPrize, shareCount, timestamp: new Date() };
+        this.io.to(`session_${gameSessionId}`).emit('line_winner', eventData);
+        this.io.to(`room_${gameState.roomId}`).emit('line_winner', eventData);
+      }
+
+      // Resetear pozo de línea en la sesión
+      await pool.query(`UPDATE game_sessions SET jackpot_linea = 0 WHERE id = ?`, [gameSessionId]);
 
     } catch (error) {
-      console.error('❌ [OfflineWinners] Error registrando ganador de línea:', error);
+      console.error('❌ [OfflineWinners] Error registrando ganadores de línea:', error);
     }
   }
 
   /**
-   * Registra un ganador de BINGO (conectado o offline)
+   * Registra múltiples ganadores de BINGO en la misma bolilla
    */
-  async registerBingoWinner(gameSessionId, userId, cardId, ballNumber, username) {
+  async registerBingoWinners(gameSessionId, winners, ballNumber) {
     try {
       const gameState = this.activeGames.get(gameSessionId);
+      const shareCount = winners.length;
 
-      console.log(`🏆 [OfflineWinners] BINGO! Usuario ${username} (${userId}) - Cartón ${cardId} - Bolilla ${ballNumber}`);
+      // Obtener pozo actual
+      const [session] = await pool.query(`SELECT jackpot_bingo, jackpot_pre40, room FROM game_sessions WHERE id = ?`, [gameSessionId]);
+      const baseBingoPrize = parseFloat(session[0].jackpot_bingo) || 0;
 
-      // 1. Marcar cartón como ganador de bingo
-      await pool.query(`
-        UPDATE player_card_selections 
-        SET bingo_won = TRUE, bingo_ball_number = ?
-        WHERE id = ?
-      `, [ballNumber, cardId]);
+      // Verificar JackPot Pre-40
+      let totalBingoPrize = baseBingoPrize;
+      let pre40Won = false;
+      if (ballNumber <= 40) {
+        const pre40Prize = parseFloat(session[0].jackpot_pre40) || 0;
+        if (pre40Prize > 0) {
+          totalBingoPrize += pre40Prize;
+          pre40Won = true;
+          console.log(`🔥 [OfflineWinners] ¡JACKPOT PRE-40 GANADO! (Bolilla ${ballNumber}) Extra: $${pre40Prize}`);
+        }
+      }
 
-      // 2. Contar cuántos ganadores de bingo hay (puede haber múltiples en la misma bolilla)
-      const [winners] = await pool.query(`
-        SELECT COUNT(*) as count
-        FROM player_card_selections
-        WHERE session_id = ? AND bingo_won = TRUE
-      `, [gameSessionId]);
+      const individualPrize = totalBingoPrize / shareCount;
 
-      const shareCount = winners[0].count;
+      console.log(`🏆 [OfflineWinners] ${shareCount} GANADORES DE BINGO en bolilla ${ballNumber}. Premio Total: $${totalBingoPrize} -> $${individualPrize} c/u`);
 
-      // 3. Obtener pozo de bingo
-      const [session] = await pool.query(`
-        SELECT jackpot_bingo FROM game_sessions WHERE id = ?
-      `, [gameSessionId]);
+      for (const winner of winners) {
+        // Obtener nombre de usuario
+        const [u] = await pool.query(`SELECT username FROM users WHERE id = ?`, [winner.user_id]);
+        const username = u[0]?.username || 'Usuario';
 
-      const totalPrize = parseFloat(session[0].jackpot_bingo) || 0;
-      const individualPrize = totalPrize / shareCount;
+        // Marcar cartón en la tabla correspondiente
+        if (winner.room_type === 'paga') {
+          await pool.query(`UPDATE validated_cards SET bingo_won = TRUE, bingo_ball_number = ? WHERE id = ?`, [ballNumber, winner.card_id]);
+        } else {
+          await pool.query(`UPDATE card_pool SET bingo_won = TRUE, bingo_ball_number = ? WHERE id = ?`, [ballNumber, winner.card_id]);
+        }
 
-      // 4. Acreditar al balance del usuario
-      await pool.query(`
-        UPDATE users 
-        SET balance = balance + ?
-        WHERE id = ?
-      `, [individualPrize, userId]);
+        // Acreditar balance
+        await pool.query(`UPDATE users SET balance = balance + ? WHERE id = ?`, [individualPrize, winner.user_id]);
 
-      console.log(`💰 [OfflineWinners] Premio BINGO acreditado: $${individualPrize.toFixed(2)} (${shareCount} ganadores)`);
+        // Registrar en historial con card_data
+        await pool.query(`
+          INSERT INTO game_winners 
+          (game_session_id, user_id, card_id, card_data, prize_type, ball_number, balls_drawn, prize_amount, share_count, balance_credited)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)
+        `, [gameSessionId, winner.user_id, winner.card_id, JSON.stringify(winner.cardData), pre40Won ? 'bingo_pre40' : 'bingo', ballNumber, JSON.stringify(gameState.ballsDrawn), individualPrize, shareCount]);
 
-      // 5. Registrar en tabla de ganadores
-      await pool.query(`
-        INSERT INTO game_winners 
-        (session_id, user_id, card_id, prize_type, ball_number, balls_drawn, prize_amount, share_count, balance_credited)
-        VALUES (?, ?, ?, 'bingo', ?, ?, ?, ?, TRUE)
-      `, [gameSessionId, userId, cardId, ballNumber, JSON.stringify(gameState.ballsDrawn), individualPrize, shareCount]);
+        // Notificar via Socket
+        const eventData = { userId: winner.user_id, username, cardId: winner.card_id, ballNumber, prize: individualPrize, shareCount, isPre40: pre40Won, timestamp: new Date() };
+        this.io.to(`session_${gameSessionId}`).emit('bingo_winner', eventData);
+        this.io.to(`room_${gameState.roomId}`).emit('bingo_winner', eventData);
+      }
 
-      // 6. Emitir evento a jugadores conectados
-      this.io.to(`session_${gameSessionId}`).emit('bingo_winner', {
-        userId,
-        username,
-        cardId,
-        ballNumber,
-        prize: individualPrize,
-        shareCount,
-        timestamp: new Date()
-      });
+      // Resetear pozos
+      if (pre40Won) {
+        await pool.query(`UPDATE game_sessions SET jackpot_bingo = 0, jackpot_pre40 = 0 WHERE id = ?`, [gameSessionId]);
+        await pool.query(`UPDATE room_settings SET accumulated_pot_pre40 = 0 WHERE room = ?`, [session[0].room]);
+      } else {
+        await pool.query(`UPDATE game_sessions SET jackpot_bingo = 0 WHERE id = ?`, [gameSessionId]);
+      }
 
-      // También emitir a la sala global
-      this.io.to(`room_${gameState.roomId}`).emit('bingo_winner', {
-        userId,
-        username,
-        cardId,
-        ballNumber,
-        prize: individualPrize,
-        shareCount,
-        timestamp: new Date()
-      });
-
-      console.log(`📡 [OfflineWinners] Evento 'bingo_winner' emitido`);
-
-      // 7. TERMINAR EL JUEGO
-      console.log(`🏁 [OfflineWinners] Terminando juego por BINGO`);
+      // TERMINAR EL JUEGO
+      console.log(`🏁 [OfflineWinners] Finalizando sesión ${gameSessionId} por Bingo`);
       await this.endGame(gameSessionId, 'completed');
 
     } catch (error) {
-      console.error('❌ [OfflineWinners] Error registrando ganador de bingo:', error);
+      console.error('❌ [OfflineWinners] Error registrando ganadores de bingo:', error);
     }
   }
 }

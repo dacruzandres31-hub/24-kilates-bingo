@@ -3,6 +3,7 @@ import axios from 'axios';
 import { motion, AnimatePresence, animate } from 'framer-motion';
 import { FaTimes, FaGift, FaLock } from 'react-icons/fa';
 import audioService from '../../services/audioService';
+import logo24k from '../../assets/logo.png';
 import './FortuneWheel.css';
 
 const FortuneWheel = ({ isOpen, onClose, onPrizeClaimed, onSpinComplete }) => {
@@ -191,15 +192,17 @@ const FortuneWheel = ({ isOpen, onClose, onPrizeClaimed, onSpinComplete }) => {
                                 >
                                     {/* Rotate text back if needed specific reading angle, but default is radial */}
                                     <span className="segment-label">
-                                        {seg.type === 'cash' && <span className="money-icon">💰</span>}
                                         {seg.label}
                                     </span>
                                 </div>
                             ))}
-                        </div>
 
-                        <div className="wheel-center">
-                            <div className="wheel-center-inner"></div>
+                            {/* Wheel Center - Moved inside to rotate with segments */}
+                            <div className={`wheel-center ${(isSpinning || prize) ? 'spinning-glow' : ''}`}>
+                                <div className="wheel-center-inner">
+                                    <img src={logo24k} alt="24K" className="wheel-center-logo" />
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -246,7 +249,7 @@ const FortuneWheel = ({ isOpen, onClose, onPrizeClaimed, onSpinComplete }) => {
                     </div>
                 </motion.div>
             </motion.div>
-        </AnimatePresence>
+        </AnimatePresence >
     );
 };
 

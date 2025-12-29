@@ -14,6 +14,8 @@ import RecentBallsPanel from './RecentBallsPanel';
 import JackpotDisplay from './JackpotDisplay';
 import useSocket from '../hooks/useSocket';
 import useBingoTerminal from '../hooks/useBingoTerminal';
+import PendingPrizesModal from './PendingPrizesModal';
+import { checkPendingPrizes } from '../helpers/pendingPrizesHelper';
 
 export default function BronzeRoom({ onLogout }) {
   const { sessionId } = useParams();
@@ -46,6 +48,8 @@ export default function BronzeRoom({ onLogout }) {
   const [sidebarOpen, setSidebarOpen] = useState(false); // Estado del sidebar
   const [showCardSelection, setShowCardSelection] = useState(false); // Mostrar lobby de selección de cartones
   const [selectedPlayerCards, setSelectedPlayerCards] = useState([]); // Cartones seleccionados por el jugador
+  const [pendingPrizes, setPendingPrizes] = useState(null); // Premios pendientes
+  const [showPrizesModal, setShowPrizesModal] = useState(false); // Modal de premios
   const [cardsRemaining, setCardsRemaining] = useState(20); // Cartones que faltan por seleccionar
   const [showReadyModal, setShowReadyModal] = useState(false); // Modal "¡¡Todo Listo!!"
   const [timeRemaining, setTimeRemaining] = useState(null);
@@ -613,6 +617,26 @@ export default function BronzeRoom({ onLogout }) {
     };
   }, [sessionId]);
 
+  // Verificar premios pendientes al conectarse
+  useEffect(() => {
+    const verifyPendingPrizes = async () => {
+      const result = await checkPendingPrizes();
+      if (result && result.prizes.length > 0) {
+        console.log(`🎁 [BronzeRoom] Encontrados ${result.prizes.length} premios pendientes`);
+        setPendingPrizes(result.prizes);
+        setShowPrizesModal(true);
+      }
+    };
+
+    verifyPendingPrizes();
+  }, []); // Solo se ejecuta al montar el componente
+
+  // Handler para cerrar modal de premios
+  const handleClosePrizesModal = () => {
+    setShowPrizesModal(false);
+    setPendingPrizes(null);
+  };
+
   // Organizar bolillas por decenas para el grid
   const organizedBalls = {};
   for (let i = 0; i < 9; i++) {
@@ -1075,20 +1099,7 @@ export default function BronzeRoom({ onLogout }) {
             {/* Cuadrícula Digital - IZQUIERDA COMPLETA - 3 FILAS */}
             <div className="digital-grid-full">
               <div className="grid-header">
-                <div className="grid-title" style={{
-                  fontSize: '1rem',
-                  fontWeight: 900,
-                  letterSpacing: '2px',
-                  color: '#b87333',
-                  textShadow: '0 0 8px rgba(184, 115, 51, 0.5)',
-                  background: 'linear-gradient(180deg, rgba(62, 39, 35, 0.9), rgba(42, 24, 16, 0.9))',
-                  borderRadius: '6px',
-                  border: '2px solid #5a2d0c',
-                  fontFamily: "'Roboto Condensed', 'Arial Narrow', sans-serif",
-                  padding: '8px 16px',
-                  textAlign: 'center',
-                  textTransform: 'uppercase'
-                }}>NÚMEROS CANTADOS</div>
+                <div className="grid-title">NÚMEROS CANTADOS</div>
                 <div className="grid-glow"></div>
               </div>
 
@@ -1105,14 +1116,14 @@ export default function BronzeRoom({ onLogout }) {
                       <div
                         className="column-letter"
                         style={{
-                          color: '#b87333',
-                          textShadow: '0 0 8px rgba(184, 115, 51, 0.5)',
-                          background: 'linear-gradient(180deg, rgba(62, 39, 35, 0.9), rgba(42, 24, 16, 0.9))',
+                          color: '#d4a574',
+                          textShadow: '0 0 8px rgba(184, 115, 51, 0.7)',
+                          background: 'linear-gradient(180deg, rgba(139, 69, 13, 0.3), rgba(62, 39, 35, 0.3))',
                           borderRadius: '6px',
-                          border: '2px solid #5a2d0c',
-                          fontFamily: "'Roboto Condensed', 'Arial Narrow', sans-serif",
+                          border: '2px solid #8b4513',
+                          fontFamily: "Georgia, 'Times New Roman', serif",
                           padding: '4px 0',
-                          fontWeight: 900,
+                          fontWeight: 700,
                           textAlign: 'center',
                           fontSize: '1rem',
                           letterSpacing: '2px'
@@ -1135,33 +1146,32 @@ export default function BronzeRoom({ onLogout }) {
                               key={number}
                               className={`grid-number ${isCalled ? 'called' : ''} ${isRecent ? 'recent' : ''}`}
                               style={isCalled ? {
-                                background: 'linear-gradient(135deg, #b87333, #d4a574)',
+                                background: 'linear-gradient(135deg, #d4a574, #b87333)',
                                 color: '#1a1310',
                                 fontWeight: 900,
                                 border: '2px solid #8b4513',
-                                boxShadow: '0 0 15px rgba(184, 115, 51, 0.8), inset 0 0 10px rgba(255, 255, 255, 0.2)',
-                                fontFamily: "'Roboto Condensed', 'Arial Narrow', sans-serif",
+                                boxShadow: '0 0 15px rgba(184, 115, 51, 0.9), inset 0 0 10px rgba(255, 255, 255, 0.3)',
+                                fontFamily: "Georgia, 'Times New Roman', serif",
                                 borderRadius: '4px',
                                 padding: '6px 3px',
                                 textAlign: 'center',
                                 fontSize: '1.2rem',
-                                textShadow: '1px 1px 2px rgba(255, 255, 255, 0.3), -1px -1px 2px rgba(0, 0, 0, 0.5)'
+                                textShadow: '1px 1px 2px rgba(255, 255, 255, 0.5), -1px -1px 2px rgba(0, 0, 0, 0.3)'
                               } : {
-                                background: 'rgba(26, 19, 16, 0.7)',
-                                border: '1px solid rgba(90, 45, 12, 0.3)',
+                                background: 'rgba(40, 20, 10, 0.7)',
+                                border: '1px solid rgba(139, 69, 13, 0.3)',
                                 borderRadius: '4px',
                                 color: '#6b4423',
-                                fontFamily: "'Roboto Condensed', 'Arial Narrow', sans-serif",
+                                fontFamily: "Georgia, 'Times New Roman', serif",
                                 padding: '6px 3px',
                                 textAlign: 'center',
                                 fontSize: '1.2rem',
-                                fontWeight: 600,
-                                textShadow: '1px 1px 2px rgba(212, 165, 116, 0.2)'
+                                fontWeight: 600
                               }}
                             >
                               {number}
                               {isCalled && (
-                                <div className="number-glow-ring" style={{ borderColor: '#b87333' }}></div>
+                                <div className="number-glow-ring" style={{ borderColor: '#d4a574' }}></div>
                               )}
                             </div>
                           );
@@ -1185,14 +1195,14 @@ export default function BronzeRoom({ onLogout }) {
                       <div
                         className="column-letter"
                         style={{
-                          color: '#b87333',
-                          textShadow: '0 0 8px rgba(184, 115, 51, 0.5)',
-                          background: 'linear-gradient(180deg, rgba(62, 39, 35, 0.9), rgba(42, 24, 16, 0.9))',
+                          color: '#d4a574',
+                          textShadow: '0 0 8px rgba(184, 115, 51, 0.7)',
+                          background: 'linear-gradient(180deg, rgba(139, 69, 13, 0.3), rgba(62, 39, 35, 0.3))',
                           borderRadius: '6px',
-                          border: '2px solid #5a2d0c',
-                          fontFamily: "'Roboto Condensed', 'Arial Narrow', sans-serif",
+                          border: '2px solid #8b4513',
+                          fontFamily: "Georgia, 'Times New Roman', serif",
                           padding: '4px 0',
-                          fontWeight: 900,
+                          fontWeight: 700,
                           textAlign: 'center',
                           fontSize: '1rem',
                           letterSpacing: '2px'
@@ -1215,33 +1225,32 @@ export default function BronzeRoom({ onLogout }) {
                               key={number}
                               className={`grid-number ${isCalled ? 'called' : ''} ${isRecent ? 'recent' : ''}`}
                               style={isCalled ? {
-                                background: 'linear-gradient(135deg, #b87333, #d4a574)',
+                                background: 'linear-gradient(135deg, #d4a574, #b87333)',
                                 color: '#1a1310',
                                 fontWeight: 900,
                                 border: '2px solid #8b4513',
-                                boxShadow: '0 0 15px rgba(184, 115, 51, 0.8), inset 0 0 10px rgba(255, 255, 255, 0.2)',
-                                fontFamily: "'Roboto Condensed', 'Arial Narrow', sans-serif",
+                                boxShadow: '0 0 15px rgba(184, 115, 51, 0.9), inset 0 0 10px rgba(255, 255, 255, 0.3)',
+                                fontFamily: "Georgia, 'Times New Roman', serif",
                                 borderRadius: '4px',
                                 padding: '6px 3px',
                                 textAlign: 'center',
                                 fontSize: '1.2rem',
-                                textShadow: '1px 1px 2px rgba(255, 255, 255, 0.3), -1px -1px 2px rgba(0, 0, 0, 0.5)'
+                                textShadow: '1px 1px 2px rgba(255, 255, 255, 0.5), -1px -1px 2px rgba(0, 0, 0, 0.3)'
                               } : {
-                                background: 'rgba(26, 19, 16, 0.7)',
-                                border: '1px solid rgba(90, 45, 12, 0.3)',
+                                background: 'rgba(40, 20, 10, 0.7)',
+                                border: '1px solid rgba(139, 69, 13, 0.3)',
                                 borderRadius: '4px',
                                 color: '#6b4423',
-                                fontFamily: "'Roboto Condensed', 'Arial Narrow', sans-serif",
+                                fontFamily: "Georgia, 'Times New Roman', serif",
                                 padding: '6px 3px',
                                 textAlign: 'center',
                                 fontSize: '1.2rem',
-                                fontWeight: 600,
-                                textShadow: '1px 1px 2px rgba(212, 165, 116, 0.2)'
+                                fontWeight: 600
                               }}
                             >
                               {number}
                               {isCalled && (
-                                <div className="number-glow-ring" style={{ borderColor: '#b87333' }}></div>
+                                <div className="number-glow-ring" style={{ borderColor: '#d4a574' }}></div>
                               )}
                             </div>
                           );
@@ -1265,14 +1274,14 @@ export default function BronzeRoom({ onLogout }) {
                       <div
                         className="column-letter"
                         style={{
-                          color: '#b87333',
-                          textShadow: '0 0 8px rgba(184, 115, 51, 0.5)',
-                          background: 'linear-gradient(180deg, rgba(62, 39, 35, 0.9), rgba(42, 24, 16, 0.9))',
+                          color: '#d4a574',
+                          textShadow: '0 0 8px rgba(184, 115, 51, 0.7)',
+                          background: 'linear-gradient(180deg, rgba(139, 69, 13, 0.3), rgba(62, 39, 35, 0.3))',
                           borderRadius: '6px',
-                          border: '2px solid #5a2d0c',
-                          fontFamily: "'Roboto Condensed', 'Arial Narrow', sans-serif",
+                          border: '2px solid #8b4513',
+                          fontFamily: "Georgia, 'Times New Roman', serif",
                           padding: '4px 0',
-                          fontWeight: 900,
+                          fontWeight: 700,
                           textAlign: 'center',
                           fontSize: '1rem',
                           letterSpacing: '2px'
@@ -1295,33 +1304,32 @@ export default function BronzeRoom({ onLogout }) {
                               key={number}
                               className={`grid-number ${isCalled ? 'called' : ''} ${isRecent ? 'recent' : ''}`}
                               style={isCalled ? {
-                                background: 'linear-gradient(135deg, #b87333, #d4a574)',
+                                background: 'linear-gradient(135deg, #d4a574, #b87333)',
                                 color: '#1a1310',
                                 fontWeight: 900,
                                 border: '2px solid #8b4513',
-                                boxShadow: '0 0 15px rgba(184, 115, 51, 0.8), inset 0 0 10px rgba(255, 255, 255, 0.2)',
-                                fontFamily: "'Roboto Condensed', 'Arial Narrow', sans-serif",
+                                boxShadow: '0 0 15px rgba(184, 115, 51, 0.9), inset 0 0 10px rgba(255, 255, 255, 0.3)',
+                                fontFamily: "Georgia, 'Times New Roman', serif",
                                 borderRadius: '4px',
                                 padding: '6px 3px',
                                 textAlign: 'center',
                                 fontSize: '1.2rem',
-                                textShadow: '1px 1px 2px rgba(255, 255, 255, 0.3), -1px -1px 2px rgba(0, 0, 0, 0.5)'
+                                textShadow: '1px 1px 2px rgba(255, 255, 255, 0.5), -1px -1px 2px rgba(0, 0, 0, 0.3)'
                               } : {
-                                background: 'rgba(26, 19, 16, 0.7)',
-                                border: '1px solid rgba(90, 45, 12, 0.3)',
+                                background: 'rgba(40, 20, 10, 0.7)',
+                                border: '1px solid rgba(139, 69, 13, 0.3)',
                                 borderRadius: '4px',
                                 color: '#6b4423',
-                                fontFamily: "'Roboto Condensed', 'Arial Narrow', sans-serif",
+                                fontFamily: "Georgia, 'Times New Roman', serif",
                                 padding: '6px 3px',
                                 textAlign: 'center',
                                 fontSize: '1.2rem',
-                                fontWeight: 600,
-                                textShadow: '1px 1px 2px rgba(212, 165, 116, 0.2)'
+                                fontWeight: 600
                               }}
                             >
                               {number}
                               {isCalled && (
-                                <div className="number-glow-ring" style={{ borderColor: '#b87333' }}></div>
+                                <div className="number-glow-ring" style={{ borderColor: '#d4a574' }}></div>
                               )}
                             </div>
                           );
@@ -1702,6 +1710,14 @@ export default function BronzeRoom({ onLogout }) {
         </>
       )
       }
+
+      {/* Modal de premios pendientes */}
+      {showPrizesModal && pendingPrizes && (
+        <PendingPrizesModal
+          prizes={pendingPrizes}
+          onClose={handleClosePrizesModal}
+        />
+      )}
     </div >
   );
 }

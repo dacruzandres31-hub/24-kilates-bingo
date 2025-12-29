@@ -13,6 +13,8 @@ import ModernBallMachine from './ModernBallMachine';
 import RecentBallsPanel from './RecentBallsPanel';
 import useSocket from '../hooks/useSocket';
 import useBingoTerminal from '../hooks/useBingoTerminal';
+import PendingPrizesModal from './PendingPrizesModal';
+import { checkPendingPrizes } from '../helpers/pendingPrizesHelper';
 
 export default function GoldRoom({ onLogout }) {
   const { sessionId } = useParams();
@@ -42,6 +44,8 @@ export default function GoldRoom({ onLogout }) {
   const [sidebarOpen, setSidebarOpen] = useState(false); // Estado del sidebar
   const [showCardSelection, setShowCardSelection] = useState(false); // Mostrar lobby de selección de cartones
   const [selectedPlayerCards, setSelectedPlayerCards] = useState([]); // Cartones seleccionados por el jugador
+  const [pendingPrizes, setPendingPrizes] = useState(null); // Premios pendientes
+  const [showPrizesModal, setShowPrizesModal] = useState(false); // Modal de premios
 
   // --- TERMINAL AUTOMÁTICA ---
   const { alreadyClaimedLine, alreadyClaimedBingo } = useBingoTerminal(
@@ -256,6 +260,26 @@ export default function GoldRoom({ onLogout }) {
       audioService.stop(); // Detener música de fondo
     };
   }, [sessionId]);
+
+  // Verificar premios pendientes al conectarse
+  useEffect(() => {
+    const verifyPendingPrizes = async () => {
+      const result = await checkPendingPrizes();
+      if (result && result.prizes.length > 0) {
+        console.log(`🎁 [GoldRoom] Encontrados ${result.prizes.length} premios pendientes`);
+        setPendingPrizes(result.prizes);
+        setShowPrizesModal(true);
+      }
+    };
+
+    verifyPendingPrizes();
+  }, []); // Solo se ejecuta al montar el componente
+
+  // Handler para cerrar modal de premios
+  const handleClosePrizesModal = () => {
+    setShowPrizesModal(false);
+    setPendingPrizes(null);
+  };
 
   // Generar número de serie del cartón: DDMMYY-S0001
   const generateCardSerial = (cardIndex, roomLetter = 'S') => {
@@ -1599,6 +1623,14 @@ export default function GoldRoom({ onLogout }) {
             </div>
           )}
         </>
+      )}
+
+      {/* Modal de premios pendientes */}
+      {showPrizesModal && pendingPrizes && (
+        <PendingPrizesModal
+          prizes={pendingPrizes}
+          onClose={handleClosePrizesModal}
+        />
       )}
     </div>
   );

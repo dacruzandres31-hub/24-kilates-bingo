@@ -13,6 +13,8 @@ import ModernBallMachine from './ModernBallMachine';
 import RecentBallsPanel from './RecentBallsPanel';
 import useSocket from '../hooks/useSocket';
 import useBingoTerminal from '../hooks/useBingoTerminal';
+import PendingPrizesModal from './PendingPrizesModal';
+import { checkPendingPrizes } from '../helpers/pendingPrizesHelper';
 
 export default function StarterRoom({ onLogout }) {
   const { sessionId } = useParams();
@@ -42,6 +44,8 @@ export default function StarterRoom({ onLogout }) {
   const [sidebarOpen, setSidebarOpen] = useState(false); // Estado del sidebar
   const [showCardSelection, setShowCardSelection] = useState(false); // Mostrar lobby de selección de cartones
   const [selectedPlayerCards, setSelectedPlayerCards] = useState([]); // Cartones seleccionados por el jugador
+  const [pendingPrizes, setPendingPrizes] = useState(null); // Premios pendientes
+  const [showPrizesModal, setShowPrizesModal] = useState(false); // Modal de premios
 
   // --- TERMINAL AUTOMÁTICA ---
   const { alreadyClaimedLine, alreadyClaimedBingo } = useBingoTerminal(
@@ -194,6 +198,26 @@ export default function StarterRoom({ onLogout }) {
     loadRoomStatus();
     restoreGameState();
   }, [sessionId]);
+
+  // Verificar premios pendientes al conectarse
+  useEffect(() => {
+    const verifyPendingPrizes = async () => {
+      const result = await checkPendingPrizes();
+      if (result && result.prizes.length > 0) {
+        console.log(`🎁 [StarterRoom] Encontrados ${result.prizes.length} premios pendientes`);
+        setPendingPrizes(result.prizes);
+        setShowPrizesModal(true);
+      }
+    };
+
+    verifyPendingPrizes();
+  }, []); // Solo se ejecuta al montar el componente
+
+  // Handler para cerrar modal de premios
+  const handleClosePrizesModal = () => {
+    setShowPrizesModal(false);
+    setPendingPrizes(null);
+  };
 
   // Cargar estado de la sala (siguiente sorteo)
   const loadRoomStatus = async () => {
@@ -996,8 +1020,17 @@ export default function StarterRoom({ onLogout }) {
                       <div
                         className="column-letter"
                         style={{
-                          color: getBallColor(start),
-                          textShadow: `0 0 20px ${getBallColor(start)}`
+                          color: '#00fbff',
+                          textShadow: '0 0 8px rgba(0, 251, 255, 0.7)',
+                          background: 'linear-gradient(180deg, rgba(0, 251, 255, 0.3), rgba(0, 139, 139, 0.3))',
+                          borderRadius: '6px',
+                          border: '2px solid #008b8b',
+                          fontFamily: "Georgia, 'Times New Roman', serif",
+                          padding: '4px 0',
+                          fontWeight: 700,
+                          textAlign: 'center',
+                          fontSize: '1rem',
+                          letterSpacing: '2px'
                         }}
                       >
                         {columnLabel}
@@ -1016,14 +1049,33 @@ export default function StarterRoom({ onLogout }) {
                             <div
                               key={number}
                               className={`grid-number ${isCalled ? 'called' : ''} ${isRecent ? 'recent' : ''}`}
-                              data-range={isCalled ? getNumberRange(number) : ''}
                               style={isCalled ? {
-                                boxShadow: `0 0 20px ${getBallColor(number)}`
-                              } : {}}
+                                background: 'linear-gradient(135deg, #00fbff, #00ced1)',
+                                color: '#001a1a',
+                                fontWeight: 900,
+                                border: '2px solid #00fbff',
+                                boxShadow: '0 0 15px rgba(0, 251, 255, 0.9), inset 0 0 10px rgba(255, 255, 255, 0.3)',
+                                fontFamily: "Georgia, 'Times New Roman', serif",
+                                borderRadius: '4px',
+                                padding: '6px 3px',
+                                textAlign: 'center',
+                                fontSize: '1.2rem',
+                                textShadow: '1px 1px 2px rgba(255, 255, 255, 0.5), -1px -1px 2px rgba(0, 0, 0, 0.3)'
+                              } : {
+                                background: 'rgba(0, 40, 40, 0.7)',
+                                border: '1px solid rgba(0, 251, 255, 0.3)',
+                                borderRadius: '4px',
+                                color: '#008b8b',
+                                fontFamily: "Georgia, 'Times New Roman', serif",
+                                padding: '6px 3px',
+                                textAlign: 'center',
+                                fontSize: '1.2rem',
+                                fontWeight: 600
+                              }}
                             >
                               {number}
                               {isCalled && (
-                                <div className="number-glow-ring" style={{ borderColor: getBallColor(number) }}></div>
+                                <div className="number-glow-ring" style={{ borderColor: '#00fbff' }}></div>
                               )}
                             </div>
                           );
@@ -1047,8 +1099,17 @@ export default function StarterRoom({ onLogout }) {
                       <div
                         className="column-letter"
                         style={{
-                          color: getBallColor(start),
-                          textShadow: `0 0 20px ${getBallColor(start)}`
+                          color: '#00fbff',
+                          textShadow: '0 0 8px rgba(0, 251, 255, 0.7)',
+                          background: 'linear-gradient(180deg, rgba(0, 251, 255, 0.3), rgba(0, 139, 139, 0.3))',
+                          borderRadius: '6px',
+                          border: '2px solid #008b8b',
+                          fontFamily: "Georgia, 'Times New Roman', serif",
+                          padding: '4px 0',
+                          fontWeight: 700,
+                          textAlign: 'center',
+                          fontSize: '1rem',
+                          letterSpacing: '2px'
                         }}
                       >
                         {columnLabel}
@@ -1067,14 +1128,33 @@ export default function StarterRoom({ onLogout }) {
                             <div
                               key={number}
                               className={`grid-number ${isCalled ? 'called' : ''} ${isRecent ? 'recent' : ''}`}
-                              data-range={isCalled ? getNumberRange(number) : ''}
                               style={isCalled ? {
-                                boxShadow: `0 0 20px ${getBallColor(number)}`
-                              } : {}}
+                                background: 'linear-gradient(135deg, #00fbff, #00ced1)',
+                                color: '#001a1a',
+                                fontWeight: 900,
+                                border: '2px solid #00fbff',
+                                boxShadow: '0 0 15px rgba(0, 251, 255, 0.9), inset 0 0 10px rgba(255, 255, 255, 0.3)',
+                                fontFamily: "Georgia, 'Times New Roman', serif",
+                                borderRadius: '4px',
+                                padding: '6px 3px',
+                                textAlign: 'center',
+                                fontSize: '1.2rem',
+                                textShadow: '1px 1px 2px rgba(255, 255, 255, 0.5), -1px -1px 2px rgba(0, 0, 0, 0.3)'
+                              } : {
+                                background: 'rgba(0, 40, 40, 0.7)',
+                                border: '1px solid rgba(0, 251, 255, 0.3)',
+                                borderRadius: '4px',
+                                color: '#008b8b',
+                                fontFamily: "Georgia, 'Times New Roman', serif",
+                                padding: '6px 3px',
+                                textAlign: 'center',
+                                fontSize: '1.2rem',
+                                fontWeight: 600
+                              }}
                             >
                               {number}
                               {isCalled && (
-                                <div className="number-glow-ring" style={{ borderColor: getBallColor(number) }}></div>
+                                <div className="number-glow-ring" style={{ borderColor: '#00fbff' }}></div>
                               )}
                             </div>
                           );
@@ -1098,8 +1178,17 @@ export default function StarterRoom({ onLogout }) {
                       <div
                         className="column-letter"
                         style={{
-                          color: getBallColor(start),
-                          textShadow: `0 0 20px ${getBallColor(start)}`
+                          color: '#00fbff',
+                          textShadow: '0 0 8px rgba(0, 251, 255, 0.7)',
+                          background: 'linear-gradient(180deg, rgba(0, 251, 255, 0.3), rgba(0, 139, 139, 0.3))',
+                          borderRadius: '6px',
+                          border: '2px solid #008b8b',
+                          fontFamily: "Georgia, 'Times New Roman', serif",
+                          padding: '4px 0',
+                          fontWeight: 700,
+                          textAlign: 'center',
+                          fontSize: '1rem',
+                          letterSpacing: '2px'
                         }}
                       >
                         {columnLabel}
@@ -1118,14 +1207,33 @@ export default function StarterRoom({ onLogout }) {
                             <div
                               key={number}
                               className={`grid-number ${isCalled ? 'called' : ''} ${isRecent ? 'recent' : ''}`}
-                              data-range={isCalled ? getNumberRange(number) : ''}
                               style={isCalled ? {
-                                boxShadow: `0 0 20px ${getBallColor(number)}`
-                              } : {}}
+                                background: 'linear-gradient(135deg, #00fbff, #00ced1)',
+                                color: '#001a1a',
+                                fontWeight: 900,
+                                border: '2px solid #00fbff',
+                                boxShadow: '0 0 15px rgba(0, 251, 255, 0.9), inset 0 0 10px rgba(255, 255, 255, 0.3)',
+                                fontFamily: "Georgia, 'Times New Roman', serif",
+                                borderRadius: '4px',
+                                padding: '6px 3px',
+                                textAlign: 'center',
+                                fontSize: '1.2rem',
+                                textShadow: '1px 1px 2px rgba(255, 255, 255, 0.5), -1px -1px 2px rgba(0, 0, 0, 0.3)'
+                              } : {
+                                background: 'rgba(0, 40, 40, 0.7)',
+                                border: '1px solid rgba(0, 251, 255, 0.3)',
+                                borderRadius: '4px',
+                                color: '#008b8b',
+                                fontFamily: "Georgia, 'Times New Roman', serif",
+                                padding: '6px 3px',
+                                textAlign: 'center',
+                                fontSize: '1.2rem',
+                                fontWeight: 600
+                              }}
                             >
                               {number}
                               {isCalled && (
-                                <div className="number-glow-ring" style={{ borderColor: getBallColor(number) }}></div>
+                                <div className="number-glow-ring" style={{ borderColor: '#00fbff' }}></div>
                               )}
                             </div>
                           );
@@ -1450,6 +1558,14 @@ export default function StarterRoom({ onLogout }) {
             </div>
           ))}
         </>
+      )}
+
+      {/* Modal de premios pendientes */}
+      {showPrizesModal && pendingPrizes && (
+        <PendingPrizesModal
+          prizes={pendingPrizes}
+          onClose={handleClosePrizesModal}
+        />
       )}
     </div>
   );

@@ -612,7 +612,7 @@ const CasinoLobby = ({ user, onLogout }) => {
   }, []);
 
   return (
-    <div className="casino-lobby" style={{ '--lobby-bg-image': `url(${lobbyBackground})` }}>
+    <div className={`casino-lobby ${showWheel ? 'wheel-open' : ''}`} style={{ '--lobby-bg-image': `url(${lobbyBackground})` }}>
       {/* Hidden target for Tour - Central Ghost Logo */}
       <div
         id="tour-start-logo"
@@ -757,60 +757,62 @@ const CasinoLobby = ({ user, onLogout }) => {
 
       <CustomTour runTour={runTour} onTourEnd={handleTourEnd} />
 
-      {/* Header con Logo */}
-      <header className="lobby-header">
-        {/* Stats Izquierda */}
-        <div className="header-stats left">
-          <div className="stat-card">
-            <FaUsers className="stat-icon" />
-            <div className="stat-content">
-              <div className="stat-value">2,847</div>
-              <div className="stat-label">Jugadores Online</div>
+      {/* Header con Logo - Oculto si la rueda está abierta */}
+      {!showWheel && (
+        <header className="lobby-header">
+          {/* Stats Izquierda */}
+          <div className="header-stats left">
+            <div className="stat-card">
+              <FaUsers className="stat-icon" />
+              <div className="stat-content">
+                <div className="stat-value">2,847</div>
+                <div className="stat-label">Jugadores Online</div>
+              </div>
+            </div>
+            <div className="stat-card">
+              <FaClock className="stat-icon" />
+              <div className="stat-content">
+                <div className="stat-value">{currentTime.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</div>
+                <div className="stat-label">Hora Argentina</div>
+              </div>
             </div>
           </div>
-          <div className="stat-card">
-            <FaClock className="stat-icon" />
-            <div className="stat-content">
-              <div className="stat-value">{currentTime.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</div>
-              <div className="stat-label">Hora Argentina</div>
-            </div>
-          </div>
-        </div>
 
-        {/* Logo Central */}
-        <div className="logo-container" id="lobby-header-logo">
-          <div className="logo-shine"></div>
-          <div className="logo-shine"></div>
-          <img
-            src={logo}
-            alt="Bingo 24 Kilates"
-            className="logo-image"
-            loading="eager"
-            decoding="async"
-            fetchpriority="high"
-            style={{ imageRendering: 'crisp-edges' }}
-          />
-          <div className="logo-tagline">El Bingo Virtual de Alta Gama</div>
-        </div>
+          {/* Logo Central */}
+          <div className="logo-container" id="lobby-header-logo">
+            <div className="logo-shine"></div>
+            <div className="logo-shine"></div>
+            <img
+              src={logo}
+              alt="Bingo 24 Kilates"
+              className="logo-image"
+              loading="eager"
+              decoding="async"
+              fetchpriority="high"
+              style={{ imageRendering: 'crisp-edges' }}
+            />
+            <div className="logo-tagline">El Bingo Virtual de Alta Gama</div>
+          </div>
 
-        {/* Stats Derecha */}
-        <div className="header-stats right">
-          <div className="stat-card">
-            <FaTrophy className="stat-icon" />
-            <div className="stat-content">
-              <div className="stat-value">$284,500</div>
-              <div className="stat-label">Pagado Hoy</div>
+          {/* Stats Derecha */}
+          <div className="header-stats right">
+            <div className="stat-card">
+              <FaTrophy className="stat-icon" />
+              <div className="stat-content">
+                <div className="stat-value">$284,500</div>
+                <div className="stat-label">Pagado Hoy</div>
+              </div>
+            </div>
+            <div className="stat-card">
+              <FaStar className="stat-icon" />
+              <div className="stat-content">
+                <div className="stat-value">4/4</div>
+                <div className="stat-label">Salas Activas</div>
+              </div>
             </div>
           </div>
-          <div className="stat-card">
-            <FaStar className="stat-icon" />
-            <div className="stat-content">
-              <div className="stat-value">4/4</div>
-              <div className="stat-label">Salas Activas</div>
-            </div>
-          </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       {/* Grid de Salas */}
       <div className="rooms-grid" id="rooms-grid">
@@ -860,15 +862,7 @@ const CasinoLobby = ({ user, onLogout }) => {
         )
       }
 
-      {/* Modal de Cambiar Contraseña */}
-      <FortuneWheel
-        isOpen={showWheel}
-        onClose={() => setShowWheel(false)}
-        onPrizeClaimed={(prize) => {
-          // Opcional: recargar perfil para actualizar saldo
-          loadUserProfile();
-        }}
-      />
+
       {
         showChangePasswordModal && createPortal(
           <div style={{
@@ -1146,8 +1140,10 @@ const CasinoLobby = ({ user, onLogout }) => {
       {
         showWheel && createPortal(
           <FortuneWheel
+            isOpen={true}
             onClose={() => setShowWheel(false)}
             onSpinComplete={handleSpinComplete}
+            onPrizeClaimed={() => loadUserProfile()}
           />,
           document.body
         )

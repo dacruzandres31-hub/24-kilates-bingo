@@ -24,22 +24,31 @@ async function runMigration() {
 
         console.log('📄 Ejecutando migración: CREATE_OFFLINE_WINNERS_SYSTEM.sql\n');
 
-        // Ejecutar el script
-        const [results] = await conn.query(sql);
+        // Dividir por ; y ejecutar uno por uno
+        const statements = sql
+            .split(';')
+            .map(s => s.trim())
+            .filter(s => s.length > 0 && !s.startsWith('--'));
 
-        console.log('✅ Migración ejecutada exitosamente\n');
-
-        // Mostrar resultados de verificación
-        if (Array.isArray(results)) {
-            results.forEach((result, index) => {
-                if (Array.isArray(result) && result.length > 0) {
-                    console.log(`📊 Resultado ${index + 1}:`);
-                    console.table(result);
+        for (const statement of statements) {
+            try {
+                await conn.query(statement);
+                console.log(`✅ Ejecutado: ${statement.substring(0, 50)}...`);
+            } catch (err) {
+                // Ignorar error si la columna ya existe o si no se puede borrar lo que no existe
+                if (err.code === 'ER_DUP_FIELDNAME' ||
+                    err.code === 'ER_CANT_DROP_FIELD_OR_KEY' ||
+                    err.message.includes('Duplicate column') ||
+                    err.message.includes('Can\'t DROP')) {
+                    console.log(`⚠️ Ignorado (ya procesado o inexistente): ${statement.substring(0, 50)}...`);
+                } else {
+                    console.error(`❌ Error en: ${statement.substring(0, 50)}...`);
+                    console.error(`   Motivo: ${err.message}`);
                 }
-            });
+            }
         }
 
-        console.log('\n🎉 Sistema de verificación de ganadores offline creado correctamente');
+        console.log('\n🎉 Proceso de migración finalizado');
 
     } catch (error) {
         console.error('❌ Error ejecutando migración:', error.message);

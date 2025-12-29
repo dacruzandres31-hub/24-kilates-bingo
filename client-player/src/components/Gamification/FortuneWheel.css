@@ -147,28 +147,66 @@
 
 .wheel-center {
     position: absolute;
-    width: 15%;
-    /* Responsive size */
-    height: 15%;
-    background: radial-gradient(circle at 30% 30%, #fff, #d4af37);
+    width: 28.5%;
+    /* Reduced by 25% from 38% */
+    height: 28.5%;
+    background: #000;
+    /* Black background as requested */
     border-radius: 50%;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    z-index: 10;
-    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.6);
+    z-index: 100;
+    /* Ensure it's above segments */
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.8), inset 0 0 15px rgba(212, 175, 55, 0.5);
     display: flex;
     justify-content: center;
     align-items: center;
-    border: 4px solid #b8860b;
+    border: 4px solid #d4af37;
+    /* Slightly thicker Gold border */
+    transition: box-shadow 0.3s ease;
+}
+
+.wheel-center.spinning-glow {
+    animation: center-pulse-glow 0.8s ease-in-out infinite;
+    border-color: #fff;
+    /* Shine effect on border */
+}
+
+@keyframes center-pulse-glow {
+
+    0%,
+    100% {
+        box-shadow: 0 0 30px rgba(0, 0, 0, 0.8), inset 0 0 15px rgba(212, 175, 55, 0.5);
+        transform: translate(-50%, -50%) scale(1);
+    }
+
+    50% {
+        box-shadow: 0 0 60px rgba(212, 175, 55, 0.8), inset 0 0 30px rgba(212, 175, 55, 0.7);
+        transform: translate(-50%, -50%) scale(1.05);
+    }
 }
 
 .wheel-center-inner {
-    width: 40%;
-    height: 40%;
-    background: #222;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
     border-radius: 50%;
-    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.wheel-center-logo {
+    width: 85%;
+    /* Fill more space in the larger container */
+    height: auto;
+    filter: drop-shadow(0 0 8px rgba(212, 175, 55, 0.6));
+    transition: filter 0.3s ease;
+}
+
+.spinning-glow .wheel-center-logo {
+    filter: drop-shadow(0 0 20px rgba(212, 175, 55, 0.9)) brightness(1.2);
 }
 
 .pointer {

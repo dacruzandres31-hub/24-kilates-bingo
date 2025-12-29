@@ -238,7 +238,7 @@ body,
 }
 
 /* Create centered logo - FRONT AND SHINY */
-.casino-lobby::after {
+.casino-lobby:not(.wheel-open)::after {
     content: '';
     position: fixed;
     top: 50%;

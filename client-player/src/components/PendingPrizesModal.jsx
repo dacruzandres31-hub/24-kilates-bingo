@@ -12,6 +12,8 @@ export default function PendingPrizesModal({ prizes, onClose }) {
                 return '📏';
             case 'bingo':
                 return '🏆';
+            case 'bingo_pre40':
+                return '🔥';
             case 'pre40':
                 return '⚡';
             default:
@@ -25,6 +27,8 @@ export default function PendingPrizesModal({ prizes, onClose }) {
                 return 'LÍNEA';
             case 'bingo':
                 return 'BINGO';
+            case 'bingo_pre40':
+                return 'JACKPOT PRE-40';
             case 'pre40':
                 return 'PRE-40';
             default:

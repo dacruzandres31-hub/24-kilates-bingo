@@ -1307,11 +1307,10 @@ exports.getPendingPrizes = async (req, res) => {
         gw.ball_number,
         gw.share_count,
         gw.created_at,
-        gs.room,
-        pcs.card_data
+        gw.card_data,
+        gs.room
       FROM game_winners gw
-      JOIN game_sessions gs ON gw.session_id = gs.id
-      JOIN player_card_selections pcs ON gw.card_id = pcs.id
+      JOIN game_sessions gs ON gw.game_session_id = gs.id
       WHERE gw.user_id = ?
       AND gw.notified = FALSE
       ORDER BY gw.created_at DESC`,
@@ -1344,7 +1343,7 @@ exports.getPendingPrizes = async (req, res) => {
       shareCount: p.share_count,
       createdAt: p.created_at,
       room: p.room,
-      cardData: JSON.parse(p.card_data)
+      cardData: typeof p.card_data === 'string' ? JSON.parse(p.card_data) : p.card_data
     }));
 
     return responseHelper.success(res, {
