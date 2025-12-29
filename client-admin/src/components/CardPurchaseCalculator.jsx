@@ -33,15 +33,15 @@ const CardPurchaseCalculator = ({ isOpen, onClose, userRole }) => {
         try {
             setLoading(true);
             const token = localStorage.getItem('adminToken');
-            const { data } = await axios.get('/api/superadmin/room-settings', {
+            const { data } = await axios.get('/api/game/lobby-data', {
                 headers: { Authorization: `Bearer ${token}` }
             });
             if (data.success) {
-                const priceMap = {};
-                data.settings.forEach(s => {
-                    priceMap[s.room] = parseFloat(s.card_price);
+                setPrices({
+                    bronce: data.data.bronce?.price || 0,
+                    plata: data.data.plata?.price || 0,
+                    oro: data.data.oro?.price || 0
                 });
-                setPrices(priceMap);
             }
         } catch (error) {
             console.error('Error fetching prices:', error);
