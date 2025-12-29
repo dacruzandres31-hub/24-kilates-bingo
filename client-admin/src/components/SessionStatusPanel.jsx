@@ -298,36 +298,36 @@ export default function SessionStatusPanel() {
                     {!isStarter && (
                       <div className="flex items-center gap-2 text-gray-300">
                         <ShoppingCart className="w-4 h-4 text-purple-400" />
-                        <span className="text-sm font-semibold">{currentSession.total_paid_cards || 0} vendidos</span>
+                        <span className="text-sm font-semibold">{currentSession.total_cards_validated || 0} jugados</span>
                       </div>
                     )}
                     {isStarter && (
                       <div className="text-gray-300 text-sm">
-                        <span className="text-yellow-400 font-semibold">GRATIS</span> • Sorteo cada hora
+                        <span className="text-yellow-400 font-semibold">GRATIS</span> • {currentSession.total_cards_validated || 0} jugados
                       </div>
                     )}
                   </div>
 
                   {isStarter ? (
                     <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-white/10">
-                      <div className="text-center bg-blue-900/30 rounded p-2">
-                        <p className="text-xs text-gray-400 mb-1">PREMIO LÍNEA</p>
-                        <p className="text-blue-300 font-bold text-sm">{prizeConfig?.prize_linea || '1 Ticket Bronce'}</p>
-                      </div>
                       <div className="text-center bg-green-900/30 rounded p-2">
                         <p className="text-xs text-gray-400 mb-1">PREMIO BINGO</p>
                         <p className="text-green-300 font-bold text-sm">{prizeConfig?.prize_bingo || '1 Ticket Oro'}</p>
+                      </div>
+                      <div className="text-center bg-blue-900/30 rounded p-2">
+                        <p className="text-xs text-gray-400 mb-1">PREMIO LÍNEA</p>
+                        <p className="text-blue-300 font-bold text-sm">{prizeConfig?.prize_linea || '1 Ticket Bronce'}</p>
                       </div>
                     </div>
                   ) : (
                     <div className={`grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-white/10 transition-all ${animatingPots[room] ? 'animate-pulse-pot' : ''}`}>
                       <div className="text-center">
-                        <p className="text-xs text-gray-400 mb-1">LÍNEA</p>
-                        <p className="text-blue-300 font-bold text-sm">{formatMoney(currentSession.jackpot_linea || 0)}</p>
-                      </div>
-                      <div className="text-center">
                         <p className="text-xs text-gray-400 mb-1">BINGO</p>
                         <p className="text-green-300 font-bold text-sm">{formatMoney(currentSession.jackpot_bingo || 0)}</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs text-gray-400 mb-1">LÍNEA</p>
+                        <p className="text-blue-300 font-bold text-sm">{formatMoney(currentSession.jackpot_linea || 0)}</p>
                       </div>
                       <div className="text-center">
                         <p className="text-xs text-gray-400 mb-1">PRE-40</p>

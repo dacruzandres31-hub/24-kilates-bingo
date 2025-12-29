@@ -11,6 +11,22 @@ const cardPoolService = require('../services/cardPoolService');
 
 class StarterRoomController {
   /**
+   * Helper para resolver sessionId (especialmente 'starter_default')
+   */
+  async _resolveSessionId(sessionId) {
+    if (sessionId !== 'starter_default') return sessionId;
+
+    const [sessions] = await require('../db').query(`
+      SELECT id FROM game_sessions 
+      WHERE room = 'starter' 
+      ORDER BY created_at DESC 
+      LIMIT 1
+    `);
+
+    return sessions.length > 0 ? sessions[0].id : null;
+  }
+
+  /**
    * GET /api/game/starter/available-cards/:sessionId
    * Obtiene cartones disponibles para la sesión
    */
@@ -19,41 +35,33 @@ class StarterRoomController {
       let { sessionId } = req.params;
       const userId = req.user ? req.user.id : null;
 
-      // Si es 'starter_default', buscar la sesión más reciente
-      if (sessionId === 'starter_default') {
-        const [sessions] = await require('../db').query(`
-          SELECT id FROM game_sessions 
-          WHERE room = 'starter' 
-          ORDER BY created_at DESC 
-          LIMIT 1
-        `);
-        
-        if (sessions.length === 0) {
-          return res.json({
-            success: true,
-            cards: [],
-            playersOnline: 0,
-            timeRemaining: null,
-            timeWindow: 'open',
-            poolInitialized: false,
-            message: 'No hay sesión activa. Contacta al administrador.'
-          });
-        }
-        
-        sessionId = sessions[0].id;
-        console.log(`🔍 Usando sesión más reciente: ${sessionId}`);
+      // Resolver sessionId si es necesario
+      sessionId = await this._resolveSessionId(sessionId);
+
+      if (!sessionId) {
+        return res.json({
+          success: true,
+          cards: [],
+          playersOnline: 0,
+          timeRemaining: null,
+          timeWindow: 'open',
+          poolInitialized: false,
+          message: 'No hay sesión activa. Contacta al administrador.'
+        });
       }
+
+      console.log(`🔍 [Starter] Usando sesión: ${sessionId}`);
 
       // Verificar si el pool ya está en memoria
       let stats = cardPoolService.getPoolStats(sessionId);
-      
+
       // Si no está en memoria, intentar cargar desde BD
       if (!stats) {
         console.log(`🔄 Pool no encontrado en memoria para sesión ${sessionId}, cargando desde BD...`);
         try {
           await cardPoolService.loadPoolFromDB(sessionId);
           stats = cardPoolService.getPoolStats(sessionId);
-          
+
           if (stats) {
             console.log(`✅ Pool cargado exitosamente: ${stats.totalCards} cartones`);
           } else {
@@ -66,7 +74,7 @@ class StarterRoomController {
 
       // Verificar estado de ventana de tiempo
       const timeWindowStatus = cardPoolService.getTimeWindowStatus(sessionId);
-      
+
       if (timeWindowStatus === 'closed') {
         return res.status(403).json({
           success: false,
@@ -129,7 +137,7 @@ class StarterRoomController {
 
       // Verificar ventana de tiempo
       const timeWindowStatus = cardPoolService.getTimeWindowStatus(sessionId);
-      
+
       if (timeWindowStatus === 'closed') {
         return res.status(403).json({
           success: false,
@@ -169,10 +177,29 @@ class StarterRoomController {
    */
   async getMyCards(req, res) {
     try {
-      const { sessionId } = req.params;
+      let { sessionId } = req.params;
       const userId = req.user.id;
 
-      const pool = cardPoolService.pools.get(sessionId);
+      // Resolver sessionId si es necesario
+      sessionId = await this._resolveSessionId(sessionId);
+
+      if (!sessionId) {
+        return res.json({ success: true, cards: [] });
+      }
+
+      let pool = cardPoolService.pools.get(sessionId);
+
+      // Si no está en memoria, intentar cargar desde BD
+      if (!pool) {
+        console.log(`🔄 [Starter/MyCards] Pool no encontrado en memoria para sesión ${sessionId}, intentando cargar...`);
+        try {
+          await cardPoolService.loadPoolFromDB(sessionId);
+          pool = cardPoolService.pools.get(sessionId);
+        } catch (loadError) {
+          console.error(`❌ Error cargando pool en getMyCards:`, loadError.message);
+        }
+      }
+
       if (!pool) {
         return res.json({
           success: true,
@@ -181,9 +208,11 @@ class StarterRoomController {
       }
 
       // Filtrar cartones reservados por este usuario
-      const myCards = Array.from(pool.cards.values()).filter(card => 
+      const myCards = Array.from(pool.cards.values()).filter(card =>
         card.status === 'reserved' && card.reserved_by === userId
       );
+
+      console.log(`📋 [Starter/MyCards] Retornando ${myCards.length} cartones para usuario ${userId} en sesión ${sessionId}`);
 
       res.json({
         success: true,
@@ -205,7 +234,7 @@ class StarterRoomController {
   async getSessionStats(req, res) {
     try {
       const { sessionId } = req.params;
-      
+
       const stats = cardPoolService.getPoolStats(sessionId);
       const timeWindow = cardPoolService.getTimeWindowStatus(sessionId);
 
@@ -251,8 +280,8 @@ class StarterRoomController {
 
       // Inicializar pool
       const cardsGenerated = await cardPoolService.initializePool(
-        sessionId, 
-        totalCards, 
+        sessionId,
+        totalCards,
         'starter'
       );
 
@@ -417,9 +446,9 @@ class StarterRoomController {
 
     const now = Date.now();
     const gameStart = window.gameStartTime.getTime();
-    
+
     if (now >= gameStart) return 0;
-    
+
     return Math.floor((gameStart - now) / 1000); // Segundos
   }
 

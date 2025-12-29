@@ -443,10 +443,47 @@ export default function BronzeRoom({ onLogout }) {
       });
     };
 
+    const handleCurrentGameState = (data) => {
+      console.log('🔄 [SOCKET] Sincronización de estado recibida:', data);
+
+      if (data.isPaused) {
+        setGameStatus('waiting');
+      } else if (data.ballsDrawn && data.ballsDrawn.length > 0) {
+        setGameStatus('active');
+        audioService.startBolilleroGirando();
+      }
+
+      const restoredBalls = (data.ballsDrawn || []).map((num, index) => ({
+        number: num,
+        color: getBallColor(num),
+        letter: getBallLetter(num),
+        id: index + 1
+      }));
+
+      setBallsDrawn(restoredBalls);
+
+      if (data.lastBall) {
+        const last = {
+          number: data.lastBall.number,
+          color: getBallColor(data.lastBall.number),
+          letter: data.lastBall.letter,
+          id: data.drawOrder || restoredBalls.length,
+          timestamp: Date.now()
+        };
+        setLastBall(last);
+        setCurrentBall(null);
+      }
+
+      if (data.lineWinnersPaid) {
+        setLineCelebrated(true);
+      }
+    };
+
     socket.on('number_drawn', handleBallDrawn);
     socket.on('game_started', handleGameStarted);
     socket.on('game_ended', handleGameEnded);
     socket.on('pot_update', handlePotUpdate);
+    socket.on('current_game_state', handleCurrentGameState);
 
     // Escuchar actualizaciones globales de pozos (opcional como fallback)
     socket.on('pots_updated', (data) => {
@@ -469,6 +506,7 @@ export default function BronzeRoom({ onLogout }) {
       socket.off('game_ended', handleGameEnded);
       socket.off('pot_update', handlePotUpdate);
       socket.off('pots_updated');
+      socket.off('current_game_state', handleCurrentGameState);
     };
   }, [socket, sessionId]);
 

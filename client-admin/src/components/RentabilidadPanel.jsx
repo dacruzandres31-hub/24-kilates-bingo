@@ -56,7 +56,10 @@ export default function RentabilidadPanel() {
             });
 
             if (res.data.success) {
-                setData(res.data.data);
+                // El responseHelper.success envuelve el objeto en .data, 
+                // y el controlador también lo envolvió en .data
+                const ggrData = res.data.data?.data || res.data.data;
+                setData(ggrData);
             }
         } catch (err) {
             console.error('Error loading GGR:', err);
@@ -74,14 +77,27 @@ export default function RentabilidadPanel() {
     };
 
     if (loading) return <div className="p-8 text-center text-gray-400">Cargando métricas de rentabilidad...</div>;
-    if (!data) return <div className="p-8 text-center text-red-400">Error cargando datos.</div>;
+    if (!data || !data.metrics || !data.breakdown) {
+        return (
+            <div className="p-8 text-center bg-gray-900/50 rounded-lg border border-gray-700">
+                <p className="text-red-400 font-medium mb-2">⚠️ Error cargando datos de rentabilidad</p>
+                <p className="text-gray-500 text-sm">Asegúrese de que existan transacciones en el periodo seleccionado.</p>
+                <button
+                    onClick={fetchGGR}
+                    className="mt-4 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition"
+                >
+                    🔄 Reintentar
+                </button>
+            </div>
+        );
+    }
 
     const { metrics, breakdown } = data;
 
     const chartData = [
-        { name: 'Ventas Cartones', value: breakdown.sales, type: 'in' },
-        { name: 'Cargas Manuales', value: breakdown.manualLoads, type: 'in' },
-        { name: 'Retiros Pagados', value: breakdown.withdrawals, type: 'out' },
+        { name: 'Ventas Cartones', value: breakdown.sales || 0, type: 'in' },
+        { name: 'Cargas Manuales', value: breakdown.manualLoads || 0, type: 'in' },
+        { name: 'Retiros Pagados', value: breakdown.withdrawals || 0, type: 'out' },
     ];
 
     return (

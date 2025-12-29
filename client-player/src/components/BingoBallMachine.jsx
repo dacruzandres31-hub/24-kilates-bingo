@@ -14,7 +14,7 @@ export default function BingoBallMachine({ lastBall, isActive, totalDrawn }) {
     if (lastBall && lastBall.drawOrder > totalDrawn - 1) {
       // Nueva bola cantada
       setIsSpinning(true);
-      
+
       // Después de 1 segundo, mostrar la bola con zoom
       setTimeout(() => {
         setShowingBall(lastBall);
@@ -46,7 +46,7 @@ export default function BingoBallMachine({ lastBall, isActive, totalDrawn }) {
       <div className="machine-header">
         <h2>🎱 Bolillero</h2>
         <div className="ball-counter">
-          {totalDrawn} / 75
+          {totalDrawn} / 90
         </div>
       </div>
 
@@ -75,7 +75,7 @@ export default function BingoBallMachine({ lastBall, isActive, totalDrawn }) {
           {/* Bola actual (con zoom) */}
           {showingBall && (
             <div className={`current-ball-display ${zoomEffect ? 'zoom-in' : ''}`}>
-              <div 
+              <div
                 className="current-ball"
                 style={{
                   '--ball-color': getBallColor(showingBall.letter)
@@ -124,7 +124,7 @@ export default function BingoBallMachine({ lastBall, isActive, totalDrawn }) {
       {showingBall && !zoomEffect && (
         <div className="last-ball-mini">
           <span className="mini-label">Última:</span>
-          <div 
+          <div
             className="mini-ball"
             style={{ backgroundColor: getBallColor(showingBall.letter) }}
           >

@@ -37,7 +37,7 @@ export default function GameRoom() {
     // Escuchar nueva bola cantada
     socket.on('ball_drawn', (data) => {
       console.log('[GameRoom] Ball drawn:', data);
-      
+
       const newBall = {
         number: data.ballNumber,
         letter: data.ballLetter,
@@ -148,8 +148,8 @@ export default function GameRoom() {
 
         {/* Bolillero (Derecha) */}
         <div className="game-room-machine">
-          <BingoBallMachine 
-            lastBall={lastBall} 
+          <BingoBallMachine
+            lastBall={lastBall}
             isActive={gameStatus === 'active'}
             totalDrawn={ballsDrawn.length}
           />
@@ -161,14 +161,14 @@ export default function GameRoom() {
 
       {/* Sección Inferior: Cartones */}
       <div className="game-room-lower">
-        <StackedBingoCards 
+        <StackedBingoCards
           gameSessionId={sessionId}
           socket={socket}
         />
       </div>
 
       {/* Notificaciones de ganadores */}
-      <WinnerNotifications 
+      <WinnerNotifications
         socket={socket}
         currentUser={currentUser}
       />
@@ -181,7 +181,7 @@ export default function GameRoom() {
           {gameStatus === 'ended' && '🏁 Finalizado'}
         </div>
         <div className="balls-count">
-          Bolas cantadas: <strong>{ballsDrawn.length}/75</strong>
+          Bolas cantadas: <strong>{ballsDrawn.length}/90</strong>
         </div>
       </div>
     </div>

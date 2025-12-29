@@ -63,7 +63,7 @@ class Scheduler {
     const dailyQuestsJob = cron.schedule('1 0 * * *', async () => {
       try {
         console.log('[Scheduler] Ejecutando: Daily Quests Refresh');
-        
+
         // Obtener todos los jugadores
         const [playersResult] = await pool.query(
           `SELECT id FROM users WHERE role = 'jugador'`
@@ -335,41 +335,54 @@ class Scheduler {
 }
 
 /**
- * Helper: Generar grilla aleatoria de bingo 5x5
- * Columnas: B (1-15), I (16-30), N (31-45), G (46-60), O (61-75)
+ * Helper: Generar grilla aleatoria de bingo 3x9 (90 bolas)
+ * Columnas: 1-9, 10-19, ..., 80-90
  */
 function generateBingoGrid() {
   const ranges = [
-    [1, 15],    // B
-    [16, 30],   // I
-    [31, 45],   // N
-    [46, 60],   // G
-    [61, 75]    // O
+    [1, 9],    // C1
+    [10, 19],  // C2
+    [20, 29],  // C3
+    [30, 39],  // C4
+    [40, 49],  // C5
+    [50, 59],  // C6
+    [60, 69],  // C7
+    [70, 79],  // C8
+    [80, 90]   // C9
   ];
 
-  const grid = [];
-  for (let col = 0; col < 5; col++) {
-    const column = [];
+  const grid = Array(3).fill(null).map(() => Array(9).fill(null));
+
+  // Generar números para cada columna
+  const columnNumbers = [];
+  for (let col = 0; col < 9; col++) {
     const [min, max] = ranges[col];
-    const numbers = [];
-    for (let i = min; i <= max; i++) {
-      numbers.push(i);
-    }
-    // Shuffle Fisher-Yates
-    for (let i = numbers.length - 1; i > 0; i--) {
+    const available = [];
+    for (let i = min; i <= max; i++) available.push(i);
+
+    // Shuffle
+    for (let i = available.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [numbers[i], numbers[j]] = [numbers[j], numbers[i]];
+      [available[i], available[j]] = [available[j], available[i]];
     }
-    // Tomar 5 (o 4 para columna N con FREE center)
-    for (let row = 0; row < 5; row++) {
-      if (col === 2 && row === 2) {
-        column.push(0); // Centro FREE
-      } else {
-        column.push(numbers.pop());
-      }
-    }
-    grid.push(column);
+    columnNumbers.push(available);
   }
+
+  // Distribuir 15 números (5 por fila)
+  for (let row = 0; row < 3; row++) {
+    const selectedCols = [];
+    const availableCols = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+    for (let i = 0; i < 5; i++) {
+      const idx = Math.floor(Math.random() * availableCols.length);
+      selectedCols.push(availableCols.splice(idx, 1)[0]);
+    }
+    selectedCols.sort((a, b) => a - b);
+
+    selectedCols.forEach(col => {
+      grid[row][col] = columnNumbers[col].pop();
+    });
+  }
+
   return grid;
 }
 

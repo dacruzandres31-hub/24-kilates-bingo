@@ -12,7 +12,7 @@ export default function MovimientosChips() {
   const [movimientos, setMovimientos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
   // Filtros
   const [filtros, setFiltros] = useState({
     userId: '',
@@ -39,7 +39,7 @@ export default function MovimientosChips() {
     try {
       setLoading(true);
       const token = localStorage.getItem('adminToken');
-      
+
       // Construir query params
       const params = new URLSearchParams();
       if (filtros.movementType) params.append('movementType', filtros.movementType);
@@ -47,7 +47,7 @@ export default function MovimientosChips() {
       if (filtros.endDate) params.append('endDate', filtros.endDate);
       params.append('limit', filtros.limit);
 
-      const endpoint = filtros.userId 
+      const endpoint = filtros.userId
         ? `/api/chips/history/${filtros.userId}?${params}`
         : `/api/chips/history?${params}`;
 
@@ -55,9 +55,15 @@ export default function MovimientosChips() {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      // La respuesta puede ser { success: true, data: [...] } o directamente [...]
-      const movements = Array.isArray(data) ? data : (data.data || []);
-      setMovimientos(movements);
+      // La respuesta es { success: true, data: { movements: [...], total, currentBalance } }
+      let movementsArray = [];
+      if (Array.isArray(data)) {
+        movementsArray = data;
+      } else if (data.data) {
+        movementsArray = Array.isArray(data.data) ? data.data : (data.data.movements || []);
+      }
+
+      setMovimientos(movementsArray);
       setError(null);
     } catch (err) {
       console.error('Error fetching movimientos:', err);
@@ -202,8 +208,8 @@ export default function MovimientosChips() {
               </thead>
               <tbody>
                 {Array.isArray(movimientos) && movimientos.map((mov) => {
-                  const typeInfo = movementTypes[mov.movement_type] || { 
-                    label: mov.movement_type, 
+                  const typeInfo = movementTypes[mov.movement_type] || {
+                    label: mov.movement_type,
                     color: 'text-gray-400',
                     icon: '📝'
                   };
@@ -221,9 +227,8 @@ export default function MovimientosChips() {
                           {typeInfo.icon} {typeInfo.label}
                         </span>
                       </td>
-                      <td className={`py-3 px-4 text-right font-semibold ${
-                        mov.amount >= 0 ? 'text-green-400' : 'text-red-400'
-                      }`}>
+                      <td className={`py-3 px-4 text-right font-semibold ${mov.amount >= 0 ? 'text-green-400' : 'text-red-400'
+                        }`}>
                         {mov.amount >= 0 ? '+' : ''}{formatMoney(mov.amount)}
                       </td>
                       <td className="py-3 px-4 text-right text-gray-400">

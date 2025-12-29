@@ -10,7 +10,6 @@
 import { useState } from 'react';
 import MovimientosChips from './MovimientosChips';
 import SolicitudesRetiro from './SolicitudesRetiro';
-import ComisionesPanel from './ComisionesPanel';
 import ReporteIngresos from './ReporteIngresos';
 import RentabilidadPanel from './RentabilidadPanel';
 import DepositInbox from './DepositInbox';
@@ -21,13 +20,17 @@ export default function GestionFinanzas({ userData }) {
 
   const tabs = [
     { id: 'depositos', name: '📥 Depósitos (Inbox)', icon: '📥' },
-    { id: 'retiros', name: '🏦 Retiros', icon: '🏦' },
-    { id: 'rentabilidad', name: '📈 Rentabilidad (GGR)', icon: '📈' },
+    { id: 'retiros', name: '🏦 Retiros', icon: '🏦', superAdminOnly: true },
+    { id: 'rentabilidad', name: '📈 Rentabilidad (GGR)', icon: '📈', superAdminOnly: true },
     { id: 'movimientos', name: '💵 Movimientos', icon: '💵' },
-    { id: 'comisiones', name: '💰 Comisiones', icon: '💰' },
     { id: 'cuentas', name: '💳 Cuentas Bancarias', icon: '💳' },
     { id: 'reportes', name: '📊 Reportes', icon: '📊' }
   ];
+
+  // Filtrar tabs según permisos del usuario
+  const filteredTabs = tabs.filter(tab =>
+    !tab.superAdminOnly || userData?.username === 'Andy'
+  );
 
   return (
     <div className="space-y-6">
@@ -40,7 +43,7 @@ export default function GestionFinanzas({ userData }) {
       {/* Tabs Navigation */}
       <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg border border-gray-700 overflow-hidden">
         <div className="flex border-b border-gray-700 overflow-x-auto">
-          {tabs.map((tab) => (
+          {filteredTabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
@@ -62,7 +65,6 @@ export default function GestionFinanzas({ userData }) {
           {activeTab === 'rentabilidad' && <RentabilidadPanel />}
           {activeTab === 'movimientos' && <MovimientosChips />}
           {activeTab === 'retiros' && <SolicitudesRetiro userData={userData} />}
-          {activeTab === 'comisiones' && <ComisionesPanel />}
           {activeTab === 'reportes' && <ReporteIngresos />}
         </div>
       </div>

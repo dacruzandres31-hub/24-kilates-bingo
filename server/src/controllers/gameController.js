@@ -307,7 +307,21 @@ exports.finishSession = async (req, res) => {
 // OBTENER ESTADO DE SESIÓN
 exports.getSessionStatus = async (req, res) => {
   try {
-    const { sessionId } = req.params;
+    let { sessionId } = req.params;
+
+    // Si es 'starter_default', buscar la sesión más reciente de la sala starter
+    if (sessionId === 'starter_default') {
+      const latest = await dbHelper.queryOne(
+        `SELECT id FROM game_sessions 
+         WHERE room = 'starter' 
+         ORDER BY created_at DESC LIMIT 1`,
+        [], 'GetLatestStarterSession'
+      );
+      if (latest) {
+        sessionId = latest.id;
+        console.log(`🔍 [GameController] Resolviendo starter_default -> ${sessionId}`);
+      }
+    }
 
     const session = await dbHelper.queryOne(
       `SELECT id, room, status, current_pot_bingo, current_pot_linea, 
@@ -525,10 +539,24 @@ async function getAgentPath(userId) {
 exports.end_free_game = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { gameSessionId, winType } = req.body;
+    let { gameSessionId, winType } = req.body;
 
     const missingField = validationHelper.checkRequired(req.body, ['gameSessionId', 'winType']);
     if (missingField) return responseHelper.error(res, 400, `Requerido: ${missingField}`);
+
+    // Si es 'starter_default', resolver a la sesión más reciente
+    if (gameSessionId === 'starter_default') {
+      const latest = await dbHelper.queryOne(
+        `SELECT id FROM game_sessions 
+         WHERE room IN ('starter', 'free_starter') 
+         ORDER BY created_at DESC LIMIT 1`,
+        [], 'GetLatestStarterSessionForEnd'
+      );
+      if (latest) {
+        gameSessionId = latest.id;
+        console.log(`🔍 [GameController] Resolviendo starter_default -> ${gameSessionId} en end_free_game`);
+      }
+    }
 
     let responsePayload = {};
 
@@ -536,7 +564,7 @@ exports.end_free_game = async (req, res) => {
       // ====== Validar que sea Sala Starter ======
       const [sessionResult] = await connection.query(
         `SELECT id, room, status FROM game_sessions 
-         WHERE id = ? AND room = 'free_starter'`,
+         WHERE id = ? AND room IN ('starter', 'free_starter')`,
         [gameSessionId]
       );
 

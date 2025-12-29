@@ -174,7 +174,7 @@ exports.getActiveSessions = async (req, res) => {
             gs.id, gs.room, gs.start_time, gs.status,
             gs.jackpot_linea, gs.jackpot_bingo, gs.jackpot_pre40,
             gs.total_cards_validated, gs.total_paid_cards, gs.total_gift_cards,
-            rs.card_price as cost
+            rs.card_price
           FROM game_sessions gs
           LEFT JOIN room_settings rs ON gs.room = rs.room
           WHERE gs.room = ? AND gs.status IN ('active', 'pending', 'playing')
@@ -188,6 +188,10 @@ exports.getActiveSessions = async (req, res) => {
           // No hay sesión activa, crear una "virtual" para mostrar que está habilitada
           const nextScheduled = await calculateUpcomingSessions(room, 1);
           if (nextScheduled.length > 0) {
+            // [NEW] Obtener configuración de precio de la sala
+            const [roomConfig] = await pool.query('SELECT card_price FROM room_settings WHERE room = ?', [room]);
+            const cardPrice = roomConfig.length > 0 ? roomConfig[0].card_price : 0;
+
             currentSession = {
               id: null,
               room,
@@ -199,6 +203,7 @@ exports.getActiveSessions = async (req, res) => {
               total_cards_validated: 0,
               total_paid_cards: 0,
               total_gift_cards: 0,
+              card_price: cardPrice,
               is_virtual: true
             };
           }

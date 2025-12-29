@@ -471,16 +471,53 @@ export default function StarterRoom({ onLogout }) {
       });
     };
 
+    const handleCurrentGameState = (data) => {
+      console.log('🔄 [SOCKET] Sincronización de estado recibida:', data);
+
+      if (data.isPaused) {
+        setGameStatus('waiting');
+      } else if (data.ballsDrawn && data.ballsDrawn.length > 0) {
+        setGameStatus('active');
+      }
+
+      const restoredBalls = (data.ballsDrawn || []).map((num, index) => ({
+        number: num,
+        color: getBallColor(num),
+        letter: getBallLetter(num),
+        id: index + 1
+      }));
+
+      setBallsDrawn(restoredBalls);
+
+      if (data.lastBall) {
+        const last = {
+          number: data.lastBall.number,
+          color: getBallColor(data.lastBall.number),
+          letter: data.lastBall.letter,
+          id: data.drawOrder || restoredBalls.length,
+          timestamp: Date.now()
+        };
+        setLastBall(last);
+        setCurrentBall(null); // Evitar animaciones de caída para bolas ya sorteadas
+      }
+
+      if (data.lineWinnersPaid) {
+        setLineCelebrated(true); // Ya se cobró la línea en esta sesión
+      }
+    };
+
     socket.on('number_drawn', handleBallDrawn);
     socket.on('game_started', handleGameStarted);
     socket.on('game_ended', handleGameEnded);
     socket.on('pot_update', handlePotUpdate);
+    socket.on('current_game_state', handleCurrentGameState);
 
     return () => {
       socket.off('number_drawn', handleBallDrawn);
       socket.off('game_started', handleGameStarted);
       socket.off('game_ended', handleGameEnded);
       socket.off('pot_update', handlePotUpdate);
+      socket.off('current_game_state', handleCurrentGameState);
     };
   }, [socket, sessionId]);
 

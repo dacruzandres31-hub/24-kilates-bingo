@@ -111,25 +111,7 @@ class GameEngineAuto {
       console.log(`[GameEngine] 📝 Sesión ${gameSessionId} cambiada a estado 'playing'`);
 
       // Iniciar sorteo automático
-      console.log(`[GameEngine] ⏱️ Configurando intervalo de ${drawInterval}ms para sesión ${gameSessionId}`);
-      gameState.interval = setInterval(async () => {
-        console.log(`[GameEngine] 🔄 Intervalo ejecutándose para sesión ${gameSessionId}, isPaused: ${gameState.isPaused}`);
-        if (gameState.isPaused) return;
-
-        try {
-          await this.drawNextBall(gameSessionId, pauseOnWinner);
-        } catch (error) {
-          console.error(`[GameEngine] ❌ Error en sorteo ${gameSessionId}:`, error);
-          try {
-            fs.appendFileSync(
-              path.join(__dirname, '../../critical_errors.txt'),
-              `[${new Date().toISOString()}] CRASH in drawNextBall: ${error.message}\nSTACK: ${error.stack}\n\n`
-            );
-          } catch (logErr) { console.error('Error writing log:', logErr); }
-
-          this.stopGame(gameSessionId);
-        }
-      }, drawInterval);
+      this._startDrawInterval(gameSessionId, drawInterval, pauseOnWinner);
 
       console.log(`[GameEngine] 🎮 Juego ${gameSessionId} iniciado (sala: ${session.room})`);
       console.log(`[GameEngine] 📊 Estado inicial: ${gameState.ballsDrawn.length} bolas sorteadas, ${gameState.availableBalls.length} disponibles`);
@@ -163,6 +145,195 @@ class GameEngineAuto {
   }
 
   /**
+   * Método privado para iniciar el intervalo de sorteo
+   */
+  _startDrawInterval(gameSessionId, drawInterval, pauseOnWinner) {
+    const gameState = this.activeGames.get(gameSessionId);
+    if (!gameState) return;
+
+    if (gameState.interval) {
+      clearInterval(gameState.interval);
+    }
+
+    console.log(`[GameEngine] ⏱️ Configurando intervalo de ${drawInterval}ms para sesión ${gameSessionId}`);
+    gameState.interval = setInterval(async () => {
+      if (gameState.isPaused) return;
+
+      try {
+        await this.drawNextBall(gameSessionId, pauseOnWinner);
+      } catch (error) {
+        console.error(`[GameEngine] ❌ Error en sorteo ${gameSessionId}:`, error);
+        try {
+          fs.appendFileSync(
+            path.join(__dirname, '../../critical_errors.txt'),
+            `[${new Date().toISOString()}] CRASH in drawNextBall: ${error.message}\nSTACK: ${error.stack}\n\n`
+          );
+        } catch (logErr) { console.error('Error writing log:', logErr); }
+
+        this.stopGame(gameSessionId);
+      }
+    }, drawInterval);
+  }
+
+  /**
+   * Recupera sesiones que quedaron en estado 'playing' tras un reinicio
+   */
+  async resumeActiveSessions() {
+    try {
+      console.log('\n[GameEngine] 🔄 Buscando sesiones activas para recuperar...');
+      const [playingSessions] = await pool.query(
+        "SELECT * FROM game_sessions WHERE status = 'playing'"
+      );
+
+      if (playingSessions.length === 0) {
+        console.log('[GameEngine] ℹ️ No hay sesiones activas para recuperar.');
+        return;
+      }
+
+      for (const session of playingSessions) {
+        const gameSessionId = session.id;
+        console.log(`[GameEngine] 🛠️ Recuperando sesión ${gameSessionId} (${session.room})...`);
+
+        // Obtener bolas ya sorteadas
+        const [balls] = await pool.query(
+          'SELECT ball_number, ball_letter FROM game_session_balls WHERE game_session_id = ? ORDER BY draw_order',
+          [gameSessionId]
+        );
+
+        const ballsDrawn = balls.map(b => b.ball_number);
+
+        // Verificar si la línea ya fue pagada revisando si hay alguien con line_won en validated_cards o card_pool
+        const [lineWinners] = await pool.query(
+          `SELECT COUNT(*) as count FROM game_winners WHERE game_session_id = ? AND prize_type = 'linea'`,
+          [gameSessionId]
+        );
+
+        const gameState = {
+          sessionId: gameSessionId,
+          roomId: session.room,
+          ballsDrawn: ballsDrawn,
+          lastBall: balls.length > 0 ? {
+            number: balls[balls.length - 1].ball_number,
+            letter: balls[balls.length - 1].ball_letter
+          } : null,
+          availableBalls: this.generateBallPool().filter(b => !ballsDrawn.includes(b)),
+          interval: null,
+          isPaused: false,
+          lineWinnersPaid: lineWinners[0].count > 0,
+          lineWinnersThisBall: [],
+          bingoWinnersPaid: false, // Si estuviera pagado, la sesión no estaría en 'playing'
+          bingoWinnersThisBall: []
+        };
+
+        this.activeGames.set(gameSessionId, gameState);
+
+        // Reiniciar el intervalo (usando valores por defecto si no están en la sesión)
+        // Podríamos guardar el drawInterval en la BD para mayor precisión
+        this._startDrawInterval(gameSessionId, 5000, 2000);
+
+        console.log(`[GameEngine] ✅ Sesión ${gameSessionId} recuperada con ${ballsDrawn.length} bolas.`);
+      }
+
+    } catch (error) {
+      console.error('[GameEngine] ❌ Error recuperando sesiones activas:', error);
+    }
+  }
+
+  /**
+   * Vigilante que asegura que las sesiones 'playing' en BD tengan motor activo
+   */
+  startWatchdog() {
+    console.log('[GameEngine] 🛡️ Iniciando Watchdog de Sesiones...');
+    setInterval(async () => {
+      try {
+        const [playingSessions] = await pool.query(
+          "SELECT id FROM game_sessions WHERE status = 'playing'"
+        );
+
+        for (const session of playingSessions) {
+          if (!this.activeGames.has(session.id)) {
+            console.warn(`[GameEngine Watchdog] ⚠️ Sesión ${session.id} está en 'playing' pero el motor está inactivo. Recuperando...`);
+            // Recuperar esta sesión específica
+            await this.resumeSpecificSession(session.id);
+          }
+        }
+      } catch (error) {
+        console.error('[GameEngine Watchdog] Error en ciclo:', error);
+      }
+    }, 60000); // Cada minuto
+  }
+
+  async resumeSpecificSession(gameSessionId) {
+    try {
+      const [sessions] = await pool.query('SELECT * FROM game_sessions WHERE id = ?', [gameSessionId]);
+      if (sessions.length === 0) return;
+      const session = sessions[0];
+
+      const [balls] = await pool.query(
+        'SELECT ball_number, ball_letter FROM game_session_balls WHERE game_session_id = ? ORDER BY draw_order',
+        [gameSessionId]
+      );
+      const ballsDrawn = balls.map(b => b.ball_number);
+      const [lineWinners] = await pool.query(
+        `SELECT COUNT(*) as count FROM game_winners WHERE game_session_id = ? AND prize_type = 'linea'`,
+        [gameSessionId]
+      );
+
+      const gameState = {
+        sessionId: gameSessionId,
+        roomId: session.room,
+        ballsDrawn: ballsDrawn,
+        lastBall: balls.length > 0 ? {
+          number: balls[balls.length - 1].ball_number,
+          letter: balls[balls.length - 1].ball_letter
+        } : null,
+        availableBalls: this.generateBallPool().filter(b => !ballsDrawn.includes(b)),
+        interval: null,
+        isPaused: false,
+        lineWinnersPaid: lineWinners[0].count > 0,
+        lineWinnersThisBall: [],
+        bingoWinnersPaid: false,
+        bingoWinnersThisBall: []
+      };
+
+      this.activeGames.set(gameSessionId, gameState);
+      this._startDrawInterval(gameSessionId, 5000, 2000);
+      console.log(`[GameEngine] ✅ Sesión ${gameSessionId} recuperada.`);
+    } catch (err) {
+      console.error(`[GameEngine] Error recuperando sesión ${gameSessionId}:`, err);
+    }
+  }
+
+  /**
+   * Obtiene el estado actual de una sesión
+   */
+  getGameState(sessionId) {
+    const gameState = this.activeGames.get(parseInt(sessionId));
+    if (!gameState) return null;
+
+    return {
+      gameSessionId: gameState.sessionId,
+      ballsDrawn: gameState.ballsDrawn,
+      lastBall: gameState.lastBall,
+      drawOrder: gameState.ballsDrawn.length,
+      isPaused: gameState.isPaused,
+      lineWinnersPaid: gameState.lineWinnersPaid
+    };
+  }
+
+  /**
+   * Obtiene el estado de juego de una sala específica (útil para espectadores)
+   */
+  getRoomGameState(roomName) {
+    for (const gameState of this.activeGames.values()) {
+      if (gameState.roomId === roomName) {
+        return this.getGameState(gameState.sessionId);
+      }
+    }
+    return null;
+  }
+
+  /**
    * Canta el siguiente número y valida TODOS los cartones automáticamente
    */
   async drawNextBall(gameSessionId, pauseOnWinner = 2000) {
@@ -183,6 +354,9 @@ class GameEngineAuto {
 
     const ballLetter = this.getBallLetter(ballNumber);
     const drawOrder = gameState.ballsDrawn.length;
+
+    // Actualizar estado de la última bola para sincronización
+    gameState.lastBall = { number: ballNumber, letter: ballLetter };
 
     try {
       await pool.query(
@@ -325,7 +499,7 @@ class GameEngineAuto {
    * - Solo LÍNEAS HORIZONTALES
    * - Solo se paga la PRIMERA línea de toda la partida
    * - Si múltiples cartones completan en la misma bolilla: SE DIVIDE el pozo
-   * - BINGO: cartón completo (25/25), división si múltiples ganadores
+   * - BINGO: cartón completo (15/15), división si múltiples ganadores
    */
   async validateAllCards(gameSessionId, pauseOnWinner) {
     const gameState = this.activeGames.get(gameSessionId);

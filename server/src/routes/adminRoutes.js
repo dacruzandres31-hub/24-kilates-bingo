@@ -42,6 +42,8 @@ const roomSettingsController = require('../controllers/roomSettingsController');
 const scheduleController = require('../controllers/scheduleController');
 const paymentAccountsController = require('../controllers/paymentAccountsController');
 const diagnosticsController = require('../controllers/diagnosticsController');
+const adminAnalyticsController = require('../controllers/adminAnalyticsController');
+
 
 
 /**
@@ -172,6 +174,16 @@ router.delete('/payment-accounts/:id', authenticateToken, isAdmin, paymentAccoun
 // ========================================
 router.get('/socket-diagnostics', authenticateToken, isAdmin, diagnosticsController.getSocketDiagnostics);
 router.get('/live-sessions', authenticateToken, isAdmin, diagnosticsController.getLiveSessions);
+
+// ========================================
+// 📊 ANALYTICS & DASHBOARD STATISTICS
+// ========================================
+router.get('/analytics/monthly-netwin', authenticateToken, isAdmin, adminAnalyticsController.getMonthlyNetwin);
+router.get('/analytics/daily-netwin', authenticateToken, isAdmin, adminAnalyticsController.getDailyNetwin);
+router.get('/analytics/top-agents', authenticateToken, isAdmin, adminAnalyticsController.getTopAgents);
+router.get('/analytics/net-profit-comparison', authenticateToken, isAdmin, adminAnalyticsController.getNetProfitComparison);
+
+
 
 
 // CATCH-ALL 404 FOR ADMIN ROUTES

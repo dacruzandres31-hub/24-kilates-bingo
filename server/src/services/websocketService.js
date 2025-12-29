@@ -67,7 +67,7 @@ async function emitPotsUpdate() {
         total_cards_validated AS cards_sold,
         status
       FROM game_sessions
-      WHERE room = 'free_starter' 
+      WHERE room = 'starter' 
         AND status IN ('active', 'playing', 'pending')
       ORDER BY created_at DESC
       LIMIT 1

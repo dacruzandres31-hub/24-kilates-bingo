@@ -8,6 +8,13 @@ export default function EstadisticasGenerales({ financialData }) {
   const [searchResults, setSearchResults] = useState([]);
   const [newUserType, setNewUserType] = useState('jugador');
 
+  // Estados para datos de analíticas
+  const [monthlyData, setMonthlyData] = useState([]);
+  const [dailyData, setDailyData] = useState([]);
+  const [topAgentsData, setTopAgentsData] = useState([]);
+  const [netProfitData, setNetProfitData] = useState(null);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(true);
+
   useEffect(() => {
     const handleEscape = (e) => {
       if (e.key === 'Escape') {
@@ -16,50 +23,46 @@ export default function EstadisticasGenerales({ financialData }) {
         setSearchResults([]);
       }
     };
-    
+
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
   }, []);
 
-  // Datos para gráfica mensual (simulados - deberían venir del backend)
-  const dataNetwinMensual = [
-    { fecha: 'Nov-22', ganancia: 35000000, gasto: 25000000 },
-    { fecha: 'Dec-22', ganancia: 38000000, gasto: 22000000 },
-    { fecha: 'Jan-23', ganancia: 42000000, gasto: 28000000 },
-    { fecha: 'Feb-23', ganancia: 39000000, gasto: 26000000 },
-    { fecha: 'Mar-23', ganancia: 45000000, gasto: 30000000 },
-    { fecha: 'Apr-23', ganancia: 43000000, gasto: 27000000 },
-    { fecha: 'May-23', ganancia: 48000000, gasto: 32000000 },
-    { fecha: 'Jun-23', ganancia: 46000000, gasto: 29000000 },
-    { fecha: 'Jul-23', ganancia: 41000000, gasto: 31000000 },
-    { fecha: 'Aug-23', ganancia: 44000000, gasto: 28000000 },
-    { fecha: 'Sep-23', ganancia: 47000000, gasto: 33000000 },
-    { fecha: 'Oct-23', ganancia: 38000000, gasto: 26000000 }
-  ];
+  // Fetch analytics data
+  useEffect(() => {
+    fetchAnalyticsData();
+    const interval = setInterval(fetchAnalyticsData, 60000); // Actualizar cada minuto
+    return () => clearInterval(interval);
+  }, []);
 
-  // Datos para gráfica diaria
-  const dataNetwinDiario = [
-    { hora: '01', ganancia: 300000, gasto: 200000 },
-    { hora: '02', ganancia: 450000, gasto: 300000 },
-    { hora: '03', ganancia: 650000, gasto: 400000 },
-    { hora: '04', ganancia: 520000, gasto: 350000 },
-    { hora: '05', ganancia: 480000, gasto: 320000 },
-    { hora: '06', ganancia: 580000, gasto: 380000 },
-    { hora: '07', ganancia: 720000, gasto: 450000 },
-    { hora: '08', ganancia: 1050000, gasto: 650000 },
-    { hora: '09', ganancia: 890000, gasto: 550000 },
-    { hora: '10', ganancia: 780000, gasto: 480000 },
-    { hora: '11', ganancia: 620000, gasto: 420000 }
-  ];
+  // Fetch analytics data from backend
+  const fetchAnalyticsData = async () => {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const headers = { Authorization: `Bearer ${token}` };
 
-  // Datos para Top Agentes
-  const dataTopAgentes = [
-    { name: 'nahuapanel', value: 45, color: '#ec4899' },
-    { name: 'gisellapanel', value: 35, color: '#3b82f6' },
-    { name: 'silvanapanel', value: 12, color: '#f59e0b' },
-    { name: 'abiganel', value: 5, color: '#10b981' },
-    { name: 'gringapanel', value: 3, color: '#8b5cf6' }
-  ];
+      const [monthlyRes, dailyRes, agentsRes, netProfitRes] = await Promise.all([
+        axios.get('/api/admin/analytics/monthly-netwin', { headers }),
+        axios.get('/api/admin/analytics/daily-netwin', { headers }),
+        axios.get('/api/admin/analytics/top-agents', { headers }),
+        axios.get('/api/admin/analytics/net-profit-comparison', { headers })
+      ]);
+
+      setMonthlyData(monthlyRes.data.data || []);
+      setDailyData(dailyRes.data.data || []);
+      setTopAgentsData(agentsRes.data.data || []);
+      setNetProfitData(netProfitRes.data.data || null);
+      setLoadingAnalytics(false);
+    } catch (error) {
+      console.error('Error fetching analytics data:', error);
+      setLoadingAnalytics(false);
+      // Mantener datos vacíos en caso de error
+      setMonthlyData([]);
+      setDailyData([]);
+      setTopAgentsData([]);
+      setNetProfitData(null);
+    }
+  };
 
   const formatCurrency = (value) => {
     return new Intl.NumberFormat('es-CO', {
@@ -82,17 +85,17 @@ export default function EstadisticasGenerales({ financialData }) {
       const response = await axios.get('/api/admin/users/hierarchy', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
+
       if (response.data && response.data.all) {
         // Filtrar usuarios que coincidan con el término de búsqueda
-        const filtered = response.data.all.filter(u => 
+        const filtered = response.data.all.filter(u =>
           u.username.toLowerCase().includes(searchTerm.toLowerCase())
         ).slice(0, 5); // Mostrar máximo 5 resultados
-        
+
         setSearchResults(filtered);
-        
+
         // Si hay coincidencia exacta, seleccionarla
-        const exactMatch = filtered.find(u => 
+        const exactMatch = filtered.find(u =>
           u.username.toLowerCase() === searchTerm.toLowerCase()
         );
         if (exactMatch) {
@@ -111,14 +114,12 @@ export default function EstadisticasGenerales({ financialData }) {
   const handleOpenUserModal = (role) => {
     console.log('🔵 Disparando evento openCreateUserModal con role:', role);
     // Disparar evento directamente - GestionUsuarios está siempre montado
-    window.dispatchEvent(new CustomEvent('openCreateUserModal', { 
-      detail: { role } 
+    window.dispatchEvent(new CustomEvent('openCreateUserModal', {
+      detail: { role }
     }));
   };
 
-  const gananciaActual = financialData?.today?.sales || 4331434.85;
-  const gananciaAnterior = 18561624.05;
-  const porcentajeCambio = ((gananciaActual - gananciaAnterior) / gananciaAnterior * 100).toFixed(2);
+
 
   return (
     <div className="space-y-6">
@@ -131,14 +132,14 @@ export default function EstadisticasGenerales({ financialData }) {
           </div>
 
           <div className="space-y-4">
-            <button 
+            <button
               onClick={() => handleOpenUserModal('jugador')}
               className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] shadow-lg">
               <span>👤</span>
               <span>NUEVO JUGADOR</span>
             </button>
 
-            <button 
+            <button
               onClick={() => handleOpenUserModal('agente')}
               className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] shadow-lg">
               <span>🏢</span>
@@ -160,7 +161,7 @@ export default function EstadisticasGenerales({ financialData }) {
                     placeholder="🔍 Buscar usuario..."
                     className="w-full px-4 py-2 bg-gray-900/50 border border-gray-700 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   />
-                  
+
                   {/* Lista de resultados mientras escribe - HACIA ARRIBA */}
                   {searchResults.length > 0 && quickSearchUsername.length >= 2 && (
                     <div className="absolute bottom-full left-0 right-0 mb-2 bg-gray-900 border border-indigo-500/50 rounded-lg shadow-2xl max-h-80 overflow-y-auto z-[100]">
@@ -200,7 +201,7 @@ export default function EstadisticasGenerales({ financialData }) {
                   )}
                 </div>
               </div>
-              
+
               {/* Resultado seleccionado */}
               {quickSearchResult && (
                 <div className="mt-3 bg-gray-900/70 border border-indigo-500/50 rounded-xl p-3">
@@ -256,28 +257,39 @@ export default function EstadisticasGenerales({ financialData }) {
           </div>
 
           <div className="space-y-4">
-            <div>
-              <p className="text-gray-400 text-sm mb-1">Mes actual:</p>
-              <p className="text-2xl font-bold text-white">{formatCurrency(gananciaActual)}</p>
-            </div>
+            {loadingAnalytics ? (
+              <div className="flex items-center justify-center py-8">
+                <p className="text-gray-400">Cargando datos...</p>
+              </div>
+            ) : netProfitData ? (
+              <>
+                <div>
+                  <p className="text-gray-400 text-sm mb-1">Mes actual:</p>
+                  <p className="text-2xl font-bold text-white">{formatCurrency(netProfitData.currentMonth.neto)}</p>
+                </div>
 
-            <div>
-              <p className="text-gray-400 text-sm mb-1">Mes anterior:</p>
-              <p className="text-xl text-gray-300">{formatCurrency(gananciaAnterior)}</p>
-            </div>
+                <div>
+                  <p className="text-gray-400 text-sm mb-1">Mes anterior:</p>
+                  <p className="text-xl text-gray-300">{formatCurrency(netProfitData.previousMonth.neto)}</p>
+                </div>
 
-            <div className="flex items-center gap-3">
-              <span className={`text-2xl font-bold px-4 py-2 rounded-xl shadow-lg ${
-                parseFloat(porcentajeCambio) < 0 
-                  ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white' 
-                  : 'bg-gradient-to-r from-green-600 to-emerald-600 text-white'
-              }`}>
-                {porcentajeCambio}%
-              </span>
-              <button className="text-gray-400 hover:text-indigo-400 text-2xl transition-colors">
-                👁️‍🗨️
-              </button>
-            </div>
+                <div className="flex items-center gap-3">
+                  <span className={`text-2xl font-bold px-4 py-2 rounded-xl shadow-lg ${netProfitData.percentageChange < 0
+                      ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white'
+                      : 'bg-gradient-to-r from-green-600 to-emerald-600 text-white'
+                    }`}>
+                    {netProfitData.percentageChange > 0 ? '+' : ''}{netProfitData.percentageChange}%
+                  </span>
+                  <button className="text-gray-400 hover:text-indigo-400 text-2xl transition-colors">
+                    👁️‍🗨️
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center justify-center py-8">
+                <p className="text-gray-400">No hay datos disponibles</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -288,24 +300,34 @@ export default function EstadisticasGenerales({ financialData }) {
           </div>
 
           <ResponsiveContainer width="100%" height={200}>
-            <AreaChart data={dataNetwinMensual}>
-              <defs>
-                <linearGradient id="colorGanancia" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#93c5fd" stopOpacity={0.8}/>
-                  <stop offset="95%" stopColor="#93c5fd" stopOpacity={0.1}/>
-                </linearGradient>
-                <linearGradient id="colorGasto" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#fca5a5" stopOpacity={0.8}/>
-                  <stop offset="95%" stopColor="#fca5a5" stopOpacity={0.1}/>
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="fecha" stroke="#6b7280" style={{ fontSize: '12px' }} />
-              <YAxis stroke="#6b7280" style={{ fontSize: '12px' }} />
-              <Tooltip formatter={(value) => formatCurrency(value)} />
-              <Area type="monotone" dataKey="ganancia" stroke="#3b82f6" fillOpacity={1} fill="url(#colorGanancia)" />
-              <Area type="monotone" dataKey="gasto" stroke="#ef4444" fillOpacity={1} fill="url(#colorGasto)" />
-            </AreaChart>
+            {loadingAnalytics ? (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-gray-400">Cargando datos...</p>
+              </div>
+            ) : monthlyData.length === 0 ? (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-gray-400">No hay datos disponibles</p>
+              </div>
+            ) : (
+              <AreaChart data={monthlyData}>
+                <defs>
+                  <linearGradient id="colorGanancia" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#93c5fd" stopOpacity={0.8} />
+                    <stop offset="95%" stopColor="#93c5fd" stopOpacity={0.1} />
+                  </linearGradient>
+                  <linearGradient id="colorGasto" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#fca5a5" stopOpacity={0.8} />
+                    <stop offset="95%" stopColor="#fca5a5" stopOpacity={0.1} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="fecha" stroke="#6b7280" style={{ fontSize: '12px' }} />
+                <YAxis stroke="#6b7280" style={{ fontSize: '12px' }} />
+                <Tooltip formatter={(value) => formatCurrency(value)} />
+                <Area type="monotone" dataKey="ganancia" stroke="#3b82f6" fillOpacity={1} fill="url(#colorGanancia)" />
+                <Area type="monotone" dataKey="gasto" stroke="#ef4444" fillOpacity={1} fill="url(#colorGasto)" />
+              </AreaChart>
+            )}
           </ResponsiveContainer>
         </div>
       </div>
@@ -319,24 +341,34 @@ export default function EstadisticasGenerales({ financialData }) {
           </div>
 
           <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={dataNetwinDiario}>
-              <defs>
-                <linearGradient id="colorGananciaDiaria" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#93c5fd" stopOpacity={0.8}/>
-                  <stop offset="95%" stopColor="#93c5fd" stopOpacity={0.1}/>
-                </linearGradient>
-                <linearGradient id="colorGastoDiario" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#fca5a5" stopOpacity={0.8}/>
-                  <stop offset="95%" stopColor="#fca5a5" stopOpacity={0.1}/>
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="hora" stroke="#6b7280" />
-              <YAxis stroke="#6b7280" />
-              <Tooltip formatter={(value) => formatCurrency(value)} />
-              <Area type="monotone" dataKey="ganancia" stroke="#3b82f6" fillOpacity={1} fill="url(#colorGananciaDiaria)" />
-              <Area type="monotone" dataKey="gasto" stroke="#ef4444" fillOpacity={1} fill="url(#colorGastoDiario)" />
-            </AreaChart>
+            {loadingAnalytics ? (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-gray-400">Cargando datos...</p>
+              </div>
+            ) : dailyData.length === 0 ? (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-gray-400">No hay datos disponibles</p>
+              </div>
+            ) : (
+              <AreaChart data={dailyData}>
+                <defs>
+                  <linearGradient id="colorGananciaDiaria" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#93c5fd" stopOpacity={0.8} />
+                    <stop offset="95%" stopColor="#93c5fd" stopOpacity={0.1} />
+                  </linearGradient>
+                  <linearGradient id="colorGastoDiario" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#fca5a5" stopOpacity={0.8} />
+                    <stop offset="95%" stopColor="#fca5a5" stopOpacity={0.1} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="hora" stroke="#6b7280" />
+                <YAxis stroke="#6b7280" />
+                <Tooltip formatter={(value) => formatCurrency(value)} />
+                <Area type="monotone" dataKey="ganancia" stroke="#3b82f6" fillOpacity={1} fill="url(#colorGananciaDiaria)" />
+                <Area type="monotone" dataKey="gasto" stroke="#ef4444" fillOpacity={1} fill="url(#colorGastoDiario)" />
+              </AreaChart>
+            )}
           </ResponsiveContainer>
         </div>
 
@@ -348,31 +380,41 @@ export default function EstadisticasGenerales({ financialData }) {
 
           <div className="flex items-center justify-center">
             <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={dataTopAgentes}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={2}
-                  dataKey="value"
-                >
-                  {dataTopAgentes.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
+              {loadingAnalytics ? (
+                <div className="flex items-center justify-center h-full">
+                  <p className="text-gray-400">Cargando datos...</p>
+                </div>
+              ) : topAgentsData.length === 0 ? (
+                <div className="flex items-center justify-center h-full">
+                  <p className="text-gray-400">No hay datos disponibles</p>
+                </div>
+              ) : (
+                <PieChart>
+                  <Pie
+                    data={topAgentsData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={2}
+                    dataKey="value"
+                  >
+                    {topAgentsData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              )}
             </ResponsiveContainer>
           </div>
 
           {/* Leyenda personalizada */}
           <div className="mt-4 space-y-2">
-            {dataTopAgentes.map((agente, index) => (
+            {!loadingAnalytics && topAgentsData.length > 0 && topAgentsData.map((agente, index) => (
               <div key={index} className="flex items-center justify-between p-2 bg-gray-900/30 rounded-lg hover:bg-gray-900/50 transition-colors">
                 <div className="flex items-center gap-2">
-                  <div 
+                  <div
                     className="w-4 h-4 rounded shadow-lg"
                     style={{ backgroundColor: agente.color }}
                   ></div>

@@ -117,8 +117,17 @@ export default function Sidebar({ isOpen, onClose, activeSections, onToggleSecti
                 <div className="ml-6 mt-1 space-y-1">
                   {menu.sections
                     .filter(section => {
-                      if (section.superAdminOnly && userRole !== 'superadmin') return false;
-                      if ((section.id === 'support' || section.id === 'withdrawals') && userData?.username !== 'Andy') return false;
+                      const isAndy = userData?.username?.toLowerCase() === 'andy';
+
+                      // Sesiones Control: Solo para Andy
+                      if (section.id === 'sesiones-control') return isAndy;
+
+                      // SuperAdmin Only: Solo para superadmin (excepto Andy que ya manejamos arriba)
+                      if (section.superAdminOnly && userRole !== 'superadmin' && !isAndy) return false;
+
+                      // Secciones especiales de Andy (24Kilates)
+                      if ((section.id === 'support' || section.id === 'withdrawals') && !isAndy) return false;
+
                       return true;
                     })
                     .map((section) => (

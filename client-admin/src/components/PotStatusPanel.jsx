@@ -177,7 +177,7 @@ export default function PotStatusPanel() {
             jackpot: 0,
             sessionId: currentSession?.id || null,
             status: currentSession?.status || 'no_session',
-            cardsSold: currentSession?.cards_sold || 0,
+            cardsSold: currentSession?.total_cards_validated || 0,
             cardPrice: 0,
             startTime: currentSession?.start_time || null,
             isSpecial: true
@@ -192,7 +192,7 @@ export default function PotStatusPanel() {
           jackpot: parseFloat(currentSession?.jackpot_pre40) || 0,
           sessionId: currentSession?.id || null,
           status: currentSession?.status || 'no_session',
-          cardsSold: currentSession?.total_paid_cards || 0,
+          cardsSold: currentSession?.total_cards_validated || 0,
           cardPrice: parseFloat(currentSession?.card_price) || 0,
           startTime: currentSession?.start_time || null,
           isSpecial: false
@@ -380,20 +380,6 @@ export default function PotStatusPanel() {
 
             {/* Pozos */}
             <div className="space-y-3">
-              {/* LÍNEA */}
-              <div className="bg-black/20 rounded-lg p-4">
-                <div className="text-sm text-gray-400 mb-1">Pozo LÍNEA</div>
-                <div className="text-2xl font-bold text-blue-400">
-                  {pozo.isSpecial ? (
-                    <span className="flex items-center gap-2">
-                      🎫 {pozo.linea}
-                    </span>
-                  ) : (
-                    formatMoney(pozo.linea)
-                  )}
-                </div>
-              </div>
-
               {/* BINGO */}
               <div className="bg-black/20 rounded-lg p-4">
                 <div className="text-sm text-gray-400 mb-1">Pozo BINGO</div>
@@ -404,6 +390,20 @@ export default function PotStatusPanel() {
                     </span>
                   ) : (
                     formatMoney(pozo.bingo)
+                  )}
+                </div>
+              </div>
+
+              {/* LÍNEA */}
+              <div className="bg-black/20 rounded-lg p-4">
+                <div className="text-sm text-gray-400 mb-1">Pozo LÍNEA</div>
+                <div className="text-2xl font-bold text-blue-400">
+                  {pozo.isSpecial ? (
+                    <span className="flex items-center gap-2">
+                      🎫 {pozo.linea}
+                    </span>
+                  ) : (
+                    formatMoney(pozo.linea)
                   )}
                 </div>
               </div>
@@ -422,7 +422,7 @@ export default function PotStatusPanel() {
             {/* Info adicional */}
             <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-2 gap-4">
               <div>
-                <div className="text-xs text-gray-400">Cartones Vendidos</div>
+                <div className="text-xs text-gray-400">Cartones Jugados</div>
                 <div className="text-sm font-semibold text-white">
                   {pozo.cardsSold}
                 </div>

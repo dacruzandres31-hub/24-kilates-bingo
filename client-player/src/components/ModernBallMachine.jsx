@@ -39,11 +39,11 @@ const ModernBallMachine = ({
             default:
                 palette = starterColors;
                 // Standard Bingo Colors for Starter/Default
-                if (number <= 15) return '#d32f2f';
-                if (number <= 30) return '#1976d2';
-                if (number <= 45) return '#388e3c';
-                if (number <= 60) return '#fbc02d';
-                if (number <= 75) return '#7b1fa2';
+                if (number <= 18) return '#d32f2f';
+                if (number <= 36) return '#1976d2';
+                if (number <= 54) return '#388e3c';
+                if (number <= 72) return '#fbc02d';
+                if (number <= 90) return '#7b1fa2';
                 return '#455a64';
         }
 

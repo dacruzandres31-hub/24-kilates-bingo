@@ -138,6 +138,14 @@ io.on('connection', (socket) => {
       const sessionRoom = `session_${sessionId}`;
       socket.join(sessionRoom);
       console.log(`[Socket.IO] 🎲 Socket ${socket.id} unido a sesión: ${sessionRoom}`);
+
+      // Enviar estado actual si el juego está en curso
+      if (gameAdminController.gameEngine) {
+        const state = gameAdminController.gameEngine.getGameState(sessionId);
+        if (state) {
+          socket.emit('current_game_state', state);
+        }
+      }
     }
   });
 
@@ -147,6 +155,14 @@ io.on('connection', (socket) => {
       const globalRoom = `room_${room}`;
       socket.join(globalRoom);
       console.log(`[Socket.IO] 📺 Socket ${socket.id} unido como espectador a: ${globalRoom}`);
+
+      // Enviar estado actual de cualquier sorteo activo en esta sala
+      if (gameAdminController.gameEngine) {
+        const state = gameAdminController.gameEngine.getRoomGameState(room);
+        if (state) {
+          socket.emit('current_game_state', state);
+        }
+      }
     }
   });
 
@@ -312,6 +328,12 @@ const startServer = async () => {
     const gameAdminController = require('./controllers/gameAdminController');
     gameAdminController.initGameEngine(io);
     console.log('✅ Motor de juego automático inicializado');
+
+    // [NUEVO] Recuperar sesiones interrumpidas y activar Watchdog
+    if (gameAdminController.gameEngine) {
+      gameAdminController.gameEngine.resumeActiveSessions();
+      gameAdminController.gameEngine.startWatchdog();
+    }
     console.log('');
 
     // Inicializar inicio automático de sorteos programados
