@@ -8,7 +8,7 @@ import '../styles/LiveDrawBadge.css';
 import '../styles/LobbyCompact.css';
 import Countdown from './Countdown';
 import PlayerActivityHistory from './PlayerActivityHistory';
-import { FaClock, FaUsers, FaMoneyBillWave, FaTrophy, FaStar, FaGlassCheers, FaGift, FaHeadset, FaTicketAlt, FaEye, FaEyeSlash, FaMusic, FaVolumeUp, FaVolumeMute, FaUser, FaKey, FaSignOutAlt, FaMapMarkedAlt } from 'react-icons/fa';
+import { FaClock, FaUsers, FaMoneyBillWave, FaTrophy, FaStar, FaGlassCheers, FaGift, FaHeadset, FaTicketAlt, FaEye, FaEyeSlash, FaMusic, FaVolumeUp, FaVolumeMute, FaUser, FaKey, FaSignOutAlt, FaMapMarkedAlt, FaShoppingCart } from 'react-icons/fa';
 import logo from '../assets/logo.png';
 import giftIcon from '../assets/Gift_icon.png';
 import bronzeIcon from '../assets/bronze_icon.png';
@@ -28,6 +28,7 @@ import FortuneWheel from './Gamification/FortuneWheel';
 import useSocket from '../hooks/useSocket';
 import uiHelper from '../helpers/uiHelper';
 import HotPotNotification from './Notifications/HotPotNotification';
+import CardPurchaseCalculator from './CardPurchaseCalculator';
 
 // ... (existing code)
 
@@ -239,6 +240,7 @@ const CasinoLobby = ({ user, onLogout }) => {
   };
   const [showSupport, setShowSupport] = useState(false);
   const [showWithdrawal, setShowWithdrawal] = useState(false);
+  const [showCardPurchase, setShowCardPurchase] = useState(false);
 
   // Estado de audio
   const [audioStatus, setAudioStatus] = useState({
@@ -732,6 +734,21 @@ const CasinoLobby = ({ user, onLogout }) => {
             <span>FORTUNA</span>
           </button>
 
+          <button
+            className="btn-profile btn-purchase"
+            style={{
+              background: 'linear-gradient(45deg, #10b981, #059669)',
+              color: 'white',
+              fontWeight: 'bold',
+              border: '2px solid #FFF',
+              marginRight: '8px'
+            }}
+            onClick={() => setShowCardPurchase(true)}
+          >
+            <FaShoppingCart />
+            <span>COMPRAR</span>
+          </button>
+
           <div className="profile-menu-container" id="profile-section">
             <button
               className="btn-profile"
@@ -1167,6 +1184,16 @@ const CasinoLobby = ({ user, onLogout }) => {
             onWithdrawalSuccess={() => {
               loadUserProfile(); // Refresh balance
             }}
+          />
+        )
+      }
+
+      {/* Modal de Compra de Cartones */}
+      {
+        showCardPurchase && (
+          <CardPurchaseCalculator
+            isOpen={showCardPurchase}
+            onClose={() => setShowCardPurchase(false)}
           />
         )
       }
