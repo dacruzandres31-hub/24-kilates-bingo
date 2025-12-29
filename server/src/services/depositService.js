@@ -31,14 +31,14 @@ class DepositService {
     // ============================================
     // CREAR SOLICITUD DE DEPÓSITO (ORDEN)
     // ============================================
-    static async createDepositRequest(userId, accountId, amount, proofUrl, details = null) {
+    static async createDepositRequest(userId, accountId, amount, proofUrl, details = null, requestType = 'balance') {
         const detailsJson = details ? JSON.stringify(details) : null;
 
         const [result] = await pool.query(`
             INSERT INTO deposit_requests 
-            (user_id, account_id, amount_declared, proof_image_url, details, status, created_at)
-            VALUES (?, ?, ?, ?, ?, 'pending', NOW())
-        `, [userId, accountId, amount, proofUrl, detailsJson]);
+            (user_id, account_id, amount_declared, proof_image_url, details, request_type, status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, 'pending', NOW())
+        `, [userId, accountId, amount, proofUrl, detailsJson, requestType]);
 
         return {
             depositId: result.insertId,
@@ -72,15 +72,15 @@ class DepositService {
 
             // 2. Acreditar fichas al usuario
             const [users] = await connection.query(
-                `SELECT balance FROM users WHERE id = ? FOR UPDATE`,
+                `SELECT balance, role FROM users WHERE id = ? FOR UPDATE`,
                 [deposit.user_id]
             );
 
             if (users.length === 0) throw new Error('Usuario solicitante no encontrado');
 
             const balanceBefore = MoneyMath.decimal(users[0].balance);
-            if (deposit.request_type === 'b2b_stock') {
-                // --- CASO B2B STOCK: Acreditar cartones ---
+            if (deposit.request_type === 'b2b_stock' || deposit.request_type === 'card_purchase') {
+                // --- CASO B2B STOCK / COMPRA CARTONES: Acreditar cartones ---
                 const details = typeof deposit.details === 'string' ? JSON.parse(deposit.details) : deposit.details;
 
                 // Normalizar ítems
@@ -94,7 +94,7 @@ class DepositService {
                     const { room, quantity } = item;
                     if (!room || !quantity) continue;
 
-                    // Acreditar al inventario del usuario
+                    // Acreditar al inventario del usuario (Cartones Normales)
                     await connection.query(
                         `INSERT INTO user_card_inventory (user_id, room, quantity, is_gift) 
                          VALUES (?, ?, ?, FALSE) 
@@ -102,12 +102,35 @@ class DepositService {
                         [deposit.user_id, room, quantity, quantity]
                     );
 
-                    // Registrar movimiento de cartones
+                    // Registrar movimiento de cartones (NORMAL)
                     await connection.query(`
                         INSERT INTO card_movements_log 
                         (user_id, from_user_id, to_user_id, room, quantity, movement_type, is_gift, executed_by)
-                        VALUES (?, ?, ?, ?, ?, 'b2b_purchase', FALSE, ?)
-                    `, [deposit.user_id, reviewerId, deposit.user_id, room, quantity, reviewerId]);
+                        VALUES (?, ?, ?, ?, ?, ?, FALSE, ?)
+                    `, [deposit.user_id, reviewerId, deposit.user_id, room, quantity,
+                    deposit.request_type === 'card_purchase' ? 'purchase' : 'b2b_purchase', reviewerId]);
+
+                    // --- BONO DEL 10% PARA AGENTES Y ADMINISTRADORES ---
+                    const userRole = users[0].role;
+                    if (userRole === 'agente' || userRole === 'admin') {
+                        const bonusQuantity = Math.floor(quantity * 0.1);
+                        if (bonusQuantity > 0) {
+                            // Acreditar al inventario del usuario (REGALO)
+                            await connection.query(
+                                `INSERT INTO user_card_inventory (user_id, room, quantity, is_gift) 
+                                 VALUES (?, ?, ?, TRUE) 
+                                 ON DUPLICATE KEY UPDATE quantity = quantity + ?`,
+                                [deposit.user_id, room, bonusQuantity, bonusQuantity]
+                            );
+
+                            // Registrar movimiento de cartones (REGALO)
+                            await connection.query(`
+                                INSERT INTO card_movements_log 
+                                (user_id, from_user_id, to_user_id, room, quantity, movement_type, is_gift, executed_by)
+                                VALUES (?, ?, ?, ?, ?, 'purchase_bonus', TRUE, ?)
+                            `, [deposit.user_id, reviewerId, deposit.user_id, room, bonusQuantity, reviewerId]);
+                        }
+                    }
                 }
 
                 balanceAfter = balanceBefore; // No cambia el balance de plata

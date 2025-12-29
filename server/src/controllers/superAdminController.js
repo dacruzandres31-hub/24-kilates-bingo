@@ -1,5 +1,7 @@
 const pool = require('../db');
 const MoneyMath = require('../utils/moneyMath');
+const BingoCardGenerator = require('../utils/cardGenerator');
+const auditService = require('../services/auditService');
 
 /**
  * MIDDLEWARE: Verificar que el usuario es SuperAdmin
@@ -95,6 +97,14 @@ async function updateCardPrice(req, res) {
       [room, price, req.user.id]
     );
 
+    // Audit Log
+    auditService.log({
+      adminId: req.user.id,
+      action: 'UPDATE_CARD_PRICE',
+      details: { room, price },
+      ipAddress: req.ip
+    });
+
     res.json({
       success: true,
       message: `Precio de sala ${room} actualizado a $${MoneyMath.format(price)}`
@@ -176,6 +186,15 @@ async function giftCards(req, res) {
       [userId, room, quantity, reason || 'Regalo del SuperAdmin', req.user.id]
     );
 
+    // Audit Log
+    auditService.log({
+      adminId: req.user.id,
+      action: 'GIFT_CARDS',
+      targetUserId: userId,
+      details: { room, quantity, reason },
+      ipAddress: req.ip
+    });
+
     res.json({
       success: true,
       message: `✅ ${quantity} cartón(es) de ${room.toUpperCase()} acreditados a ${user[0].username}`
@@ -246,6 +265,15 @@ async function giftBalance(req, res) {
         reason || `Regalo del SuperAdmin: ${req.user.username}`
       ]
     );
+
+    // Audit Log
+    auditService.log({
+      adminId: req.user.id,
+      action: 'GIFT_BALANCE',
+      targetUserId: userId,
+      details: { amount, reason },
+      ipAddress: req.ip
+    });
 
     res.json({
       success: true,
@@ -407,6 +435,8 @@ async function generateStock(req, res) {
       });
     }
 
+    const isGiftRoom = room.includes('_regalo');
+
     const validRooms = ['bronce', 'plata', 'oro', 'free_starter', 'bronce_regalo', 'plata_regalo', 'oro_regalo'];
     if (!validRooms.includes(room)) {
       return res.status(400).json({
@@ -443,8 +473,8 @@ async function generateStock(req, res) {
       // Generar número de serie único
       const serialNumber = Date.now() + i;
 
-      // Generar grid de números (simulado - en producción usar generador real)
-      const gridNumbers = generateBingoGrid();
+      // Generar grid de números (BINGO 90: 3x9)
+      const gridNumbers = BingoCardGenerator.generateCard();
 
       await pool.query(
         `INSERT INTO daily_stock_cards (room, serial_number, grid_numbers, play_date, play_time, price, status)
@@ -468,6 +498,15 @@ async function generateStock(req, res) {
     );
 
     const roomLabel = isGiftRoom ? `${room.replace('_regalo', '').toUpperCase()} REGALO` : room.toUpperCase();
+
+    // Audit Log
+    auditService.log({
+      adminId: req.user.id,
+      action: 'GENERATE_STOCK',
+      details: { room, quantity, playDate, playTime },
+      ipAddress: req.ip
+    });
+
     res.json({
       success: true,
       message: `✅ ${quantity} cartón(es) de ${roomLabel} generados exitosamente`,
@@ -561,6 +600,8 @@ async function transferStock(req, res) {
       });
     }
 
+    const isGiftRoom = room.includes('_regalo');
+
     const validRooms = ['bronce', 'plata', 'oro', 'bronce_regalo', 'plata_regalo', 'oro_regalo'];
     if (!validRooms.includes(room)) {
       return res.status(400).json({
@@ -613,6 +654,16 @@ async function transferStock(req, res) {
     );
 
     const roomLabel = isGiftRoom ? `${room.replace('_regalo', '').toUpperCase()} REGALO` : room.toUpperCase();
+
+    // Audit Log
+    auditService.log({
+      adminId: req.user.id,
+      action: 'TRANSFER_STOCK',
+      targetUserId,
+      details: { room, quantity },
+      ipAddress: req.ip
+    });
+
     res.json({
       success: true,
       message: `✅ ${quantity} cartón(es) de ${roomLabel} transferidos a ${targetUser[0].username}`,
@@ -629,42 +680,10 @@ async function transferStock(req, res) {
 }
 
 /**
- * Función auxiliar para generar grid de bingo
+ * Función auxiliar para generar grid de bingo (Mantenida por compatibilidad, pero ya usamos BingoCardGenerator)
  */
 function generateBingoGrid() {
-  const grid = [];
-  const columns = [
-    { min: 1, max: 15 },   // B
-    { min: 16, max: 30 },  // I
-    { min: 31, max: 45 },  // N
-    { min: 46, max: 60 },  // G
-    { min: 61, max: 75 }   // O
-  ];
-
-  for (let col = 0; col < 5; col++) {
-    const column = [];
-    const used = new Set();
-
-    for (let row = 0; row < 5; row++) {
-      // Centro es FREE
-      if (col === 2 && row === 2) {
-        column.push(0);
-        continue;
-      }
-
-      let num;
-      do {
-        num = Math.floor(Math.random() * (columns[col].max - columns[col].min + 1)) + columns[col].min;
-      } while (used.has(num));
-
-      used.add(num);
-      column.push(num);
-    }
-
-    grid.push(column);
-  }
-
-  return grid;
+  return BingoCardGenerator.generateCard();
 }
 
 module.exports = {

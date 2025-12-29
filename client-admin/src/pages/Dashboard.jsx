@@ -25,6 +25,8 @@ import LiveMonitoringPanel from '../components/LiveMonitoringPanel';
 import RoomConfigPanel from '../components/RoomConfigPanel';
 import ScheduleGridPanel from '../components/ScheduleGridPanel';
 import PaymentAccountsPanel from '../components/PaymentAccountsPanel';
+import SystemHealthPanel from '../components/SystemHealthPanel';
+import AdminAuditLog from '../components/AdminAuditLog';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 
 export default function Dashboard() {
@@ -73,7 +75,9 @@ export default function Dashboard() {
     'support': false,
     'withdrawals': false,
     'whatsapp-config': false,
-    'mis-cuentas': false
+    'mis-cuentas': false,
+    'system-health': false,
+    'audit-logs': false
   });
 
   useEffect(() => {
@@ -582,6 +586,18 @@ export default function Dashboard() {
             <section className="mb-8">
               <PaymentAccountsPanel />
             </section>
+          )}
+
+          {activeSections['system-health'] && (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <SystemHealthPanel />
+            </div>
+          )}
+
+          {activeSections['audit-logs'] && (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <AdminAuditLog />
+            </div>
           )}
 
           {/* Movimientos del Día */}

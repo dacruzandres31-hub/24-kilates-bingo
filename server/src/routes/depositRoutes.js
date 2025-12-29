@@ -25,7 +25,7 @@ router.get('/info', authenticateToken, async (req, res) => {
 // 2. Avisar que ya transferí (Subir Comprobante)
 router.post('/claim', authenticateToken, async (req, res) => {
     try {
-        const { accountId, amount, proofUrl } = req.body;
+        const { accountId, amount, proofUrl, requestType, details } = req.body;
 
         if (!amount || amount <= 0) return res.status(400).json({ error: 'Monto inválido' });
         if (!proofUrl) return res.status(400).json({ error: 'Falta comprobante' });
@@ -34,7 +34,9 @@ router.post('/claim', authenticateToken, async (req, res) => {
             req.user.id,
             accountId,
             amount,
-            proofUrl
+            proofUrl,
+            details,
+            requestType
         );
 
         // Notificar a admins (Socket.IO)
@@ -42,7 +44,8 @@ router.post('/claim', authenticateToken, async (req, res) => {
         io.to('admins').emit('new_deposit_request', {
             depositId: result.depositId,
             amount,
-            username: req.user.username
+            username: req.user.username,
+            requestType: requestType || 'balance'
         });
 
         res.json({ success: true, data: result });

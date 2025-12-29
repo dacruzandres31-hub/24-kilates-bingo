@@ -1,4 +1,5 @@
 const pool = require('../db');
+const auditService = require('../services/auditService');
 
 /**
  * GET /api/superadmin/room-settings
@@ -74,6 +75,14 @@ exports.updateRoomPrice = async (req, res) => {
 
     console.log(`[RoomSettings] 💰 Precio actualizado: ${room} → $${card_price}`);
 
+    // Audit Log
+    auditService.log({
+      adminId: userId,
+      action: 'UPDATE_ROOM_PRICE',
+      details: { room, card_price },
+      ipAddress: req.ip
+    });
+
     res.json({
       success: true,
       message: `Precio de sala ${room} actualizado correctamente`,
@@ -137,6 +146,14 @@ exports.updateRoomPercentages = async (req, res) => {
 
     console.log(`[RoomSettings] 📊 Porcentajes actualizados: ${room}`);
 
+    // Audit Log
+    auditService.log({
+      adminId: userId,
+      action: 'UPDATE_ROOM_PERCENTAGES',
+      details: { room, percentage_linea, percentage_bingo, percentage_acumulado },
+      ipAddress: req.ip
+    });
+
     res.json({
       success: true,
       message: 'Porcentajes actualizados correctamente',
@@ -176,6 +193,14 @@ exports.resetAccumulatedPot = async (req, res) => {
     );
 
     console.log(`[RoomSettings] 🔄 Pozo acumulado reseteado: ${room}`);
+
+    // Audit Log
+    auditService.log({
+      adminId: userId,
+      action: 'RESET_ACCUMULATED_POT',
+      details: { room },
+      ipAddress: req.ip
+    });
 
     res.json({
       success: true,

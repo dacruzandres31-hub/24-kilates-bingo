@@ -52,10 +52,30 @@ class MetricsService {
      * Get snapshot of current metrics
      */
     getMetrics() {
+        const os = require('os');
+        const memoryUsage = process.memoryUsage();
+
         return {
             ...this.metrics,
             uptimeSeconds: Math.floor((Date.now() - this.metrics.startTime) / 1000),
-            memoryUsage: process.memoryUsage(),
+            system: {
+                platform: os.platform(),
+                arch: os.arch(),
+                cpus: os.cpus().length,
+                totalMemory: os.totalmem(),
+                freeMemory: os.freemem(),
+                loadAvg: os.loadavg(),
+                uptime: os.uptime()
+            },
+            process: {
+                pid: process.pid,
+                memory: {
+                    rss: memoryUsage.rss,
+                    heapTotal: memoryUsage.heapTotal,
+                    heapUsed: memoryUsage.heapUsed,
+                    external: memoryUsage.external
+                }
+            },
             timestamp: new Date().toISOString()
         };
     }

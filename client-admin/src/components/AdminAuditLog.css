@@ -1,0 +1,252 @@
+.admin-audit-container {
+    padding: 24px;
+    max-width: 1400px;
+    margin: 0 auto;
+    color: #e0e0e0;
+}
+
+.audit-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.header-title {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.header-icon {
+    width: 32px;
+    height: 32px;
+    color: #2196f3;
+}
+
+.header-title h2 {
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin: 0;
+    color: #fff;
+}
+
+.audit-summary {
+    font-size: 0.95rem;
+    color: #888;
+}
+
+.audit-summary strong {
+    color: #2196f3;
+}
+
+.audit-filters {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 24px;
+}
+
+.filter-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    padding: 10px 16px;
+    transition: all 0.3s ease;
+}
+
+.filter-group:focus-within {
+    border-color: rgba(33, 150, 243, 0.5);
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.filter-group input,
+.filter-group select {
+    background: transparent;
+    border: none;
+    color: #fff;
+    width: 100%;
+    outline: none;
+    font-size: 0.9rem;
+}
+
+.audit-table-wrapper {
+    margin-bottom: 30px;
+    padding: 0;
+    overflow: hidden;
+}
+
+.audit-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.audit-table th {
+    text-align: left;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.03);
+    color: #888;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.audit-row {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    transition: background 0.2s ease;
+}
+
+.audit-row:hover {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.audit-table td {
+    padding: 14px 16px;
+    vertical-align: middle;
+}
+
+.col-date .date-main {
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.col-date .date-sub {
+    color: #666;
+    font-size: 0.8rem;
+}
+
+.user-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.username {
+    color: #fff;
+    font-weight: 600;
+}
+
+.user-id {
+    color: #666;
+    font-size: 0.75rem;
+}
+
+.action-badge {
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.badge-create {
+    background: rgba(76, 175, 80, 0.15);
+    color: #4caf50;
+    border: 1px solid rgba(76, 175, 80, 0.2);
+}
+
+.badge-add {
+    background: rgba(33, 150, 243, 0.15);
+    color: #2196f3;
+    border: 1px solid rgba(33, 150, 243, 0.2);
+}
+
+.badge-delete {
+    background: rgba(244, 67, 54, 0.15);
+    color: #f44336;
+    border: 1px solid rgba(244, 67, 54, 0.2);
+}
+
+.badge-security {
+    background: rgba(255, 152, 0, 0.15);
+    color: #ff9800;
+    border: 1px solid rgba(255, 152, 0, 0.2);
+}
+
+.badge-info {
+    background: rgba(158, 158, 158, 0.15);
+    color: #9e9e9e;
+    border: 1px solid rgba(158, 158, 158, 0.2);
+}
+
+.details-compact {
+    max-width: 300px;
+    font-size: 0.85rem;
+}
+
+.detail-item {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 2px;
+}
+
+.detail-key {
+    color: #888;
+    font-weight: 600;
+}
+
+.detail-val {
+    color: #bbb;
+}
+
+.ip-val {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 3px 6px;
+    border-radius: 4px;
+    color: #4caf50;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+}
+
+.audit-pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 30px;
+}
+
+.pagination-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.pagination-btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(33, 150, 243, 0.5);
+    color: #2196f3;
+}
+
+.pagination-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.page-indicator {
+    color: #888;
+    font-size: 0.95rem;
+}
+
+.page-indicator strong {
+    color: #fff;
+}
+
+.table-loading,
+.table-empty {
+    text-align: center;
+    padding: 50px !important;
+    color: #666;
+    font-size: 1.1rem;
+}

@@ -4,6 +4,8 @@ const validationHelper = require('../helpers/validationHelper');
 const MoneyMath = require('../utils/moneyMath');
 const bcrypt = require('bcryptjs');
 const cardInventoryService = require('../services/cardInventoryService');
+const auditService = require('../services/auditService');
+const metricsService = require('../services/metricsService');
 
 /**
  * MÓDULO 7: API del Dashboard Administrativo
@@ -803,19 +805,26 @@ async function createUser(req, res) {
       return responseHelper.error(res, 400, 'Faltan campos requeridos: username, password, role');
     }
 
-    const validRoles = ['superadmin', 'agente', 'jugador'];
+    const validRoles = ['superadmin', 'admin', 'agente', 'jugador'];
     if (!validRoles.includes(role)) {
-      return responseHelper.error(res, 400, 'Rol inválido. Debe ser: superadmin, agente o jugador');
+      return responseHelper.error(res, 400, 'Rol inválido. Debe ser: superadmin, admin, agente o jugador');
     }
 
     // Determinar parent_id
     let finalParentId;
     if (currentUserRole === 'superadmin') {
       finalParentId = parent_id || null;
+    } else if (currentUserRole === 'admin') {
+      finalParentId = currentUserId;
+      // Admin no puede crear SuperAdmin ni otros Admin
+      if (role === 'superadmin' || role === 'admin') {
+        return responseHelper.error(res, 403, `No tienes permisos para crear el rol "${role}"`);
+      }
     } else if (currentUserRole === 'agente') {
       finalParentId = currentUserId;
-      if (role === 'superadmin') {
-        return responseHelper.error(res, 403, 'No tienes permisos para crear SuperAdmins');
+      // Agente no puede crear SuperAdmin ni Admin
+      if (role === 'superadmin' || role === 'admin') {
+        return responseHelper.error(res, 403, `No tienes permisos para crear el rol "${role}"`);
       }
     } else {
       return responseHelper.error(res, 403, 'No tienes permisos para crear usuarios');
@@ -1166,6 +1175,15 @@ async function addCardsToUser(req, res) {
       }
     }
 
+    // Audit Log
+    auditService.log({
+      adminId: currentUserId,
+      action: quantity > 0 ? 'ADD_CARDS' : 'REMOVE_CARDS',
+      targetUserId: parseInt(userId),
+      details: { room, quantity, isGift },
+      ipAddress: req.ip
+    });
+
     return responseHelper.success(res, {
       message: `${Math.abs(quantity)} cartón(es) de ${room} ${quantity > 0 ? 'agregado(s)' : 'descargado(s)'} exitosamente`,
       user: updatedUser
@@ -1263,9 +1281,18 @@ async function addBalanceToUser(req, res) {
       }
     }
 
+    // Audit Log
+    auditService.log({
+      adminId: req.user.id,
+      action: 'ADD_BALANCE',
+      targetUserId: userId,
+      details: { amount: parseFloat(amount), newBalance: MoneyMath.toNumber(newBalance) },
+      ipAddress: req.ip
+    });
+
     return responseHelper.success(res, {
-      message: `${amount > 0 ? 'Cargado' : 'Descargado'} $${Math.abs(amount).toLocaleString('es-CO')} ${amount > 0 ? 'a' : 'de'} ${username}`,
-      newBalance: MoneyMath.toNumber(newBalance)
+      newBalance: MoneyMath.toNumber(newBalance),
+      message: `Se han acreditado $${parseFloat(amount).toLocaleString('es-CO')} al usuario ${user.username}`
     });
 
   } catch (error) {
@@ -1364,6 +1391,15 @@ async function transferCardsToUser(req, res) {
       });
     }
 
+    // Audit Log
+    auditService.log({
+      adminId: req.user.id,
+      action: 'TRANSFER_CARDS',
+      targetUserId: to_user_id,
+      details: { room, quantity, fromUserId: req.user.id },
+      ipAddress: req.ip
+    });
+
     return res.json(result); // cardInventoryService.transferCards already returns a structured object
 
   } catch (error) {
@@ -1412,7 +1448,16 @@ async function changePassword(req, res) {
     await dbHelper.query('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, userId]);
 
     console.log(`✅ Contraseña cambiada para usuario ${user.username} (ID: ${userId})`);
-    return responseHelper.success(res, { message: 'Contraseña cambiada exitosamente' });
+    // Audit Log
+    auditService.log({
+      adminId: req.user.id,
+      action: 'CHANGE_PASSWORD',
+      targetUserId: userId,
+      details: { targetUsername: user.username },
+      ipAddress: req.ip
+    });
+
+    return responseHelper.success(res, 'Contraseña actualizada correctamente');
 
   } catch (error) {
     return responseHelper.error(res, 500, 'Error al cambiar la contraseña', error.message);
@@ -1454,6 +1499,14 @@ async function changeUserPassword(req, res) {
     await dbHelper.query('UPDATE users SET password_hash = ? WHERE id = ?', [hashedPassword, userId]);
 
     console.log(`✅ Admin ${adminId} cambió contraseña del usuario ${userId} (${targetUser.username})`);
+    // Audit Log
+    auditService.log({
+      adminId: req.user.id,
+      action: 'CHANGE_USER_PASSWORD',
+      targetUserId: userId,
+      details: { targetUsername: targetUser.username },
+      ipAddress: req.ip
+    });
     return responseHelper.success(res, { message: `Contraseña de ${targetUser.username} actualizada correctamente` });
 
   } catch (error) {
@@ -1492,14 +1545,15 @@ async function updateUserPersonalData(req, res) {
 
     const updates = [];
     const values = [];
+    const updatedFields = {};
 
-    if (nombre_completo !== undefined) { updates.push('nombre_completo = ?'); values.push(nombre_completo || null); }
-    if (documento !== undefined) { updates.push('documento = ?'); values.push(documento || null); }
-    if (email !== undefined) { updates.push('email = ?'); values.push(email || null); }
-    if (telefono !== undefined) { updates.push('telefono = ?'); values.push(telefono || null); }
-    if (cbu !== undefined) { updates.push('cbu = ?'); values.push(cbu || null); }
-    if (alias !== undefined) { updates.push('alias = ?'); values.push(alias || null); }
-    if (bank_name !== undefined) { updates.push('bank_name = ?'); values.push(bank_name || null); }
+    if (nombre_completo !== undefined) { updates.push('nombre_completo = ?'); values.push(nombre_completo || null); updatedFields.nombre_completo = nombre_completo; }
+    if (documento !== undefined) { updates.push('documento = ?'); values.push(documento || null); updatedFields.documento = documento; }
+    if (email !== undefined) { updates.push('email = ?'); values.push(email || null); updatedFields.email = email; }
+    if (telefono !== undefined) { updates.push('telefono = ?'); values.push(telefono || null); updatedFields.telefono = telefono; }
+    if (cbu !== undefined) { updates.push('cbu = ?'); values.push(cbu || null); updatedFields.cbu = cbu; }
+    if (alias !== undefined) { updates.push('alias = ?'); values.push(alias || null); updatedFields.alias = alias; }
+    if (bank_name !== undefined) { updates.push('bank_name = ?'); values.push(bank_name || null); updatedFields.bank_name = bank_name; }
 
     if (updates.length === 0) return responseHelper.error(res, 400, 'No se proporcionaron campos para actualizar');
 
@@ -1507,6 +1561,14 @@ async function updateUserPersonalData(req, res) {
     await dbHelper.query(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, values);
 
     console.log(`✅ Admin ${adminId} actualizó datos personales del usuario ${userId} (${targetUser.username})`);
+    // Audit Log
+    auditService.log({
+      adminId: req.user.id,
+      action: 'UPDATE_USER_DATA',
+      targetUserId: parseInt(userId),
+      details: { targetUsername: targetUser.username, updatedFields },
+      ipAddress: req.ip
+    });
     return responseHelper.success(res, { message: `Datos de ${targetUser.username} actualizados correctamente` });
 
   } catch (error) {
@@ -1602,6 +1664,15 @@ const bulkTransferCards = async (req, res) => {
       io.to(`user_${adminId}`).emit('resources_updated', { type: 'bulk_transfer_sent', data: results });
     }
 
+    // Audit Log
+    auditService.log({
+      adminId: req.user.id,
+      action: 'BULK_TRANSFER_CARDS',
+      targetUserId: targetUserId,
+      details: { items, applyBonus, results },
+      ipAddress: req.ip
+    });
+
     return responseHelper.success(res, { message: 'Carga masiva completada', results });
 
   } catch (error) {
@@ -1655,6 +1726,15 @@ async function removeCardsFromUser(req, res) {
            VALUES (?, 0, 'admin_adjustment', ?, ?)`,
         [userId, `Retiro de ${quantity} cartones ${room} (Regalo: ${isGift ? 'SI' : 'NO'})`, adminId]
       );
+    });
+
+    // Audit Log
+    auditService.log({
+      adminId: req.user.id,
+      action: 'REMOVE_CARDS_FORCE',
+      targetUserId: parseInt(userId),
+      details: { room, quantity, isGift },
+      ipAddress: req.ip
     });
 
     return responseHelper.success(res, { message: 'Cartones retirados exitosamente' });
@@ -1753,6 +1833,15 @@ async function createStockRequest(req, res) {
       ], 'CreateStockRequest'
     );
 
+    // Audit Log
+    auditService.log({
+      adminId: req.user.id,
+      action: 'CREATE_STOCK_REQUEST',
+      targetUserId: superiorId,
+      details: { requestId: result.insertId, room, quantity, items, amount },
+      ipAddress: req.ip
+    });
+
     return responseHelper.success(res, {
       requestId: result.insertId,
       message: 'Solicitud enviada al superior'
@@ -1787,5 +1876,54 @@ module.exports = {
   updateUserPersonalData,
   bulkTransferCards,
   getSuperiorInfo,
-  createStockRequest
+  createStockRequest,
+  getAuditLogs,
+  getSystemHealth
 };
+
+/**
+ * GET /api/admin/audit-logs
+ * Fetch administrative action logs
+ */
+async function getAuditLogs(req, res) {
+  try {
+    const { adminId, targetUserId, action, page = 1, limit = 50 } = req.query;
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+
+    const result = await auditService.getLogs({
+      adminId,
+      targetUserId,
+      action
+    }, parseInt(limit), offset);
+
+    return responseHelper.success(res, result);
+  } catch (error) {
+    return responseHelper.error(res, 500, 'Error obteniendo logs de auditoría', error.message);
+  }
+}
+
+/**
+ * GET /api/admin/system/health
+ * Fetch real-time system metrics
+ */
+async function getSystemHealth(req, res) {
+  try {
+    // Only SuperAdmin or Andy can see the full health stats
+    const isSuper = req.user.role === 'superadmin' || req.user.username?.toLowerCase() === 'andy';
+
+    const metrics = metricsService.getMetrics();
+
+    if (!isSuper) {
+      // Return a redacted version for standard admins
+      return responseHelper.success(res, {
+        status: 'ok',
+        uptime: metrics.uptimeSeconds,
+        timestamp: metrics.timestamp
+      });
+    }
+
+    return responseHelper.success(res, metrics);
+  } catch (error) {
+    return responseHelper.error(res, 500, 'Error obteniendo salud del sistema', error.message);
+  }
+}

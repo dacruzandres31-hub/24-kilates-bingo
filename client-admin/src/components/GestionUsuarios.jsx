@@ -8,6 +8,7 @@ import CostCalculatorModal from './CostCalculatorModal';
 import BulkTransferModal from './BulkTransferModal';
 import CardReceiptModal from './CardReceiptModal';
 import WholesaleCalculatorModal from './WholesaleCalculatorModal';
+import CardPurchaseCalculator from './CardPurchaseCalculator';
 
 // Modular Components
 import UserTreeView from './users/UserTreeView';
@@ -33,6 +34,9 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
     isOpen: false,
     usuario: null
   });
+
+  // Estado para Modal de Compra de Cartones
+  const [showCardPurchaseModal, setShowCardPurchaseModal] = useState(false);
 
   // Estado para el Recibo Virtual
   const [modalRecibo, setModalRecibo] = useState({
@@ -1691,6 +1695,7 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
             });
           }}
           onOpenWholesaleModal={() => setModalMayorista({ isOpen: true, usuario: currentUser })}
+          onOpenCardPurchase={() => setShowCardPurchaseModal(true)}
         />
       </div>
 
@@ -2738,6 +2743,16 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         user={modalMayorista.usuario}
         onConfirm={handleConfirmVentaMayorista}
       />
+
+      {/* Card Purchase Calculator Modal */}
+      {showCardPurchaseModal && createPortal(
+        <CardPurchaseCalculator
+          isOpen={showCardPurchaseModal}
+          onClose={() => setShowCardPurchaseModal(false)}
+          userRole={currentUser.role}
+        />,
+        document.body
+      )}
     </>
   );
 }

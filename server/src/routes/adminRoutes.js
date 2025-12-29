@@ -174,6 +174,8 @@ router.delete('/payment-accounts/:id', authenticateToken, isAdmin, paymentAccoun
 // ========================================
 router.get('/socket-diagnostics', authenticateToken, isAdmin, diagnosticsController.getSocketDiagnostics);
 router.get('/live-sessions', authenticateToken, isAdmin, diagnosticsController.getLiveSessions);
+router.get('/audit-logs', authenticateToken, isAdmin, getAuditLogs);
+router.get('/system/health', authenticateToken, isAdmin, getSystemHealth);
 
 // ========================================
 // 📊 ANALYTICS & DASHBOARD STATISTICS
