@@ -226,8 +226,8 @@ const CardPurchaseCalculator = ({ isOpen, onClose }) => {
                                                 <span style={{ color: colors.text, fontWeight: 'bold', textTransform: 'uppercase' }}>
                                                     {room}
                                                 </span>
-                                                <span style={{ color: 'white', fontSize: '0.9rem' }}>
-                                                    ${price.toFixed(2)} c/u
+                                                <span style={{ color: 'white', fontSize: '1.8rem', fontWeight: 'bold' }}>
+                                                    ${price.toFixed(2)}
                                                 </span>
                                             </div>
                                             <input
