@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { 
-  Users, 
-  RefreshCw, 
-  Search, 
+import {
+  Users,
+  RefreshCw,
+  Search,
   TrendingUp,
   AlertCircle,
   CheckCircle
@@ -33,9 +33,10 @@ export default function AllInventoriesPanel() {
         { headers: { Authorization: `Bearer ${getToken()}` } }
       );
 
-      setInventories(response.data.inventories || []);
-      setStats(response.data.stats || {});
-      setRole(response.data.role);
+      const responseData = response.data.data || response.data; // Support both formats
+      setInventories(responseData.inventories || []);
+      setStats(responseData.stats || {});
+      setRole(responseData.role);
       setError(null);
     } catch (err) {
       console.error('Error fetching inventories:', err);
@@ -64,7 +65,7 @@ export default function AllInventoriesPanel() {
     const matchesSearch = inv.username.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRoom = filterRoom === 'all' || Object.keys(inv.rooms).includes(filterRoom);
     const matchesAlert = !filterAlert || (role === 'superadmin' && inv.avg_free_percentage > 10);
-    
+
     return matchesSearch && matchesRoom && matchesAlert;
   });
 
@@ -119,7 +120,7 @@ export default function AllInventoriesPanel() {
             <div className="text-3xl font-bold text-white mt-2">{stats.total_cards || 0}</div>
             <div className="text-xs text-blue-400 mt-1">cartones activos</div>
           </div>
-          
+
           <div className="bg-gradient-to-br from-green-900/40 to-green-800/20 rounded-xl p-5 border border-green-500/30">
             <div className="text-sm text-green-300 font-medium">💰 Pagos</div>
             <div className="text-3xl font-bold text-white mt-2">{stats.total_paid || 0}</div>
@@ -127,7 +128,7 @@ export default function AllInventoriesPanel() {
               {stats.total_cards > 0 ? Math.round((stats.total_paid / stats.total_cards) * 100) : 0}% del total
             </div>
           </div>
-          
+
           <div className="bg-gradient-to-br from-yellow-900/40 to-yellow-800/20 rounded-xl p-5 border border-yellow-500/30">
             <div className="text-sm text-yellow-300 font-medium">🎁 Gratis</div>
             <div className="text-3xl font-bold text-white mt-2">{stats.total_free || 0}</div>
@@ -135,7 +136,7 @@ export default function AllInventoriesPanel() {
               {stats.global_free_percentage || 0}% del total
             </div>
           </div>
-          
+
           <div className="bg-gradient-to-br from-purple-900/40 to-purple-800/20 rounded-xl p-5 border border-purple-500/30">
             <div className="text-sm text-purple-300 font-medium">✅ Cumplimiento</div>
             <div className="text-3xl font-bold text-white mt-2">{stats.compliance_rate || 0}%</div>
@@ -151,7 +152,7 @@ export default function AllInventoriesPanel() {
             <div className="text-3xl font-bold text-white mt-2">{stats.total_cards || 0}</div>
             <div className="text-xs text-blue-400 mt-1">cartones activos</div>
           </div>
-          
+
           <div className="bg-gradient-to-br from-green-900/40 to-green-800/20 rounded-xl p-5 border border-green-500/30">
             <div className="text-sm text-green-300 font-medium">Usuarios Activos</div>
             <div className="text-3xl font-bold text-white mt-2">{inventories.length}</div>
@@ -314,13 +315,12 @@ export default function AllInventoriesPanel() {
                         </td>
 
                         <td className="px-6 py-4 whitespace-nowrap text-center">
-                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                            getAlertLevel(inv.avg_free_percentage) === 'ok'
+                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getAlertLevel(inv.avg_free_percentage) === 'ok'
                               ? 'bg-green-900/30 text-green-300 border border-green-500/30'
                               : getAlertLevel(inv.avg_free_percentage) === 'warning'
-                              ? 'bg-yellow-900/30 text-yellow-300 border border-yellow-500/30'
-                              : 'bg-red-900/30 text-red-300 border border-red-500/30'
-                          }`}>
+                                ? 'bg-yellow-900/30 text-yellow-300 border border-yellow-500/30'
+                                : 'bg-red-900/30 text-red-300 border border-red-500/30'
+                            }`}>
                             {getAlertIcon(inv.avg_free_percentage)} {inv.avg_free_percentage}%
                           </span>
                         </td>

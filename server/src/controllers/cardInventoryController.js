@@ -446,22 +446,35 @@ exports.getAllInventories = async (req, res) => {
 
     if (isSuperAdmin) {
       // SUPERADMIN: Vista completa con distinción pagos/gratis
+      // Usar CTE recursivo para obtener toda la jerarquía
       const [inventories] = await db.query(
-        `SELECT 
+        `WITH RECURSIVE user_hierarchy AS (
+           -- Usuario actual (raíz)
+           SELECT id, username, role, parent_id
+           FROM users
+           WHERE id = ?
+           
+           UNION ALL
+           
+           -- Todos los descendientes recursivamente
+           SELECT u.id, u.username, u.role, u.parent_id
+           FROM users u
+           INNER JOIN user_hierarchy uh ON u.parent_id = uh.id
+         )
+         SELECT 
            i.user_id,
-           u.username,
-           u.role,
+           uh.username,
+           uh.role,
            i.room,
            i.normal_cards,
            i.gift_cards,
            i.total_cards,
            i.free_percentage
          FROM v_superadmin_inventory i
-         JOIN users u ON i.user_id = u.id
-         WHERE u.parent_id = ? OR u.id = ?
-         ORDER BY u.username, 
+         JOIN user_hierarchy uh ON i.user_id = uh.id
+         ORDER BY uh.username, 
                   FIELD(i.room, 'bronce', 'plata', 'oro')`,
-        [req.user.id, req.user.id]
+        [req.user.id]
       );
 
       // Agrupar por usuario
@@ -524,19 +537,32 @@ exports.getAllInventories = async (req, res) => {
 
     } else {
       // AGENTES: Vista simplificada SIN distinción pagos/gratis
+      // Usar CTE recursivo para obtener toda la jerarquía
       const [inventories] = await db.query(
-        `SELECT 
+        `WITH RECURSIVE user_hierarchy AS (
+           -- Usuario actual (raíz)
+           SELECT id, username, role, parent_id
+           FROM users
+           WHERE id = ?
+           
+           UNION ALL
+           
+           -- Todos los descendientes recursivamente
+           SELECT u.id, u.username, u.role, u.parent_id
+           FROM users u
+           INNER JOIN user_hierarchy uh ON u.parent_id = uh.id
+         )
+         SELECT 
            i.user_id,
-           u.username,
-           u.role,
+           uh.username,
+           uh.role,
            i.room,
            i.total_cards
          FROM v_admin_inventory i
-         JOIN users u ON i.user_id = u.id
-         WHERE u.parent_id = ? OR u.id = ?
-         ORDER BY u.username, 
+         JOIN user_hierarchy uh ON i.user_id = uh.id
+         ORDER BY uh.username, 
                   FIELD(i.room, 'bronce', 'plata', 'oro')`,
-        [req.user.id, req.user.id]
+        [req.user.id]
       );
 
       // Agrupar por usuario
