@@ -60,3 +60,5 @@ client-player/.env
 # Backup files
 *.bak
 *~
+
+server/critical_errors.txt
