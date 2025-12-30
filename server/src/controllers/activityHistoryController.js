@@ -125,6 +125,7 @@ exports.getActivityHistory = async (req, res) => {
       }
 
       // 6. BALANCE (chips_movements)
+      // 6. BALANCE (chips_movements)
       try {
         // NOTA: Usamos 'reason' ya que 'description' podría no existir en chips_movements
         const [movements] = await connection.query(`
@@ -136,31 +137,38 @@ exports.getActivityHistory = async (req, res) => {
         `, [userId]);
 
         history.balanceMovements = movements;
+      } catch (err) {
+        console.error('[History] Error loading balance movements:', err.message);
       }
 
+      // 7. SOLICITUDES DE DEPÓSITO / COMPRA (deposit_requests)
+      try {
+        const [deposits] = await connection.query(`
+          SELECT 
+            id, amount_declared, status, request_type, created_at, proof_image_url, admin_notes
           FROM deposit_requests
           WHERE user_id = ?
-        ORDER BY created_at DESC LIMIT 50
-          `, [userId]);
+          ORDER BY created_at DESC LIMIT 50
+        `, [userId]);
 
-      history.depositRequests = deposits;
-    } catch (err) {
-      console.error('[History] Error loading deposit requests:', err.message);
+        history.depositRequests = deposits;
+      } catch (err) {
+        console.error('[History] Error loading deposit requests:', err.message);
+      }
+
+    } finally {
+      connection.release();
     }
 
-  } finally {
-    connection.release();
+    res.json({
+      success: true,
+      history
+    });
+
+  } catch (error) {
+    console.error('[ActivityHistory] Critical Error:', error);
+    res.status(500).json({ success: false, error: 'Error interno obteniendo historial' });
   }
-
-  res.json({
-    success: true,
-    history
-  });
-
-} catch (error) {
-  console.error('[ActivityHistory] Critical Error:', error);
-  res.status(500).json({ success: false, error: 'Error interno obteniendo historial' });
-}
 };
 
 exports.getSessionDetails = async (req, res) => {
