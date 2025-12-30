@@ -5,7 +5,7 @@ const responseHelper = require('../helpers/responseHelper');
 const validationHelper = require('../helpers/validationHelper');
 const gamificationEngine = require('../services/gamification_engine');
 
-const SECRET = process.env.JWT_SECRET || 'tu_super_secret_key_24k';
+const SECRET = process.env.JWT_SECRET || '24k_secret_prod_secure_2025';
 
 // Generar JWT
 const generateToken = (userId, role, username) => {

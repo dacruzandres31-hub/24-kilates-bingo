@@ -75,12 +75,7 @@ router.get('/pending', authenticateToken, isCajeroOrAdmin, async (req, res) => {
 router.post('/:id/approve', authenticateToken, isCajeroOrAdmin, async (req, res) => {
     try {
         const { id } = req.params;
-        const result = await DepositService.approveDeposit(id, req.user.id);
-
-        // Notificar al usuario (Socket.IO)
-        // Necesitamos saber el userId... DepositService ya lo usa internamente pero no lo retorna
-        // Podemos reimplementar o confiar en que el usuario verá su balance actualizado
-        // Mejor emitir evento global o a la sala del usuario en una V2
+        const result = await DepositService.approveDeposit(id, req.user.id, req.app.get('io'));
 
         res.json({ success: true, message: 'Depósito aprobado', data: result });
     } catch (error) {

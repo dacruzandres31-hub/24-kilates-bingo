@@ -1,4 +1,3 @@
-
 const pool = require('../db');
 const MoneyMath = require('../utils/moneyMath');
 
@@ -53,7 +52,7 @@ class DepositService {
     // ============================================
     // APROBAR DEPÓSITO (CAJERO)
     // ============================================
-    static async approveDeposit(depositId, reviewerId) {
+    static async approveDeposit(depositId, reviewerId, io = null) {
         const connection = await pool.getConnection();
 
         try {
@@ -83,6 +82,7 @@ class DepositService {
             if (users.length === 0) throw new Error('Usuario solicitante no encontrado');
 
             const balanceBefore = MoneyMath.decimal(users[0].balance);
+            let balanceAfter;
             if (deposit.request_type === 'b2b_stock' || deposit.request_type === 'card_purchase') {
                 // --- CASO B2B STOCK / COMPRA CARTONES: Acreditar cartones ---
                 const details = typeof deposit.details === 'string' ? JSON.parse(deposit.details) : deposit.details;
@@ -93,6 +93,41 @@ class DepositService {
                     : (details.room ? [{ room: details.room, quantity: details.quantity }] : []);
 
                 if (itemsToCredit.length === 0) throw new Error('Detalles de stock inválidos en la solicitud');
+
+                // -----------------------------------------------------
+                // VALIDAR Y DESCONTAR STOCK DEL VENDEDOR (Si existe y no es SuperAdmin)
+                // -----------------------------------------------------
+                if (deposit.target_user_id) {
+                    const [sellerRows] = await connection.query('SELECT role FROM users WHERE id = ?', [deposit.target_user_id]);
+                    if (sellerRows.length > 0 && sellerRows[0].role !== 'superadmin') {
+                        // Verificar stock para cada ITEM
+                        for (const item of itemsToCredit) {
+                            const { room, quantity } = item;
+                            const [inventory] = await connection.query(
+                                `SELECT quantity FROM user_card_inventory WHERE user_id = ? AND room = ? AND is_gift = FALSE FOR UPDATE`,
+                                [deposit.target_user_id, room]
+                            );
+
+                            const currentStock = inventory.length > 0 ? inventory[0].quantity : 0;
+                            if (currentStock < quantity) {
+                                throw new Error('INSUFFICIENT_SELLER_STOCK');
+                            }
+
+                            // Descontar
+                            await connection.query(
+                                `UPDATE user_card_inventory SET quantity = quantity - ? WHERE user_id = ? AND room = ? AND is_gift = FALSE`,
+                                [quantity, deposit.target_user_id, room]
+                            );
+
+                            // Log de Venta (SALE)
+                            await connection.query(`
+                                INSERT INTO card_movements_log 
+                                (user_id, from_user_id, to_user_id, room, quantity, movement_type, is_gift, executed_by)
+                                VALUES (?, ?, ?, ?, ?, 'sale', FALSE, ?)
+                            `, [deposit.target_user_id, deposit.target_user_id, deposit.user_id, room, quantity, reviewerId]);
+                        }
+                    }
+                }
 
                 for (const item of itemsToCredit) {
                     const { room, quantity } = item;
@@ -180,12 +215,33 @@ class DepositService {
             await connection.query(`
                 UPDATE deposit_requests 
                 SET status = 'approved', 
-                    reviewed_by = ?, 
-                    updated_at = NOW()
-                WHERE id = ?
+                reviewed_by = ?, 
+                updated_at = NOW()
+            WHERE id = ?
             `, [reviewerId, depositId]);
 
             await connection.commit();
+
+            // -----------------------------------------------------
+            // NOTIFICACIONES REAL-TIME (SOCKET.IO)
+            // -----------------------------------------------------
+            if (io) {
+                // 1. Notificar al Comprador (para que se le actualice Stock o Chips)
+                io.to(`user_${deposit.user_id}`).emit('resources_updated', {
+                    trigger: 'deposit_approved',
+                    type: deposit.request_type,
+                    amount: MoneyMath.toNumber(amount)
+                });
+
+                // 2. Notificar al Vendedor (si existe, para que se le descuente Stock)
+                if (deposit.target_user_id) {
+                    io.to(`user_${deposit.target_user_id}`).emit('resources_updated', {
+                        trigger: 'stock_sold',
+                        type: 'sale',
+                        to: deposit.user_id
+                    });
+                }
+            }
 
             return {
                 success: true,
@@ -207,10 +263,10 @@ class DepositService {
         await pool.query(`
             UPDATE deposit_requests 
             SET status = 'rejected', 
-                reviewed_by = ?, 
-                admin_notes = ?,
-                updated_at = NOW()
-            WHERE id = ?
+            reviewed_by = ?, 
+            admin_notes = ?,
+            updated_at = NOW()
+        WHERE id = ?
         `, [reviewerId, reason, depositId]);
 
         return { success: true, message: 'Solicitud rechazada' };
@@ -224,6 +280,7 @@ class DepositService {
             SELECT 
                 dr.*,
                 u.username,
+                u.role,
                 pa.alias as account_alias,
                 pa.bank_name
             FROM deposit_requests dr

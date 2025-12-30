@@ -9,7 +9,9 @@ const authenticateToken = (req, res, next) => {
       return res.status(401).json({ error: 'No autorizado. Token no proporcionado.' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'tu_clave_secreta_muy_segura_12345');
+    const secret = process.env.JWT_SECRET || '24k_secret_prod_secure_2025';
+
+    const decoded = jwt.verify(token, secret);
     req.user = decoded;
     // Normalizar para compatibilidad (el token trae 'id', los controllers a veces usan 'userId')
     if (decoded.id && !decoded.userId) {
@@ -59,7 +61,7 @@ const isCajeroOrAdmin = (req, res, next) => {
     return res.status(401).json({ error: 'No autenticado' });
   }
 
-  const allowedRoles = ['cajero', 'admin', 'superadmin'];
+  const allowedRoles = ['cajero', 'admin', 'superadmin', 'agente'];
   if (!allowedRoles.includes(req.user.role)) {
     return res.status(403).json({
       error: 'Acceso denegado. Se requiere rol de cajero o administrador.'
