@@ -23,7 +23,9 @@ exports.getActivityHistory = async (req, res) => {
       participatedSessions: [],
       prizesWon: [],
       withdrawals: [],
+      withdrawals: [],
       balanceMovements: [],
+      depositRequests: [],
       summary: {
         totalCards: 0,
         totalPrizes: 0,
@@ -134,23 +136,31 @@ exports.getActivityHistory = async (req, res) => {
         `, [userId]);
 
         history.balanceMovements = movements;
-      } catch (err) {
-        console.error('[History] Error loading balance movements:', err.message);
       }
 
-    } finally {
-      connection.release();
+          FROM deposit_requests
+          WHERE user_id = ?
+        ORDER BY created_at DESC LIMIT 50
+          `, [userId]);
+
+      history.depositRequests = deposits;
+    } catch (err) {
+      console.error('[History] Error loading deposit requests:', err.message);
     }
 
-    res.json({
-      success: true,
-      history
-    });
-
-  } catch (error) {
-    console.error('[ActivityHistory] Critical Error:', error);
-    res.status(500).json({ success: false, error: 'Error interno obteniendo historial' });
+  } finally {
+    connection.release();
   }
+
+  res.json({
+    success: true,
+    history
+  });
+
+} catch (error) {
+  console.error('[ActivityHistory] Critical Error:', error);
+  res.status(500).json({ success: false, error: 'Error interno obteniendo historial' });
+}
 };
 
 exports.getSessionDetails = async (req, res) => {
@@ -161,7 +171,7 @@ exports.getSessionDetails = async (req, res) => {
     const [participated] = await pool.query(`
       SELECT COUNT(*) as count FROM bingo_cards_pool 
       WHERE selected_by = ? AND game_session_id = ?
-    `, [userId, sessionId]);
+        `, [userId, sessionId]);
 
     if (participated[0].count === 0) {
       return res.status(403).json({ success: false, error: 'No participaste en este sorteo' });
@@ -172,7 +182,7 @@ exports.getSessionDetails = async (req, res) => {
       FROM session_history sh
       INNER JOIN game_sessions gs ON sh.game_session_id = gs.id
       WHERE sh.game_session_id = ?
-    `, [sessionId]);
+        `, [sessionId]);
 
     if (sessionInfo.length === 0) {
       return res.status(404).json({ success: false, error: 'Sorteo no encontrado' });
@@ -185,7 +195,7 @@ exports.getSessionDetails = async (req, res) => {
       SELECT id, serial, card_data, is_gift, selected_at 
       FROM bingo_cards_pool 
       WHERE selected_by = ? AND game_session_id = ?
-    `, [userId, sessionId]);
+        `, [userId, sessionId]);
 
     session.my_cards = myCards.map(c => ({
       ...c,
@@ -196,7 +206,7 @@ exports.getSessionDetails = async (req, res) => {
       SELECT prize_type, prize_amount, payment_status 
       FROM game_winners 
       WHERE user_id = ? AND game_session_id = ?
-    `, [userId, sessionId]);
+        `, [userId, sessionId]);
 
     session.my_prizes = myPrizes;
 

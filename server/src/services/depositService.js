@@ -34,11 +34,15 @@ class DepositService {
     static async createDepositRequest(userId, accountId, amount, proofUrl, details = null, requestType = 'balance') {
         const detailsJson = details ? JSON.stringify(details) : null;
 
+        // Obtener el dueño de la cuenta (target_user_id)
+        const [accountRows] = await pool.query('SELECT owner_id FROM payment_accounts WHERE id = ?', [accountId]);
+        const targetUserId = accountRows.length > 0 ? accountRows[0].owner_id : null;
+
         const [result] = await pool.query(`
             INSERT INTO deposit_requests 
-            (user_id, account_id, amount_declared, proof_image_url, details, request_type, status, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, 'pending', NOW())
-        `, [userId, accountId, amount, proofUrl, detailsJson, requestType]);
+            (user_id, account_id, amount_declared, proof_image_url, details, request_type, target_user_id, status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', NOW())
+        `, [userId, accountId, amount, proofUrl, detailsJson, requestType, targetUserId]);
 
         return {
             depositId: result.insertId,

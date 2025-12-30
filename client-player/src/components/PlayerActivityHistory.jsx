@@ -388,6 +388,44 @@ const PlayerActivityHistory = ({ onClose }) => {
     );
   };
 
+  const renderDeposits = () => {
+    if (!history?.depositRequests?.length) {
+      return <div className="no-data">No hay solicitudes de compra/depósito</div>;
+    }
+
+    return (
+      <div className="deposits-list">
+        <h3>🛒 Historial de Compras y Depósitos</h3>
+        <table className="history-table">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Tipo</th>
+              <th>Monto</th>
+              <th>Estado</th>
+              <th>Notas</th>
+            </tr>
+          </thead>
+          <tbody>
+            {history.depositRequests.map((dep) => (
+              <tr key={dep.id}>
+                <td>{formatDate(dep.created_at)}</td>
+                <td>
+                  <span className={`movement-type ${dep.request_type === 'card_purchase' ? 'purchase' : 'deposit'}`}>
+                    {dep.request_type === 'card_purchase' ? 'Compra Cartones' : 'Carga Saldo'}
+                  </span>
+                </td>
+                <td className="amount">{formatMoney(dep.amount_declared)}</td>
+                <td>{getStatusBadge(dep.status)}</td>
+                <td className="notes">{dep.admin_notes || '-'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
   const renderBalance = () => {
     if (!history?.balanceMovements?.length) {
       return <div className="no-data">No hay movimientos de balance</div>;
@@ -572,6 +610,12 @@ const PlayerActivityHistory = ({ onClose }) => {
             📤 Retiros
           </button>
           <button
+            className={`tab ${activeTab === 'purchases' ? 'active' : ''}`}
+            onClick={() => setActiveTab('purchases')}
+          >
+            🛒 Compras
+          </button>
+          <button
             className={`tab ${activeTab === 'balance' ? 'active' : ''}`}
             onClick={() => setActiveTab('balance')}
           >
@@ -586,6 +630,7 @@ const PlayerActivityHistory = ({ onClose }) => {
           {activeTab === 'sessions' && renderSessions()}
           {activeTab === 'prizes' && renderPrizes()}
           {activeTab === 'withdrawals' && renderWithdrawals()}
+          {activeTab === 'purchases' && renderDeposits()}
           {activeTab === 'balance' && renderBalance()}
         </div>
       </div>
