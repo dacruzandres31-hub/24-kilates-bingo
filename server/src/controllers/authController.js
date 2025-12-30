@@ -38,7 +38,10 @@ exports.login = async (req, res) => {
     // Verificar si el usuario está bloqueado
     if (user.is_blocked) {
       return res.status(403).json({
+<<<<<<< HEAD
         success: false,
+=======
+>>>>>>> da36289 (feat: implement AI probability prediction, game replay system, and mobile enhancements)
         error: 'Usuario bloqueado',
         blocked: true,
         reason: user.block_reason,
@@ -255,8 +258,15 @@ exports.changePassword = async (req, res) => {
       'ChangePassUpdate'
     );
 
+<<<<<<< HEAD
     return responseHelper.success(res, null, 'Contraseña actualizada exitosamente');
 
+=======
+    res.json({
+      success: true,
+      message: 'Contraseña actualizada exitosamente'
+    });
+>>>>>>> da36289 (feat: implement AI probability prediction, game replay system, and mobile enhancements)
   } catch (error) {
     return responseHelper.error(res, 500, 'Error al cambiar contraseña', error.message);
   }

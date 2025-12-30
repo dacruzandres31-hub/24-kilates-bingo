@@ -13,7 +13,15 @@ import GlobalTicker from '../components/GlobalTicker';
 import CelebrationModal from '../components/CelebrationModal';
 import PrizeClaimModal from '../components/PrizeClaimModal';
 import LineaPrizeNotification from '../components/LineaPrizeNotification';
-import { LogOut, Home, Grid, Layers } from 'lucide-react';
+import ChatWidget from '../components/ChatWidget';
+import EmojiReactions from '../components/EmojiReactions';
+import SoundToggle from '../components/SoundToggle';
+import AchievementManager, { useAchievements } from '../components/AchievementManager';
+import soundManager from '../utils/soundManager';
+import hapticManager from '../utils/hapticManager';
+import { motion, AnimatePresence } from 'framer-motion';
+import QuickPinchZoom, { make3dTransformValue } from 'react-quick-pinch-zoom';
+import { LogOut, Home, Grid, Layers, ChevronLeft, ChevronRight } from 'lucide-react';
 
 /**
  * GameRoom Page - Sala de Juego Principal
@@ -24,7 +32,11 @@ export default function GameRoom() {
   const navigate = useNavigate();
   const { roomType } = useParams();
   const socket = useSocket();
+<<<<<<< HEAD
   const { trigger: triggerHaptic } = useHaptic();
+=======
+  const { unlockAchievement } = useAchievements();
+>>>>>>> da36289 (feat: implement AI probability prediction, game replay system, and mobile enhancements)
 
   const [gameState, setGameState] = useState({
     drawnNumbers: [],
@@ -54,6 +66,15 @@ export default function GameRoom() {
   });
   const [equippedSkin, setEquippedSkin] = useState(null);
   const [viewMode, setViewMode] = useState('stacked'); // 'stacked' | 'single'
+  const [selectedCardIndex, setSelectedCardIndex] = useState(0);
+
+  // Sync selected index when card changes externally
+  useEffect(() => {
+    if (selectedCard && myCards.length > 0) {
+      const idx = myCards.findIndex(c => c.id === selectedCard.id);
+      if (idx !== -1) setSelectedCardIndex(idx);
+    }
+  }, [selectedCard, myCards]);
 
   // Socket listeners
   useEffect(() => {
@@ -97,6 +118,7 @@ export default function GameRoom() {
       }));
     });
 
+<<<<<<< HEAD
     // Escuchar ganador de LÍNEA
     socket.on('line_winner', (data) => {
       const isMe = currentUser && data.winner.userId === currentUser.id;
@@ -153,6 +175,41 @@ export default function GameRoom() {
         });
         setShowWinnerModal(true);
       }
+=======
+    // Escuchar ganador detectado
+    socket.on('winner_detected', (data) => {
+      // Verificar si soy yo el ganador
+      if (currentUser && data.userId === currentUser.id) {
+        const prizeType = data.type?.toUpperCase(); // 'LINEA', 'BINGO', 'POZO'
+
+        setPrizeData({
+          type: prizeType,
+          amount: data.amount || data.prizeAmount || 0,
+          sessionId: gameState.sessionId
+        });
+
+        // Si es LÍNEA → Modal simple de notificación
+        if (prizeType === 'LINEA') {
+          setShowLineaNotification(true);
+        }
+        // Si es BINGO o POZO → Modal con formulario de retiro
+        else if (prizeType === 'BINGO' || prizeType === 'POZO') {
+          setShowPrizeClaimModal(true);
+        }
+
+        // Logro: Primer Triunfo
+        unlockAchievement('first_win');
+      }
+
+      // Mostrar también el modal general de ganadores (para todos)
+      setWinnerData(data);
+      setShowWinnerModal(true);
+
+      // Sonido de notificación para ganadores ajenos
+      if (!currentUser || data.userId !== currentUser.id) {
+        soundManager.playNotificationSound();
+      }
+>>>>>>> da36289 (feat: implement AI probability prediction, game replay system, and mobile enhancements)
     });
 
     // Escuchar cascada de jackpot
@@ -293,6 +350,26 @@ export default function GameRoom() {
     }
     return styles;
   };
+
+  // Navegación de cartones (Mobile Gestures)
+  const navigateCard = (direction) => {
+    if (myCards.length <= 1) return;
+
+    let nextIndex = selectedCardIndex + direction;
+    if (nextIndex < 0) nextIndex = myCards.length - 1;
+    if (nextIndex >= myCards.length) nextIndex = 0;
+
+    setSelectedCardIndex(nextIndex);
+    setSelectedCard(myCards[nextIndex]);
+    hapticManager.vibrateMark(); // Feedback suave al cambiar
+  };
+
+  const onPinchUpdate = useCallback(({ x, y, scale }) => {
+    const cardEl = document.getElementById('zoomable-card');
+    if (cardEl) {
+      cardEl.style.transform = make3dTransformValue({ x, y, scale });
+    }
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 to-slate-900 p-4">
@@ -435,8 +512,9 @@ export default function GameRoom() {
           </div>
         </div>
 
-        {/* Cartón Grande Seleccionado */}
+        {/* Cartón Grande Seleccionado (Con Gestos Mobile) */}
         {selectedCard && (
+<<<<<<< HEAD
           <div className="bg-slate-800 rounded-xl p-6 border-2 border-cyan-500">
             <h2 className="text-2xl font-bold text-white mb-4">
               🎯 Cartón #{selectedCard.serialNumber}
@@ -454,25 +532,83 @@ export default function GameRoom() {
                     : []
                 }
               />
+=======
+          <div className="bg-slate-800 rounded-xl p-4 md:p-6 border-2 border-cyan-500 relative overflow-hidden">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl md:text-2xl font-bold text-white">
+                🎯 Cartón #{selectedCard.serialNumber}
+              </h2>
+              {myCards.length > 1 && (
+                <div className="flex gap-2">
+                  <button onClick={() => navigateCard(-1)} className="p-2 bg-slate-700 rounded-full hover:bg-slate-600 text-white">
+                    <ChevronLeft size={20} />
+                  </button>
+                  <span className="text-slate-400 font-medium py-1">
+                    {selectedCardIndex + 1} / {myCards.length}
+                  </span>
+                  <button onClick={() => navigateCard(1)} className="p-2 bg-slate-700 rounded-full hover:bg-slate-600 text-white">
+                    <ChevronRight size={20} />
+                  </button>
+                </div>
+              )}
+>>>>>>> da36289 (feat: implement AI probability prediction, game replay system, and mobile enhancements)
             </div>
-            <div className="mt-4 grid grid-cols-3 gap-4">
-              <div className="text-center">
-                <p className="text-slate-400 text-sm">Números Marcados</p>
-                <p className="text-2xl font-bold text-cyan-400">
+
+            <div className="relative h-[220px] md:h-auto overflow-hidden rounded-lg bg-slate-900 shadow-inner">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={selectedCard.id}
+                  initial={{ opacity: 0, x: 50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -50 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  drag="x"
+                  dragConstraints={{ left: 0, right: 0 }}
+                  onDragEnd={(e, { offset, velocity }) => {
+                    const swipe = Math.abs(offset.x) > 50;
+                    if (swipe && offset.x > 0) navigateCard(-1);
+                    else if (swipe && offset.x < 0) navigateCard(1);
+                  }}
+                  className="w-full h-full p-2 md:p-4 cursor-grab active:cursor-grabbing"
+                >
+                  <QuickPinchZoom onUpdate={onPinchUpdate} wheelScaleFactor={0.1}>
+                    <div id="zoomable-card" className="origin-top-left transition-transform duration-75">
+                      <BingoCard
+                        gridNumbers={selectedCard.gridNumbers}
+                        cardNumber={selectedCard.serialNumber}
+                        markedNumbers={new Set(gameState.drawnNumbers)}
+                        showNumbers={true}
+                        equippedSkin={equippedSkin}
+                      />
+                    </div>
+                  </QuickPinchZoom>
+                </motion.div>
+              </AnimatePresence>
+
+              {/* Hint para mobile */}
+              <div className="absolute bottom-2 right-2 text-[10px] text-slate-500 pointer-events-none italic">
+                Pinch para zoom • Desliza para cambiar
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-3 gap-2 md:gap-4">
+              <div className="text-center bg-slate-900/50 p-2 rounded-lg">
+                <p className="text-slate-400 text-[10px] md:text-sm uppercase tracking-wider">Marcados</p>
+                <p className="text-xl md:text-2xl font-bold text-cyan-400">
                   {Array.from(selectedCard.gridNumbers.flat().filter(n => n !== null))
-                    .filter(n => gameState.drawnNumbers.includes(n)).length}/25
+                    .filter(n => gameState.drawnNumbers.includes(n)).length}/15
                 </p>
               </div>
-              <div className="text-center">
-                <p className="text-slate-400 text-sm">Completado</p>
-                <p className="text-2xl font-bold text-green-400">
-                  {(Array.from(selectedCard.gridNumbers.flat().filter(n => n !== null))
-                    .filter(n => gameState.drawnNumbers.includes(n)).length / 25 * 100).toFixed(0)}%
+              <div className="text-center bg-slate-900/50 p-2 rounded-lg">
+                <p className="text-slate-400 text-[10px] md:text-sm uppercase tracking-wider">Progreso</p>
+                <p className="text-xl md:text-2xl font-bold text-green-400">
+                  {((Array.from(selectedCard.gridNumbers.flat().filter(n => n !== null))
+                    .filter(n => gameState.drawnNumbers.includes(n)).length / 15) * 100).toFixed(0)}%
                 </p>
               </div>
-              <div className="text-center">
-                <p className="text-slate-400 text-sm">Bolillas Sorteadas</p>
-                <p className="text-2xl font-bold text-yellow-400">
+              <div className="text-center bg-slate-900/50 p-2 rounded-lg">
+                <p className="text-slate-400 text-[10px] md:text-sm uppercase tracking-wider">Sorteados</p>
+                <p className="text-xl md:text-2xl font-bold text-yellow-400">
                   {gameState.drawnNumbers.length}
                 </p>
               </div>
@@ -529,6 +665,37 @@ export default function GameRoom() {
           💡 Tip: Los números se marcan automáticamente. Mantén atención al bolillero para no perder ningún número.
         </p>
       </div>
+
+      {/* Chat Widget */}
+      {currentUser && gameState.sessionId && (
+        <ChatWidget
+          socket={socket}
+          gameSessionId={gameState.sessionId}
+          username={currentUser.username || currentUser.name}
+          onMessageSent={() => unlockAchievement('first_message')}
+        />
+      )}
+
+      {/* Emoji Reactions */}
+      {gameState.sessionId && (
+        <EmojiReactions
+          socket={socket}
+          gameSessionId={gameState.sessionId}
+          onEmojiSent={() => unlockAchievement('first_reaction')}
+        />
+      )}
+
+      {/* Sound Control */}
+      <SoundToggle />
+
+      {/* Achievement Manager (Handles notifications and logic) */}
+      <AchievementManager
+        socket={socket}
+        gameData={{
+          cards: myCards,
+          sessionId: gameState.sessionId
+        }}
+      />
     </div>
   );
 }

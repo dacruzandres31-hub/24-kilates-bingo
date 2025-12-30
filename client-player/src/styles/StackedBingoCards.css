@@ -118,12 +118,15 @@
 }
 
 @keyframes pulse {
-  0%, 100% { 
-    transform: scale(1); 
+
+  0%,
+  100% {
+    transform: scale(1);
     box-shadow: 0 4px 12px rgba(233, 30, 99, 0.3);
   }
-  50% { 
-    transform: scale(1.02); 
+
+  50% {
+    transform: scale(1.02);
     box-shadow: 0 6px 20px rgba(233, 30, 99, 0.5);
   }
 }
@@ -133,6 +136,7 @@
     transform: translateX(-20px);
     opacity: 0;
   }
+
   to {
     transform: translateX(0);
     opacity: 1;
@@ -234,6 +238,7 @@
     transform: translate(-50%, -50%) scale(0.9);
     opacity: 0.8;
   }
+
   to {
     transform: translate(-50%, -50%) scale(1.05);
     opacity: 1;
@@ -274,9 +279,24 @@
   animation: shimmer 2s infinite;
 }
 
+.badge-probability {
+  background: #64748b;
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 @keyframes shimmer {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.8; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.8;
+  }
 }
 
 /* Close Button (expanded) */
@@ -356,18 +376,23 @@
   0% {
     transform: rotateY(0deg) scale(1);
   }
+
   50% {
     transform: rotateY(90deg) scale(1.1);
   }
+
   100% {
     transform: rotateY(0deg) scale(0.95);
   }
 }
 
 @keyframes cellGlow {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 2px 8px rgba(76, 175, 80, 0.4);
   }
+
   50% {
     box-shadow: 0 4px 20px rgba(76, 175, 80, 0.8);
   }
@@ -504,8 +529,13 @@
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .stacked-cards-loader p {
@@ -597,29 +627,56 @@
 
 /* Shake cuando el cartón está a 1 número de ganar */
 @keyframes shake-horizontal {
-  0%, 100% { transform: translateX(0); }
-  10%, 30%, 50%, 70%, 90% { transform: translateX(-8px); }
-  20%, 40%, 60%, 80% { transform: translateX(8px); }
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  10%,
+  30%,
+  50%,
+  70%,
+  90% {
+    transform: translateX(-8px);
+  }
+
+  20%,
+  40%,
+  60%,
+  80% {
+    transform: translateX(8px);
+  }
 }
 
 @keyframes shake-scale {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.02); }
+
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.02);
+  }
 }
 
 @keyframes pulse-glow {
-  0%, 100% { 
+
+  0%,
+  100% {
     box-shadow: 0 4px 20px rgba(255, 215, 0, 0.3);
   }
-  50% { 
-    box-shadow: 0 4px 30px rgba(255, 215, 0, 0.6), 
-                0 0 40px rgba(255, 215, 0, 0.4);
+
+  50% {
+    box-shadow: 0 4px 30px rgba(255, 215, 0, 0.6),
+      0 0 40px rgba(255, 215, 0, 0.4);
   }
 }
 
 /* Clase para cartón a punto de ganar */
 .card-almost-winning {
-  animation: 
+  animation:
     shake-horizontal 0.6s ease-in-out infinite,
     pulse-glow 1.5s ease-in-out infinite;
 }
@@ -640,8 +697,15 @@
 }
 
 @keyframes pulse-badge {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.1); }
+
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.1);
+  }
 }
 
 /* Efecto de brillo en números faltantes */
@@ -651,10 +715,13 @@
 }
 
 @keyframes highlight-missing {
-  0%, 100% {
+
+  0%,
+  100% {
     background-color: #fff3cd;
     box-shadow: 0 0 0 rgba(255, 215, 0, 0);
   }
+
   50% {
     background-color: #ffe082;
     box-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
@@ -673,24 +740,30 @@
 }
 
 @keyframes rotate-icon {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Reduced motion para accesibilidad */
 @media (prefers-reduced-motion: reduce) {
+
   .card-almost-winning,
   .card-high-priority {
     animation: none;
     border-color: #FFD700 !important;
     box-shadow: 0 4px 20px rgba(255, 215, 0, 0.5);
   }
-  
+
   .grid-cell.missing-for-win {
     animation: none;
     background-color: #ffe082;
   }
-  
+
   .card-almost-winning::before {
     animation: none;
   }
@@ -699,11 +772,28 @@
 /* Mobile optimizations */
 @media (max-width: 768px) {
   @keyframes shake-horizontal {
-    0%, 100% { transform: translateX(0); }
-    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
-    20%, 40%, 60%, 80% { transform: translateX(5px); }
+
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+
+    10%,
+    30%,
+    50%,
+    70%,
+    90% {
+      transform: translateX(-5px);
+    }
+
+    20%,
+    40%,
+    60%,
+    80% {
+      transform: translateX(5px);
+    }
   }
-  
+
   .card-almost-winning::before {
     font-size: 18px;
     top: 5px;

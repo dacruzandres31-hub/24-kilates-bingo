@@ -1,64 +1,88 @@
-import React, { useEffect, useState } from 'react';
-import '../styles/ConfettiEffect.css';
+import { useEffect } from 'react';
+import confetti from 'canvas-confetti';
 
 /**
- * ConfettiEffect - Efecto de confetti animado
- * Se dispara cuando hay un ganador de BINGO
+ * ConfettiEffect - Explosión de confetti para celebrar victoria BINGO
+ * Usa canvas-confetti para mejor rendimiento y efectos visuales
+ * 
+ * @param {boolean} isActive - Cuando cambia a true, dispara el confetti
+ * @param {string} type - Tipo de victoria: 'bingo', 'linea', 'jackpot'
+ * @param {function} onComplete - Callback cuando termina la animación
  */
-export default function ConfettiEffect({ isActive, duration = 3000, onComplete }) {
-  const [confettiPieces, setConfettiPieces] = useState([]);
-
+export default function ConfettiEffect({ isActive, type = 'bingo', duration = 3000, onComplete }) {
   useEffect(() => {
     if (!isActive) return;
 
-    // Generar piezas de confetti
-    const pieces = [];
-    const colors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DFE6E9'];
-    const pieceCount = 100;
+    const colors = {
+      bingo: ['#FFD700', '#FFA500', '#FF6347'], // Oro, naranja, rojo
+      linea: ['#C0C0C0', '#E5E4E2', '#B0C4DE'], // Plata
+      jackpot: ['#FFD700', '#FF1493', '#00CED1'] // Oro, rosa, cyan
+    };
 
-    for (let i = 0; i < pieceCount; i++) {
-      pieces.push({
-        id: i,
-        color: colors[Math.floor(Math.random() * colors.length)],
-        left: Math.random() * 100,
-        delay: Math.random() * 0.5,
-        duration: 2 + Math.random() * 1,
-        size: 8 + Math.random() * 8,
-        rotation: Math.random() * 360,
-        shape: Math.random() > 0.5 ? 'circle' : 'square'
-      });
+    const selectedColors = colors[type] || colors.bingo;
+
+    // Configuración de confetti
+    const animationEnd = Date.now() + duration;
+    const defaults = {
+      startVelocity: 30,
+      spread: 360,
+      ticks: 60,
+      zIndex: 10000,
+      colors: selectedColors
+    };
+
+    function randomInRange(min, max) {
+      return Math.random() * (max - min) + min;
     }
 
-    setConfettiPieces(pieces);
+    // Lanzar confetti desde múltiples puntos
+    const interval = setInterval(() => {
+      const timeLeft = animationEnd - Date.now();
 
-    // Limpiar después de la duración
-    const timeout = setTimeout(() => {
-      setConfettiPieces([]);
-      if (onComplete) onComplete();
-    }, duration);
+      if (timeLeft <= 0) {
+        clearInterval(interval);
+        if (onComplete) onComplete();
+        return;
+      }
 
-    return () => clearTimeout(timeout);
-  }, [isActive, duration, onComplete]);
+      const particleCount = 50 * (timeLeft / duration);
 
-  if (!isActive || confettiPieces.length === 0) return null;
+      // Desde la izquierda
+      confetti({
+        ...defaults,
+        particleCount,
+        origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 }
+      });
 
-  return (
-    <div className="confetti-container">
-      {confettiPieces.map((piece) => (
-        <div
-          key={piece.id}
-          className={`confetti-piece confetti-${piece.shape}`}
-          style={{
-            left: `${piece.left}%`,
-            backgroundColor: piece.color,
-            width: `${piece.size}px`,
-            height: `${piece.size}px`,
-            animationDelay: `${piece.delay}s`,
-            animationDuration: `${piece.duration}s`,
-            transform: `rotate(${piece.rotation}deg)`
-          }}
-        />
-      ))}
-    </div>
-  );
+      // Desde la derecha
+      confetti({
+        ...defaults,
+        particleCount,
+        origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 }
+      });
+    }, 250);
+
+    return () => clearInterval(interval);
+  }, [isActive, type, duration, onComplete]);
+
+  return null; // Este componente no renderiza nada visible
 }
+
+/**
+ * Función helper para disparar confetti manualmente
+ */
+export function fireConfetti(type = 'bingo') {
+  const colors = {
+    bingo: ['#FFD700', '#FFA500', '#FF6347'],
+    linea: ['#C0C0C0', '#E5E4E2', '#B0C4DE'],
+    jackpot: ['#FFD700', '#FF1493', '#00CED1']
+  };
+
+  confetti({
+    particleCount: 100,
+    spread: 70,
+    origin: { y: 0.6 },
+    colors: colors[type] || colors.bingo
+  });
+}
+

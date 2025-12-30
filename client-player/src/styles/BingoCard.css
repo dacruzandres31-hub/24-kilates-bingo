@@ -39,10 +39,13 @@
 }
 
 @keyframes neon-glow {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 0 20px var(--card-primary-color);
     text-shadow: 0 0 10px var(--card-primary-color);
   }
+
   50% {
     box-shadow: 0 0 40px var(--card-primary-color);
     text-shadow: 0 0 20px var(--card-primary-color);
@@ -53,27 +56,35 @@
   0% {
     filter: hue-rotate(0deg);
   }
+
   50% {
     filter: hue-rotate(30deg);
   }
+
   100% {
     filter: hue-rotate(0deg);
   }
 }
 
 @keyframes cyberpunk-pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     border-color: var(--card-primary-color);
   }
+
   50% {
     border-color: #FF006E;
   }
 }
 
 @keyframes diamond-sparkle {
-  0%, 100% {
+
+  0%,
+  100% {
     filter: brightness(1);
   }
+
   50% {
     filter: brightness(1.3);
   }
@@ -115,9 +126,11 @@
   0% {
     transform: scale(1);
   }
+
   50% {
     transform: scale(1.1);
   }
+
   100% {
     transform: scale(1);
   }
@@ -133,9 +146,11 @@
   0% {
     transform: rotate(0deg) scale(1);
   }
+
   50% {
     transform: rotate(2deg) scale(1.05);
   }
+
   100% {
     transform: rotate(0deg) scale(1);
   }
@@ -164,6 +179,7 @@
   0% {
     transform: translate(-50%, -50%) scale(0) rotate(-180deg);
   }
+
   100% {
     transform: translate(-50%, -50%) scale(1) rotate(0deg);
   }
@@ -182,18 +198,24 @@
 }
 
 @keyframes bingo-badge-float {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translate(-50%, -50%) scale(1);
   }
+
   50% {
     transform: translate(-50%, -55%) scale(1.1);
   }
 }
 
 @keyframes linea-badge-float {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translate(-50%, -50%) scale(1);
   }
+
   50% {
     transform: translate(-50%, -55%) scale(1.1);
   }
@@ -206,6 +228,42 @@
   color: var(--card-primary-color);
   text-align: right;
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* PROBABILITY BADGE */
+.probability-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  z-index: 5;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  animation: probability-pulse 2s infinite ease-in-out;
+}
+
+@keyframes probability-pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.85;
+    transform: scale(0.98);
+  }
 }
 
 /* GRID */
@@ -261,9 +319,11 @@
   0% {
     transform: scale(1.2) rotate(5deg);
   }
+
   50% {
     transform: scale(0.95);
   }
+
   100% {
     transform: scale(1) rotate(0deg);
   }
@@ -354,7 +414,8 @@
 /* ===== BINGO 90 STYLES (3x9 Grid) ===== */
 
 .bingo-card-90 {
-  aspect-ratio: 16 / 9; /* Más ancho para acomodar 9 columnas */
+  aspect-ratio: 16 / 9;
+  /* Más ancho para acomodar 9 columnas */
 }
 
 .card-grid-90 {
@@ -451,4 +512,3 @@
     font-size: 0.45rem;
   }
 }
-

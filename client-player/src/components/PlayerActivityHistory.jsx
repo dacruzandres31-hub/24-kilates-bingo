@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import ReplayViewer from './ReplayViewer';
 import '../styles/PlayerActivityHistory.css';
 
 const PlayerActivityHistory = ({ onClose }) => {
@@ -8,6 +9,7 @@ const PlayerActivityHistory = ({ onClose }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedSession, setSelectedSession] = useState(null);
+  const [showReplay, setShowReplay] = useState(false);
 
   useEffect(() => {
     loadHistory();
@@ -26,7 +28,11 @@ const PlayerActivityHistory = ({ onClose }) => {
         return;
       }
 
+<<<<<<< HEAD
       console.log('🔍 Cargando historial desde:', '/api/activity-history');
+=======
+      console.log('🔍 Cargando historial desde:', `${import.meta.env.VITE_API_URL}/activity-history`);
+>>>>>>> da36289 (feat: implement AI probability prediction, game replay system, and mobile enhancements)
       console.log('🔑 Token encontrado:', token ? 'Sí' : 'No');
       const response = await axios.get('/api/activity-history', {
         headers: { Authorization: `Bearer ${token}` }
@@ -476,7 +482,15 @@ const PlayerActivityHistory = ({ onClose }) => {
         <div className="session-details-modal" onClick={e => e.stopPropagation()}>
           <div className="modal-header">
             <h2>Detalles del Sorteo</h2>
-            <button className="btn-close" onClick={() => setSelectedSession(null)}>×</button>
+            <div className="header-actions">
+              <button
+                className="btn-replay-action"
+                onClick={() => setShowReplay(true)}
+              >
+                🎬 Reproducir Replay
+              </button>
+              <button className="btn-close" onClick={() => setSelectedSession(null)}>×</button>
+            </div>
           </div>
 
           <div className="modal-body">
@@ -610,12 +624,15 @@ const PlayerActivityHistory = ({ onClose }) => {
             📤 Retiros
           </button>
           <button
+<<<<<<< HEAD
             className={`tab ${activeTab === 'purchases' ? 'active' : ''}`}
             onClick={() => setActiveTab('purchases')}
           >
             🛒 Compras
           </button>
           <button
+=======
+>>>>>>> da36289 (feat: implement AI probability prediction, game replay system, and mobile enhancements)
             className={`tab ${activeTab === 'balance' ? 'active' : ''}`}
             onClick={() => setActiveTab('balance')}
           >
@@ -636,6 +653,13 @@ const PlayerActivityHistory = ({ onClose }) => {
       </div>
 
       {renderSessionDetailsModal()}
+
+      {showReplay && selectedSession && (
+        <ReplayViewer
+          session={selectedSession}
+          onClose={() => setShowReplay(false)}
+        />
+      )}
     </>
   );
 };

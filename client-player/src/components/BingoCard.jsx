@@ -1,4 +1,5 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
+import { analyzeCardProbability } from '../utils/probabilityUtils';
 import '../styles/BingoCard.css';
 
 /**
@@ -19,7 +20,7 @@ const BingoCard = forwardRef((props, ref) => {
     onSelect,
     equippedSkin,
     missingNumbers = [],
-    markedNumbers: propMarkedNumbers // NUEVO
+    markedNumbers: propMarkedNumbers
   } = props;
 
   const [internalMarkedNumbers, setInternalMarkedNumbers] = useState(new Set());
@@ -47,8 +48,6 @@ const BingoCard = forwardRef((props, ref) => {
     const cols = gridNumbers[0].length;
 
     // Convertir a array plano para validación (solo números, no nulls)
-    const allNumbersCount = gridNumbers.flat().filter(n => n !== null && n !== 0 && n !== 'FREE').length;
-
     // Check BINGO: todos los números marcados
     let totalMarked = 0;
     gridNumbers.flat().forEach(n => {
@@ -97,8 +96,11 @@ const BingoCard = forwardRef((props, ref) => {
     '--card-animation-class': equippedSkin.animation_class || 'none'
   } : {};
 
-  // Clase dinámica del skin
+  // Propriedades de skin
   const skinClass = equippedSkin ? equippedSkin.animation_class : '';
+
+  // Análisis de probabilidad
+  const probability = analyzeCardProbability(gridNumbers, currentMarkedNumbers);
 
   return (
     <div
@@ -109,6 +111,16 @@ const BingoCard = forwardRef((props, ref) => {
       {/* Etiqueta de ganancia */}
       {isBingo && <div className="win-badge bingo-badge">🎉 ¡BINGO!</div>}
       {isLinea && <div className="win-badge linea-badge">⭐ LÍNEA</div>}
+
+      {/* Probability Badge */}
+      {!isBingo && probability && (
+        <div
+          className="probability-badge"
+          style={{ backgroundColor: probability.line.color }}
+        >
+          {probability.line.icon} {probability.line.label} ({probability.line.percentage}%)
+        </div>
+      )}
 
       {/* Número de serie */}
       <div className="card-number">#{cardNumber}</div>

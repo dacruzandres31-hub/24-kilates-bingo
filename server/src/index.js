@@ -123,6 +123,7 @@ io.on('connection', (socket) => {
     }
   });
 
+<<<<<<< HEAD
   // Handler para unirse a una sala de juego (DEPRECATED - Usar join_session)
   socket.on('join_game', ({ room }) => {
     if (room) {
@@ -130,6 +131,38 @@ io.on('connection', (socket) => {
       socket.join(roomName);
       console.log(`[Socket.IO] 🎮 Socket ${socket.id} unido a sala de juego: ${roomName}`);
     }
+=======
+  // Chat en vivo
+  socket.on('chat_message', (data) => {
+    const { gameSessionId, username, message, timestamp } = data;
+    console.log(`[Socket.IO] Chat message from ${username} in session ${gameSessionId}`);
+
+    // Broadcast a todos en la sesión
+    io.to(`session_${gameSessionId}`).emit('chat_message', {
+      username,
+      message,
+      timestamp
+    });
+  });
+
+  // Reacciones emoji
+  socket.on('emoji_reaction', (data) => {
+    const { gameSessionId, emoji } = data;
+    const userData = socket.userData || {};
+    console.log(`[Socket.IO] Emoji reaction ${emoji} from ${userData.username} in session ${gameSessionId}`);
+
+    // Broadcast a todos en la sesión
+    io.to(`session_${gameSessionId}`).emit('emoji_reaction', {
+      emoji,
+      username: userData.username || 'Anónimo'
+    });
+  });
+
+  // Eventos del juego
+  socket.on('join_game', (data) => {
+    console.log(`[Socket.IO] Join game: ${data.userId} en sala ${data.room}`);
+    socket.join(`game_${data.room}`);
+>>>>>>> da36289 (feat: implement AI probability prediction, game replay system, and mobile enhancements)
   });
 
   // NEW: Handler para unirse a una sesión específica (Sincronización v2.0)

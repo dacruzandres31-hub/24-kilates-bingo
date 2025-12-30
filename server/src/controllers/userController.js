@@ -68,7 +68,7 @@ exports.createUser = async (req, res) => {
 
     // Insertar usuario
     const [result] = await pool.query(
-      `INSERT INTO users (username, password_hash, role, parent_id, balance)
+      `INSERT INTO users (username, password, role, parent_id, balance)
        VALUES (?, ?, ?, ?, ?)`,
       [username, hashedPassword, newRole, validParentId, 0.00]
     );
