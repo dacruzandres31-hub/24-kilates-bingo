@@ -251,27 +251,28 @@ const CardPurchaseCalculator = ({ isOpen, onClose, userRole }) => {
                                                 <span style={{ color: colors.text, fontWeight: 'bold', textTransform: 'uppercase' }}>
                                                     {room}
                                                 </span>
-                                                <span style={{ color: 'white', fontSize: '0.9rem' }}>
-                                                    ${finalPrice.toFixed(2)} c/u
-                                                    {discount > 0 && <span style={{ textDecoration: 'line-through', marginLeft: '5px', color: '#64748b' }}>${price}</span>}
+                                                <span style={{ color: 'white', fontSize: '1.8rem', fontWeight: 'bold' }}>
+                                                    ${finalPrice.toFixed(2)}
+                                                    {discount > 0 && <span style={{ textDecoration: 'line-through', marginLeft: '8px', color: '#64748b', fontSize: '1rem' }}>${price.toFixed(2)}</span>}
                                                 </span>
                                             </div>
                                             <input
                                                 type="number"
                                                 min="0"
-                                                value={quantities[room]}
+                                                value={quantities[room] === 0 ? '' : quantities[room]}
                                                 onChange={(e) => setQuantities({ ...quantities, [room]: parseInt(e.target.value) || 0 })}
                                                 style={{
-                                                    width: '100%',
-                                                    padding: '0.75rem',
+                                                    width: '120px',
+                                                    padding: '0.5rem',
                                                     background: '#0f172a',
                                                     border: '1px solid #334155',
                                                     borderRadius: '0.5rem',
                                                     color: 'white',
                                                     fontSize: '1rem',
-                                                    outline: 'none'
+                                                    outline: 'none',
+                                                    textAlign: 'center'
                                                 }}
-                                                placeholder="Cantidad"
+                                                placeholder="0"
                                             />
                                         </div>
                                     );
