@@ -859,20 +859,13 @@ export default function BronzeRoom({ onLogout }) {
 
     setCardWinningLines(newCardWinningLines); // Actualizar líneas ganadoras
 
-<<<<<<< HEAD
-    // removed redundant setAlmostLineCards call
-
     // Mostrar celebración si hay NUEVOS ganadores que NO han sido festejados
-    // ANTI-LOOP: Verificar que el cartón NO esté en celebratedCardIds
+    // ANTI-LOOP: Verificar que el cartón NO esté en celebratedCardIds Y que no haya celebración activa
     const newWinners = cardsWithWinningLines.filter(card =>
       !celebratedCardIds.includes(card.cardId)
     );
 
-    // FIX: Line can only be won ONCE per game session.
-    // If celebratedCardIds has any entries, it means Line was already won by someone.
-    const hasLineBeenWon = celebratedCardIds.length > 0;
-
-    if (newWinners.length > 0 && !lineCelebrated && !hasLineBeenWon) {
+    if (newWinners.length > 0 && !lineCelebrated && winnerCards.length === 0) {
       // Tomar el primer cartón ganador nuevo
       const winnerCard = newWinners[0];
 
@@ -883,146 +876,84 @@ export default function BronzeRoom({ onLogout }) {
       // Limpiar alertas de "casi línea" porque ya se ganó
       setAlmostLineCards([]);
 
-      // 1. PRIMERO: Anunciar línea ganadora INMEDIATAMENTE (100ms para dar tiempo a que se active el audio)
+      // 1. PRIMERO: Anunciar línea ganadora INMEDIATAMENTE
       setTimeout(() => {
         console.log('[BronzeRoom] 🎶 Reproduciendo voz: Felicitaciones, Ganaste Línea');
         voiceService.speak('Felicitaciones, Ganaste Línea', { volume: 1.0, rate: 0.9 });
       }, 100);
 
-      // 2. Toast de celebración (sin sonido)
+      // 2. Toast de celebración
       addToast('🎉', '¡LÍNEA!', 'Has completado una línea', 8000);
 
       // 3. Activar confeti
       triggerConfetti();
 
-      // 4. DESPUÉS DE LA VOZ: Reproducir aplausos (1.5 segundos después para no interferir)
+      // 4. DESPUÉS DE LA VOZ: Reproducir aplausos
       setTimeout(() => {
         celebrationAudio.currentTime = 0;
         celebrationAudio.play();
       }, 1500);
 
-      // 5. Pausar sorteo (pero NO anunciar "Sorteo Pausado" - se anunciará al reanudar)
+      // 5. Pausar sorteo
       if (gameStatus === 'active') {
         setGameStatus('waiting');
         const timeout = setTimeout(() => {
-          // Desaparecer festejo de línea e información relacionada JUSTO antes del anuncio
-          setWinnerCards([]);
-          setHighlightedLine(null);
-          setLineCelebrated(false);
-=======
-  // Mostrar celebración si hay NUEVOS ganadores que NO han sido festejados
-  // ANTI-LOOP: Verificar que el cartón NO esté en celebratedCardIds Y que no haya celebración activa
-  const newWinners = cardsWithWinningLines.filter(card => 
-    !celebratedCardIds.includes(card.cardId)
-  );
-  
-  if (newWinners.length > 0 && !lineCelebrated && winnerCards.length === 0) {
-    // Tomar el primer cartón ganador nuevo
-    const winnerCard = newWinners[0];
-    
-    setWinnerCards([winnerCard]); // Solo el nuevo ganador
-    setLineCelebrated(true);
-    setCelebratedCardIds([...celebratedCardIds, winnerCard.cardId]); // Marcar como festejado
-    
-    // Limpiar alertas de "casi línea" porque ya se ganó
-    setAlmostLineCards([]);
-    
-    // 1. PRIMERO: Anunciar línea ganadora INMEDIATAMENTE (100ms para dar tiempo a que se active el audio)
-    setTimeout(() => {
-      console.log('[BronzeRoom] 🎶 Reproduciendo voz: Felicitaciones, Ganaste Línea');
-      voiceService.speak('Felicitaciones, Ganaste Línea', { volume: 1.0, rate: 0.9 });
-    }, 100);
-    
-    // 2. Toast de celebración (sin sonido)
-    addToast('🎉', '¡LÍNEA!', 'Has completado una línea', 8000);
-    
-    // 3. Activar confeti
-    triggerConfetti();
-    
-    // 4. DESPUÉS DE LA VOZ: Reproducir aplausos (1.5 segundos después para no interferir)
-    setTimeout(() => {
-      celebrationAudio.currentTime = 0;
-      celebrationAudio.play();
-    }, 1500);
-    
-    // 5. Pausar sorteo (pero NO anunciar "Sorteo Pausado" - se anunciará al reanudar)
-    if (gameStatus === 'active') {
-      setGameStatus('waiting');
-      const timeout = setTimeout(() => {
-        // Anunciar continuación a BINGO antes de reanudar
-        voiceService.speak('Continuamos hasta Bingo');
-        setTimeout(() => {
-          // ORDEN IMPORTANTE: Limpiar ganadores PRIMERO, luego resetear flag
-          setWinnerCards([]);
-          setHighlightedLine(null);
-          setLineCelebrated(false); // RESETEAR después de limpiar ganadores
-          setGameStatus('active');
-        }, 2000); // Esperar 2 segundos para que termine el anuncio
-      }, 18000); // 18 segundos + 2 del anuncio = 20 segundos total
-      setPauseTimeout(timeout);
-    }
-    
-    // 6. Resaltar la línea ganadora (primera del primer cartón)
-    if (cardsWithWinningLines[0]?.lines?.length > 0) {
-      setHighlightedLine(cardsWithWinningLines[0].lines[0].numbers);
-    }
-  }
-
-  // DETECTAR BINGO (Cartón completo - 15 números marcados)
-  if (!bingoCelebrated && !lineCelebrated && winnerCards.length === 0) {
-    playerCards.forEach(card => {
-      const allNumbers = card.numbers.flat().filter(n => n !== null && n !== undefined);
-      const markedNumbers = allNumbers.filter(num => isNumberCalled(num));
-      
-      if (markedNumbers.length === 15) {
-        console.log('[BronzeRoom] 🎊 BINGO DETECTADO');
-        setBingoWinnerCard({
-          cardId: card.id,
-          cardSerial: card.serial || generateCardSerial(playerCards.indexOf(card), 'B'),
-          card: card
-        });
-        setBingoCelebrated(true);
-        setGameStatus('ended');
-        
-        setTimeout(() => voiceService.speak('BINGO', { volume: 1.0, rate: 0.9 }), 100);
-        setTimeout(() => voiceService.speak('Felicitaciones, Ganaste Bingo', { volume: 1.0, rate: 0.9 }), 1500);
-        addToast('🎊', '¡BINGO!', 'Has completado el cartón', 8000);
-        triggerConfetti();
-        setTimeout(() => { celebrationAudio.currentTime = 0; celebrationAudio.play(); }, 2000);
-        
-        setTimeout(() => {
-          voiceService.speak('El Bingo ha finalizado');
+          // Anunciar continuación a BINGO antes de reanudar
+          voiceService.speak('Continuamos hasta Bingo');
           setTimeout(() => {
-            setBallsDrawn([]); setSelectedPlayerCards([]); setPlayerCards([]);
-            setBingoWinnerCard(null); setBingoCelebrated(false); setGameStatus('waiting');
-            setShowCardSelection(false); setCardsRemaining(6); setCelebratedCardIds([]);
-            setWinnerCards([]); setLineCelebrated(false); audioService.stopBolilleroGirando();
-            addToast('✅', 'Juego Finalizado', 'Puedes comprar nuevos cartones', 5000);
+            // ORDEN IMPORTANTE: Limpiar ganadores PRIMERO, luego resetear flag
+            setWinnerCards([]);
+            setHighlightedLine(null);
+            setLineCelebrated(false); // RESETEAR después de limpiar ganadores
+            setGameStatus('active');
           }, 2000);
         }, 18000);
-        return;
-      }
-    });
-  }
-}, [ballsDrawn.length, playerCards.length, lineCelebrated, gameStatus, winnerCards.length, bingoCelebrated]);
->>>>>>> da36289 (feat: implement AI probability prediction, game replay system, and mobile enhancements)
-
-          // Anunciar continuación a BINGO
-          voiceService.speak('Continuamos hasta Bingo');
-
-          setTimeout(() => {
-            setGameStatus('active');
-          }, 2000); // Esperar 2 segundos para que termine el anuncio
-        }, 18000); // 18 segundos + 2 del anuncio = 20 segundos total
         setPauseTimeout(timeout);
       }
 
-      // 6. Resaltar la línea ganadora (primera del primer cartón)
+      // 6. Resaltar la línea ganadora
       if (cardsWithWinningLines[0]?.lines?.length > 0) {
         setHighlightedLine(cardsWithWinningLines[0].lines[0].numbers);
       }
     }
-  }, [ballsDrawn.length, playerCards.length, lineCelebrated, gameStatus, winnerCards.length]);
+
+    // DETECTAR BINGO (Cartón completo - 15 números marcados)
+    if (!bingoCelebrated && !lineCelebrated && winnerCards.length === 0) {
+      playerCards.forEach(card => {
+        const allNumbers = card.numbers.flat().filter(n => n !== null && n !== undefined);
+        const markedNumbers = allNumbers.filter(num => isNumberCalled(num));
+
+        if (markedNumbers.length === 15) {
+          console.log('[BronzeRoom] 🎊 BINGO DETECTADO');
+          setBingoWinnerCard({
+            cardId: card.id,
+            cardSerial: card.serial || generateCardSerial(playerCards.indexOf(card), 'B'),
+            card: card
+          });
+          setBingoCelebrated(true);
+          setGameStatus('ended');
+
+          setTimeout(() => voiceService.speak('BINGO', { volume: 1.0, rate: 0.9 }), 100);
+          setTimeout(() => voiceService.speak('Felicitaciones, Ganaste Bingo', { volume: 1.0, rate: 0.9 }), 1500);
+          addToast('🎊', '¡BINGO!', 'Has completado el cartón', 8000);
+          triggerConfetti();
+          setTimeout(() => { celebrationAudio.currentTime = 0; celebrationAudio.play(); }, 2000);
+
+          setTimeout(() => {
+            voiceService.speak('El Bingo ha finalizado');
+            setTimeout(() => {
+              setBallsDrawn([]); setSelectedPlayerCards([]); setPlayerCards([]);
+              setBingoWinnerCard(null); setBingoCelebrated(false); setGameStatus('waiting');
+              setShowCardSelection(false); setCardsRemaining(6); setCelebratedCardIds([]);
+              setWinnerCards([]); setLineCelebrated(false); audioService.stopBolilleroGirando();
+              addToast('✅', 'Juego Finalizado', 'Puedes comprar nuevos cartones', 5000);
+            }, 2000);
+          }, 18000);
+          return;
+        }
+      });
+    }
+  }, [ballsDrawn.length, playerCards.length, lineCelebrated, gameStatus, winnerCards.length, bingoCelebrated]);
 
   useEffect(() => {
     return () => {
@@ -1194,85 +1125,38 @@ export default function BronzeRoom({ onLogout }) {
 
           {/* CELEBRACIÓN DE BINGO GANADOR */}
           {bingoWinnerCard && (
-<div className="winner-celebration-overlay">
-  <div className="celebration-content">
-    <h1 className="felicitaciones-pulse">¡BINGO!</h1>
-    <div className="celebration-subtitle">Felicitaciones Ganaste Bingo con el cartón {bingoWinnerCard.cardSerial}</div>
-    <div className="celebration-card-display">
-      <BingoCardPreview
-        card={{ card_serial: bingoWinnerCard.cardSerial, numbers: bingoWinnerCard.card.numbers }}
-        room="bronce" selected={false} onClick={null} showSerial={true}
-        drawnNumbers={ballsDrawn.map(b => b.number)} winningLines={[0, 1, 2]}
-      />
-    </div>
-  </div>
-  <div className="confetti-container">
-    {Array.from({ length: 50 }).map((_, i) => (
-      <div key={i} className="confetti" style={{
-        left: `${Math.random() * 100}%`, animationDelay: `${Math.random() * 3}s`,
-        backgroundColor: getBallColor(Math.floor(Math.random() * 90) + 1)
-      }} />
-    ))}
-  </div>
-</div>
-)}
-
-          {/* CELEBRACIÓN DE LÍNEA GANADORA - Usa el cartón de la grilla con números marcados */}
-<<<<<<< HEAD
-          {winnerCards.length > 0 && (
             <div className="winner-celebration-overlay">
               <div className="celebration-content">
-                {/* Título pulsante */}
+                <h1 className="felicitaciones-pulse">¡BINGO!</h1>
+                <div className="celebration-subtitle">Felicitaciones Ganaste Bingo con el cartón {bingoWinnerCard.cardSerial}</div>
+                <div className="celebration-card-display">
+                  <BingoCardPreview
+                    card={{ card_serial: bingoWinnerCard.cardSerial, numbers: bingoWinnerCard.card.numbers }}
+                    room="bronce" selected={false} onClick={null} showSerial={true}
+                    drawnNumbers={ballsDrawn.map(b => b.number)} winningLines={[0, 1, 2]}
+                  />
+                </div>
+              </div>
+              <div className="confetti-container">
+                {Array.from({ length: 50 }).map((_, i) => (
+                  <div key={i} className="confetti" style={{
+                    left: `${Math.random() * 100}%`, animationDelay: `${Math.random() * 3}s`,
+                    backgroundColor: getBallColor(Math.floor(Math.random() * 90) + 1)
+                  }} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* CELEBRACIÓN DE LÍNEA GANADORA - Usa el cartón de la grilla con números marcados */}
+          {winnerCards.length > 0 && !bingoWinnerCard && (
+            <div className="winner-celebration-overlay">
+              <div className="celebration-content">
                 <h1 className="felicitaciones-pulse">¡Felicitaciones!</h1>
                 <div className="celebration-subtitle">Ganaste Línea con el cartón {winnerCards[0].cardSerial}</div>
-=======
-          {winnerCards.length > 0 && !bingoWinnerCard && (
-  <div className="winner-celebration-overlay">
-    <div className="celebration-content">
-      {/* Título pulsante */}
-      <h1 className="felicitaciones-pulse">¡Felicitaciones!</h1>
-      <div className="celebration-subtitle">Ganaste Línea con el cartón {winnerCards[0].cardSerial}</div>
-      
-      {/* Cartón usando BingoCardPreview IGUAL que el expandido */}
-      {winnerCards[0] && (
-        <div className="celebration-card-display">
-          <BingoCardPreview
-            card={{
-              card_serial: winnerCards[0].cardSerial,
-              numbers: winnerCards[0].card.numbers
-            }}
-            room="bronce"
-            selected={false}
-            onClick={null}
-            showSerial={true}
-            drawnNumbers={ballsDrawn.map(b => b.number)}
-            winningLines={cardWinningLines[winnerCards[0].cardId] || []}
-          />
-        </div>
-      )}
-    </div>
-    
-    {/* Confetti animado */}
-    <div className="confetti-container">
-      {Array.from({ length: 50 }).map((_, i) => (
-        <div 
-          key={i} 
-          className="confetti"
-          style={{
-            left: `${Math.random() * 100}%`,
-            animationDelay: `${Math.random() * 3}s`,
-            backgroundColor: getBallColor(Math.floor(Math.random() * 90) + 1)
-          }}
-        />
-      ))}
-    </div>
-  </div>
-)}
->>>>>>> da36289 (feat: implement AI probability prediction, game replay system, and mobile enhancements)
 
-                {/* Cartón usando BingoCardPreview IGUAL que el expandido */}
                 {winnerCards[0] && (
-                  <div className="celebration-card-display" style={{ transform: 'scale(1.5)', marginTop: '40px' }}>
+                  <div className="celebration-card-display">
                     <BingoCardPreview
                       card={{
                         card_serial: winnerCards[0].cardSerial,
@@ -1289,7 +1173,6 @@ export default function BronzeRoom({ onLogout }) {
                 )}
               </div>
 
-              {/* Confetti animado */}
               <div className="confetti-container">
                 {Array.from({ length: 50 }).map((_, i) => (
                   <div
@@ -1917,19 +1800,17 @@ export default function BronzeRoom({ onLogout }) {
                   </div>
                 </div>
               </div>
-            )
-          }
+            )}
+
+          {showPrizesModal && pendingPrizes && (
+            <PendingPrizesModal
+              prizes={pendingPrizes}
+              onClose={handleClosePrizesModal}
+            />
+          )}
         </>
       )
       }
-
-      {/* Modal de premios pendientes */}
-      {showPrizesModal && pendingPrizes && (
-        <PendingPrizesModal
-          prizes={pendingPrizes}
-          onClose={handleClosePrizesModal}
-        />
-      )}
     </div >
   );
 }

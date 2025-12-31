@@ -1496,16 +1496,7 @@ async function changeUserPassword(req, res) {
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
-<<<<<<< HEAD
     await dbHelper.query('UPDATE users SET password_hash = ? WHERE id = ?', [hashedPassword, userId]);
-=======
-
-    // Actualizar contraseña
-    await pool.query(
-      'UPDATE users SET password = ? WHERE id = ?',
-      [hashedPassword, userId]
-    );
->>>>>>> da36289 (feat: implement AI probability prediction, game replay system, and mobile enhancements)
 
     console.log(`✅ Admin ${adminId} cambió contraseña del usuario ${userId} (${targetUser.username})`);
     // Audit Log

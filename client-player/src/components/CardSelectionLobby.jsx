@@ -12,7 +12,11 @@ const CardSelectionLobby = ({
   onCancel,
   currentCards = 0, // Cartones ya seleccionados
   timeWindow = 'open', // 'open', 'closed', 'drawing'
-  roomTheme = 'starter' // 'starter', 'bronze', 'silver', 'gold'
+  roomTheme = 'starter', // 'starter', 'bronze', 'silver', 'gold'
+  isTourMode = false, // Modo tour interactivo
+  onTourFinish = null, // Callback al finalizar tour
+  onPackageSelected = null, // Callback al seleccionar paquete
+  onFirstCardSelected = null // Callback al seleccionar primer cartón
 }) => {
   const [availableCards, setAvailableCards] = useState([]);
   const [selectedCards, setSelectedCards] = useState([]);
@@ -40,6 +44,11 @@ const CardSelectionLobby = ({
     console.log('[CardSelection] Paquete seleccionado:', pkg);
     setSelectedPackage(pkg);
     setShowPackageModal(false);
+
+    // Notificar al tour si es necesario (FIX: Agregado para que avance el tour)
+    if (onPackageSelected) {
+      onPackageSelected(pkg);
+    }
 
     // Limpiar gift cards (ya no se cargan automáticamente)
     setGiftCards([]);
@@ -238,6 +247,16 @@ const CardSelectionLobby = ({
         return;
       }
 
+      // TOUR MODE BYPASS: Simular reserva exitosa sin backend
+      if (isTourMode) {
+        if (selectedCards.length === 0 && onFirstCardSelected) {
+          onFirstCardSelected();
+        }
+        setSelectedCards([...selectedCards, card]);
+        console.log('[CardSelection] Cartón reservado (Tour Mock):', card.id);
+        return;
+      }
+
       // Reservar en backend ANTES de agregar a la lista
       try {
         const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
@@ -247,6 +266,11 @@ const CardSelectionLobby = ({
         );
 
         if (response.data.success) {
+          // En modo tour, si es el primer cartón, notificar
+          if (isTourMode && selectedCards.length === 0 && onFirstCardSelected) {
+            onFirstCardSelected();
+          }
+
           setSelectedCards([...selectedCards, card]);
           console.log('[CardSelection] Cartón reservado:', card.id);
         }
@@ -277,12 +301,39 @@ const CardSelectionLobby = ({
       }
     }
 
-    // Si es paquete sin yapa (total=0), permitir cualquier cantidad de 1 a maxCards
     if (selectedPackage && selectedPackage.total === 0) {
       if (selectedCards.length > maxCards) {
         alert(`⚠️ Puedes seleccionar hasta ${maxCards} cartones\n\nActualmente tienes: ${selectedCards.length}`);
         return;
       }
+    }
+
+    // --- MODO TOUR: Simular éxito sin llamar al backend ---
+    if (isTourMode) {
+      console.log('[CardSelection] TOUR MODE - Simulando compra exitosa');
+      setPurchasedCount(selectedCards.length);
+      setShowSuccessModal(true);
+
+      // Simular delay y finalizar
+      setTimeout(() => {
+        setShowSuccessModal(false);
+        // Liberar selección localmente
+        setSelectedCards([]);
+
+        // Mock de cartones para visualizar en sala
+        const mockCards = selectedCards.map((c, i) => ({
+          ...c,
+          id: `tour-card-${i}`,
+          serial: c.card_serial || c.serial || `TOUR-00${i + 1}`
+        }));
+
+        if (onTourFinish) {
+          onTourFinish(mockCards); // Pasar cartones mock
+        } else {
+          onCancel();
+        }
+      }, 3000);
+      return;
     }
 
     try {
@@ -558,6 +609,7 @@ const CardSelectionLobby = ({
           className={`refresh-cards-btn refresh-cards-btn-${roomTheme}`}
           onClick={handleRefreshCards}
           disabled={refreshing || loading}
+          id="btn-refresh-cards"
         >
           {refreshing ? '🔄 Actualizando...' : '💾 Reservar cartones seleccionados y Mostrar nuevos'}
         </button>
@@ -569,7 +621,7 @@ const CardSelectionLobby = ({
       {/* Grid de Cartones */}
       <div className="cards-grid">
         {/* Cartones normales disponibles para seleccionar */}
-        {availableCards.map((card) => {
+        {availableCards.map((card, index) => {
           console.log('[CardSelection] Rendering card:', card.id, 'serial:', card.card_serial || card.serial, 'numbers:', card.numbers);
           const selected = isCardSelected(card);
 
@@ -596,6 +648,7 @@ const CardSelectionLobby = ({
               selected={selected}
               onClick={() => handleCardToggle(card)}
               showSerial={true}
+              id={index === 0 ? 'card-grid-item-0' : undefined}
             />
           );
         })}
@@ -622,6 +675,7 @@ const CardSelectionLobby = ({
 
         <button
           className="btn-confirm"
+          id="btn-confirm-selection"
           onClick={handleConfirmSelection}
           disabled={selectedCards.length === 0}
         >

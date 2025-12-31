@@ -135,7 +135,7 @@ const FortuneWheel = ({ isOpen, onClose, onPrizeClaimed, onSpinComplete }) => {
                     setPrize(prize);
                     setCanSpin(false);
                     const d = new Date();
-                    d.setHours(d.getHours() + 4);
+                    d.setHours(d.getHours() + 24);
                     setNextSpinTime(d.toISOString());
 
                     if (onPrizeClaimed) onPrizeClaimed(prize);
@@ -206,23 +206,43 @@ const FortuneWheel = ({ isOpen, onClose, onPrizeClaimed, onSpinComplete }) => {
                         </div>
                     </div>
 
-                    <div className="wheel-controls">
-                        {!prize && (
-                            canSpin ? (
-                                <button
-                                    className="spin-btn glow-effect"
-                                    onClick={spin}
-                                    disabled={isSpinning}
-                                >
-                                    {isSpinning ? '¡SUERTE!' : '¡GIRAR GRATIS!'}
-                                </button>
-                            ) : (
-                                <div className="cooldown-timer">
-                                    <FaLock />
-                                    <p>Próximo giro en:</p>
-                                    <h3>{timeLeft || 'Calculando...'}</h3>
+                    {/* Cooldown Overlay - Positioned Relative to Modal (Centered) */}
+                    {!prize && !canSpin && (
+                        <div className="cooldown-overlay">
+                            <FaLock className="cooldown-icon" />
+                            <p>Próximo giro habilitado en:</p>
+                            <h3>{timeLeft || 'Calculando...'}</h3>
+
+                            <div className="wheel-attributes">
+                                <div className="attribute-item">
+                                    <span className="attribute-icon">💵</span>
+                                    <span>Hasta $100k</span>
                                 </div>
-                            )
+                                <div className="attribute-item">
+                                    <span className="attribute-icon">🎫</span>
+                                    <span>Cartones Gratis</span>
+                                </div>
+                                <div className="attribute-item">
+                                    <span className="attribute-icon">🎁</span>
+                                    <span>Premios Sorpresa</span>
+                                </div>
+                            </div>
+
+                            <button className="back-lobby-btn" onClick={onClose} style={{ marginTop: '10px' }}>
+                                VOLVER AL LOBBY
+                            </button>
+                        </div>
+                    )}
+
+                    <div className="wheel-controls">
+                        {!prize && canSpin && (
+                            <button
+                                className="spin-btn glow-effect"
+                                onClick={spin}
+                                disabled={isSpinning}
+                            >
+                                {isSpinning ? '¡SUERTE!' : '¡GIRAR GRATIS!'}
+                            </button>
                         )}
 
                         {prize && (

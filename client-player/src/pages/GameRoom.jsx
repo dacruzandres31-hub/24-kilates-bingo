@@ -32,11 +32,8 @@ export default function GameRoom() {
   const navigate = useNavigate();
   const { roomType } = useParams();
   const socket = useSocket();
-<<<<<<< HEAD
   const { trigger: triggerHaptic } = useHaptic();
-=======
   const { unlockAchievement } = useAchievements();
->>>>>>> da36289 (feat: implement AI probability prediction, game replay system, and mobile enhancements)
 
   const [gameState, setGameState] = useState({
     drawnNumbers: [],
@@ -118,7 +115,6 @@ export default function GameRoom() {
       }));
     });
 
-<<<<<<< HEAD
     // Escuchar ganador de LÍNEA
     socket.on('line_winner', (data) => {
       const isMe = currentUser && data.winner.userId === currentUser.id;
@@ -133,7 +129,6 @@ export default function GameRoom() {
         triggerHaptic('success');
         setShowLineaNotification(true);
       } else {
-        // Notification for others
         setWinnerData({
           ...data,
           userId: data.winner.userId,
@@ -148,7 +143,6 @@ export default function GameRoom() {
     socket.on('bingo_winner', (data) => {
       const isMe = currentUser && data.winner.userId === currentUser.id;
 
-      // Celebración general (confetti)
       confetti({
         particleCount: isMe ? 200 : 100,
         spread: 70,
@@ -165,7 +159,6 @@ export default function GameRoom() {
         triggerHaptic('celebrate');
         setShowPrizeClaimModal(true);
       } else {
-        // Modal general para el resto
         setWinnerData({
           ...data,
           userId: data.winner.userId,
@@ -175,41 +168,30 @@ export default function GameRoom() {
         });
         setShowWinnerModal(true);
       }
-=======
-    // Escuchar ganador detectado
-    socket.on('winner_detected', (data) => {
-      // Verificar si soy yo el ganador
-      if (currentUser && data.userId === currentUser.id) {
-        const prizeType = data.type?.toUpperCase(); // 'LINEA', 'BINGO', 'POZO'
+    });
 
+    // Escuchar ganador unificado (fallback)
+    socket.on('winner_detected', (data) => {
+      if (currentUser && data.userId === currentUser.id) {
+        const prizeType = data.type?.toUpperCase();
         setPrizeData({
           type: prizeType,
           amount: data.amount || data.prizeAmount || 0,
           sessionId: gameState.sessionId
         });
 
-        // Si es LÍNEA → Modal simple de notificación
         if (prizeType === 'LINEA') {
           setShowLineaNotification(true);
-        }
-        // Si es BINGO o POZO → Modal con formulario de retiro
-        else if (prizeType === 'BINGO' || prizeType === 'POZO') {
+        } else if (prizeType === 'BINGO' || prizeType === 'POZO') {
           setShowPrizeClaimModal(true);
         }
-
-        // Logro: Primer Triunfo
         unlockAchievement('first_win');
       }
-
-      // Mostrar también el modal general de ganadores (para todos)
       setWinnerData(data);
       setShowWinnerModal(true);
-
-      // Sonido de notificación para ganadores ajenos
       if (!currentUser || data.userId !== currentUser.id) {
         soundManager.playNotificationSound();
       }
->>>>>>> da36289 (feat: implement AI probability prediction, game replay system, and mobile enhancements)
     });
 
     // Escuchar cascada de jackpot
@@ -514,25 +496,6 @@ export default function GameRoom() {
 
         {/* Cartón Grande Seleccionado (Con Gestos Mobile) */}
         {selectedCard && (
-<<<<<<< HEAD
-          <div className="bg-slate-800 rounded-xl p-6 border-2 border-cyan-500">
-            <h2 className="text-2xl font-bold text-white mb-4">
-              🎯 Cartón #{selectedCard.serialNumber}
-            </h2>
-            <div className="bg-slate-900 rounded-lg p-4 overflow-x-auto">
-              <BingoCard
-                gridNumbers={selectedCard.gridNumbers}
-                markedNumbers={new Set(gameState.drawnNumbers)}
-                showNumbers={true}
-                missingNumbers={
-                  selectedCard.lineAnalysis
-                    ? selectedCard.lineAnalysis
-                      .filter(l => l.missing === 1 && !l.isComplete)
-                      .flatMap(l => l.missingNumbers)
-                    : []
-                }
-              />
-=======
           <div className="bg-slate-800 rounded-xl p-4 md:p-6 border-2 border-cyan-500 relative overflow-hidden">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl md:text-2xl font-bold text-white">
@@ -551,7 +514,6 @@ export default function GameRoom() {
                   </button>
                 </div>
               )}
->>>>>>> da36289 (feat: implement AI probability prediction, game replay system, and mobile enhancements)
             </div>
 
             <div className="relative h-[220px] md:h-auto overflow-hidden rounded-lg bg-slate-900 shadow-inner">

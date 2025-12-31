@@ -56,12 +56,22 @@
 
 .tour-card.bottom::before {
     top: -20px;
-    border-color: transparent transparent #ffd700 transparent;
+    border-color: transparent transparent rgba(26, 26, 26, 0.95) transparent;
+    /* Match bg color or gold if preferred */
+    border-bottom-color: #ffd700;
+    /* Use gold for the border look */
 }
 
 .tour-card.top::before {
     bottom: -20px;
     border-color: #ffd700 transparent transparent transparent;
+}
+
+.tour-card.right::before {
+    left: -20px;
+    top: 50%;
+    transform: translateY(-50%);
+    border-color: transparent #ffd700 transparent transparent;
 }
 
 .tour-header {

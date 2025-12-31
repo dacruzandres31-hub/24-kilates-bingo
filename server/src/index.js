@@ -63,7 +63,8 @@ app.use(morgan('combined'));
 const corsOptions = {
   origin: [
     'http://localhost:5173',  // Player dev
-    'http://localhost:5174',  // Admin dev
+    'http://localhost:5174',  // Admin dev (default)
+    'http://localhost:3000',  // Admin dev (forced port)
     process.env.CORS_ORIGIN_PLAYER,
     process.env.CORS_ORIGIN_ADMIN
   ].filter(Boolean),
@@ -123,7 +124,6 @@ io.on('connection', (socket) => {
     }
   });
 
-<<<<<<< HEAD
   // Handler para unirse a una sala de juego (DEPRECATED - Usar join_session)
   socket.on('join_game', ({ room }) => {
     if (room) {
@@ -131,7 +131,8 @@ io.on('connection', (socket) => {
       socket.join(roomName);
       console.log(`[Socket.IO] 🎮 Socket ${socket.id} unido a sala de juego: ${roomName}`);
     }
-=======
+  });
+
   // Chat en vivo
   socket.on('chat_message', (data) => {
     const { gameSessionId, username, message, timestamp } = data;
@@ -156,13 +157,6 @@ io.on('connection', (socket) => {
       emoji,
       username: userData.username || 'Anónimo'
     });
-  });
-
-  // Eventos del juego
-  socket.on('join_game', (data) => {
-    console.log(`[Socket.IO] Join game: ${data.userId} en sala ${data.room}`);
-    socket.join(`game_${data.room}`);
->>>>>>> da36289 (feat: implement AI probability prediction, game replay system, and mobile enhancements)
   });
 
   // NEW: Handler para unirse a una sesión específica (Sincronización v2.0)

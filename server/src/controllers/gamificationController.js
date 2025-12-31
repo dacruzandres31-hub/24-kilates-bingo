@@ -461,12 +461,9 @@ exports.getWheelStatus = async (req, res) => {
       const diffMs = now - last;
       const hours = diffMs / (1000 * 60 * 60);
 
-      if (hours < 4) {
-        // UNLIMITED MODE FOR TESTING
-        // canSpin = false;
-        // nextSpinTime = new Date(last.getTime() + (4 * 60 * 60 * 1000));
-        canSpin = true;
-        nextSpinTime = null;
+      if (hours < 24) {
+        canSpin = false;
+        nextSpinTime = new Date(last.getTime() + (24 * 60 * 60 * 1000));
       }
     }
 

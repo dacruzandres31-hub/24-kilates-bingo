@@ -905,7 +905,9 @@
    ============================================ */
 
 .card-selection-lobby.theme-bronze {
-  background: linear-gradient(135deg, #1a0f0a 0%, #2d1810 50%, #3d1f15 100%);
+  /* Fondo semi-transparente para ver el logo de la sala */
+  background: rgba(26, 15, 10, 0.75);
+  backdrop-filter: blur(5px);
 }
 
 .card-selection-lobby.theme-bronze .selection-header {

@@ -28,11 +28,7 @@ const PlayerActivityHistory = ({ onClose }) => {
         return;
       }
 
-<<<<<<< HEAD
-      console.log('🔍 Cargando historial desde:', '/api/activity-history');
-=======
-      console.log('🔍 Cargando historial desde:', `${import.meta.env.VITE_API_URL}/activity-history`);
->>>>>>> da36289 (feat: implement AI probability prediction, game replay system, and mobile enhancements)
+      console.log('🔍 Cargando historial desde: /api/activity-history');
       console.log('🔑 Token encontrado:', token ? 'Sí' : 'No');
       const response = await axios.get('/api/activity-history', {
         headers: { Authorization: `Bearer ${token}` }
@@ -624,15 +620,12 @@ const PlayerActivityHistory = ({ onClose }) => {
             📤 Retiros
           </button>
           <button
-<<<<<<< HEAD
             className={`tab ${activeTab === 'purchases' ? 'active' : ''}`}
             onClick={() => setActiveTab('purchases')}
           >
             🛒 Compras
           </button>
           <button
-=======
->>>>>>> da36289 (feat: implement AI probability prediction, game replay system, and mobile enhancements)
             className={`tab ${activeTab === 'balance' ? 'active' : ''}`}
             onClick={() => setActiveTab('balance')}
           >

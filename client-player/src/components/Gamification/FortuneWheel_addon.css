@@ -1,0 +1,58 @@
+/* Cooldown Modal Styling */
+.cooldown-overlay {
+    background: rgba(0, 0, 0, 0.85);
+    padding: 30px 50px;
+    border-radius: 20px;
+    border: 3px solid #d4af37;
+    box-shadow: 0 0 40px rgba(212, 175, 55, 0.4);
+    text-align: center;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    backdrop-filter: blur(5px);
+    max-width: 400px;
+}
+
+.cooldown-overlay h3 {
+    font-size: 2.5rem;
+    color: #f1c40f;
+    margin: 10px 0;
+    font-family: 'Cinzel', serif;
+    text-shadow: 0 0 10px rgba(241, 196, 15, 0.5);
+}
+
+.cooldown-overlay p {
+    font-size: 1.1rem;
+    color: #bdc3c7;
+    margin: 0;
+}
+
+.cooldown-icon {
+    font-size: 3rem;
+    color: #e74c3c;
+    margin-bottom: 10px;
+}
+
+.wheel-attributes {
+    display: flex;
+    gap: 15px;
+    margin: 15px 0;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.attribute-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.9rem;
+    color: #ecf0f1;
+}
+
+.attribute-icon {
+    font-size: 1.5rem;
+    color: #f1c40f;
+}

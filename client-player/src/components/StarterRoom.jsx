@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import '../styles/StarterRoom.css';
 import GiftIcon from '../assets/Gift_icon.png';
 import selectCardsButton from '../assets/select_cards_button.png';
@@ -15,10 +15,14 @@ import useSocket from '../hooks/useSocket';
 import useBingoTerminal from '../hooks/useBingoTerminal';
 import PendingPrizesModal from './PendingPrizesModal';
 import { checkPendingPrizes } from '../helpers/pendingPrizesHelper';
+import RoomTour from './RoomTour';
 
 export default function StarterRoom({ onLogout }) {
   const { sessionId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const isTourMode = queryParams.get('tour') === 'true';
   const socket = useSocket();
   const [ballsDrawn, setBallsDrawn] = useState([]);
   const [lastBall, setLastBall] = useState(null);
@@ -99,6 +103,54 @@ export default function StarterRoom({ onLogout }) {
   const [luckMeter, setLuckMeter] = useState(0); // Medidor de suerte (0-100)
   const [comboCount, setComboCount] = useState(0); // Contador de combo
   const [lastComboTime, setLastComboTime] = useState(Date.now()); // Último tiempo de combo
+
+  // Estado del tour de sala
+  const [runRoomTour, setRunRoomTour] = useState(false);
+  const [tourStepOverride, setTourStepOverride] = useState(null);
+
+  useEffect(() => {
+    if (isTourMode) {
+      // Si entra en modo tour, activarlo y mostrar selector de cartones inmediatamente
+      const hasSeenRoomTour = localStorage.getItem('room_tour_seen');
+      if (!hasSeenRoomTour || true) { // Force tour if param is present
+        setTimeout(() => {
+          setRunRoomTour(true);
+          setShowCardSelection(true);
+        }, 1000);
+      }
+    }
+  }, [isTourMode]);
+
+  const handleTourCardsSelected = (mockCards) => {
+    // Recibir cartones mock del lobby
+    setSelectedPlayerCards(mockCards);
+    setShowCardSelection(false);
+
+    // Avanzar el tour al paso final (Mis Cartones)
+    // New RoomTour steps: 0:Welcome/Package, 1:Select, 2:Refresh(new), 3:Confirm, 4:Result -> index 4
+    setTourStepOverride(4);
+  };
+
+  const handleTourPackageSelected = () => {
+    // Avanzar al paso de seleccionar cartones (index 1)
+    setTourStepOverride(1);
+  };
+
+  const handleTourFirstCardSelected = () => {
+    // Avanzar al paso de "Elige Más Cartones (Refresh)" (index 2)
+    setTourStepOverride(2);
+  };
+
+
+
+  const handleRoomTourEnd = () => {
+    setRunRoomTour(false);
+    localStorage.setItem('room_tour_seen', 'true');
+    // Forzar scroll al inicio
+    window.scrollTo({ top: 0, behavior: 'auto' });
+    // Redirigir a la misma sala sin el parámetro tour para limpiar URL
+    navigate(`/sala/starter/${sessionId || 'starter_default'}`, { replace: true });
+  };
 
   // Nuevos estados para mejoras visuales adicionales
   const [cardsDealing, setCardsDealing] = useState(false); // Animación de entrada de cartones
@@ -633,16 +685,10 @@ export default function StarterRoom({ onLogout }) {
 
   // Expandir cartón (por click o por acierto)
   const expandCard = (cardId) => {
-<<<<<<< HEAD
-    // BLOQUEO: No expandir si hay celebración activa o modal de ganador
-    if (celebrationMode || winnerCards.length > 0) return;
-
-=======
-    // NO expandir si hay celebración de línea activa
+    // NO expandip si hay celebración de línea activa
     if (winnerCards.length > 0 || lineCelebrated) {
       return;
     }
->>>>>>> da36289 (feat: implement AI probability prediction, game replay system, and mobile enhancements)
     setExpandedCard(cardId);
     setCanCloseExpandedCard(false); // Bloquear cierre manual durante tiempo programado
     setTimeout(() => {
@@ -768,18 +814,13 @@ export default function StarterRoom({ onLogout }) {
 
     // removed redundant setAlmostLineCards call
 
-<<<<<<< HEAD
     // Mostrar celebración si hay NUEVOS ganadores que NO han sido festejados
-    // ANTI-LOOP: Verificar que el cartón NO esté en celebratedCardIds
+    // ANTI-LOOP: Verificar que el cartón NO esté en celebratedCardIds Y que no haya celebración activa
     const newWinners = cardsWithWinningLines.filter(card =>
       !celebratedCardIds.includes(card.cardId)
     );
 
-    // FIX: Line can only be won ONCE per game session.
-    // If celebratedCardIds has any entries, it means Line was already won by someone.
-    const hasLineBeenWon = celebratedCardIds.length > 0;
-
-    if (newWinners.length > 0 && !lineCelebrated && !hasLineBeenWon) {
+    if (newWinners.length > 0 && !lineCelebrated && winnerCards.length === 0) {
       // Tomar el primer cartón ganador nuevo
       const winnerCard = newWinners[0];
 
@@ -790,163 +831,35 @@ export default function StarterRoom({ onLogout }) {
       // Limpiar alertas de "casi línea" porque ya se ganó
       setAlmostLineCards([]);
 
-      // 1. PRIMERO: Anunciar línea ganadora INMEDIATAMENTE (100ms para dar tiempo a que se active el audio)
+      // 1. PRIMERO: Anunciar línea ganadora INMEDIATAMENTE
       setTimeout(() => {
         console.log('[StarterRoom] 🎶 Reproduciendo voz: Felicitaciones, Ganaste Línea');
         voiceService.speak('Felicitaciones, Ganaste Línea', { volume: 1.0, rate: 0.9 });
       }, 100);
 
-      // 2. Toast de celebración (sin sonido)
+      // 2. Toast de celebración
       addToast('🎉', '¡LÍNEA!', 'Has completado una línea', 8000);
 
       // 3. Activar confeti
       triggerConfetti();
 
-      // 4. DESPUÉS DE LA VOZ: Reproducir aplausos (1.5 segundos después para no interferir)
+      // 4. DESPUÉS DE LA VOZ: Reproducir aplausos
       setTimeout(() => {
         celebrationAudio.currentTime = 0;
         celebrationAudio.play();
       }, 1500);
 
-      // 5. Pausar sorteo (pero NO anunciar "Sorteo Pausado" - se anunciará al reanudar)
+      // 5. Pausar sorteo
       if (gameStatus === 'active') {
         setGameStatus('waiting');
         const timeout = setTimeout(() => {
-          // Desaparecer festejo de línea e información relacionada JUSTO antes del anuncio
-          setWinnerCards([]);
-          setHighlightedLine(null);
-          setLineCelebrated(false);
-=======
-  // Mostrar celebración si hay NUEVOS ganadores que NO han sido festejados
-  // ANTI-LOOP: Verificar que el cartón NO esté en celebratedCardIds Y que no haya celebración activa
-  const newWinners = cardsWithWinningLines.filter(card => 
-    !celebratedCardIds.includes(card.cardId)
-  );
-  
-  if (newWinners.length > 0 && !lineCelebrated && winnerCards.length === 0) {
-    // Tomar el primer cartón ganador nuevo
-    const winnerCard = newWinners[0];
-    
-    setWinnerCards([winnerCard]); // Solo el nuevo ganador
-    setLineCelebrated(true);
-    setCelebratedCardIds([...celebratedCardIds, winnerCard.cardId]); // Marcar como festejado
-    
-    // Limpiar alertas de "casi línea" porque ya se ganó
-    setAlmostLineCards([]);
-    
-    // 1. PRIMERO: Anunciar línea ganadora INMEDIATAMENTE (100ms para dar tiempo a que se active el audio)
-    setTimeout(() => {
-      console.log('[StarterRoom] 🎶 Reproduciendo voz: Felicitaciones, Ganaste Línea');
-      voiceService.speak('Felicitaciones, Ganaste Línea', { volume: 1.0, rate: 0.9 });
-    }, 100);
-    
-    // 2. Toast de celebración (sin sonido)
-    addToast('🎉', '¡LÍNEA!', 'Has completado una línea', 8000);
-    
-    // 3. Activar confeti
-    triggerConfetti();
-    
-    // 4. DESPUÉS DE LA VOZ: Reproducir aplausos (1.5 segundos después para no interferir)
-    setTimeout(() => {
-      celebrationAudio.currentTime = 0;
-      celebrationAudio.play();
-    }, 1500);
-    
-    // 5. Pausar sorteo (pero NO anunciar "Sorteo Pausado" - se anunciará al reanudar)
-    if (gameStatus === 'active') {
-      setGameStatus('waiting');
-      const timeout = setTimeout(() => {
-        // Anunciar continuación a BINGO antes de reanudar
-        voiceService.speak('Continuamos hasta Bingo');
-        setTimeout(() => {
-          // Cerrar modal y resetear flags
-          setWinnerCards([]); // ← CERRAR MODAL
-          setHighlightedLine(null);
-          setLineCelebrated(false);
-          setGameStatus('active');
-        }, 2000); // Esperar 2 segundos para que termine el anuncio
-      }, 18000); // 18 segundos + 2 del anuncio = 20 segundos total
-      setPauseTimeout(timeout);
-    }
-    
-    // 6. Resaltar la línea ganadora (primera del primer cartón)
-    if (cardsWithWinningLines[0]?.lines?.length > 0) {
-      setHighlightedLine(cardsWithWinningLines[0].lines[0].numbers);
-    }
-  }
-
-  // DETECTAR BINGO (Cartón completo - 15 números marcados)
-  if (!bingoCelebrated && !lineCelebrated && winnerCards.length === 0) {
-    playerCards.forEach(card => {
-      const allNumbers = card.numbers.flat().filter(n => n !== null && n !== undefined);
-      const markedNumbers = allNumbers.filter(num => isNumberCalled(num));
-      
-      // BINGO = 15 números marcados (cartón completo)
-      if (markedNumbers.length === 15) {
-        console.log('[StarterRoom] 🎊 BINGO DETECTADO en cartón:', card.serial || card.id);
-        setBingoWinnerCard({
-          cardId: card.id,
-          cardSerial: card.serial || generateCardSerial(playerCards.indexOf(card)),
-          card: card
-        });
-        setBingoCelebrated(true);
-        setGameStatus('ended');
-        
-        // 1. Anunciar BINGO
-        setTimeout(() => {
-          voiceService.speak('BINGO', { volume: 1.0, rate: 0.9 });
-        }, 100);
-        
-        setTimeout(() => {
-          voiceService.speak('Felicitaciones, Ganaste Bingo', { volume: 1.0, rate: 0.9 });
-        }, 1500);
-        
-        // 2. Toast
-        addToast('🎊', '¡BINGO!', 'Has completado el cartón', 8000);
-        
-        // 3. Confeti
-        triggerConfetti();
-        
-        // 4. Aplausos
-        setTimeout(() => {
-          celebrationAudio.currentTime = 0;
-          celebrationAudio.play();
-        }, 2000);
-        
-        // 5. Después de 18 segundos: finalizar y resetear todo
-        setTimeout(() => {
-          voiceService.speak('El Bingo ha finalizado');
-          
-          setTimeout(() => {
-            // RESET COMPLETO
-            setBallsDrawn([]);
-            setSelectedPlayerCards([]);
-            setPlayerCards([]);
-            setBingoWinnerCard(null);
-            setBingoCelebrated(false);
-            setGameStatus('waiting');
-            setShowCardSelection(false);
-            setCardsRemaining(20);
-            setCelebratedCardIds([]);
-            setWinnerCards([]);
-            setLineCelebrated(false);
-            audioService.stopBolilleroGirando();
-            
-            addToast('✅', 'Juego Finalizado', 'Puedes seleccionar nuevos cartones', 5000);
-          }, 2000);
-        }, 18000);
-        
-        return; // Solo un BINGO por vez
-      }
-    });
-  }
-}, [ballsDrawn.length, playerCards.length, lineCelebrated, gameStatus, winnerCards.length, bingoCelebrated]);
->>>>>>> da36289 (feat: implement AI probability prediction, game replay system, and mobile enhancements)
-
-          // Anunciar continuación a BINGO
+          // Anunciar continuación a BINGO antes de reanudar
           voiceService.speak('Continuamos hasta Bingo');
-
           setTimeout(() => {
+            // Cerrar modal y resetear flags
+            setWinnerCards([]); // ← CERRAR MODAL
+            setHighlightedLine(null);
+            setLineCelebrated(false);
             setGameStatus('active');
           }, 2000); // Esperar 2 segundos para que termine el anuncio
         }, 18000); // 18 segundos + 2 del anuncio = 20 segundos total
@@ -958,7 +871,73 @@ export default function StarterRoom({ onLogout }) {
         setHighlightedLine(cardsWithWinningLines[0].lines[0].numbers);
       }
     }
-  }, [ballsDrawn.length, playerCards.length, lineCelebrated, gameStatus, winnerCards.length]);
+
+    // DETECTAR BINGO (Cartón completo - 15 números marcados)
+    if (!bingoCelebrated && !lineCelebrated && winnerCards.length === 0) {
+      playerCards.forEach(card => {
+        const allNumbers = card.numbers.flat().filter(n => n !== null && n !== undefined);
+        const markedNumbers = allNumbers.filter(num => isNumberCalled(num));
+
+        // BINGO = 15 números marcados (cartón completo)
+        if (markedNumbers.length === 15) {
+          console.log('[StarterRoom] 🎊 BINGO DETECTADO en cartón:', card.serial || card.id);
+          setBingoWinnerCard({
+            cardId: card.id,
+            cardSerial: card.serial || generateCardSerial(playerCards.indexOf(card)),
+            card: card
+          });
+          setBingoCelebrated(true);
+          setGameStatus('ended');
+
+          // 1. Anunciar BINGO
+          setTimeout(() => {
+            voiceService.speak('BINGO', { volume: 1.0, rate: 0.9 });
+          }, 100);
+
+          setTimeout(() => {
+            voiceService.speak('Felicitaciones, Ganaste Bingo', { volume: 1.0, rate: 0.9 });
+          }, 1500);
+
+          // 2. Toast
+          addToast('🎊', '¡BINGO!', 'Has completado el cartón', 8000);
+
+          // 3. Confeti
+          triggerConfetti();
+
+          // 4. Aplausos
+          setTimeout(() => {
+            celebrationAudio.currentTime = 0;
+            celebrationAudio.play();
+          }, 2000);
+
+          // 5. Después de 18 segundos: finalizar y resetear todo
+          setTimeout(() => {
+            voiceService.speak('El Bingo ha finalizado');
+
+            setTimeout(() => {
+              // RESET COMPLETO
+              setBallsDrawn([]);
+              setSelectedPlayerCards([]);
+              setPlayerCards([]);
+              setBingoWinnerCard(null);
+              setBingoCelebrated(false);
+              setGameStatus('waiting');
+              setShowCardSelection(false);
+              setCardsRemaining(20);
+              setCelebratedCardIds([]);
+              setWinnerCards([]);
+              setLineCelebrated(false);
+              audioService.stopBolilleroGirando();
+
+              addToast('✅', 'Juego Finalizado', 'Puedes seleccionar nuevos cartones', 5000);
+            }, 2000);
+          }, 18000);
+
+          return; // Solo un BINGO por vez
+        }
+      });
+    }
+  }, [ballsDrawn.length, playerCards.length, lineCelebrated, gameStatus, winnerCards.length, bingoCelebrated]);
 
   useEffect(() => {
     return () => {
@@ -1101,17 +1080,30 @@ export default function StarterRoom({ onLogout }) {
 
 
       {/* Sala de selección de cartones (overlay sobre la sala) */}
+      {/* Modal de selección de cartones (Lobby dentro de la sala) */}
       {showCardSelection && (
-        <CardSelectionLobby
-          sessionId={sessionId || 'starter_default'}
-          onCardsSelected={handleCardsSelected}
-          onCancel={handleCancelSelection}
-          maxCards={cardsRemaining}
-          currentCards={selectedPlayerCards.length}
-          timeWindow="open"
-          roomTheme="starter"
-        />
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 2000 }}>
+          <CardSelectionLobby
+            sessionId={sessionId || 'starter_default'}
+            onCardsSelected={handleCardsSelected}
+            onCancel={handleCancelSelection}
+            currentCards={selectedPlayerCards.length}
+            timeWindow={gameStatus === 'active' ? 'closed' : 'open'}
+            roomTheme="starter"
+            isTourMode={isTourMode && runRoomTour}
+            onTourFinish={handleTourCardsSelected}
+            onPackageSelected={handleTourPackageSelected}
+            onFirstCardSelected={handleTourFirstCardSelected}
+          />
+        </div>
       )}
+
+      {/* Tour interactivo de la sala */}
+      <RoomTour
+        runTour={runRoomTour}
+        onTourEnd={handleRoomTourEnd}
+        currentStepOverride={tourStepOverride}
+      />
 
       {/* Sala de juego (solo visible después de seleccionar cartones) */}
       {!showCardSelection && (
@@ -1125,102 +1117,55 @@ export default function StarterRoom({ onLogout }) {
 
           {/* CELEBRACIÓN DE BINGO GANADOR */}
           {bingoWinnerCard && (
-  <div className="winner-celebration-overlay">
-    <div className="celebration-content">
-      {/* Título pulsante */}
-      <h1 className="felicitaciones-pulse">¡BINGO!</h1>
-      <div className="celebration-subtitle">Felicitaciones Ganaste Bingo con el cartón {bingoWinnerCard.cardSerial}</div>
-      
-      {/* Cartón usando BingoCardPreview */}
-      <div className="celebration-card-display">
-        <BingoCardPreview
-          card={{
-            card_serial: bingoWinnerCard.cardSerial,
-            numbers: bingoWinnerCard.card.numbers
-          }}
-          room="starter"
-          selected={false}
-          onClick={null}
-          showSerial={true}
-          drawnNumbers={ballsDrawn.map(b => b.number)}
-          winningLines={[0, 1, 2]}
-        />
-      </div>
-    </div>
-    
-    {/* Confetti animado */}
-    <div className="confetti-container">
-      {Array.from({ length: 50 }).map((_, i) => (
-        <div 
-          key={i} 
-          className="confetti"
-          style={{
-            left: `${Math.random() * 100}%`,
-            animationDelay: `${Math.random() * 3}s`,
-            backgroundColor: getBallColor(Math.floor(Math.random() * 90) + 1)
-          }}
-        />
-      ))}
-    </div>
-  </div>
-)}
-
-          {/* CELEBRACIÓN DE LÍNEA GANADORA - Usa el cartón de la grilla con números marcados */}
-<<<<<<< HEAD
-          {winnerCards.length > 0 && (
             <div className="winner-celebration-overlay">
               <div className="celebration-content">
                 {/* Título pulsante */}
+                <h1 className="felicitaciones-pulse">¡BINGO!</h1>
+                <div className="celebration-subtitle">Felicitaciones Ganaste Bingo con el cartón {bingoWinnerCard.cardSerial}</div>
+
+                {/* Cartón usando BingoCardPreview */}
+                <div className="celebration-card-display">
+                  <BingoCardPreview
+                    card={{
+                      card_serial: bingoWinnerCard.cardSerial,
+                      numbers: bingoWinnerCard.card.numbers
+                    }}
+                    room="starter"
+                    selected={false}
+                    onClick={null}
+                    showSerial={true}
+                    drawnNumbers={ballsDrawn.map(b => b.number)}
+                    winningLines={[0, 1, 2]}
+                  />
+                </div>
+              </div>
+
+              {/* Confetti animado */}
+              <div className="confetti-container">
+                {Array.from({ length: 50 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="confetti"
+                    style={{
+                      left: `${Math.random() * 100}%`,
+                      animationDelay: `${Math.random() * 3}s`,
+                      backgroundColor: getBallColor(Math.floor(Math.random() * 90) + 1)
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* CELEBRACIÓN DE LÍNEA GANADORA - Usa el cartón de la grilla con números marcados */}
+          {winnerCards.length > 0 && !bingoWinnerCard && (
+            <div className="winner-celebration-overlay">
+              <div className="celebration-content">
                 <h1 className="felicitaciones-pulse">¡Felicitaciones!</h1>
                 <div className="celebration-subtitle">Ganaste Línea con el cartón {winnerCards[0].cardSerial}</div>
-=======
-          {winnerCards.length > 0 && !bingoWinnerCard && (
-  <div className="winner-celebration-overlay">
-    <div className="celebration-content">
-      {/* Título pulsante */}
-      <h1 className="felicitaciones-pulse">¡Felicitaciones!</h1>
-      <div className="celebration-subtitle">Ganaste Línea con el cartón {winnerCards[0].cardSerial}</div>
-      
-      {/* Cartón usando BingoCardPreview IGUAL que el expandido */}
-      {winnerCards[0] && (
-        <div className="celebration-card-display">
-          <BingoCardPreview
-            card={{
-              card_serial: winnerCards[0].cardSerial,
-              numbers: winnerCards[0].card.numbers
-            }}
-            room="starter"
-            selected={false}
-            onClick={null}
-            showSerial={true}
-            drawnNumbers={ballsDrawn.map(b => b.number)}
-            winningLines={cardWinningLines[winnerCards[0].cardId] || []}
-          />
-        </div>
-      )}
-    </div>
-    
-    {/* Confetti animado */}
-    <div className="confetti-container">
-      {Array.from({ length: 50 }).map((_, i) => (
-        <div 
-          key={i} 
-          className="confetti"
-          style={{
-            left: `${Math.random() * 100}%`,
-            animationDelay: `${Math.random() * 3}s`,
-            backgroundColor: getBallColor(Math.floor(Math.random() * 90) + 1)
-          }}
-        />
-      ))}
-    </div>
-  </div>
-)}
->>>>>>> da36289 (feat: implement AI probability prediction, game replay system, and mobile enhancements)
 
-                {/* Cartón usando BingoCardPreview IGUAL que el expandido */}
                 {winnerCards[0] && (
-                  <div className="celebration-card-display" style={{ transform: 'scale(1.5)', marginTop: '40px' }}>
+                  <div className="celebration-card-display">
                     <BingoCardPreview
                       card={{
                         card_serial: winnerCards[0].cardSerial,
@@ -1231,17 +1176,12 @@ export default function StarterRoom({ onLogout }) {
                       onClick={null}
                       showSerial={true}
                       drawnNumbers={ballsDrawn.map(b => b.number)}
-                      winningLines={
-                        cardWinningLines[winnerCards[0].cardId] && cardWinningLines[winnerCards[0].cardId].length > 0
-                          ? [cardWinningLines[winnerCards[0].cardId][0]] // FIX: SÓLO mostrar la PRIMERA línea ganadora como dorada
-                          : []
-                      }
+                      winningLines={cardWinningLines[winnerCards[0].cardId] || []}
                     />
                   </div>
                 )}
               </div>
 
-              {/* Confetti animado */}
               <div className="confetti-container">
                 {Array.from({ length: 50 }).map((_, i) => (
                   <div
@@ -1817,15 +1757,14 @@ export default function StarterRoom({ onLogout }) {
               </div>
             </div>
           ))}
+          {/* Modal de premios pendientes */}
+          {showPrizesModal && pendingPrizes && (
+            <PendingPrizesModal
+              prizes={pendingPrizes}
+              onClose={handleClosePrizesModal}
+            />
+          )}
         </>
-      )}
-
-      {/* Modal de premios pendientes */}
-      {showPrizesModal && pendingPrizes && (
-        <PendingPrizesModal
-          prizes={pendingPrizes}
-          onClose={handleClosePrizesModal}
-        />
       )}
     </div>
   );

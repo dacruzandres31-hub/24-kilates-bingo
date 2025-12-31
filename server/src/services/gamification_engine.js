@@ -209,10 +209,9 @@ async function spinFortuneWheel(userId) {
         const diffMs = now - new Date(lastSpin);
         const hoursSinceLastSpin = diffMs / (1000 * 60 * 60);
 
-        if (hoursSinceLastSpin < 4) {
-          // UNLIMITED SPIN RESTRICTION REMOVED FOR TESTING
-          // const remainingMinutes = Math.ceil((4 - hoursSinceLastSpin) * 60);
-          // throw new Error(`Cooldown active. Try again in ${remainingMinutes} minutes.`);
+        if (hoursSinceLastSpin < 24) {
+          const remainingMinutes = Math.ceil((24 - hoursSinceLastSpin) * 60);
+          throw new Error(`Cooldown activo. Intenta de nuevo en ${Math.floor(remainingMinutes / 60)}h ${remainingMinutes % 60}m.`);
         }
       }
 

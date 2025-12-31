@@ -6,7 +6,7 @@ import '../styles/PackageSelectionModal.css';
 const PackageSelectionModal = ({ onSelectPackage, onClose, roomTheme, currentCards = 0 }) => {
   const MAX_CARDS_TOTAL = 30; // Límite máximo de cartones totales (pagos + PLUS)
   const MAX_CARDS_PAID = 20;  // Límite máximo de cartones PAGOS (sin contar PLUS)
-  
+
   const packages = [
     {
       id: 'no-bonus',
@@ -52,7 +52,7 @@ const PackageSelectionModal = ({ onSelectPackage, onClose, roomTheme, currentCar
         <button className="close-btn" onClick={onClose}>
           <FaTimes />
         </button>
-        
+
         <h2 className="modal-title">PACK BINGO PLUS</h2>
         <p className="modal-subtitle">Elige cuántos cartones quieres y obtén gift cards PLUS gratis</p>
 
@@ -60,28 +60,29 @@ const PackageSelectionModal = ({ onSelectPackage, onClose, roomTheme, currentCar
           {packages.map((pkg) => {
             // Validar límite TOTAL (pagos + PLUS)
             const wouldExceedTotalLimit = (currentCards + pkg.total) > MAX_CARDS_TOTAL;
-            
+
             // Validar límite de COMPRA (solo cartones pagos, sin contar PLUS)
             // Asumimos que currentCards son los cartones que ya tiene (pueden incluir PLUS de compras anteriores)
             // pkg.buy es cuántos cartones PAGOS va a comprar ahora
             // El límite de compra es cuántos cartones PAGOS puede tener en total (20)
             const wouldExceedPaidLimit = (currentCards + pkg.buy) > MAX_CARDS_PAID;
-            
+
             const isDisabled = wouldExceedTotalLimit || wouldExceedPaidLimit;
             const remainingTotal = MAX_CARDS_TOTAL - currentCards;
             const remainingPaid = MAX_CARDS_PAID - currentCards;
-            
+
             let disabledReason = '';
             if (wouldExceedTotalLimit) {
               disabledReason = `Excede límite total de ${MAX_CARDS_TOTAL} cartones (${remainingTotal} espacios)`;
             } else if (wouldExceedPaidLimit) {
               disabledReason = `Excede límite de compra de ${MAX_CARDS_PAID} cartones (solo puedes comprar ${remainingPaid} más)`;
             }
-            
+
             return (
               <button
                 key={pkg.id}
                 className={`package-option animation-level-${pkg.animationLevel} ${isDisabled ? 'disabled' : ''}`}
+                id={pkg.id === 'no-bonus' ? 'btn-package-no-bonus' : undefined}
                 onClick={() => {
                   uiSoundService.playClick();
                   !isDisabled && onSelectPackage(pkg);
@@ -89,37 +90,37 @@ const PackageSelectionModal = ({ onSelectPackage, onClose, roomTheme, currentCar
                 disabled={isDisabled}
                 title={isDisabled ? disabledReason : ''}
               >
-              <div className="package-content">
-                <div className="package-header">
-                  <h3 className="package-title">{pkg.title}</h3>
+                <div className="package-content">
+                  <div className="package-header">
+                    <h3 className="package-title">{pkg.title}</h3>
+                    {pkg.bonus > 0 && (
+                      <div className="bonus-badge">
+                        <FaGift /> +{pkg.bonus}
+                      </div>
+                    )}
+                  </div>
+
+                  <p className="package-description">{pkg.description}</p>
+
                   {pkg.bonus > 0 && (
-                    <div className="bonus-badge">
-                      <FaGift /> +{pkg.bonus}
+                    <div className="package-breakdown">
+                      <span className="buy-amount">{pkg.buy} para comprar</span>
+                      <span className="plus-sign">+</span>
+                      <span className="bonus-amount">{pkg.bonus} Gift Cards</span>
+                      <span className="equals-sign">=</span>
+                      <span className="total-amount">{pkg.total} total</span>
                     </div>
                   )}
                 </div>
-                
-                <p className="package-description">{pkg.description}</p>
-                
-                {pkg.bonus > 0 && (
-                  <div className="package-breakdown">
-                    <span className="buy-amount">{pkg.buy} para comprar</span>
-                    <span className="plus-sign">+</span>
-                    <span className="bonus-amount">{pkg.bonus} Gift Cards</span>
-                    <span className="equals-sign">=</span>
-                    <span className="total-amount">{pkg.total} total</span>
+
+                <div className="package-glow"></div>
+
+                {isDisabled && (
+                  <div className="package-disabled-overlay">
+                    <span>⚠️ {wouldExceedPaidLimit ? `Solo puedes comprar ${remainingPaid} más` : `Excede límite (${remainingTotal} espacios)`}</span>
                   </div>
                 )}
-              </div>
-              
-              <div className="package-glow"></div>
-              
-              {isDisabled && (
-                <div className="package-disabled-overlay">
-                  <span>⚠️ {wouldExceedPaidLimit ? `Solo puedes comprar ${remainingPaid} más` : `Excede límite (${remainingTotal} espacios)`}</span>
-                </div>
-              )}
-            </button>
+              </button>
             );
           })}
         </div>

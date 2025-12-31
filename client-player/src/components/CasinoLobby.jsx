@@ -67,7 +67,7 @@ const RoomCard = ({ room }) => {
   };
 
   return (
-    <Link to={room.path} className={`room-link ${room.className} ${room.featured ? 'featured' : ''}`}>
+    <Link to={room.path} className={`room-link ${room.className} ${room.featured ? 'featured' : ''}`} id={room.id === 'starter' ? 'btn-room-starter' : undefined}>
       <div className="room-card">
         {room.id === 'starter' && (
           <div className="ribbon-wrapper">
@@ -744,6 +744,7 @@ const CasinoLobby = ({ user, onLogout }) => {
               marginRight: '8px'
             }}
             onClick={() => setShowCardPurchase(true)}
+            id="btn-purchase"
           >
             <FaShoppingCart />
             <span>COMPRAR</span>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './CustomTour.css';
 import { FaChevronRight, FaChevronLeft, FaTimes } from 'react-icons/fa';
 
@@ -42,7 +43,13 @@ const tourSteps = [
     {
         target: '#wheel-btn',
         title: 'Rueda de la Fortuna',
-        content: '¡Gira GRATIS cada 60 minutos! Atento al brillo dorado para reclamar tus premios.',
+        content: '¡Gira GRATIS cada 24 horas! Atento al brillo dorado para reclamar tus premios.',
+        position: 'bottom'
+    },
+    {
+        target: '#btn-purchase',
+        title: 'Comprar Créditos',
+        content: 'Aquí puedes cargar saldo o comprar paquetes de cartones para asegurar tu participación.',
         position: 'bottom'
     },
     {
@@ -52,22 +59,23 @@ const tourSteps = [
         position: 'bottom'
     },
     {
-        target: '#rooms-grid',
-        title: 'Salas de Juego',
-        content: 'Selecciona una sala (Starter, Bronce, Plata, Oro). ¡Cada una con distintos premios!',
-        position: 'top',
-        scrollBlock: 'center',
-        customHeight: 525
-    },
-    {
         target: '.winners-ticker',
         title: 'Noticias 24K',
         content: 'Mantente informado con actualizaciones en tiempo real y el ranking de ganadores.',
         position: 'top'
+    },
+    {
+        target: '#btn-room-starter',
+        title: '¡Vamos a Jugar!',
+        content: 'Entra a la sala Starter. Adentro, te enseñaremos cómo elegir tus primeros cartones.',
+        position: 'top',
+        scrollBlock: 'center',
+        customHeight: 525
     }
 ];
 
 const CustomTour = ({ runTour, onTourEnd }) => {
+    const navigate = useNavigate();
     const [stepIndex, setStepIndex] = useState(0);
     const [coords, setCoords] = useState(null);
     const [isVisible, setIsVisible] = useState(false);
@@ -158,6 +166,11 @@ const CustomTour = ({ runTour, onTourEnd }) => {
     const handleClose = () => {
         setIsVisible(false);
         if (onTourEnd) onTourEnd();
+
+        // If finished successfully (last step), redirect to room with tour
+        if (stepIndex === tourSteps.length - 1) {
+            navigate('/sala/starter?tour=true');
+        }
     };
 
     if (!isVisible || !coords) return null;
