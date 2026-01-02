@@ -43,6 +43,7 @@ temp/
 *.tmp
 
 # Database
+*.sql
 *.sql.backup
 *.db
 *.sqlite
