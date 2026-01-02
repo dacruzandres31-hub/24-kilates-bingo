@@ -157,7 +157,7 @@ const MembershipPage = ({ user, onLogout }) => {
                                     <div className="tier-icon">{getTierIcon(plan.name)}</div>
                                     <h2 className="tier-name">SOCIO {tierName.replace(' 24K', '')}</h2>
                                     <div className="tier-price-container">
-                                        <span className="price">${parseFloat(plan.price).toLocaleString()}</span>
+                                        <span className="price">${parseFloat(plan.price).toLocaleString()} ARS</span>
                                         <span className="period">/mes</span>
                                     </div>
                                 </div>

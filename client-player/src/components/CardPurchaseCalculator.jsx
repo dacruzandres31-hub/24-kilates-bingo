@@ -334,8 +334,22 @@ const CardPurchaseCalculator = ({ isOpen, onClose }) => {
                                         </div>
                                         {superiorInfo.cbu && (
                                             <div style={{ gridColumn: 'span 2' }}>
-                                                <label style={{ display: 'block', color: '#64748b', fontSize: '0.8rem' }}>CBU/CVU</label>
-                                                <span style={{ color: 'white', fontFamily: 'monospace' }}>{superiorInfo.cbu}</span>
+                                                <label style={{ display: 'block', color: '#64748b', fontSize: '0.8rem', marginBottom: '4px' }}>CBU/CVU (Click para copiar)</label>
+                                                <div
+                                                    onClick={() => handleCopy(superiorInfo.cbu)}
+                                                    style={{
+                                                        display: 'flex',
+                                                        justifyContent: 'space-between',
+                                                        alignItems: 'center',
+                                                        cursor: 'pointer',
+                                                        padding: '8px',
+                                                        borderRadius: '6px',
+                                                        background: 'rgba(0,0,0,0.2)'
+                                                    }}
+                                                >
+                                                    <span style={{ color: 'white', fontFamily: 'monospace' }}>{superiorInfo.cbu}</span>
+                                                    <FaCopy color={themeColor} />
+                                                </div>
                                             </div>
                                         )}
                                     </div>

@@ -36,7 +36,7 @@ export default function RoomConfigPanel() {
   const formatMoney = (amount) => {
     return new Intl.NumberFormat('es-CO', {
       style: 'currency',
-      currency: 'COP',
+      currency: 'ARS',
       minimumFractionDigits: 0
     }).format(amount);
   };
@@ -71,9 +71,9 @@ export default function RoomConfigPanel() {
 
     try {
       // Validar que los porcentajes no superen 100%
-      const totalPercentage = 
-        parseFloat(editForm.percentage_linea) + 
-        parseFloat(editForm.percentage_bingo) + 
+      const totalPercentage =
+        parseFloat(editForm.percentage_linea) +
+        parseFloat(editForm.percentage_bingo) +
         parseFloat(editForm.percentage_acumulado);
 
       if (totalPercentage > 100) {
@@ -195,7 +195,7 @@ export default function RoomConfigPanel() {
 
                 <div className="space-y-2">
                   <label className="block text-sm text-gray-300 mb-1">Distribución de Pozos (%)</label>
-                  
+
                   <div className="flex items-center gap-2">
                     <input
                       type="number"

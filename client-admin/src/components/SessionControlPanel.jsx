@@ -222,7 +222,7 @@ export default function SessionControlPanel() {
   const formatMoney = (amount) => {
     return new Intl.NumberFormat('es-CO', {
       style: 'currency',
-      currency: 'COP',
+      currency: 'ARS',
       minimumFractionDigits: 0
     }).format(amount);
   };

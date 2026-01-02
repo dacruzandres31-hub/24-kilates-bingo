@@ -12,13 +12,37 @@ const uiHelper = {
         const number = parseFloat(value);
         if (isNaN(number)) return '$ 0';
 
-        // Formato sin decimales por defecto para COP, o con 2 si se desea
-        return new Intl.NumberFormat('es-CO', {
+        // Formato sin decimales por defecto para ARS, o con 2 si se desea
+        return new Intl.NumberFormat('es-AR', {
             style: 'currency',
-            currency: 'COP',
+            currency: 'ARS',
             minimumFractionDigits: 0,
             maximumFractionDigits: 0
-        }).format(number);
+        }).format(value);
+    },
+
+    /**
+     * Formato compacto: 1.5K, 2.3M
+     */
+    formatCompact(value) {
+        return new Intl.NumberFormat('es-AR', {
+            notation: 'compact',
+            currency: 'ARS',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 1
+        }).format(value);
+    },
+
+    /**
+     * Formato con decimales (para premios exactos)
+     */
+    formatDecimal(value, decimals = 2) {
+        return new Intl.NumberFormat('es-AR', {
+            style: 'currency',
+            currency: 'ARS',
+            minimumFractionDigits: decimals,
+            maximumFractionDigits: decimals
+        }).format(value);
     },
 
     /**
@@ -26,9 +50,9 @@ const uiHelper = {
      */
     formatCurrencyPrecise: (value) => {
         if (value === undefined || value === null) return '$ 0,00';
-        return new Intl.NumberFormat('es-CO', {
+        return new Intl.NumberFormat('es-AR', {
             style: 'currency',
-            currency: 'COP',
+            currency: 'ARS',
             minimumFractionDigits: 2
         }).format(value);
     },

@@ -185,8 +185,22 @@ const DepositModal = ({ isOpen, onClose, themeColor = '#00ffff', accentColor = '
                                     </div>
                                     {account.cbu && (
                                         <div style={{ gridColumn: 'span 2' }}>
-                                            <label style={{ display: 'block', color: '#64748b', fontSize: '0.8rem' }}>CBU/CVU</label>
-                                            <span style={{ color: 'white', fontFamily: 'monospace' }}>{account.cbu}</span>
+                                            <label style={{ display: 'block', color: '#64748b', fontSize: '0.8rem', marginBottom: '4px' }}>CBU/CVU (Click para copiar)</label>
+                                            <div
+                                                onClick={() => handleCopy(account.cbu)}
+                                                style={{
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    alignItems: 'center',
+                                                    cursor: 'pointer',
+                                                    padding: '8px',
+                                                    borderRadius: '6px',
+                                                    background: 'rgba(0,0,0,0.2)'
+                                                }}
+                                            >
+                                                <span style={{ color: 'white', fontFamily: 'monospace' }}>{account.cbu}</span>
+                                                <FaCopy color={themeColor} />
+                                            </div>
                                         </div>
                                     )}
                                 </div>

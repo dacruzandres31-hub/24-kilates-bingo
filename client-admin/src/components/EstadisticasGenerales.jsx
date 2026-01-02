@@ -67,7 +67,7 @@ export default function EstadisticasGenerales({ financialData }) {
   const formatCurrency = (value) => {
     return new Intl.NumberFormat('es-CO', {
       style: 'currency',
-      currency: 'COP',
+      currency: 'ARS',
       minimumFractionDigits: 0
     }).format(value);
   };
@@ -275,8 +275,8 @@ export default function EstadisticasGenerales({ financialData }) {
 
                 <div className="flex items-center gap-3">
                   <span className={`text-2xl font-bold px-4 py-2 rounded-xl shadow-lg ${netProfitData.percentageChange < 0
-                      ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white'
-                      : 'bg-gradient-to-r from-green-600 to-emerald-600 text-white'
+                    ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white'
+                    : 'bg-gradient-to-r from-green-600 to-emerald-600 text-white'
                     }`}>
                     {netProfitData.percentageChange > 0 ? '+' : ''}{netProfitData.percentageChange}%
                   </span>

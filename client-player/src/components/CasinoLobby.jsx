@@ -198,6 +198,7 @@ const CasinoLobby = ({ user, onLogout }) => {
   const [showSupport, setShowSupport] = useState(false);
   const [showWithdrawal, setShowWithdrawal] = useState(false);
   const [showCardPurchase, setShowCardPurchase] = useState(false);
+  const [showTicketsDropdown, setShowTicketsDropdown] = useState(false);
 
   // Estado de audio
   const [audioStatus, setAudioStatus] = useState({
@@ -520,10 +521,29 @@ const CasinoLobby = ({ user, onLogout }) => {
             <span className="balance">
               💰 {uiHelper.formatCurrencyFlexible(userData?.balance)}
             </span>
-            <div className="tickets-display">
-              <span className="ticket-item">🎴 Bronce: {userData?.tickets?.bronze || 0}</span>
-              <span className="ticket-item">🥈 Plata: {userData?.tickets?.silver || 0}</span>
-              <span className="ticket-item">🥇 Oro: {userData?.tickets?.gold || 0}</span>
+
+            <div className="profile-menu-container">
+              <button
+                className="btn-profile"
+                onClick={() => setShowTicketsDropdown(!showTicketsDropdown)}
+              >
+                <span style={{ fontSize: '1.2rem' }}>🎴</span>
+                <span>Cartones</span>
+              </button>
+
+              {showTicketsDropdown && (
+                <div className="profile-dropdown" style={{ minWidth: '150px', left: 0, right: 'auto' }}>
+                  <div className="dropdown-item" style={{ cursor: 'default' }}>
+                    <span>🥉 Bronce: {userData?.tickets?.bronze || 0}</span>
+                  </div>
+                  <div className="dropdown-item" style={{ cursor: 'default' }}>
+                    <span>🥈 Plata: {userData?.tickets?.silver || 0}</span>
+                  </div>
+                  <div className="dropdown-item" style={{ cursor: 'default' }}>
+                    <span>🥇 Oro: {userData?.tickets?.gold || 0}</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

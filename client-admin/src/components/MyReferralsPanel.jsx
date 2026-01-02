@@ -44,11 +44,61 @@ const MyReferralsPanel = ({ userData }) => {
         }
     };
 
-    const copyToClipboard = () => {
-        const referralLink = `${window.location.origin}/register?ref=${referralCode}`;
-        navigator.clipboard.writeText(referralLink);
-        setCopied(true);
+    const copyToClipboard = (type) => {
+        const baseUrl = window.location.origin;
+        const link = type === 'player'
+            ? `${baseUrl}/register?ref=${referralCode}`
+            : `${baseUrl}/register-agent?ref=${referralCode}`;
+
+        navigator.clipboard.writeText(link);
+        setCopied(type);
         setTimeout(() => setCopied(false), 2000);
+    };
+
+    const [showAmbassadorModal, setShowAmbassadorModal] = useState(false);
+    const [ambassadorAccount, setAmbassadorAccount] = useState(null);
+    const [loadingAccount, setLoadingAccount] = useState(false);
+    const [copiedAmbassador, setCopiedAmbassador] = useState(false);
+
+    const handleActivateAmbassador = async () => {
+        try {
+            setLoadingAccount(true);
+            const token = localStorage.getItem('adminToken');
+
+            // Obtener cuenta de Andy para transferencia (igual que VIP)
+            const { data } = await axios.get('/api/deposits/info?purpose=membership', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            if (data.success) {
+                setAmbassadorAccount(data.data);
+                setShowAmbassadorModal(true);
+            }
+        } catch (error) {
+            alert('❌ Error al obtener información de pago: ' + (error.response?.data?.message || error.message));
+        } finally {
+            setLoadingAccount(false);
+        }
+    };
+
+    const handleAmbassadorPaymentSubmit = async (proofUrl) => {
+        try {
+            const token = localStorage.getItem('adminToken');
+            await axios.post('/api/deposits/claim', {
+                accountId: ambassadorAccount.id,
+                amount: 5000,
+                proofUrl: proofUrl,
+                requestType: 'ambassador_membership',
+                details: 'Pago Membresía Socio Embajador 24K'
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            setShowAmbassadorModal(false);
+            alert('✅ Comprobante enviado. Tu membresía será activada una vez se verifique el pago.');
+        } catch (error) {
+            alert('❌ Error: ' + (error.response?.data?.message || error.message));
+        }
     };
 
     const shareOnWhatsApp = () => {
@@ -99,31 +149,74 @@ const MyReferralsPanel = ({ userData }) => {
                     </div>
                 </div>
                 <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700 md:col-span-2">
-                    <div className="flex items-center justify-between gap-4 h-full">
-                        <div className="flex-1 space-y-2">
-                            <label className="text-slate-400 text-xs font-bold uppercase tracking-wider block">Link de Invitación</label>
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    readOnly
-                                    value={`${window.location.origin}/register?ref=${referralCode}`}
-                                    className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-300 w-full focus:outline-none focus:border-indigo-500"
-                                />
-                                <button
-                                    onClick={copyToClipboard}
-                                    className={`p-2 rounded-lg transition-all ${copied ? 'bg-emerald-600 text-white' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20'}`}
-                                >
-                                    {copied ? <CheckCircle size={18} /> : <Copy size={18} />}
-                                </button>
-                                <button
-                                    onClick={shareOnWhatsApp}
-                                    className="p-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg transition-all shadow-lg shadow-emerald-500/20"
-                                >
-                                    <Share2 size={18} />
-                                </button>
-                            </div>
+                    <div className="flex flex-col justify-center h-full gap-2">
+                        <label className="text-slate-400 text-xs font-bold uppercase tracking-wider block mb-1">Links de Invitación</label>
+
+                        {/* Link Jugador */}
+                        <div className="flex gap-2 mb-2">
+                            <input
+                                type="text"
+                                readOnly
+                                value={`${window.location.origin.replace(':3000', ':5173')}/register?ref=${referralCode}`}
+                                className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-300 w-full focus:outline-none focus:border-indigo-500"
+                            />
+                            <button
+                                onClick={() => copyToClipboard('player')}
+                                className={`p-2 rounded-lg transition-all min-w-[140px] flex items-center justify-center gap-2 ${copied === 'player' ? 'bg-emerald-600 text-white' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20'}`}
+                            >
+                                {copied === 'player' ? <CheckCircle size={16} /> : <Copy size={16} />}
+                                <span className="text-xs font-bold">COPIAR JUGADOR</span>
+                            </button>
+                        </div>
+
+                        {/* Link Agente */}
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                readOnly
+                                value={`${window.location.origin}/register-agent?ref=${referralCode}`}
+                                className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-300 w-full focus:outline-none focus:border-indigo-500"
+                            />
+                            <button
+                                onClick={() => copyToClipboard('agent')}
+                                className={`p-2 rounded-lg transition-all min-w-[140px] flex items-center justify-center gap-2 ${copied === 'agent' ? 'bg-emerald-600 text-white' : 'bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-500/20'}`}
+                            >
+                                {copied === 'agent' ? <CheckCircle size={16} /> : <Copy size={16} />}
+                                <span className="text-xs font-bold">COPIAR AGENTE</span>
+                            </button>
                         </div>
                     </div>
+                </div>
+
+                {/* Membership Payment Card */}
+                <div className="bg-gradient-to-br from-indigo-900/50 to-purple-900/50 p-4 rounded-xl border border-indigo-500/30 md:col-span-4 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 bg-indigo-500/20 rounded-xl">
+                            <Trophy className="text-yellow-400" size={32} />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-bold text-white">Membresía Socio Embajador</h3>
+                            <p className="text-indigo-200 text-sm">Habilita el cobro de comisiones de red por referidos.</p>
+                            {userData?.is_ambassador && (
+                                <p className="text-emerald-400 text-xs mt-1 flex items-center gap-1">
+                                    <CheckCircle size={14} /> Membresía Activa
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                    {!userData?.is_ambassador ? (
+                        <button
+                            onClick={handleActivateAmbassador}
+                            className="bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 text-white font-bold py-2 px-6 rounded-lg shadow-lg shadow-amber-500/20 transition-all flex items-center gap-2"
+                        >
+                            <span>ACTIVAR ($5.000)</span>
+                        </button>
+                    ) : (
+                        <div className="bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 font-bold py-2 px-6 rounded-lg flex items-center gap-2">
+                            <CheckCircle size={18} />
+                            <span>ACTIVA</span>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -169,9 +262,9 @@ const MyReferralsPanel = ({ userData }) => {
                                             <div className="flex items-center gap-2">
                                                 <span className="text-white font-bold">{ref.username}</span>
                                                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${ref.level === 1 ? 'bg-indigo-500/20 text-indigo-400' :
-                                                        ref.level === 2 ? 'bg-blue-500/20 text-blue-400' :
-                                                            ref.level === 3 ? 'bg-purple-500/20 text-purple-400' :
-                                                                'bg-slate-500/20 text-slate-400'
+                                                    ref.level === 2 ? 'bg-blue-500/20 text-blue-400' :
+                                                        ref.level === 3 ? 'bg-purple-500/20 text-purple-400' :
+                                                            'bg-slate-500/20 text-slate-400'
                                                     }`}>N{ref.level}</span>
                                             </div>
                                             <p className="text-[10px] text-slate-500 mt-1">Registrado el {new Date(ref.created_at).toLocaleDateString()}</p>
@@ -236,6 +329,98 @@ const MyReferralsPanel = ({ userData }) => {
                     </div>
                 )}
             </div>
+
+            {/* Ambassador Payment Modal */}
+            {showAmbassadorModal && ambassadorAccount && (
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[10000] p-4">
+                    <div className="bg-slate-900 border border-yellow-500/30 rounded-2xl p-6 max-w-md w-full shadow-2xl">
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                <Trophy className="text-yellow-400" size={24} />
+                                Membresía Socio Embajador
+                            </h3>
+                            <button
+                                onClick={() => setShowAmbassadorModal(false)}
+                                className="text-slate-400 hover:text-white"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-yellow-500/10 to-amber-600/10 border border-yellow-500/20 rounded-xl p-4 mb-4">
+                            <p className="text-yellow-200 text-sm mb-2">💰 <strong>Monto a pagar:</strong> $5.000 ARS</p>
+                            <p className="text-slate-300 text-xs">Habilita el cobro de comisiones de red por tus referidos.</p>
+                        </div>
+
+                        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 mb-4">
+                            <p className="text-xs text-slate-400 mb-2 uppercase font-bold">Transferir a:</p>
+                            <div className="space-y-2">
+                                <div>
+                                    <span className="text-xs text-slate-500">Banco:</span>
+                                    <p className="text-white font-bold">{ambassadorAccount.bank_name}</p>
+                                </div>
+                                <div>
+                                    <span className="text-xs text-slate-500">Titular:</span>
+                                    <p className="text-white font-bold">{ambassadorAccount.holder_name}</p>
+                                </div>
+                                <div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs text-slate-500">Alias/CBU:</span>
+                                        <button
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(ambassadorAccount.alias || ambassadorAccount.cbu);
+                                                setCopiedAmbassador(true);
+                                                setTimeout(() => setCopiedAmbassador(false), 2000);
+                                            }}
+                                            className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1 rounded transition-colors"
+                                        >
+                                            <Copy size={14} />
+                                            {copiedAmbassador ? '✓ Copiado' : 'Copiar'}
+                                        </button>
+                                    </div>
+                                    <p className="text-emerald-400 font-mono font-bold mt-1">{ambassadorAccount.alias || ambassadorAccount.cbu}</p>
+                                    {copiedAmbassador && (
+                                        <p className="text-emerald-300 text-xs mt-1 animate-pulse">✅ Copiado al portapapeles</p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="mb-4">
+                            <label className="block text-xs text-slate-400 mb-2 uppercase font-bold">Subir Comprobante:</label>
+                            <input
+                                type="file"
+                                accept="image/*"
+                                onChange={async (e) => {
+                                    const file = e.target.files[0];
+                                    if (!file) return;
+
+                                    const formData = new FormData();
+                                    formData.append('file', file);
+
+                                    try {
+                                        const token = localStorage.getItem('adminToken');
+                                        const { data } = await axios.post('/api/upload', formData, {
+                                            headers: {
+                                                'Authorization': `Bearer ${token}`,
+                                                'Content-Type': 'multipart/form-data'
+                                            }
+                                        });
+                                        handleAmbassadorPaymentSubmit(data.url);
+                                    } catch (error) {
+                                        alert('Error subiendo comprobante: ' + error.message);
+                                    }
+                                }}
+                                className="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-white file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-emerald-600 file:text-white hover:file:bg-emerald-500"
+                            />
+                        </div>
+
+                        <p className="text-xs text-slate-500 text-center">
+                            Tu membresía será activada una vez se verifique el pago.
+                        </p>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

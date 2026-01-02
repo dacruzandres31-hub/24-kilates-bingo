@@ -1,3 +1,4 @@
+const pool = require('../db');
 const MoneyMath = require('../utils/moneyMath');
 const MembershipService = require('./membershipService');
 const ReferralService = require('./referralService');
@@ -22,7 +23,9 @@ class DepositService {
         `, ownerId ? [ownerId] : []);
 
         if (accounts.length === 0) {
-            throw new Error('No hay cuentas disponibles configuradas por tu superior para recibir depósitos.');
+            throw new Error(ownerId
+                ? 'No hay cuentas disponibles configuradas por tu superior para recibir depósitos. Por favor, contáctalo.'
+                : 'No hay cuentas disponibles del sistema para recibir depósitos.');
         }
 
         return accounts[0];

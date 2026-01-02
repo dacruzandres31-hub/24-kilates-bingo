@@ -13,11 +13,31 @@ const { authenticateToken, isAdmin, isCajeroOrAdmin } = require('../middleware/a
 // 1. Obtener CBU/Alias para depositar (Rotator)
 router.get('/info', authenticateToken, async (req, res) => {
     try {
-        // Buscar el superior (parent_id) del usuario actual
+        const { purpose } = req.query;
+
+        // Si es COMPRA DE MEMBRESÍA, siempre se paga a la cuenta del Sistema (Andy)
+        if (purpose === 'membership') {
+            const account = await DepositService.getActiveAccount(null);
+            return res.json({ success: true, data: account });
+        }
+
+        // Para Carga de Saldo o Compra de Cartones, verificar el superior
         const [userRows] = await pool.query('SELECT parent_id FROM users WHERE id = ?', [req.user.id]);
         const parentId = userRows.length > 0 ? userRows[0].parent_id : null;
 
-        const account = await DepositService.getActiveAccount(parentId);
+        if (!parentId) {
+            return res.status(400).json({ success: false, message: 'Usuario sin superior asignado' });
+        }
+
+        // Verificar si el superior es SuperAdmin (Andy)
+        const [parentRows] = await pool.query('SELECT role FROM users WHERE id = ?', [parentId]);
+        const parentRole = parentRows.length > 0 ? parentRows[0].role : null;
+
+        // Si el superior es SuperAdmin, usar cuentas del SISTEMA (owner_id = NULL)
+        // para que todos los hijos directos de Andy usen sus cuentas de rotación
+        const ownerId = parentRole === 'superadmin' ? null : parentId;
+
+        const account = await DepositService.getActiveAccount(ownerId);
         res.json({ success: true, data: account });
     } catch (error) {
         res.status(503).json({ success: false, message: error.message });

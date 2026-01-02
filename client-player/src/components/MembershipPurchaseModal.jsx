@@ -23,7 +23,7 @@ const MembershipPurchaseModal = ({ isOpen, onClose, plan, themeColor = '#ffd700'
             setLoading(true);
             const token = localStorage.getItem('playerToken');
             // We use the same endpoint as deposits to get the Transfer Info
-            const { data } = await axios.get('/api/deposits/info', {
+            const { data } = await axios.get('/api/deposits/info?purpose=membership', {
                 headers: { Authorization: `Bearer ${token}` }
             });
             if (data.success) {

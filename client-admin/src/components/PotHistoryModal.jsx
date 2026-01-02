@@ -49,7 +49,7 @@ export default function PotHistoryModal({ room, onClose }) {
     const formatMoney = (amount) => {
         return new Intl.NumberFormat('es-CO', {
             style: 'currency',
-            currency: 'COP',
+            currency: 'ARS',
             minimumFractionDigits: 0
         }).format(amount);
     };
@@ -90,8 +90,8 @@ export default function PotHistoryModal({ room, onClose }) {
                         <button
                             onClick={() => setActiveTab('chart')}
                             className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'chart'
-                                    ? 'bg-purple-600 text-white shadow-lg'
-                                    : 'text-gray-400 hover:text-white'
+                                ? 'bg-purple-600 text-white shadow-lg'
+                                : 'text-gray-400 hover:text-white'
                                 }`}
                         >
                             <div className="flex items-center gap-2">
@@ -102,8 +102,8 @@ export default function PotHistoryModal({ room, onClose }) {
                         <button
                             onClick={() => setActiveTab('list')}
                             className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'list'
-                                    ? 'bg-purple-600 text-white shadow-lg'
-                                    : 'text-gray-400 hover:text-white'
+                                ? 'bg-purple-600 text-white shadow-lg'
+                                : 'text-gray-400 hover:text-white'
                                 }`}
                         >
                             <div className="flex items-center gap-2">
@@ -208,8 +208,8 @@ export default function PotHistoryModal({ room, onClose }) {
                                                     </td>
                                                     <td className="px-6 py-4">
                                                         <span className={`px-2 py-1 rounded-full text-xs font-semibold ${item.type === 'purchase' ? 'bg-green-500/10 text-green-400' :
-                                                                item.type === 'win' ? 'bg-red-500/10 text-red-400' :
-                                                                    'bg-blue-500/10 text-blue-400'
+                                                            item.type === 'win' ? 'bg-red-500/10 text-red-400' :
+                                                                'bg-blue-500/10 text-blue-400'
                                                             }`}>
                                                             {item.type === 'purchase' ? 'Compra' :
                                                                 item.type === 'win' ? 'Premio' :

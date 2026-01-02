@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
+import RegisterAgent from './pages/RegisterAgent';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
@@ -38,6 +39,7 @@ function App() {
               <Navigate to="/login" replace />
           }
         />
+        <Route path="/register-agent" element={<RegisterAgent />} />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </Router>
