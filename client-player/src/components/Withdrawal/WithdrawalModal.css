@@ -111,6 +111,45 @@
     margin-top: 5px;
 }
 
+.text-emerald-400 {
+    color: #34d399 !important;
+}
+
+.withdrawal-mode-selector {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.mode-btn {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #888;
+    padding: 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: bold;
+    transition: all 0.2s;
+}
+
+.mode-btn.active {
+    background: rgba(52, 211, 153, 0.15);
+    border-color: #34d399;
+    color: #34d399;
+}
+
+.date-warning {
+    background: rgba(239, 68, 68, 0.1);
+    border-left: 4px solid #ef4444;
+    color: #f87171;
+    padding: 10px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    margin-bottom: 20px;
+}
+
 .input-with-icon {
     position: relative;
     display: flex;

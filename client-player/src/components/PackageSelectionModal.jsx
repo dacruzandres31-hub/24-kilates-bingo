@@ -1,11 +1,43 @@
-import React from 'react';
-import { FaGift, FaTimes } from 'react-icons/fa';
+import React, { useState, useEffect } from 'react';
+import { FaGift, FaTimes, FaCrown } from 'react-icons/fa';
+import axios from 'axios';
 import uiSoundService from '../services/uiSoundService';
 import '../styles/PackageSelectionModal.css';
 
 const PackageSelectionModal = ({ onSelectPackage, onClose, roomTheme, currentCards = 0 }) => {
   const MAX_CARDS_TOTAL = 30; // Límite máximo de cartones totales (pagos + PLUS)
   const MAX_CARDS_PAID = 20;  // Límite máximo de cartones PAGOS (sin contar PLUS)
+
+  const [userMembership, setUserMembership] = useState(null);
+
+  useEffect(() => {
+    fetchUserMembership();
+  }, []);
+
+  const fetchUserMembership = async () => {
+    try {
+      const res = await axios.get('/api/memberships/my-subscription');
+      if (res.data.subscription && res.data.subscription.status === 'active') {
+        setUserMembership(res.data.subscription);
+      }
+    } catch (error) {
+      console.error('Error fetching membership:', error);
+    }
+  };
+
+  // Calculate VIP discount based on membership tier
+  const calculateVIPDiscount = (buyQuantity) => {
+    if (!userMembership?.benefits_config?.pack_bingo_bonus) return 0;
+
+    const { threshold, free_cards } = userMembership.benefits_config.pack_bingo_bonus;
+
+    // Only apply if quantity matches threshold exactly
+    if (buyQuantity === threshold) {
+      return free_cards;
+    }
+
+    return 0;
+  };
 
   const packages = [
     {
@@ -85,7 +117,14 @@ const PackageSelectionModal = ({ onSelectPackage, onClose, roomTheme, currentCar
                 id={pkg.id === 'no-bonus' ? 'btn-package-no-bonus' : undefined}
                 onClick={() => {
                   uiSoundService.playClick();
-                  !isDisabled && onSelectPackage(pkg);
+                  if (!isDisabled) {
+                    const vipDiscount = calculateVIPDiscount(pkg.buy);
+                    onSelectPackage({
+                      ...pkg,
+                      vipDiscount: vipDiscount,
+                      actualCost: pkg.buy - vipDiscount // Lo que realmente paga
+                    });
+                  }
                 }}
                 disabled={isDisabled}
                 title={isDisabled ? disabledReason : ''}
@@ -111,6 +150,20 @@ const PackageSelectionModal = ({ onSelectPackage, onClose, roomTheme, currentCar
                       <span className="total-amount">{pkg.total} total</span>
                     </div>
                   )}
+
+                  {(() => {
+                    const vipDiscount = calculateVIPDiscount(pkg.buy);
+                    if (vipDiscount > 0) {
+                      const chargedAmount = pkg.buy - vipDiscount;
+                      return (
+                        <div className="vip-bonus-badge">
+                          <FaCrown className="vip-icon" />
+                          <span>¡Bonificación VIP! Pagas {chargedAmount}, recibes {pkg.buy}</span>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
 
                 <div className="package-glow"></div>

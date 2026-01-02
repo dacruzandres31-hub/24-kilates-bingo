@@ -1,0 +1,217 @@
+/* VIPBadge.css */
+
+.vip-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    vertical-align: middle;
+    margin-left: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    animation: badgePulse 3s ease-in-out infinite;
+    position: relative;
+    overflow: hidden;
+}
+
+.vip-badge::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    animation: badgeShine 3s linear infinite;
+}
+
+@keyframes badgePulse {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
+}
+
+@keyframes badgeShine {
+    0% {
+        transform: translateX(-100%) translateY(-100%) rotate(45deg);
+    }
+
+    100% {
+        transform: translateX(100%) translateY(100%) rotate(45deg);
+    }
+}
+
+.vip-badge-icon {
+    display: flex;
+    align-items: center;
+    font-size: 12px;
+    filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.5));
+    position: relative;
+    z-index: 1;
+}
+
+.vip-badge-label {
+    position: relative;
+    z-index: 1;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* Tier-specific styles */
+.vip-badge-bronze {
+    background: linear-gradient(135deg, #cd7f32 0%, #8b4513 100%);
+    color: #fff;
+    border: 1px solid rgba(205, 127, 50, 0.5);
+}
+
+.vip-badge-bronze .vip-badge-icon {
+    color: #ffd700;
+}
+
+.vip-badge-silver {
+    background: linear-gradient(135deg, #c0c0c0 0%, #808080 100%);
+    color: #fff;
+    border: 1px solid rgba(192, 192, 192, 0.5);
+}
+
+.vip-badge-silver .vip-badge-icon {
+    color: #e8e8e8;
+}
+
+.vip-badge-gold {
+    background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%);
+    color: #1a1a2e;
+    border: 1px solid rgba(255, 215, 0, 0.5);
+    animation: badgePulseGold 2s ease-in-out infinite, badgeGlow 2s ease-in-out infinite;
+}
+
+.vip-badge-gold .vip-badge-icon {
+    color: #ff4500;
+    animation: iconRotate 4s linear infinite;
+}
+
+@keyframes badgePulseGold {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.08);
+    }
+}
+
+@keyframes badgeGlow {
+
+    0%,
+    100% {
+        box-shadow: 0 2px 8px rgba(255, 215, 0, 0.4);
+    }
+
+    50% {
+        box-shadow: 0 4px 16px rgba(255, 215, 0, 0.8);
+    }
+}
+
+@keyframes iconRotate {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    25% {
+        transform: rotate(-10deg);
+    }
+
+    50% {
+        transform: rotate(0deg);
+    }
+
+    75% {
+        transform: rotate(10deg);
+    }
+
+    100% {
+        transform: rotate(0deg);
+    }
+}
+
+/* Size variants */
+.vip-badge-small {
+    padding: 2px 6px;
+    font-size: 9px;
+    gap: 3px;
+}
+
+.vip-badge-small .vip-badge-icon {
+    font-size: 10px;
+}
+
+.vip-badge-medium {
+    padding: 3px 8px;
+    font-size: 11px;
+    gap: 4px;
+}
+
+.vip-badge-medium .vip-badge-icon {
+    font-size: 12px;
+}
+
+.vip-badge-large {
+    padding: 5px 12px;
+    font-size: 13px;
+    gap: 6px;
+}
+
+.vip-badge-large .vip-badge-icon {
+    font-size: 16px;
+}
+
+/* Icon-only variant */
+.vip-badge-icon-only {
+    padding: 4px;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.vip-badge-icon-only .vip-badge-icon {
+    font-size: 14px;
+    margin: 0;
+}
+
+/* Hover effect */
+.vip-badge:hover {
+    transform: scale(1.1);
+    cursor: default;
+}
+
+/* Chat integration */
+.chat-message .vip-badge {
+    margin-left: 4px;
+    vertical-align: text-top;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .vip-badge {
+        padding: 2px 6px;
+        font-size: 9px;
+    }
+
+    .vip-badge-icon {
+        font-size: 10px;
+    }
+}

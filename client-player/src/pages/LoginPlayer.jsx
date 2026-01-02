@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import '../styles/LoginPlayer.css';
 import BlockedUserModal from '../components/BlockedUserModal';
 
 export default function LoginPlayer({ onLogin }) {
+  const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -149,8 +151,24 @@ export default function LoginPlayer({ onLogin }) {
             <p className="no-account-text">
               ¿No tienes cuenta?
             </p>
-            <p className="agent-contact-text">
-              Contacta a tu agente para registrarte
+            <button
+              className="register-link-btn"
+              onClick={() => navigate('/register')}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#fbbf24',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                fontSize: '1rem',
+                marginTop: '5px',
+                textDecoration: 'underline'
+              }}
+            >
+              Regístrate Aquí
+            </button>
+            <p className="agent-contact-text" style={{ marginTop: '15px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '10px' }}>
+              O contacta a tu agente para una cuenta personalizada
             </p>
           </div>
         </div>

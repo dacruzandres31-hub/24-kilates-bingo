@@ -4,6 +4,7 @@ import { Trophy, DollarSign, X, Sparkles } from 'lucide-react';
 import ConfettiEffect from './ConfettiEffect';
 import ParticleEffect from './ParticleEffect';
 import BingoCardPreview from './BingoCardPreview';
+import VIPBadge from './VIPBadge';
 import '../styles/WinnerNotifications.css';
 
 /**
@@ -51,13 +52,14 @@ export default function WinnerNotifications({ socket, currentUser }) {
     // Escuchar ganador de línea
     socket.on('line_winner', (data) => {
       console.log('[WinnerNotifications] Line winner:', data);
-      
+
       const isMe = currentUser && data.username === currentUser.username;
-      
+
       addNotification({
         type: 'line',
         username: data.username || data.winner?.username,
-        prize: data.prizeAmount,
+        tier: data.tier, // Nuevo
+        prize: data.prizeAmount || data.prize,
         lineType: data.lineType,
         isMe: isMe
       });
@@ -68,7 +70,7 @@ export default function WinnerNotifications({ socket, currentUser }) {
         if ('vibrate' in navigator) {
           navigator.vibrate([200, 100, 200]);
         }
-        
+
         // Mostrar partículas
         setParticleLineType(data.lineType || 'horizontal');
         setShowParticles(true);
@@ -82,7 +84,7 @@ export default function WinnerNotifications({ socket, currentUser }) {
           room: getCurrentRoom() // Detectar sala actual para colores correctos
         });
         setShowLineInfoModal(true);
-        
+
         // Auto-cerrar después de 6 segundos (más tiempo para ver el cartón)
         setTimeout(() => {
           setShowLineInfoModal(false);
@@ -96,7 +98,8 @@ export default function WinnerNotifications({ socket, currentUser }) {
       addNotification({
         type: 'bingo',
         username: data.username,
-        prize: data.prizeAmount,
+        tier: data.tier, // Nuevo
+        prize: data.prizeAmount || data.prize,
         isMe: currentUser && data.username === currentUser.username
       });
 
@@ -106,7 +109,7 @@ export default function WinnerNotifications({ socket, currentUser }) {
         if ('vibrate' in navigator) {
           navigator.vibrate([300, 100, 300, 100, 300]);
         }
-        
+
         // Mostrar confetti
         setShowConfetti(true);
         setTimeout(() => setShowConfetti(false), 3100);
@@ -116,7 +119,7 @@ export default function WinnerNotifications({ socket, currentUser }) {
     // Escuchar show payment forms
     socket.on('show_payment_forms', (data) => {
       console.log('[WinnerNotifications] Show payment forms:', data);
-      
+
       // Verificar si soy uno de los ganadores
       if (currentUser && data.winners) {
         const myWin = data.winners.find(w => w.userId === currentUser.userId || w.username === currentUser.username);
@@ -200,13 +203,13 @@ export default function WinnerNotifications({ socket, currentUser }) {
   return (
     <>
       {/* Efectos visuales */}
-      <ConfettiEffect 
-        isActive={showConfetti} 
+      <ConfettiEffect
+        isActive={showConfetti}
         duration={3000}
         onComplete={() => setShowConfetti(false)}
       />
-      
-      <ParticleEffect 
+
+      <ParticleEffect
         isActive={showParticles}
         lineType={particleLineType}
         duration={1500}
@@ -250,7 +253,7 @@ export default function WinnerNotifications({ socket, currentUser }) {
 
 // Componente: Tarjeta de notificación individual
 function NotificationCard({ notification, index, onClose }) {
-  const { type, username, prize, lineType, isMe, message } = notification;
+  const { type, username, prize, lineType, isMe, message, tier } = notification;
 
   const getIcon = () => {
     if (type === 'bingo') return <Trophy size={24} />;
@@ -261,10 +264,26 @@ function NotificationCard({ notification, index, onClose }) {
 
   const getTitle = () => {
     if (type === 'success') return message;
-    if (type === 'bingo') return isMe ? '🎉 ¡GANASTE BINGO!' : `${username} ganó BINGO`;
+
+    const badge = tier ? <VIPBadge tier={tier} size="small" /> : null;
+
+    if (type === 'bingo') {
+      return (
+        <span className="flex items-center gap-1">
+          {isMe ? '🎉 ¡GANASTE BINGO!' : `${username} ganó BINGO`}
+          {badge}
+        </span>
+      );
+    }
+
     if (type === 'line') {
       const lineName = lineType ? ` (${lineType})` : '';
-      return isMe ? `🎯 ¡Ganaste Línea${lineName}!` : `${username} ganó Línea${lineName}`;
+      return (
+        <span className="flex items-center gap-1">
+          {isMe ? `🎯 ¡Ganaste Línea${lineName}!` : `${username} ganó Línea${lineName}`}
+          {badge}
+        </span>
+      );
     }
     return '';
   };
@@ -275,9 +294,9 @@ function NotificationCard({ notification, index, onClose }) {
   };
 
   return (
-    <div 
+    <div
       className={`notification-card ${type} ${isMe ? 'is-me' : ''}`}
-      style={{ 
+      style={{
         transform: `translateY(${index * -110}%)`,
         zIndex: 1000 - index
       }}
@@ -293,7 +312,7 @@ function NotificationCard({ notification, index, onClose }) {
         )}
       </div>
 
-      <button 
+      <button
         className="notification-close"
         onClick={onClose}
       >
@@ -319,7 +338,7 @@ function PaymentFormModal({ winnerInfo, onClose, onSubmit }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Validaciones
     if (formData.payment_method === 'mercadopago') {
       if (!formData.mercadopago_alias && !formData.mercadopago_cvu) {
@@ -446,8 +465,8 @@ function PaymentFormModal({ winnerInfo, onClose, onSubmit }) {
               />
             </div>
 
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="btn-submit"
               disabled={submitting}
             >
@@ -467,7 +486,7 @@ function PaymentFormModal({ winnerInfo, onClose, onSubmit }) {
 // Componente: Modal informativo de línea ganada (para jugadores que NO ganaron)
 function LineWinnerInfoModal({ winnerData, onClose }) {
   const { username, lineType, winningCard, room = 'starter' } = winnerData;
-  
+
   const getLineTypeText = () => {
     if (!lineType) return 'Línea';
     if (lineType.includes('horizontal')) return 'Horizontal';
@@ -479,23 +498,23 @@ function LineWinnerInfoModal({ winnerData, onClose }) {
   // Determinar qué filas son ganadoras según el tipo de línea
   const getWinningLines = () => {
     if (!lineType) return [];
-    
+
     // Para líneas horizontales, extraer el índice de la fila
     if (lineType.includes('horizontal')) {
       const match = lineType.match(/horizontal_(\d+)/);
       if (match) return [parseInt(match[1])];
     }
-    
+
     // Para líneas verticales, devolvemos todas las filas (resaltaremos la columna con CSS)
     if (lineType.includes('vertical')) {
       return []; // Manejado con clase especial
     }
-    
+
     // Para diagonales, devolvemos todas las filas
     if (lineType.includes('diagonal')) {
       return []; // Manejado con clase especial
     }
-    
+
     return [];
   };
 
@@ -508,7 +527,7 @@ function LineWinnerInfoModal({ winnerData, onClose }) {
     }
 
     const { numbers, winningNumbers = [], serial } = winningCard;
-    
+
     console.log('[LineWinnerInfoModal] 🃏 Renderizando cartón ganador:');
     console.log('  ✅ numbers:', numbers);
     console.log('  ✅ numbers type:', typeof numbers, 'isArray:', Array.isArray(numbers));
@@ -516,17 +535,17 @@ function LineWinnerInfoModal({ winnerData, onClose }) {
     console.log('  ✅ lineType:', lineType);
     console.log('  ✅ room:', room);
     console.log('  ✅ serial:', serial);
-    
+
     // Validar estructura del cartón
     if (!Array.isArray(numbers)) {
       console.error('[LineWinnerInfoModal] ERROR: numbers no es un array');
       return null;
     }
-    
+
     if (numbers.length !== 3) {
       console.error('[LineWinnerInfoModal] ERROR: numbers debe tener 3 filas, tiene:', numbers.length);
     }
-    
+
     // Preparar datos del cartón para BingoCardPreview
     const cardData = {
       card_serial: serial || 'LÍNEA-GANADORA',

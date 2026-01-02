@@ -6,11 +6,11 @@ import { Trophy, X, Copy, CheckCircle } from 'lucide-react';
  * Muestra premio ganado y formulario para reclamar (CBU/Alias + WhatsApp)
  */
 
-export default function WinnerModal({ 
-  isOpen = false, 
-  onClose = () => {}, 
+export default function WinnerModal({
+  isOpen = false,
+  onClose = () => { },
   winnerData = null,
-  onClaim = async () => {}
+  onClaim = async () => { }
 }) {
   const [formData, setFormData] = useState({
     cbu_alias: '',
@@ -36,7 +36,7 @@ export default function WinnerModal({
   // Submit claim
   const handleSubmitClaim = async (e) => {
     e.preventDefault();
-    
+
     if (!formData.cbu_alias.trim() || !formData.whatsapp.trim()) {
       setClaimStatus({ type: 'error', message: 'Completa todos los campos' });
       return;
@@ -48,10 +48,10 @@ export default function WinnerModal({
         amount,
         ...formData
       });
-      
-      setClaimStatus({ 
-        type: 'success', 
-        message: 'Premio reclamado exitosamente. Te contactaremos pronto por WhatsApp.' 
+
+      setClaimStatus({
+        type: 'success',
+        message: 'Premio reclamado exitosamente. Te contactaremos pronto por WhatsApp.'
       });
 
       // Cerrar después de 2 segundos
@@ -61,9 +61,9 @@ export default function WinnerModal({
         setClaimStatus(null);
       }, 2000);
     } catch (error) {
-      setClaimStatus({ 
-        type: 'error', 
-        message: error.message || 'Error reclamando premio' 
+      setClaimStatus({
+        type: 'error',
+        message: error.message || 'Error reclamando premio'
       });
     } finally {
       setIsLoading(false);
@@ -79,7 +79,7 @@ export default function WinnerModal({
 
   // Determine color based on prize type
   const getTypeColor = () => {
-    switch(type) {
+    switch (type) {
       case 'bingo': return 'from-yellow-400 to-orange-500';
       case 'linea': return 'from-green-400 to-emerald-500';
       case 'jackpot': return 'from-red-400 to-pink-500';
@@ -88,7 +88,7 @@ export default function WinnerModal({
   };
 
   const getTypeLabel = () => {
-    switch(type) {
+    switch (type) {
       case 'bingo': return '🎰 ¡BINGO!';
       case 'linea': return '✨ LÍNEA';
       case 'jackpot': return '💎 JACKPOT';
@@ -100,7 +100,7 @@ export default function WinnerModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-4">
       {/* Modal Content */}
       <div className="relative w-full max-w-2xl bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl border-2 border-cyan-500 shadow-2xl overflow-hidden">
-        
+
         {/* Close Button */}
         <button
           onClick={onClose}
@@ -120,11 +120,17 @@ export default function WinnerModal({
           <h1 className="text-4xl font-black text-white drop-shadow-lg">
             {getTypeLabel()}
           </h1>
+          {winnerData.username && (
+            <div className="mt-4 flex items-center justify-center gap-2 text-white font-bold text-xl">
+              <span>👤 {winnerData.username}</span>
+              {winnerData.tier && <VIPBadge tier={winnerData.tier} size="medium" />}
+            </div>
+          )}
         </div>
 
         {/* Content */}
         <div className="p-8 space-y-6">
-          
+
           {/* Prize Amount - Large Display */}
           <div className="text-center">
             <p className="text-slate-400 text-sm mb-2">Monto a Cobrar</p>
@@ -207,8 +213,8 @@ export default function WinnerModal({
                 disabled={isLoading}
                 className={`
                   w-full py-4 px-6 rounded-lg font-bold text-lg transition-all
-                  ${isLoading 
-                    ? 'bg-slate-700 text-slate-400 cursor-not-allowed' 
+                  ${isLoading
+                    ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
                     : 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:shadow-lg hover:shadow-green-500/50'
                   }
                 `}
@@ -222,13 +228,13 @@ export default function WinnerModal({
           {claimStatus && (
             <div className={`
               rounded-lg p-4 flex items-start gap-3
-              ${claimStatus.type === 'success' 
-                ? 'bg-green-950 border-2 border-green-600' 
+              ${claimStatus.type === 'success'
+                ? 'bg-green-950 border-2 border-green-600'
                 : 'bg-red-950 border-2 border-red-600'
               }
             `}>
-              <CheckCircle 
-                size={24} 
+              <CheckCircle
+                size={24}
                 className={claimStatus.type === 'success' ? 'text-green-400' : 'text-red-400'}
               />
               <p className={claimStatus.type === 'success' ? 'text-green-300' : 'text-red-300'}>

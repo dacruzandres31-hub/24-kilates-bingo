@@ -1,0 +1,471 @@
+/* MembershipRenewalModal.css */
+
+.renewal-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10001;
+    backdrop-filter: blur(8px);
+    animation: fadeIn 0.3s ease-out;
+}
+
+/* Urgencia baja (5-4 días) */
+.renewal-modal-overlay.urgency-low {
+    animation: fadeIn 0.3s ease-out;
+}
+
+/* Urgencia media (3 días) */
+.renewal-modal-overlay.urgency-medium {
+    animation: fadeIn 0.3s ease-out, pulseOverlay 3s ease-in-out infinite;
+}
+
+/* Urgencia alta (2 días) */
+.renewal-modal-overlay.urgency-high {
+    animation: fadeIn 0.3s ease-out, pulseOverlay 2s ease-in-out infinite;
+    background: rgba(139, 0, 0, 0.3);
+}
+
+/* Urgencia crítica (1 día) */
+.renewal-modal-overlay.urgency-critical {
+    animation: fadeIn 0.3s ease-out, pulseOverlayCritical 1.5s ease-in-out infinite;
+    background: rgba(139, 0, 0, 0.5);
+}
+
+@keyframes pulseOverlay {
+
+    0%,
+    100% {
+        background: rgba(0, 0, 0, 0.85);
+    }
+
+    50% {
+        background: rgba(139, 92, 0, 0.4);
+    }
+}
+
+@keyframes pulseOverlayCritical {
+
+    0%,
+    100% {
+        background: rgba(139, 0, 0, 0.5);
+    }
+
+    50% {
+        background: rgba(220, 0, 0, 0.7);
+    }
+}
+
+.renewal-modal {
+    background: linear-gradient(145deg, #1a1a2e 0%, #16213e 100%);
+    border-radius: 28px;
+    padding: 40px 35px;
+    max-width: 550px;
+    width: 90%;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    animation: slideUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Efectos de brillo según urgencia */
+.renewal-modal.urgency-low {
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 80px rgba(255, 215, 0, 0.2);
+    border: 2px solid rgba(255, 215, 0, 0.3);
+}
+
+.renewal-modal.urgency-medium {
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 100px rgba(255, 165, 0, 0.4);
+    border: 3px solid rgba(255, 165, 0, 0.5);
+    animation: slideUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), glowMedium 3s ease-in-out infinite;
+}
+
+.renewal-modal.urgency-high {
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 120px rgba(255, 69, 0, 0.6);
+    border: 3px solid rgba(255, 69, 0, 0.7);
+    animation: slideUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), glowHigh 2s ease-in-out infinite;
+}
+
+.renewal-modal.urgency-critical {
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9), 0 0 150px rgba(220, 20, 60, 0.8);
+    border: 4px solid rgba(220, 20, 60, 0.9);
+    animation: slideUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), glowCritical 1.5s ease-in-out infinite, shake 0.5s ease-in-out infinite;
+}
+
+@keyframes glowMedium {
+
+    0%,
+    100% {
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 100px rgba(255, 165, 0, 0.4);
+    }
+
+    50% {
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 140px rgba(255, 165, 0, 0.7);
+    }
+}
+
+@keyframes glowHigh {
+
+    0%,
+    100% {
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 120px rgba(255, 69, 0, 0.6);
+    }
+
+    50% {
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 180px rgba(255, 69, 0, 0.9);
+    }
+}
+
+@keyframes glowCritical {
+
+    0%,
+    100% {
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9), 0 0 150px rgba(220, 20, 60, 0.8);
+    }
+
+    50% {
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9), 0 0 220px rgba(220, 20, 60, 1);
+    }
+}
+
+@keyframes shake {
+
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+
+    25% {
+        transform: translateX(-2px);
+    }
+
+    75% {
+        transform: translateX(2px);
+    }
+}
+
+.renewal-modal::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255, 215, 0, 0.1) 0%, transparent 70%);
+    animation: rotate 15s linear infinite;
+}
+
+@keyframes rotate {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.close-btn {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: #fff;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    transition: all 0.3s ease;
+    z-index: 10;
+}
+
+.close-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: rotate(90deg);
+}
+
+.modal-icon-container {
+    position: relative;
+    margin-bottom: 20px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.crown-icon {
+    font-size: 64px;
+    color: #ffd700;
+    filter: drop-shadow(0 0 20px rgba(255, 215, 0, 0.7));
+    position: relative;
+    z-index: 1;
+}
+
+.urgency-critical .crown-icon {
+    animation: bounce 1s ease-in-out infinite;
+    color: #ff4500;
+    filter: drop-shadow(0 0 30px rgba(255, 69, 0, 1));
+}
+
+.warning-icon {
+    position: absolute;
+    top: 0;
+    right: 35%;
+    font-size: 32px;
+    color: #ff4500;
+    animation: blink 1s ease-in-out infinite;
+    filter: drop-shadow(0 0 15px rgba(255, 69, 0, 0.9));
+}
+
+@keyframes bounce {
+
+    0%,
+    100% {
+        transform: translateY(0) scale(1);
+    }
+
+    50% {
+        transform: translateY(-10px) scale(1.1);
+    }
+}
+
+@keyframes blink {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.3;
+    }
+}
+
+.modal-title {
+    font-size: 32px;
+    font-weight: 800;
+    margin: 0 0 15px 0;
+    text-shadow: 0 0 25px rgba(255, 215, 0, 0.6);
+    position: relative;
+    z-index: 1;
+}
+
+.urgency-low .modal-title {
+    color: #ffd700;
+}
+
+.urgency-medium .modal-title {
+    color: #ffa500;
+}
+
+.urgency-high .modal-title {
+    color: #ff6347;
+}
+
+.urgency-critical .modal-title {
+    color: #ff4500;
+    animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
+}
+
+.tier-badge {
+    display: inline-block;
+    padding: 8px 20px;
+    background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%);
+    border-radius: 20px;
+    color: #1a1a2e;
+    font-weight: 700;
+    font-size: 14px;
+    margin: 10px 0;
+    box-shadow: 0 4px 15px rgba(255, 215, 0, 0.4);
+    position: relative;
+    z-index: 1;
+}
+
+.expiration-message {
+    font-size: 16px;
+    color: #fff;
+    margin: 20px 0;
+    line-height: 1.5;
+    position: relative;
+    z-index: 1;
+}
+
+.urgency-critical .expiration-message {
+    font-weight: 700;
+    color: #ff6347;
+}
+
+.benefits-list {
+    margin: 25px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    position: relative;
+    z-index: 1;
+}
+
+.benefit-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.benefit-icon {
+    font-size: 20px;
+    color: #ffd700;
+}
+
+.benefit-item span {
+    color: #fff;
+    font-size: 14px;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 15px;
+    margin-top: 30px;
+    justify-content: center;
+    position: relative;
+    z-index: 1;
+}
+
+.btn-renew,
+.btn-later {
+    padding: 14px 30px;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-renew {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+}
+
+.urgency-critical .btn-renew {
+    background: linear-gradient(135deg, #ff4500 0%, #dc143c 100%);
+    animation: pulseBtnCritical 1.5s ease-in-out infinite;
+}
+
+@keyframes pulseBtnCritical {
+
+    0%,
+    100% {
+        transform: scale(1);
+        box-shadow: 0 4px 15px rgba(255, 69, 0, 0.4);
+    }
+
+    50% {
+        transform: scale(1.05);
+        box-shadow: 0 6px 25px rgba(255, 69, 0, 0.8);
+    }
+}
+
+.btn-renew:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.6);
+}
+
+.btn-later {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.btn-later:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.critical-note {
+    margin-top: 20px;
+    font-size: 13px;
+    color: #ff6347;
+    font-weight: 700;
+    padding: 10px;
+    background: rgba(255, 69, 0, 0.1);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 69, 0, 0.3);
+    position: relative;
+    z-index: 1;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(50px) scale(0.9);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .renewal-modal {
+        padding: 30px 25px;
+    }
+
+    .modal-title {
+        font-size: 26px;
+    }
+
+    .crown-icon {
+        font-size: 52px;
+    }
+
+    .modal-actions {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .btn-renew,
+    .btn-later {
+        width: 100%;
+        justify-content: center;
+    }
+}

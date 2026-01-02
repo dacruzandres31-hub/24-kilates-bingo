@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaUser, FaWallet, FaTicketAlt, FaHeadset, FaTimes, FaBars, FaEye, FaEyeSlash, FaHome, FaMusic, FaVolumeUp, FaVolumeMute, FaUserCircle, FaSignOutAlt } from 'react-icons/fa';
+import { FaUser, FaWallet, FaTicketAlt, FaHeadset, FaTimes, FaBars, FaEye, FaEyeSlash, FaHome, FaMusic, FaVolumeUp, FaVolumeMute, FaUserCircle, FaSignOutAlt, FaCrown } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import '../styles/PlayerSidebar.css';
 import bronzeIcon from '../assets/bronze_icon.png';
@@ -384,6 +384,11 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
           <button className="sidebar-action-btn lobby-btn" onClick={handleGoToLobby} style={{ borderColor: themeColor }}>
             <FaHome className="action-icon" style={{ color: themeColor }} />
             <span>Volver al Lobby</span>
+          </button>
+
+          <button className="sidebar-action-btn vip-btn" onClick={() => navigate('/membresia')} style={{ borderColor: '#ffd700', background: 'rgba(255, 215, 0, 0.1)' }}>
+            <FaCrown className="action-icon" style={{ color: '#ffd700' }} />
+            <span style={{ color: '#ffd700', fontWeight: 'bold' }}>Club VIP</span>
           </button>
 
           <button className="sidebar-action-btn support-btn" onClick={handleSupport} style={{ borderColor: themeColor }}>

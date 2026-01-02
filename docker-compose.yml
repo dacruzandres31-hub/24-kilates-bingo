@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: bingo_db
+    restart: always
+    environment:
+      MYSQL_DATABASE: bingo_24k
+      MYSQL_ROOT_PASSWORD: root_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  redis:
+    image: redis:alpine
+    container_name: bingo_redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+  backend:
+    build: ./server
+    container_name: bingo_backend
+    restart: always
+    depends_on:
+      - db
+      - redis
+    environment:
+      - DB_HOST=db
+      - DB_USER=root
+      - DB_PASSWORD=root_password
+      - DB_NAME=bingo_24k
+      - REDIS_HOST=redis
+      - PORT=3001
+      - NODE_ENV=production
+    ports:
+      - "3001:3001"
+
+  client-player:
+    build: ./client-player
+    container_name: bingo_player
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+
+  client-admin:
+    build: ./client-admin
+    container_name: bingo_admin
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+
+volumes:
+  mysql_data:

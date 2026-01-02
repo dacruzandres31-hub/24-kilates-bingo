@@ -1,4 +1,5 @@
 const pool = require('../db');
+const referralService = require('../services/referralService');
 
 /**
  * USER CONTROLLER - Gestión de Usuarios
@@ -378,9 +379,16 @@ exports.getUserProfile = async (req, res) => {
 
     console.log('[getUserProfile] 🔍 Buscando usuario ID:', userId);
 
+    // Intentar entregar premios de referidos pendientes (1 por día)
+    try {
+      await referralService.deliverPendingReward(userId);
+    } catch (err) {
+      console.error('[getUserProfile] Error entregando premios referidos:', err.message);
+    }
+
     // Obtener datos del usuario
     const [users] = await pool.query(
-      'SELECT id, username, role, balance FROM users WHERE id = ?',
+      'SELECT id, username, role, balance, referral_code FROM users WHERE id = ?',
       [userId]
     );
 
@@ -424,9 +432,22 @@ exports.getUserProfile = async (req, res) => {
       gold: `${data.cards_oro}+${data.gift_oro}=${goldTotal}`
     });
 
+    // Obtener membresía activa
+    const [subs] = await pool.query(
+      `SELECT m.name, m.id 
+       FROM user_subscriptions us
+       JOIN memberships m ON us.membership_id = m.id
+       WHERE us.user_id = ? AND us.status = 'active'
+       ORDER BY us.created_at DESC LIMIT 1`,
+      [userId]
+    );
+    const activePlan = subs.length > 0 ? subs[0] : null;
+
     const response = {
       username: user.username,
       balance: user.balance || 0,
+      referral_code: user.referral_code,
+      plan: activePlan ? { name: activePlan.name, id: activePlan.id } : null,
       tickets: {
         starter: 0, // Starter se maneja aparte
         bronze: bronzeTotal,

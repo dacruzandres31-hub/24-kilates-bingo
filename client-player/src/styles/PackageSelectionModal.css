@@ -213,6 +213,54 @@
   font-size: 12px;
 }
 
+/* VIP Bonus Badge */
+.vip-bonus-badge {
+  margin-top: 8px;
+  padding: 6px 12px;
+  background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #1a1a2e;
+  box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3);
+  animation: vipPulse 2s ease-in-out infinite;
+}
+
+.vip-icon {
+  color: #1a1a2e;
+  font-size: 14px;
+  animation: vipRotate 3s linear infinite;
+}
+
+@keyframes vipPulse {
+
+  0%,
+  100% {
+    box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3);
+  }
+
+  50% {
+    box-shadow: 0 4px 16px rgba(255, 215, 0, 0.6);
+  }
+}
+
+@keyframes vipRotate {
+
+  0%,
+  90%,
+  100% {
+    transform: rotate(0deg);
+  }
+
+  95% {
+    transform: rotate(15deg);
+  }
+}
+
+
 /* Niveles de animación */
 .package-glow {
   position: absolute;

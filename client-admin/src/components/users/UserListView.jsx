@@ -62,7 +62,25 @@ const UserListView = ({
                                 <div className="flex items-center gap-3 flex-1">
                                     <span className="text-2xl">{esAgente ? '🏢' : '👤'}</span>
                                     <div className="flex-1">
-                                        <p className="font-semibold">{usuario.username}</p>
+                                        <div className="flex items-center gap-2">
+                                            <p className="font-semibold">{usuario.username}</p>
+                                            {/* Membership Badges */}
+                                            {Number(usuario.subscription_tier_id) === 1 && (
+                                                <span className="px-1.5 py-0.5 rounded border border-orange-600/50 bg-orange-900/30 text-orange-400 text-[10px] font-bold tracking-wider" title="Socio Bronce">
+                                                    V.B.
+                                                </span>
+                                            )}
+                                            {Number(usuario.subscription_tier_id) === 2 && (
+                                                <span className="px-1.5 py-0.5 rounded border border-gray-400/50 bg-gray-800/40 text-gray-300 text-[10px] font-bold tracking-wider" title="Socio Plata">
+                                                    V.P.
+                                                </span>
+                                            )}
+                                            {Number(usuario.subscription_tier_id) === 3 && (
+                                                <span className="px-1.5 py-0.5 rounded border border-yellow-500/50 bg-yellow-900/30 text-yellow-400 text-[10px] font-bold tracking-wider" title="Socio Oro">
+                                                    V.O.
+                                                </span>
+                                            )}
+                                        </div>
                                         <p className={`text-xs ${modalGestionUsuario.usuario?.id === usuario.id ? 'text-blue-200' : 'text-gray-400'}`}>
                                             {esAgente ? 'Agente' : 'Jugador'} • ID: {usuario.id}
                                         </p>

@@ -156,9 +156,15 @@ export default function DepositInbox() {
                             </div>
                         )}
 
-                        {!isCardPurchase && (
+                        {!isCardPurchase && deposit.request_type !== 'membership_purchase' && (
                             <p className="text-yellow-400 text-sm bg-yellow-900/20 p-2 rounded border border-yellow-900/50 text-center">
                                 Se acreditará saldo en efectivo al balance del usuario.
+                            </p>
+                        )}
+
+                        {deposit.request_type === 'membership_purchase' && (
+                            <p className="text-emerald-400 text-sm bg-emerald-900/20 p-2 rounded border border-emerald-900/50 text-center font-bold">
+                                ✅ Al confirmar, se activará la Membresía Automáticamente.
                             </p>
                         )}
                     </div>
@@ -240,6 +246,21 @@ export default function DepositInbox() {
                                                                 <span className="text-blue-400 font-bold text-xs">{item.room?.toUpperCase()}</span>
                                                             </div>
                                                         ))}
+                                                    </div>
+                                                );
+                                            })()}
+                                        </>
+                                    ) : deposit.request_type === 'membership_purchase' ? (
+                                        <>
+                                            Tipo: <span className="text-gold-400 font-bold" style={{ color: '#ffd700' }}>MEMBRESÍA VIP</span>
+                                            {(() => {
+                                                const details = typeof deposit.details === 'string' ? JSON.parse(deposit.details) : deposit.details;
+                                                return (
+                                                    <div className="mt-1 bg-yellow-900/30 p-2 rounded border border-yellow-500/30">
+                                                        <span className="text-white text-xs block">Plan Solicitado:</span>
+                                                        <span className="text-white font-bold uppercase" style={{ color: '#ffd700' }}>
+                                                            {details?.planName || 'VIP'}
+                                                        </span>
                                                     </div>
                                                 );
                                             })()}

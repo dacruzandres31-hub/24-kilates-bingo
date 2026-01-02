@@ -30,7 +30,10 @@ export default function Sidebar({ isOpen, onClose, activeSections, onToggleSecti
       id: 'usuarios',
       title: '👥 Usuarios',
       icon: '👥',
-      sections: []
+      sections: [
+        { id: 'usuarios', name: 'Gestión de Red Administrativa' },
+        { id: 'my-referrals', name: '🎁 Mis Referidos (Premios)' }
+      ]
     },
     {
       id: 'finanzas',
@@ -38,6 +41,7 @@ export default function Sidebar({ isOpen, onClose, activeSections, onToggleSecti
       icon: '💰',
       sections: [
         { id: 'finanzas', name: 'Panel de Finanzas Completo' },
+        { id: 'membership-accounting', name: '💎 Contabilidad Membresías', andyOnly: true },
         { id: 'mis-cuentas', name: '💳 Mis Cuentas' },
         { id: 'withdrawals', name: 'Gestionar Retiros (24Kilates)' },
         { id: 'finanzas-hoy', name: 'Finanzas de Hoy' },
@@ -128,7 +132,7 @@ export default function Sidebar({ isOpen, onClose, activeSections, onToggleSecti
                       if (section.superAdminOnly && userRole !== 'superadmin' && !isAndy) return false;
 
                       // Secciones especiales de Andy (24Kilates)
-                      if ((section.id === 'support' || section.id === 'withdrawals') && !isAndy) return false;
+                      if ((section.id === 'support' || section.id === 'withdrawals' || section.andyOnly) && !isAndy) return false;
 
                       return true;
                     })

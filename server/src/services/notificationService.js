@@ -31,8 +31,9 @@ const ANNOUNCEMENT_TYPES = {
  * @param {string} username - Nombre del usuario
  * @param {number} newLevel - Nuevo nivel
  * @param {string} rankName - Nombre del rango
+ * @param {string} tier - Membership tier (VIP)
  */
-async function broadcastLevelUp(username, newLevel, rankName) {
+async function broadcastLevelUp(username, newLevel, rankName, tier = null) {
   if (!globalIO) {
     console.error('❌ NotificationService no inicializado');
     return;
@@ -47,6 +48,7 @@ async function broadcastLevelUp(username, newLevel, rankName) {
     icon: '🏆',
     color: 'text-amber-400',
     username,
+    tier, // Nuevo
     priority: 'high',
     timestamp: new Date()
   };
@@ -61,8 +63,9 @@ async function broadcastLevelUp(username, newLevel, rankName) {
  * @param {number} prizeAmount - Monto ganado
  * @param {string} room - Sala (bronce, plata, oro)
  * @param {string} prizeType - Tipo: 'linea', 'bingo', 'jackpot'
+ * @param {string} tier - Membership tier (VIP)
  */
-async function broadcastBigWin(username, prizeAmount, room, prizeType = 'bingo') {
+async function broadcastBigWin(username, prizeAmount, room, prizeType = 'bingo', tier = null) {
   if (!globalIO) return;
 
   const roomNames = {
@@ -85,6 +88,7 @@ async function broadcastBigWin(username, prizeAmount, room, prizeType = 'bingo')
     icon: '💰',
     color: 'text-green-400',
     username,
+    tier, // Nuevo
     prizeAmount,
     priority: prizeAmount > 50000 ? 'critical' : 'high',
     timestamp: new Date()
@@ -182,8 +186,9 @@ async function broadcastAchievement(username, achievementName, achievementIcon =
  * Broadcast de Línea (Menos importante que Bingo pero aún celebrable)
  * @param {string} username - Nombre del jugador
  * @param {string} room - Sala
+ * @param {string} tier - Membership tier (VIP)
  */
-async function broadcastLinea(username, room) {
+async function broadcastLinea(username, room, tier = null) {
   if (!globalIO) return;
 
   const roomNames = {
@@ -201,6 +206,7 @@ async function broadcastLinea(username, room) {
     icon: '🎯',
     color: 'text-yellow-400',
     username,
+    tier, // Nuevo
     priority: 'low',
     timestamp: new Date()
   };

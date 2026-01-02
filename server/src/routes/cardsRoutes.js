@@ -34,6 +34,10 @@ router.post('/select', cardsController.selectCards);
 // Seleccionar cartones del pool V2 (versión refactorizada - TESTING)
 router.post('/select-v2', cardsControllerV2.selectCardsV2);
 
+// Reclamar cartones gratis diarios (VIP)
+const dailyFreeCardsController = require('../controllers/dailyFreeCardsController');
+router.post('/claim-daily-free', dailyFreeCardsController.claimDailyFreeCards);
+
 // Obtener mis cartones seleccionados
 router.get('/my-selected/:room', cardsController.getMySelectedCards);
 

@@ -10,7 +10,7 @@ const ChipsService = require('../services/chipsService');
 exports.createWithdrawalRequest = async (req, res) => {
   try {
     const userId = req.user.id; // Usuario autenticado
-    let { amount, bankAccountHolder, cbu, bankName, accountType, notes, method, whatsappNumber } = req.body;
+    let { amount, bankAccountHolder, cbu, bankName, accountType, notes, method, whatsappNumber, isReferralEarnings } = req.body;
 
     // Si se proporciona WhatsApp, actualizar perfil del usuario
     if (whatsappNumber) {
@@ -49,7 +49,8 @@ exports.createWithdrawalRequest = async (req, res) => {
       bankAccountHolder,
       cbu,
       bankName,
-      accountType || 'savings'
+      accountType || 'savings',
+      isReferralEarnings
     );
 
     res.json({

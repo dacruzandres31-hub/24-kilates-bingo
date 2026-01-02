@@ -8,6 +8,7 @@ import Sidebar from '../components/Sidebar';
 import EstadisticasGenerales from '../components/EstadisticasGenerales';
 import GestionUsuarios from '../components/GestionUsuarios';
 import GestionFinanzas from '../components/GestionFinanzas';
+import MembershipAccounting from '../components/MembershipAccounting';
 
 import AllInventoriesPanel from '../components/AllInventoriesPanel';
 import CardMovementsHistory from '../components/CardMovementsHistory';
@@ -27,7 +28,8 @@ import ScheduleGridPanel from '../components/ScheduleGridPanel';
 import PaymentAccountsPanel from '../components/PaymentAccountsPanel';
 import SystemHealthPanel from '../components/SystemHealthPanel';
 import AdminAuditLog from '../components/AdminAuditLog';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import MyReferralsPanel from '../components/MyReferralsPanel';
+import { ChevronDown, ChevronRight, Share2, Copy, Check } from 'lucide-react';
 
 export default function Dashboard() {
   const [userData, setUserData] = useState(null);
@@ -40,6 +42,7 @@ export default function Dashboard() {
   });
   const [showCartonesDropdown, setShowCartonesDropdown] = useState(false);
   const [showPerfilDropdown, setShowPerfilDropdown] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
@@ -62,6 +65,7 @@ export default function Dashboard() {
     'inventories-panel': false,
     'movements-history': false,
     'finanzas': false, // Panel completo de finanzas
+    'membership-accounting': false,
     'finanzas-hoy': false,
     'movimientos': false,
     'movimientos-recientes': false,
@@ -77,7 +81,8 @@ export default function Dashboard() {
     'whatsapp-config': false,
     'mis-cuentas': false,
     'system-health': false,
-    'audit-logs': false
+    'audit-logs': false,
+    'my-referrals': false
   });
 
   useEffect(() => {
@@ -288,6 +293,17 @@ export default function Dashboard() {
     }).format(amount);
   };
 
+  const copyReferralLink = () => {
+    if (!userData?.referral_code) return;
+    // Asumimos que el player corre en el puerto por defecto o mismo dominio
+    // Podríamos usar una variable de entorno para la URL del player si fuera necesario
+    const playerUrl = window.location.origin.replace(':3000', ':5173'); // Ajuste común para desarrollo
+    const link = `${playerUrl}/register?ref=${userData.referral_code}`;
+    navigator.clipboard.writeText(link);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
@@ -325,6 +341,21 @@ export default function Dashboard() {
 
             {/* Controles - Derecha */}
             <div className="flex items-center space-x-3">
+              {/* Link de Invitación - Agentes y SuperAdmin */}
+              {userData?.referral_code && (
+                <button
+                  onClick={copyReferralLink}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all shadow-lg transform hover:scale-105 font-semibold text-sm ${copiedLink
+                    ? 'bg-green-600 text-white'
+                    : 'bg-gradient-to-r from-amber-500 to-orange-600 text-white hover:from-amber-600 hover:to-orange-700'
+                    }`}
+                  title="Copiar link de invitación para nuevos jugadores"
+                >
+                  {copiedLink ? <Check size={18} /> : <Share2 size={18} />}
+                  <span>{copiedLink ? '¡Copiado!' : 'Invitación'}</span>
+                </button>
+              )}
+
               {/* Botón Refrescar */}
               <button
                 onClick={handleRefresh}
@@ -415,6 +446,20 @@ export default function Dashboard() {
           {activeSections['finanzas'] && (
             <section className="mb-8">
               <GestionFinanzas userData={userData} />
+            </section>
+          )}
+
+          {/* Mis Referidos e Historial de Premios */}
+          {activeSections['my-referrals'] && (
+            <section className="mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <MyReferralsPanel userData={userData} />
+            </section>
+          )}
+
+          {/* Membership Accounting - Andy Only */}
+          {activeSections['membership-accounting'] && userData?.username === 'Andy' && (
+            <section className="mb-8">
+              <MembershipAccounting />
             </section>
           )}
 

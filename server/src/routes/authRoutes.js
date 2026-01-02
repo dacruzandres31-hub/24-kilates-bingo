@@ -1,8 +1,15 @@
 const express = require('express');
 const authController = require('../controllers/authController');
 const authMiddleware = require('../middleware/authMiddleware');
+const { authLimiter } = require('../middleware/security');
+const validate = require('../middleware/validationMiddleware');
+const { loginSchema, registerSchema } = require('../utils/schemas');
 
 const router = express.Router();
+
+// Public routes with rate limiting and validation
+router.post('/login', authLimiter, validate(loginSchema), authController.login);
+router.post('/register', authLimiter, validate(registerSchema), authController.register);
 
 /**
  * AUTH ROUTES

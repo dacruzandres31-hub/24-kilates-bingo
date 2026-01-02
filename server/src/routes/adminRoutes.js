@@ -187,7 +187,11 @@ router.get('/analytics/daily-netwin', authenticateToken, isAdmin, adminAnalytics
 router.get('/analytics/top-agents', authenticateToken, isAdmin, adminAnalyticsController.getTopAgents);
 router.get('/analytics/net-profit-comparison', authenticateToken, isAdmin, adminAnalyticsController.getNetProfitComparison);
 
-
+// ========================================
+// 💎 MEMBERSHIP ACCOUNTING (Andy Only)
+// ========================================
+const getMembershipAccounting = require('../controllers/membershipAccountingController');
+router.get('/memberships/accounting', authenticateToken, isAdmin, getMembershipAccounting);
 
 
 // CATCH-ALL 404 FOR ADMIN ROUTES

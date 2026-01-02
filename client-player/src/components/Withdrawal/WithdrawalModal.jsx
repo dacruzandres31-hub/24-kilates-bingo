@@ -13,6 +13,8 @@ export default function WithdrawalModal({ isOpen, onClose, onWithdrawalSuccess }
     const [history, setHistory] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [balance, setBalance] = useState(null);
+    const [referralBalance, setReferralBalance] = useState(null);
+    const [isReferralMode, setIsReferralMode] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
@@ -28,6 +30,7 @@ export default function WithdrawalModal({ isOpen, onClose, onWithdrawalSuccess }
                 headers: { Authorization: `Bearer ${token}` }
             });
             setBalance(parseFloat(res.data.balance));
+            setReferralBalance(parseFloat(res.data.referral_balance || 0));
         } catch (err) { console.error(err); }
     };
 
@@ -52,9 +55,19 @@ export default function WithdrawalModal({ isOpen, onClose, onWithdrawalSuccess }
 
     const handleRequest = async (e) => {
         e.preventDefault();
+        const currentLimit = isReferralMode ? referralBalance : balance;
+
         if (!amount || amount <= 0) return alert('Monto inválido');
-        if (amount > balance) return alert('Saldo insuficiente');
+        if (amount > currentLimit) return alert('Saldo insuficiente');
         if (!accountDetails) return alert('Datos de cuenta requeridos');
+
+        // Date check for referral earnings
+        if (isReferralMode) {
+            const day = new Date().getDate();
+            if (day < 1 || day > 10) {
+                return alert('Los retiros de ganancias por referidos solo se procesan del 1 al 10 de cada mes.');
+            }
+        }
 
         setIsLoading(true);
         try {
@@ -65,7 +78,8 @@ export default function WithdrawalModal({ isOpen, onClose, onWithdrawalSuccess }
                 cbu: accountDetails, // Send as cbu specifically as backend expects it or notes
                 bankAccountHolder,
                 whatsappNumber, // Send new field
-                notes: accountDetails
+                notes: accountDetails,
+                isReferralEarnings: isReferralMode
             }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -123,10 +137,35 @@ export default function WithdrawalModal({ isOpen, onClose, onWithdrawalSuccess }
 
                     {activeTab === 'request' && (
                         <form onSubmit={handleRequest} className="withdrawal-form">
-                            <div className="balance-info">
-                                <span>Tu Saldo Disponible:</span>
-                                <span className="balance-amount">${balance?.toLocaleString()}</span>
+                            <div className="withdrawal-mode-selector">
+                                <button
+                                    type="button"
+                                    className={`mode-btn ${!isReferralMode ? 'active' : ''}`}
+                                    onClick={() => setIsReferralMode(false)}
+                                >
+                                    Saldo de Juego
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`mode-btn ${isReferralMode ? 'active' : ''}`}
+                                    onClick={() => setIsReferralMode(true)}
+                                >
+                                    Ganancias Referidos (1-10)
+                                </button>
                             </div>
+
+                            <div className="balance-info">
+                                <span>Saldo {isReferralMode ? 'en Ganancias' : 'Disponible'}:</span>
+                                <span className={`balance-amount ${isReferralMode ? 'text-emerald-400' : ''}`}>
+                                    ${isReferralMode ? referralBalance?.toLocaleString() : balance?.toLocaleString()}
+                                </span>
+                            </div>
+
+                            {isReferralMode && (new Date().getDate() > 10 || new Date().getDate() < 1) && (
+                                <div className="date-warning">
+                                    ⚠️ Los retiros de referidos abren el día 1 de cada mes.
+                                </div>
+                            )}
 
                             <div className="form-group">
                                 <label>Monto a Retirar</label>
@@ -184,7 +223,11 @@ export default function WithdrawalModal({ isOpen, onClose, onWithdrawalSuccess }
                                 />
                             </div>
 
-                            <button type="submit" className="submit-withdrawal-btn" disabled={isLoading || !balance || amount > balance}>
+                            <button
+                                type="submit"
+                                className="submit-withdrawal-btn"
+                                disabled={isLoading || (isReferralMode ? (referralBalance < amount || new Date().getDate() > 10) : (balance < amount))}
+                            >
                                 {isLoading ? <FaSpinner className="spin" /> : 'Confirmar Retiro'}
                             </button>
 

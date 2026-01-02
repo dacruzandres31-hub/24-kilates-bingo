@@ -50,7 +50,8 @@
 .user-top-bar {
   background: linear-gradient(to bottom, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5));
   border-bottom: 1px solid rgba(212, 175, 55, 0.3);
-  padding: 1rem 2rem;
+  padding: 0.5rem 1.5rem;
+  /* Reduced padding */
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -60,61 +61,135 @@
   left: 0;
   right: 0;
   z-index: 100;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  /* Prevent wrapping if possible */
   gap: 1rem;
 }
 
 .user-info-section {
   display: flex;
   align-items: center;
-  gap: 2rem;
-  flex-wrap: wrap;
+  gap: 1rem;
+  /* Reduced gap */
+  flex-wrap: nowrap;
+  /* Prevent wrapping */
 }
 
 .user-name {
-  font-size: 1.25rem;
+  font-size: 1.1rem;
+  /* Slightly smaller */
   font-weight: 700;
   color: #FDE047;
   text-shadow: 0 0 10px rgba(253, 224, 71, 0.5);
+  white-space: nowrap;
+}
+
+.vip-badge {
+  padding: 0.2rem 0.6rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  margin-left: 8px;
+  animation: fadeIn 0.5s ease-out;
+}
+
+.vip-badge.bronze {
+  background: linear-gradient(135deg, #cd7f32, #a05a2c);
+  color: #fff;
+  border-color: #cd7f32;
+  box-shadow: 0 0 10px rgba(205, 127, 50, 0.4);
+}
+
+.vip-badge.silver {
+  background: linear-gradient(135deg, #e0e0e0, #9e9e9e);
+  color: #333;
+  border-color: #fff;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.4);
+}
+
+.vip-badge.gold {
+  background: linear-gradient(135deg, #FFD700, #FDB931);
+  color: #000;
+  border-color: #FFD700;
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
+  animation: pulse-gold-badge 2s infinite;
+}
+
+.vip-badge.ambassador {
+  background: linear-gradient(135deg, #10B981, #059669);
+  color: #fff;
+  border-color: #34D399;
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.6);
+}
+
+@keyframes pulse-gold-badge {
+  0% {
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
+  }
+
+  50% {
+    box-shadow: 0 0 20px rgba(255, 215, 0, 1);
+  }
+
+  100% {
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
+  }
 }
 
 .user-resources {
   display: flex;
   align-items: center;
-  gap: 2rem;
-  flex-wrap: wrap;
+  gap: 1rem;
+  /* Reduced gap */
+  flex-wrap: nowrap;
 }
 
 .balance {
-  font-size: 1.5rem;
+  font-size: 1.2rem;
+  /* Reduced size */
   font-weight: 800;
   color: #10B981;
   background: rgba(16, 185, 129, 0.1);
-  padding: 0.5rem 1rem;
+  padding: 0.4rem 0.8rem;
+  /* Reduced padding */
   border-radius: 8px;
   border: 2px solid rgba(16, 185, 129, 0.3);
   text-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+  white-space: nowrap;
 }
 
 .tickets-display {
   display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
+  gap: 0.5rem;
+  /* Reduced gap */
+  flex-wrap: nowrap;
 }
 
 .ticket-item {
   background: rgba(255, 255, 255, 0.1);
-  padding: 0.5rem 1rem;
+  padding: 0.3rem 0.6rem;
+  /* Reduced padding */
   border-radius: 6px;
   border: 1px solid rgba(212, 175, 55, 0.3);
   font-weight: 600;
-  font-size: 0.95rem;
+  font-size: 0.85rem;
+  /* Reduced size */
+  white-space: nowrap;
 }
 
 .user-actions {
   display: flex;
-  gap: 1rem;
+  gap: 0.5rem;
+  /* Reduced gap */
   align-items: center;
+  flex-wrap: nowrap;
 }
 
 .profile-menu-container {
@@ -122,24 +197,158 @@
 }
 
 .btn-profile {
-  background: linear-gradient(135deg, #6366F1, #8B5CF6);
-  color: white;
-  border: 2px solid rgba(139, 92, 246, 0.5);
-  padding: 0.75rem 1.5rem;
-  border-radius: 10px;
-  font-weight: 700;
+  background: rgba(30, 41, 59, 0.7);
+  /* Dark semi-transparent base */
+  color: #E2E8F0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
   cursor: pointer;
   transition: all 0.3s ease;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+  gap: 0.4rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  white-space: nowrap;
+  backdrop-filter: blur(5px);
 }
 
 .btn-profile:hover {
+  background: rgba(51, 65, 85, 0.9);
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(139, 92, 246, 0.6);
-  border-color: rgba(139, 92, 246, 0.8);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border-color: rgba(255, 255, 255, 0.4);
+  color: #fff;
+}
+
+/* Glass Variant (Explicit) */
+.btn-glass {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.btn-glass:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Icon Colors for accents */
+.btn-icon-green {
+  color: #10B981;
+}
+
+.btn-icon-blue {
+  color: #6366F1;
+}
+
+.btn-icon-gold {
+  color: #F59E0B;
+}
+
+/* Active states (e.g. Wheel ready) */
+.glow-active {
+  box-shadow: 0 0 15px rgba(245, 158, 11, 0.4);
+  border-color: rgba(245, 158, 11, 0.6);
+  animation: pulse-border 2s infinite;
+}
+
+@keyframes pulse-border {
+  0% {
+    border-color: rgba(245, 158, 11, 0.4);
+  }
+
+  50% {
+    border-color: rgba(245, 158, 11, 1);
+  }
+
+  100% {
+    border-color: rgba(245, 158, 11, 0.4);
+  }
+}
+
+/* === BOTÓN VIP PREMIUM === */
+.btn-vip {
+  background: linear-gradient(135deg, #BF953F, #FCF6BA, #B38728, #FBF5B7, #AA771C);
+  background-size: 300% 100%;
+  color: #1a1a1a !important;
+  /* Force dark text for contrast */
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  box-shadow: 0 0 15px rgba(212, 175, 55, 0.5) !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.5px;
+  position: relative;
+  overflow: hidden;
+  animation: gold-gradient-move 4s ease infinite alternate;
+}
+
+.btn-vip:hover {
+  /* Re-assert background to prevent 'ugly gray' inheritance from .btn-profile:hover */
+  background: linear-gradient(135deg, #d4a746, #fffacd, #c6952d, #fff7bd, #bd841f);
+  background-size: 300% 100%;
+  transform: translateY(-2px) scale(1.02);
+  /* "Iluminarse reluciendo por atras" - Strong outer glow */
+  box-shadow:
+    0 0 30px rgba(255, 215, 0, 0.8),
+    0 0 60px rgba(255, 215, 0, 0.4),
+    inset 0 0 10px rgba(255, 255, 255, 0.5) !important;
+  border-color: #fff !important;
+}
+
+.btn-vip .vip-icon {
+  color: #3e2723;
+  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.5));
+  font-size: 1.1rem;
+}
+
+/* Efecto de brillo que pasa */
+.btn-vip::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(to right, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.8) 50%, rgba(255, 255, 255, 0) 100%);
+  transform: skewX(-25deg);
+  animation: vip-shine 3s infinite;
+}
+
+/* Ensure 'Retirar' has white border like 'Comprar' */
+.btn-withdrawal {
+  border: 1px solid rgba(255, 255, 255, 0.8) !important;
+}
+
+.btn-purchase {
+  border: 1px solid rgba(255, 255, 255, 0.8) !important;
+}
+
+@keyframes vip-shine {
+  0% {
+    left: -100%;
+  }
+
+  20% {
+    left: 200%;
+  }
+
+  /* Fast pass */
+  100% {
+    left: 200%;
+  }
+
+  /* Wait */
+}
+
+@keyframes gold-gradient-move {
+  0% {
+    background-position: 0% 50%;
+  }
+
+  100% {
+    background-position: 100% 50%;
+  }
 }
 
 .profile-dropdown {

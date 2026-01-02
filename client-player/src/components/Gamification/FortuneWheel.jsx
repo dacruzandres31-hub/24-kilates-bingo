@@ -6,13 +6,15 @@ import audioService from '../../services/audioService';
 import logo24k from '../../assets/logo.png';
 import './FortuneWheel.css';
 
-const FortuneWheel = ({ isOpen, onClose, onPrizeClaimed, onSpinComplete }) => {
+const FortuneWheel = ({ isOpen, onClose, onPrizeClaimed, onSpinComplete, initialExtraSpins = 0 }) => {
     const [canSpin, setCanSpin] = useState(false);
     const [nextSpinTime, setNextSpinTime] = useState(null);
     const [isSpinning, setIsSpinning] = useState(false);
     const [rotation, setRotation] = useState(0);
     const [prize, setPrize] = useState(null);
     const [timeLeft, setTimeLeft] = useState('');
+    const [extraSpins, setExtraSpins] = useState(initialExtraSpins);
+    const [usingExtraSpin, setUsingExtraSpin] = useState(false);
 
     // 12 Segments - MATCHING BACKEND CONFIG
     const segments = [
@@ -31,11 +33,26 @@ const FortuneWheel = ({ isOpen, onClose, onPrizeClaimed, onSpinComplete }) => {
     ];
 
     useEffect(() => {
-        console.log("FortuneWheel Loaded - Version: BIG PRIZES + ICONS");
+        console.log("FortuneWheel Loaded - Version: BIG PRIZES + ICONS + VIP EXTRA SPINS");
         if (isOpen) {
             checkStatus();
+            // Fetch extra spins from backend
+            fetchExtraSpins();
         }
     }, [isOpen]);
+
+    const fetchExtraSpins = async () => {
+        try {
+            const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
+            const response = await axios.get('/api/memberships/daily-benefits', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setExtraSpins(response.data.extraSpins || 0);
+            console.log('[FortuneWheel] Extra spins VIP:', response.data.extraSpins);
+        } catch (error) {
+            console.error('Error fetching extra spins:', error);
+        }
+    };
 
     useEffect(() => {
         let interval;
@@ -80,15 +97,34 @@ const FortuneWheel = ({ isOpen, onClose, onPrizeClaimed, onSpinComplete }) => {
     };
 
     const spin = async () => {
-        if (!canSpin || isSpinning) return;
+        // Verificar si puede girar (tiene giros extra O puede girar normalmente)
+        const hasExtraSpins = extraSpins > 0;
+        if ((!canSpin && !hasExtraSpins) || isSpinning) return;
 
         try {
             setIsSpinning(true);
-            const token = localStorage.getItem('playerToken');
+            const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
 
-            const response = await axios.post('/api/gamification/wheel/spin', {}, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            // Determinar si usar giro extra o giro normal
+            const useExtra = hasExtraSpins;
+            setUsingExtraSpin(useExtra);
+
+            let response;
+            if (useExtra) {
+                // Usar giro extra VIP
+                console.log('[FortuneWheel] Usando giro extra VIP');
+                response = await axios.post('/api/wheel/use-extra-spin', {}, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                // Reducir contador de giros extra
+                setExtraSpins(prev => prev - 1);
+            } else {
+                // Usar giro diario normal
+                console.log('[FortuneWheel] Usando giro diario normal');
+                response = await axios.post('/api/gamification/wheel/spin', {}, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+            }
 
             const { prize } = response.data;
             // Calculate rotation based on index from backend

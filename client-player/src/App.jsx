@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import axios from 'axios';
 import LoginPlayer from './pages/LoginPlayer';
+import RegisterPlayer from './pages/RegisterPlayer';
 import CasinoLobby from './components/CasinoLobby';
 import StarterRoom from './components/StarterRoom';
 import BronzeRoom from './components/BronzeRoom';
 import SilverRoom from './components/SilverRoom';
 import GoldRoom from './components/GoldRoom';
 import StreakModal from './components/Gamification/StreakModal';
+import MembershipPage from './pages/MembershipPage';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -16,28 +18,38 @@ function App() {
   const [showStreakModal, setShowStreakModal] = useState(false);
   const [streakData, setStreakData] = useState(null);
 
+  // Safety check for parsing user data
+  const parseUserData = (data) => {
+    try {
+      return data ? JSON.parse(data) : null;
+    } catch (e) {
+      console.error('Error parsing user data:', e);
+      localStorage.removeItem('playerUser');
+      return null;
+    }
+  };
+
   useEffect(() => {
-    // Verificar si hay token guardado
     const token = localStorage.getItem('playerToken');
     const savedUser = localStorage.getItem('playerUser');
 
     if (token && savedUser) {
-      // Configurar axios con el token
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      setUser(JSON.parse(savedUser));
-      setIsAuthenticated(true);
+      const parsedUser = parseUserData(savedUser);
+      if (parsedUser) {
+        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        setUser(parsedUser);
+        setIsAuthenticated(true);
+      }
     }
 
     setLoading(false);
   }, []);
 
   const handleLogin = (token, userData, gamificationData) => {
-    // Configurar axios con el token
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     setUser(userData);
     setIsAuthenticated(true);
 
-    // Check Streak
     if (gamificationData && gamificationData.streak && !gamificationData.streak.error) {
       setStreakData(gamificationData.streak);
       setShowStreakModal(true);
@@ -63,19 +75,47 @@ function App() {
     );
   }
 
-  if (!isAuthenticated) {
-    return <LoginPlayer onLogin={handleLogin} />;
-  }
-
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<CasinoLobby user={user} onLogout={handleLogout} />} />
-        <Route path="/sala/starter/:sessionId?" element={<StarterRoom user={user} onLogout={handleLogout} />} />
-        <Route path="/sala/bronce/:sessionId?" element={<BronzeRoom user={user} onLogout={handleLogout} />} />
-        <Route path="/sala/plata/:sessionId?" element={<SilverRoom user={user} onLogout={handleLogout} />} />
-        <Route path="/sala/oro/:sessionId?" element={<GoldRoom user={user} onLogout={handleLogout} />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* Public Routes */}
+        <Route
+          path="/login"
+          element={!isAuthenticated ? <LoginPlayer onLogin={handleLogin} /> : <Navigate to="/" />}
+        />
+        <Route
+          path="/register"
+          element={!isAuthenticated ? <RegisterPlayer /> : <Navigate to="/" />}
+        />
+
+        {/* Protected Routes */}
+        <Route
+          path="/"
+          element={isAuthenticated ? <CasinoLobby user={user} onLogout={handleLogout} /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/sala/starter/:sessionId?"
+          element={isAuthenticated ? <StarterRoom user={user} onLogout={handleLogout} /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/sala/bronce/:sessionId?"
+          element={isAuthenticated ? <BronzeRoom user={user} onLogout={handleLogout} /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/sala/plata/:sessionId?"
+          element={isAuthenticated ? <SilverRoom user={user} onLogout={handleLogout} /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/sala/oro/:sessionId?"
+          element={isAuthenticated ? <GoldRoom user={user} onLogout={handleLogout} /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/membresia"
+          element={isAuthenticated ? <MembershipPage user={user} onLogout={handleLogout} /> : <Navigate to="/login" />}
+        />
+
+        {/* Catch all */}
+        <Route path="*" element={<Navigate to={isAuthenticated ? "/" : "/login"} replace />} />
       </Routes>
 
       {showStreakModal && streakData && (

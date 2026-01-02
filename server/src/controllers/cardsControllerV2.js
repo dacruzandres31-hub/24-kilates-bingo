@@ -1,5 +1,6 @@
 const pool = require('../db');
 const websocketService = require('../services/websocketService');
+const membershipService = require('../services/membershipService');
 
 // Importar helpers
 const cardValidation = require('../helpers/cards/validation');
@@ -29,11 +30,34 @@ exports.selectCardsV2 = async (req, res) => {
         const userId = req.user.id;
         const roomDB = ROOM_MAP[room] || room;
 
-        // Extraer cantidades
-        const giftCount = packageInfo?.bonus || 0;
-        const purchasedCount = cardIds.length - giftCount;
+        // ============================================
+        // VIP DISCOUNT CALCULATION
+        // ============================================
+        let vipDiscount = 0;
+        const userSubscription = await membershipService.getUserSubscription(userId);
 
-        console.log(`[Cards-V2] 🎯 Usuario ${userId} seleccionando ${cardIds.length} cartones (${purchasedCount} comprados + ${giftCount} PLUS) para sala ${roomDB}`);
+        if (userSubscription?.benefits_config?.pack_bingo_bonus && packageInfo?.buy) {
+            const { threshold, free_cards } = userSubscription.benefits_config.pack_bingo_bonus;
+
+            // Solo aplicar si la cantidad comprada coincide con el umbral
+            if (packageInfo.buy === threshold) {
+                vipDiscount = free_cards;
+                console.log(`[Cards-V2] 👑 VIP Discount: ${vipDiscount} cartones gratis por membresía ${userSubscription.tier_name}`);
+            }
+        }
+
+        // Extraer cantidades ajustadas por VIP
+        const standardGiftCount = packageInfo?.bonus || 0; // PLUS del paquete estándar
+        const totalGiftCount = standardGiftCount + vipDiscount; // Total de gifts (PLUS + VIP)
+        const purchasedCount = cardIds.length - totalGiftCount; // Lo que realmente paga
+
+        console.log(`[Cards-V2] 🎯 Usuario ${userId} seleccionando ${cardIds.length} cartones:`);
+        console.log(`[Cards-V2]    - Pagados: ${purchasedCount}`);
+        console.log(`[Cards-V2]    - PLUS estándar: ${standardGiftCount}`);
+        console.log(`[Cards-V2]    - VIP bonus: ${vipDiscount}`);
+        console.log(`[Cards-V2]    - Total gifts: ${totalGiftCount}`);
+        console.log(`[Cards-V2]    - Sala: ${roomDB}`);
+
 
         // ============================================
         // 1. VALIDACIÓN
@@ -59,15 +83,15 @@ exports.selectCardsV2 = async (req, res) => {
                     connection,
                     userId,
                     totalCost,
-                    `Compra de ${purchasedCount} cartones para sala ${roomDB} (${giftCount} PLUS gratis)`
+                    `Compra de ${purchasedCount} cartones para sala ${roomDB} (${standardGiftCount} PLUS + ${vipDiscount} VIP gratis)`
                 );
 
-                // Crear inventario de cartones comprados
+                // Crear inventario de cartones comprados (pagados)
                 await cardPayment.createCardInventory(connection, userId, roomDB, purchasedCount, false);
 
-                // Crear inventario de cartones PLUS si hay
-                if (giftCount > 0) {
-                    await cardPayment.createCardInventory(connection, userId, roomDB, giftCount, true);
+                // Crear inventario de cartones PLUS + VIP (todos como gift)
+                if (totalGiftCount > 0) {
+                    await cardPayment.createCardInventory(connection, userId, roomDB, totalGiftCount, true);
                 }
             } else {
                 // Tiene suficientes tickets - usarlos

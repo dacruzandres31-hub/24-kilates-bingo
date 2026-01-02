@@ -95,7 +95,7 @@ class ChipsService {
   // ============================================
   // SOLICITUD DE RETIRO (Por el jugador)
   // ============================================
-  static async createWithdrawalRequest(userId, amount, bankAccountHolder, cbu, bankName = null, accountType = 'savings') {
+  static async createWithdrawalRequest(userId, amount, bankAccountHolder, cbu, bankName = null, accountType = 'savings', isReferralEarnings = false) {
     if (amount <= 0) {
       throw new Error('La cantidad debe ser mayor a 0');
     }
@@ -104,18 +104,23 @@ class ChipsService {
       throw new Error('Datos bancarios incompletos');
     }
 
-    // if (cbu.length !== 22) {
-    //   throw new Error('CBU inválido. Debe tener 22 dígitos');
-    // }
+    // --- REGLA: Retiro de ganancias por referidos solo del 1 al 10 ---
+    if (isReferralEarnings) {
+      const today = new Date().getDate();
+      if (today < 1 || today > 10) {
+        throw new Error('Los retiros de ganancias por referidos solo están permitidos del 1 al 10 de cada mes.');
+      }
+    }
 
     const connection = await pool.getConnection();
 
     try {
       await connection.query('START TRANSACTION');
 
-      // Verificar balance del usuario
+      // Verificar balance del usuario (dependiendo de si es retiro de ganancias o chips normales)
+      const balanceColumn = isReferralEarnings ? 'referral_balance' : 'balance';
       const [users] = await connection.query(
-        'SELECT balance FROM users WHERE id = ?',
+        `SELECT ${balanceColumn} as current_balance FROM users WHERE id = ? FOR UPDATE`,
         [userId]
       );
 
@@ -124,14 +129,14 @@ class ChipsService {
       }
 
       // ⚠️ PUNTO CLAVE #1: MATEMÁTICAS PRECISAS
-      const balanceDecimal = MoneyMath.decimal(users[0].balance);
+      const balanceDecimal = MoneyMath.decimal(users[0].current_balance);
       const amountDecimal = MoneyMath.decimal(amount);
 
       if (balanceDecimal.lessThan(amountDecimal)) {
-        throw new Error(`Fondos insuficientes. Balance: ${MoneyMath.toString(balanceDecimal)}, Solicitado: ${MoneyMath.toString(amountDecimal)}`);
+        throw new Error(`Fondos insuficientes en balance de ${isReferralEarnings ? 'referidos' : 'fichas'}. Balance: ${MoneyMath.toString(balanceDecimal)}, Solicitado: ${MoneyMath.toString(amountDecimal)}`);
       }
 
-      if (amount < 100) {
+      if (!isReferralEarnings && amount < 100) {
         throw new Error('El monto mínimo de retiro es 100 fichas');
       }
 
@@ -139,7 +144,7 @@ class ChipsService {
 
       // 1. DEBITAR BALANCE INMEDIATAMENTE
       await connection.query(
-        'UPDATE users SET balance = ? WHERE id = ?',
+        `UPDATE users SET ${balanceColumn} = ? WHERE id = ?`,
         [MoneyMath.toNumber(balanceAfter), userId]
       );
 

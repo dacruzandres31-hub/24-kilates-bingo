@@ -14,6 +14,28 @@ const generateToken = (userId, role, username) => {
   return token;
 };
 
+// Helper to generate a unique referral code
+const generateReferralCode = async () => {
+  const characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // No 0, O, 1, I to avoid confusion
+  let code = '';
+  let isUnique = false;
+
+  while (!isUnique) {
+    code = '';
+    for (let i = 0; i < 6; i++) {
+      code += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+
+    const existing = await dbHelper.queryOne(
+      'SELECT id FROM users WHERE referral_code = ?',
+      [code],
+      'CheckReferralCodeUniqueness'
+    );
+    if (!existing) isUnique = true;
+  }
+  return code;
+};
+
 // LOGIN - Validar credenciales y retornar token
 exports.login = async (req, res) => {
   try {
@@ -26,7 +48,7 @@ exports.login = async (req, res) => {
 
     // Buscar usuario
     const user = await dbHelper.queryOne(
-      'SELECT id, username, role, password_hash, balance, is_blocked, block_reason FROM users WHERE username = ?',
+      'SELECT id, username, role, password_hash, balance, is_blocked, block_reason, referral_code FROM users WHERE username = ?',
       [username],
       'LoginUserSearch'
     );
@@ -68,7 +90,8 @@ exports.login = async (req, res) => {
         id: user.id,
         username: user.username,
         role: user.role,
-        balance: user.balance
+        balance: user.balance,
+        referral_code: user.referral_code
       },
       gamification: {
         streak: streakData
@@ -83,7 +106,7 @@ exports.login = async (req, res) => {
 // REGISTER - Crear nuevo usuario
 exports.register = async (req, res) => {
   try {
-    const { username, password, role = 'jugador', parent_id } = req.body;
+    const { username, password, role = 'jugador', parent_id, ref } = req.body;
 
     const missingField = validationHelper.checkRequired(req.body, ['username', 'password']);
     if (missingField) {
@@ -107,14 +130,44 @@ exports.register = async (req, res) => {
       return responseHelper.error(res, 409, 'Usuario ya existe');
     }
 
+    // Buscar referente si existe código 'ref'
+    let referrerId = null;
+    let finalParentId = parent_id || null;
+
+    if (ref) {
+      const referrer = await dbHelper.queryOne(
+        'SELECT id, role, parent_id FROM users WHERE referral_code = ?',
+        [ref],
+        'RegisterFindReferrer'
+      );
+      if (referrer) {
+        referrerId = referrer.id;
+
+        // LÓGICA DE RED:
+        if (referrer.role === 'agente') {
+          // Si el que refiere es un agente, él es el padre directo
+          finalParentId = referrer.id;
+        } else if (referrer.role === 'jugador') {
+          // Si el que refiere es otro jugador, el nuevo jugador hereda el mismo agente (parent_id)
+          finalParentId = referrer.parent_id;
+        }
+
+        console.log(`🔗 Registro via REF: ${ref}. Referente: ${referrer.role} (ID: ${referrerId}) -> ParentID: ${finalParentId}`);
+      }
+    }
+
+    // Generar código de referido propio
+    const referralCode = await generateReferralCode();
+
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Insertar usuario
+    // Insertar usuario (Forzando role jugador para auto-registro si no viene de un flujo admin)
+    // Nota: El usuario pidió que se cree "solo usuario y contraseña", asumo que es para jugadores.
     const result = await dbHelper.query(
-      `INSERT INTO users (username, password_hash, role, parent_id, balance)
-       VALUES (?, ?, ?, ?, ?)`,
-      [username, hashedPassword, role, parent_id || null, 0.00],
+      `INSERT INTO users (username, password_hash, role, parent_id, balance, referral_code, referred_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [username, hashedPassword, role || 'jugador', finalParentId, 0.00, referralCode, referrerId],
       'RegisterInsertUser'
     );
 
@@ -122,7 +175,7 @@ exports.register = async (req, res) => {
 
     // Obtener el usuario recién creado
     const newUser = await dbHelper.queryOne(
-      'SELECT id, username, role, balance FROM users WHERE id = ?',
+      'SELECT id, username, role, balance, referral_code FROM users WHERE id = ?',
       [newUserId],
       'RegisterGetUser'
     );
@@ -161,7 +214,8 @@ exports.register = async (req, res) => {
         id: newUser.id,
         username: newUser.username,
         role: newUser.role,
-        balance: newUser.balance
+        balance: newUser.balance,
+        referral_code: newUser.referral_code
       }
     }, 'Usuario registrado exitosamente');
 

@@ -16,7 +16,9 @@ const CardSelectionLobby = ({
   isTourMode = false, // Modo tour interactivo
   onTourFinish = null, // Callback al finalizar tour
   onPackageSelected = null, // Callback al seleccionar paquete
-  onFirstCardSelected = null // Callback al seleccionar primer cartón
+  onFirstCardSelected = null, // Callback al seleccionar primer cartón
+  freeCardsMode = false, // Modo cartones gratis VIP
+  freeCardsCount = 0 // Cantidad de cartones gratis disponibles
 }) => {
   const [availableCards, setAvailableCards] = useState([]);
   const [selectedCards, setSelectedCards] = useState([]);
@@ -35,8 +37,8 @@ const CardSelectionLobby = ({
   const [fundsError, setFundsError] = useState(null);
 
   // Estados para el sistema de paquetes PLUS
-  const [showPackageModal, setShowPackageModal] = useState(true); // Mostrar en todas las salas
-  const [selectedPackage, setSelectedPackage] = useState(null);
+  const [showPackageModal, setShowPackageModal] = useState(!freeCardsMode); // No mostrar en modo free
+  const [selectedPackage, setSelectedPackage] = useState(freeCardsMode ? { id: 'free-vip', total: freeCardsCount, buy: 0, bonus: freeCardsCount } : null);
   const [giftCards, setGiftCards] = useState([]); // Gift cards PLUS
 
   // Manejar selección de paquete

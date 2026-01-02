@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import '../styles/CasinoLobby.css';
 import '../styles/Countdown.css';
@@ -8,7 +8,8 @@ import '../styles/LiveDrawBadge.css';
 import '../styles/LobbyCompact.css';
 import Countdown from './Countdown';
 import PlayerActivityHistory from './PlayerActivityHistory';
-import { FaClock, FaUsers, FaMoneyBillWave, FaTrophy, FaStar, FaGlassCheers, FaGift, FaHeadset, FaTicketAlt, FaEye, FaEyeSlash, FaMusic, FaVolumeUp, FaVolumeMute, FaUser, FaKey, FaSignOutAlt, FaMapMarkedAlt, FaShoppingCart } from 'react-icons/fa';
+import { FaClock, FaUsers, FaMoneyBillWave, FaTrophy, FaStar, FaGlassCheers, FaGift, FaHeadset, FaTicketAlt, FaEye, FaEyeSlash, FaMusic, FaVolumeUp, FaVolumeMute, FaUser, FaKey, FaSignOutAlt, FaMapMarkedAlt, FaShoppingCart, FaCrown, FaGem } from 'react-icons/fa';
+
 import logo from '../assets/logo.png';
 import giftIcon from '../assets/Gift_icon.png';
 import bronzeIcon from '../assets/bronze_icon.png';
@@ -29,15 +30,12 @@ import useSocket from '../hooks/useSocket';
 import uiHelper from '../helpers/uiHelper';
 import HotPotNotification from './Notifications/HotPotNotification';
 import CardPurchaseCalculator from './CardPurchaseCalculator';
-
-// ... (existing code)
-
-// ...
+import ReferralDashboard from './Referral/ReferralDashboard';
+import { FaShareAlt, FaCheck } from 'react-icons/fa';
 
 const getTargetTime = (hour) => {
   const target = new Date();
   target.setHours(hour, 0, 0, 0);
-  // Si la hora ya pasó hoy, programarla para mañana
   if (target < new Date()) {
     target.setDate(target.getDate() + 1);
   }
@@ -75,7 +73,6 @@ const RoomCard = ({ room }) => {
           </div>
         )}
 
-        {/* Badge EN VIVO */}
         {room.isLive && (
           <div className="live-draw-badge">
             <span className="live-dot"></span>
@@ -174,10 +171,8 @@ const RoomCard = ({ room }) => {
   );
 };
 
-// ... (existing code)
-
-
 const CasinoLobby = ({ user, onLogout }) => {
+  const navigate = useNavigate();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [userData, setUserData] = useState(null);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -198,31 +193,125 @@ const CasinoLobby = ({ user, onLogout }) => {
   const [showWheel, setShowWheel] = useState(false);
   const [runTour, setRunTour] = useState(false);
   const [activeHotPot, setActiveHotPot] = useState(null);
+  const [showReferralDashboard, setShowReferralDashboard] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [showSupport, setShowSupport] = useState(false);
+  const [showWithdrawal, setShowWithdrawal] = useState(false);
+  const [showCardPurchase, setShowCardPurchase] = useState(false);
 
+  // Estado de audio
+  const [audioStatus, setAudioStatus] = useState({
+    musicEnabled: audioService.enabled,
+    efectosEnabled: audioService.efectosEnabled,
+  });
+
+  // NUEVO: Estado para datos dinámicos del lobby
+  const [lobbyData, setLobbyData] = useState(null);
+  const [loadingLobby, setLoadingLobby] = useState(true);
+  const [wheelReady, setWheelReady] = useState(false);
+
+  // Sockets y lógica
+  const socket = useSocket();
+
+  // Estado para rastrear sorteos en vivo por sala
+  const [liveDraws, setLiveDraws] = useState({
+    starter: false,
+    bronce: false,
+    plata: false,
+    oro: false
+  });
+
+  // Cargar perfil
   useEffect(() => {
-    // Check if tour has been seen
-    const hasSeenTour = localStorage.getItem('tutorial_seen');
-    if (!hasSeenTour) {
-      setTimeout(() => setRunTour(true), 1500); // Small delay for loading
-    }
+    loadUserProfile();
+  }, []);
 
-    // Check Fortune Wheel Cooldown
-    checkWheelCooldown();
-    const interval = setInterval(checkWheelCooldown, 60000); // Check every minute
+  // Socket Listeners
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleResourcesUpdated = (data) => {
+      setUserData(prev => {
+        if (!prev) return prev;
+        const updated = { ...prev };
+        if (data.balance !== undefined) updated.balance = data.balance;
+        if (data.cartones || data.tickets) {
+          const c = data.cartones || data.tickets;
+          updated.tickets = {
+            bronze: c.bronce ?? c.bronze ?? prev.tickets?.bronze ?? 0,
+            silver: c.plata ?? c.silver ?? prev.tickets?.silver ?? 0,
+            gold: c.oro ?? c.gold ?? prev.tickets?.gold ?? 0
+          };
+        }
+        return updated;
+      });
+    };
+
+    socket.on('resources_updated', handleResourcesUpdated);
+    socket.on('pots_updated', (data) => {
+      setLobbyData(prev => {
+        if (!prev || !prev[data.room]) return prev;
+        return {
+          ...prev,
+          [data.room]: {
+            ...prev[data.room],
+            pots: {
+              bingo: data.pots.jackpot_bingo,
+              line: data.pots.jackpot_linea,
+              pre40: data.pots.jackpot_pre40
+            }
+          }
+        };
+      });
+    });
+    socket.on('hot_pot_alert', setActiveHotPot);
+
+    return () => {
+      socket.off('resources_updated', handleResourcesUpdated);
+      socket.off('pots_updated');
+      socket.off('hot_pot_alert');
+    };
+  }, [socket]);
+
+  // Load Lobby Data
+  useEffect(() => {
+    loadLobbyData();
+    const interval = setInterval(loadLobbyData, 30000);
     return () => clearInterval(interval);
   }, []);
 
-  const checkWheelCooldown = () => {
-    const lastSpin = localStorage.getItem('last_wheel_spin');
-    if (!lastSpin) {
-      setWheelReady(true);
-      return;
+  const loadLobbyData = async () => {
+    try {
+      const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
+      const response = await axios.get('/api/game/lobby-data', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.data.success) setLobbyData(response.data.data);
+    } catch (error) {
+      console.error('Error loading lobby data', error);
+    } finally {
+      setLoadingLobby(false);
     }
-
-    const diff = Date.now() - parseInt(lastSpin);
-    const cooldown = 60 * 60 * 1000; // 60 minutes
-    setWheelReady(diff >= cooldown);
   };
+
+  // Wheel Status
+  const checkWheelStatus = async () => {
+    try {
+      const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
+      const response = await axios.get('/api/gamification/wheel/status', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setWheelReady(response.data.canSpin);
+    } catch (error) {
+      console.error('Error checking wheel status', error);
+    }
+  };
+
+  useEffect(() => {
+    checkWheelStatus();
+    const interval = setInterval(checkWheelStatus, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleSpinComplete = () => {
     localStorage.setItem('last_wheel_spin', Date.now().toString());
@@ -238,273 +327,58 @@ const CasinoLobby = ({ user, onLogout }) => {
     setRunTour(true);
     setShowProfileMenu(false);
   };
-  const [showSupport, setShowSupport] = useState(false);
-  const [showWithdrawal, setShowWithdrawal] = useState(false);
-  const [showCardPurchase, setShowCardPurchase] = useState(false);
 
-  // Estado de audio
-  const [audioStatus, setAudioStatus] = useState({
-    musicEnabled: audioService.enabled,
-    efectosEnabled: audioService.efectosEnabled,
-  });
-
-  // NUEVO: Estado para datos dinámicos del lobby
-  const [lobbyData, setLobbyData] = useState(null);
-  const [loadingLobby, setLoadingLobby] = useState(true);
-
-  const socket = useSocket();
-
-  // Estado para rastrear sorteos en vivo por sala
-  const [liveDraws, setLiveDraws] = useState({
-    starter: false,
-    bronce: false,
-    plata: false,
-    oro: false
-  });
-
-  // Cargar perfil del usuario
-  useEffect(() => {
-    loadUserProfile();
-  }, []);
-
-  // Escuchar actualizaciones de balance en tiempo real
-  useEffect(() => {
-    if (!socket) return;
-
-    const handleResourcesUpdated = (data) => {
-      console.log('[CasinoLobby] 📡 resources_updated recibido:', data);
-
-      setUserData(prev => {
-        if (!prev) return prev;
-
-        const updated = { ...prev };
-
-        // Actualizar balance si viene
-        if (data.balance !== undefined) {
-          console.log('[CasinoLobby] 💰 Actualizando balance:', prev.balance, '->', data.balance);
-          updated.balance = data.balance;
-        }
-
-        // Actualizar cartones si vienen
-        if (data.cartones || data.tickets) {
-          const cartonesData = data.cartones || data.tickets;
-          console.log('[CasinoLobby] 🎫 Actualizando cartones:', cartonesData);
-
-          // Actualizar en formato cartones
-          updated.cartones = {
-            bronce: cartonesData.bronce !== undefined ? cartonesData.bronce : (cartonesData.bronze !== undefined ? cartonesData.bronze : (prev.cartones?.bronce || 0)),
-            plata: cartonesData.plata !== undefined ? cartonesData.plata : (cartonesData.silver !== undefined ? cartonesData.silver : (prev.cartones?.plata || 0)),
-            oro: cartonesData.oro !== undefined ? cartonesData.oro : (cartonesData.gold !== undefined ? cartonesData.gold : (prev.cartones?.oro || 0))
-          };
-
-          // También actualizar en formato tickets para compatibilidad
-          updated.tickets = {
-            bronze: cartonesData.bronce !== undefined ? cartonesData.bronce : (cartonesData.bronze !== undefined ? cartonesData.bronze : (prev.tickets?.bronze || 0)),
-            silver: cartonesData.plata !== undefined ? cartonesData.plata : (cartonesData.silver !== undefined ? cartonesData.silver : (prev.tickets?.silver || 0)),
-            gold: cartonesData.oro !== undefined ? cartonesData.oro : (cartonesData.gold !== undefined ? cartonesData.gold : (prev.tickets?.gold || 0))
-          };
-        }
-
-        return updated;
-      });
-    };
-
-    socket.on('resources_updated', handleResourcesUpdated);
-
-    return () => {
-      socket.off('resources_updated', handleResourcesUpdated);
-    };
-  }, [socket]);
-
-  // Escuchar actualizaciones de pozos en tiempo real
-  useEffect(() => {
-    if (!socket) return;
-
-    const handlePotsUpdated = (data) => {
-      console.log('[CasinoLobby] 📡 pots_updated recibido:', data);
-
-      // Actualizar lobbyData con los nuevos pozos
-      setLobbyData(prevData => {
-        if (!prevData) return prevData;
-
-        const roomData = prevData[data.room];
-        if (!roomData) return prevData;
-
-        return {
-          ...prevData,
-          [data.room]: {
-            ...roomData,
-            pots: {
-              bingo: data.pots.jackpot_bingo,
-              line: data.pots.jackpot_linea,
-              pre40: data.pots.jackpot_pre40
-            }
-          }
-        };
-      });
-    };
-
-    socket.on('pots_updated', handlePotsUpdated);
-
-    const handleHotPotAlert = (data) => {
-      console.log('[CasinoLobby] 🔥 hot_pot_alert recibido:', data);
-      setActiveHotPot(data);
-    };
-
-    socket.on('hot_pot_alert', handleHotPotAlert);
-
-    return () => {
-      socket.off('pots_updated', handlePotsUpdated);
-      socket.off('hot_pot_alert', handleHotPotAlert);
-    };
-  }, [socket]);
-
-  // NUEVO: Cargar datos del lobby al montar componente
-  useEffect(() => {
-    loadLobbyData();
-
-    // Actualizar cada 30 segundos para reflejar cambios en pozos
-    const interval = setInterval(loadLobbyData, 30000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  // NUEVO: Función para cargar datos del lobby desde el backend
-  const loadLobbyData = async () => {
-    try {
-      console.log('[CasinoLobby] 🔄 Cargando datos del lobby...');
-      const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
-      const response = await axios.get('/api/game/lobby-data', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      if (response.data.success) {
-        console.log('[CasinoLobby] ✅ Datos del lobby recibidos:', response.data.data);
-        setLobbyData(response.data.data);
-      }
-    } catch (error) {
-      console.error('[CasinoLobby] ❌ Error al cargar datos del lobby:', error);
-    } finally {
-      setLoadingLobby(false);
-    }
+  const copyReferralLink = () => {
+    if (!userData?.referral_code) return;
+    const link = `${window.location.origin}/register?ref=${userData.referral_code}`;
+    navigator.clipboard.writeText(link);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
   };
 
-  // NUEVO: Estado para disponibilidad de la rueda
-  const [wheelReady, setWheelReady] = useState(false);
-
-  // NUEVO: Verificar estado de la rueda
-  const checkWheelStatus = async () => {
-    try {
-      const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
-      const response = await axios.get('/api/gamification/wheel/status', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setWheelReady(response.data.canSpin);
-    } catch (error) {
-      console.error('Error checking wheel status:', error);
-    }
-  };
-
-  useEffect(() => {
-    checkWheelStatus();
-    // Re-chequear cada minuto
-    const interval = setInterval(checkWheelStatus, 60000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // NUEVO: Función para formatear valores monetarios
-
-
-  // NUEVO: Construir roomsData dinámicamente con datos del backend
+  // Rooms Data Construction
   const getRoomsData = () => {
     const baseRooms = [
       {
-        id: 'starter',
-        backendId: 'starter',
-        name: 'Starter',
-        path: '/sala/starter',
-        status: 'active',
-        targetTime: getTargetTime(19), // Fallback si no hay datos del backend
-        description: 'Premios en tickets para canjear en la tienda.',
-        className: 'room-turquoise',
-        iconImage: giftIcon,
-        rewards: ['ticket', 'ticket', 'ticket', 'ticket'],
-        featured: false,
+        id: 'starter', backendId: 'starter', name: 'Starter', path: '/sala/starter',
+        status: 'active', targetTime: getTargetTime(19), description: 'Premios en tickets.',
+        className: 'room-turquoise', iconImage: giftIcon, rewards: ['ticket', 'ticket', 'ticket', 'ticket'], featured: false,
       },
       {
-        id: 'bronze',
-        backendId: 'bronce',
-        name: 'Bronce',
-        path: '/sala/bronce',
-        status: 'active',
-        targetTime: getTargetTime(20),
-        description: 'La sala clásica para empezar a ganar.',
-        className: 'room-bronze',
-        iconImage: bronzeIcon,
-        featured: false,
+        id: 'bronze', backendId: 'bronce', name: 'Bronce', path: '/sala/bronce',
+        status: 'active', targetTime: getTargetTime(20), description: 'Sala clásica.',
+        className: 'room-bronze', iconImage: bronzeIcon, featured: false,
       },
       {
-        id: 'silver',
-        backendId: 'plata',
-        name: 'Plata',
-        path: '/sala/plata',
-        status: 'active',
-        targetTime: getTargetTime(21),
-        description: 'Apuestas más altas, premios más grandes.',
-        className: 'room-silver',
-        iconImage: silverIcon,
-        featured: false,
+        id: 'silver', backendId: 'plata', name: 'Plata', path: '/sala/plata',
+        status: 'active', targetTime: getTargetTime(21), description: 'Apuestas altas.',
+        className: 'room-silver', iconImage: silverIcon, featured: false,
       },
       {
-        id: 'gold',
-        backendId: 'oro',
-        name: 'Oro',
-        path: '/sala/oro',
-        status: 'active',
-        targetTime: getTargetTime(22),
-        description: 'La experiencia VIP con pozos millonarios.',
-        className: 'room-gold',
-        iconImage: goldIcon,
-        featured: true,
+        id: 'gold', backendId: 'oro', name: 'Oro', path: '/sala/oro',
+        status: 'active', targetTime: getTargetTime(22), description: 'Experiencia VIP.',
+        className: 'room-gold', iconImage: goldIcon, featured: true,
       },
     ];
 
-    // Si no hay datos del backend aún, retornar valores por defecto
     if (!lobbyData) return baseRooms.map(room => ({
       ...room,
       price: room.id === 'starter' ? 'Tickets' : '$...',
-      pots: room.id !== 'starter' ? {
-        bingo: '$...',
-        line: '$...',
-        pre40: '$...',
-      } : undefined
+      pots: room.id !== 'starter' ? { bingo: '$...', line: '$...', pre40: '$...' } : undefined
     }));
 
-    // Mapear datos del backend a cada sala usando backendId
     return baseRooms.map(room => {
       const roomData = lobbyData[room.backendId];
-
-      if (!roomData) {
-        return {
-          ...room,
-          price: room.id === 'starter' ? 'Tickets' : '$...',
-          pots: room.id !== 'starter' ? {
-            bingo: '$...',
-            line: '$...',
-            pre40: '$...',
-          } : undefined
-        };
-      }
-
-      // Usar nextSession del backend si está disponible
-      const targetTime = roomData.nextSession
-        ? new Date(roomData.nextSession)
-        : room.targetTime;
+      if (!roomData) return {
+        ...room,
+        price: room.id === 'starter' ? 'Tickets' : '$...',
+        pots: room.id !== 'starter' ? { bingo: '$...', line: '$...', pre40: '$...' } : undefined
+      };
 
       return {
         ...room,
         path: roomData.sessionId ? `${room.path}/${roomData.sessionId}` : room.path,
-        targetTime,
+        targetTime: roomData.nextSession ? new Date(roomData.nextSession) : room.targetTime,
         status: roomData.status || 'no_session',
         price: room.id === 'starter' ? 'Tickets' : uiHelper.formatCurrency(roomData.price),
         prizes: room.id === 'starter' ? roomData.prizes : undefined,
@@ -526,7 +400,6 @@ const CasinoLobby = ({ user, onLogout }) => {
     if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
     if (/[0-9]/.test(password)) strength++;
     if (/[^a-zA-Z0-9]/.test(password)) strength++;
-
     if (strength <= 2) return { level: 1, text: 'Débil', color: 'text-red-500' };
     if (strength <= 3) return { level: 2, text: 'Media', color: 'text-yellow-500' };
     return { level: 3, text: 'Fuerte', color: 'text-green-500' };
@@ -534,80 +407,60 @@ const CasinoLobby = ({ user, onLogout }) => {
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
-
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       alert('❌ Las contraseñas no coinciden');
       return;
     }
-
     if (passwordData.newPassword.length < 6) {
-      alert('❌ La contraseña debe tener al menos 6 caracteres');
+      alert('❌ Mínimo 6 caracteres');
       return;
     }
-
     try {
       const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
       await axios.post('/api/auth/change-password', {
         currentPassword: passwordData.currentPassword,
         newPassword: passwordData.newPassword
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      alert('✅ Contraseña cambiada exitosamente');
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      alert('✅ Contraseña cambiada');
       setShowChangePasswordModal(false);
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
     } catch (error) {
-      alert('❌ ' + (error.response?.data?.error || 'Error al cambiar la contraseña'));
+      alert('❌ ' + (error.response?.data?.error || 'Error'));
     }
   };
 
   const loadUserProfile = async () => {
     try {
-      console.log('[CasinoLobby] 🔄 Cargando perfil de usuario...');
       const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
-
-      if (!token) {
-        console.warn('[CasinoLobby] ⚠️ No hay token disponible');
-        return;
-      }
-
-      console.log('[CasinoLobby] 🔑 Token:', token.substring(0, 20) + '...');
-
+      if (!token) return;
       const response = await axios.get('/api/users/profile', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-
-      console.log('[CasinoLobby] ✅ Datos recibidos:', response.data);
       setUserData(response.data);
     } catch (error) {
-      console.error('[CasinoLobby] ❌ Error loading profile:', error);
-      console.error('[CasinoLobby] ❌ Status:', error.response?.status);
-      console.error('[CasinoLobby] ❌ Detalles:', error.response?.data);
+      console.error('Error loading profile', error);
     }
   };
 
-  // Handlers de audio
+  // Audio Handlers
   const toggleMusic = () => {
     const newStatus = audioService.toggleMusic();
     setAudioStatus(prev => ({ ...prev, musicEnabled: newStatus }));
   };
-
   const toggleEfectos = () => {
     const newStatus = audioService.toggleEfectos();
     setAudioStatus(prev => ({ ...prev, efectosEnabled: newStatus }));
   };
 
-  // Actualizar reloj
+  // Reloj
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // Audio del lobby - una sola vez con primer click
+  // Audio click lobby
   useEffect(() => {
     let activated = false;
-
     const handleClick = () => {
       if (!activated) {
         activated = true;
@@ -615,36 +468,54 @@ const CasinoLobby = ({ user, onLogout }) => {
         document.removeEventListener('click', handleClick);
       }
     };
-
     document.addEventListener('click', handleClick);
-
     return () => {
       document.removeEventListener('click', handleClick);
     };
   }, []);
 
+  const renderVIPBadge = () => {
+    if (!userData?.plan) return null;
+    const planName = userData.plan.name.toLowerCase();
+
+    let badgeClass = '';
+    let badgeText = '';
+    let icon = null;
+
+    if (planName.includes('bronce')) {
+      badgeClass = 'bronze';
+      badgeText = 'BRONCE';
+      icon = <FaStar />;
+    } else if (planName.includes('plata')) {
+      badgeClass = 'silver';
+      badgeText = 'PLATA';
+      icon = <FaGem />;
+    } else if (planName.includes('oro')) {
+      badgeClass = 'gold';
+      badgeText = 'ORO';
+      icon = <FaCrown />;
+    } else if (planName.includes('embajador')) {
+      badgeClass = 'ambassador';
+      badgeText = 'EMBAJADOR';
+      icon = <FaCrown />;
+    } else {
+      return null;
+    }
+
+    return (
+      <div className={`vip-badge ${badgeClass}`}>
+        {icon} {badgeText}
+      </div>
+    );
+  };
+
   return (
     <div className={`casino-lobby ${showWheel ? 'wheel-open' : ''}`} style={{ '--lobby-bg-image': `url(${lobbyBackground})` }}>
-      {/* Hidden target for Tour - Central Ghost Logo */}
-      <div
-        id="tour-start-logo"
-        style={{
-          position: 'fixed',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          width: '375px',
-          height: '375px',
-          pointerEvents: 'none',
-          zIndex: 9999, // Ensure tour can find it, although react-joyride handles z-index
-          visibility: 'hidden' // Hidden but present in DOM
-        }}
-      />
-
-      {/* Top User Bar */}
+      {/* ... existing code ... */}
       <div className="user-top-bar" id="user-main-bar">
         <div className="user-info-section">
           <span className="user-name">👤 {user?.username || 'Usuario'}</span>
+          {renderVIPBadge()}
           <div className="user-resources">
             <span className="balance">
               💰 {uiHelper.formatCurrencyFlexible(userData?.balance)}
@@ -717,6 +588,44 @@ const CasinoLobby = ({ user, onLogout }) => {
           </button>
 
           <button
+            className="btn-profile btn-vip"
+            onClick={() => navigate('/membresia')}
+          >
+            <FaCrown className="vip-icon" />
+            <span>CLUB VIP</span>
+          </button>
+
+          <button
+            className="btn-profile btn-referral"
+            style={{
+              background: 'linear-gradient(45deg, #8b5cf6, #6366f1)',
+              color: 'white',
+              fontWeight: 'bold',
+              border: '2px solid rgba(255,255,255,0.2)',
+              marginRight: '8px'
+            }}
+            onClick={() => setShowReferralDashboard(true)}
+          >
+            <FaUsers />
+            <span>REFERIDOS</span>
+          </button>
+
+          <button
+            className={`btn-profile btn-invite ${copiedLink ? 'bg-emerald-600' : ''}`}
+            style={{
+              background: copiedLink ? '#10b981' : 'linear-gradient(45deg, #f59e0b, #d97706)',
+              color: 'white',
+              fontWeight: 'bold',
+              border: '2px solid rgba(255,255,255,0.2)',
+              marginRight: '8px'
+            }}
+            onClick={copyReferralLink}
+          >
+            {copiedLink ? <FaCheck /> : <FaShareAlt />}
+            <span>{copiedLink ? 'COPIADO' : 'INVITAR'}</span>
+          </button>
+
+          <button
             id="wheel-btn"
             className={`btn-profile btn-wheel ${wheelReady ? 'glow-active' : ''}`}
             style={{
@@ -785,8 +694,8 @@ const CasinoLobby = ({ user, onLogout }) => {
 
       <CustomTour runTour={runTour} onTourEnd={handleTourEnd} />
 
-      {/* Header con Logo - Oculto si la rueda está abierta */}
-      {!showWheel && (
+      {/* Header con Logo - Oculto si la rueda o el dashboard de referidos están abiertos */}
+      {!showWheel && !showReferralDashboard && (
         <header className="lobby-header">
           {/* Stats Izquierda */}
           <div className="header-stats left">
@@ -1200,11 +1109,12 @@ const CasinoLobby = ({ user, onLogout }) => {
       }
 
       {/* Alerta de Pozo Caliente */}
-      <HotPotNotification
-        alert={activeHotPot}
-        onClose={() => setActiveHotPot(null)}
-      />
-    </div >
+      {/* Referral Dashboard Modal */}
+      {showReferralDashboard && createPortal(
+        <ReferralDashboard onClose={() => setShowReferralDashboard(false)} />,
+        document.body
+      )}
+    </div>
   );
 };
 

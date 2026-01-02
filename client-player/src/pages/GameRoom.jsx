@@ -16,6 +16,7 @@ import LineaPrizeNotification from '../components/LineaPrizeNotification';
 import ChatWidget from '../components/ChatWidget';
 import EmojiReactions from '../components/EmojiReactions';
 import SoundToggle from '../components/SoundToggle';
+import VIPBadge from '../components/VIPBadge';
 import AchievementManager, { useAchievements } from '../components/AchievementManager';
 import soundManager from '../utils/soundManager';
 import hapticManager from '../utils/hapticManager';
@@ -86,6 +87,9 @@ export default function GameRoom() {
 
     // Cargar skins equipados
     loadEquippedSkin();
+
+    // Obtener tier del usuario
+    fetchUserTier();
 
     // Unirse a la sala
     socket.emit('join_game', { room: roomType });
@@ -302,6 +306,24 @@ export default function GameRoom() {
     }
   };
 
+  // Obtener el tier del usuario para mostrar su medalla
+  const fetchUserTier = async () => {
+    try {
+      const response = await fetch('/api/memberships/my-subscription', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      const data = await response.json();
+      if (data.success && data.subscription) {
+        setCurrentUser(prev => ({
+          ...prev,
+          tier: data.subscription.tier_name
+        }));
+      }
+    } catch (error) {
+      console.error('Error fetching user tier:', error);
+    }
+  };
+
   // Cargar skin equipado del usuario
   const loadEquippedSkin = async () => {
     try {
@@ -361,8 +383,11 @@ export default function GameRoom() {
       {/* Header */}
       <div className="max-w-7xl mx-auto mb-6">
         <div className="flex items-center justify-between bg-gradient-to-r from-cyan-600 to-blue-600 rounded-lg p-4">
-          <div>
-            <h1 className="text-3xl font-black text-white">🎰 SALA {roomType?.toUpperCase()}</h1>
+          <div className="flex flex-col">
+            <h1 className="text-3xl font-black text-white flex items-center gap-2">
+              🎰 SALA {roomType?.toUpperCase()}
+              {currentUser?.tier && <VIPBadge tier={currentUser.tier} size="medium" />}
+            </h1>
             <p className="text-cyan-100 text-sm mt-1">Sesión activa - {gameState.drawnNumbers.length} bolillas sorteadas</p>
           </div>
 

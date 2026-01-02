@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSocket } from '../hooks/useSocket';
+import VIPBadge from './VIPBadge';
 
 export default function GlobalTicker() {
   const socket = useSocket();
@@ -40,6 +41,7 @@ export default function GlobalTicker() {
         type: announcement.type || 'custom',
         icon: announcement.icon || typeIcons[announcement.type] || '✨',
         username: announcement.username,
+        tier: announcement.tier, // Nuevo
         priority: announcement.priority || 'normal',
         timestamp: Date.now()
       };
@@ -106,8 +108,9 @@ export default function GlobalTicker() {
                 <span className="text-xl">{msg.icon}</span>
 
                 {/* Texto del mensaje */}
-                <span className="text-sm font-semibold text-white truncate">
+                <span className="text-sm font-semibold text-white truncate flex items-center gap-1">
                   {msg.text}
+                  {msg.tier && <VIPBadge tier={msg.tier} size="small" />}
                 </span>
 
                 {/* Separador */}
@@ -129,8 +132,9 @@ export default function GlobalTicker() {
                     }}
                   >
                     <span className="text-xl">{msg.icon}</span>
-                    <span className="text-sm font-semibold text-white truncate">
+                    <span className="text-sm font-semibold text-white truncate flex items-center gap-1">
                       {msg.text}
+                      {msg.tier && <VIPBadge tier={msg.tier} size="small" />}
                     </span>
                     {idx < displayMessages.length - 1 && (
                       <span className="text-slate-600 ml-2">•</span>

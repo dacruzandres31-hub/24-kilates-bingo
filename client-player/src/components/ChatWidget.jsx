@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, MessageCircle, X, Minimize2 } from 'lucide-react';
+import VIPBadge from './VIPBadge';
 import '../styles/ChatWidget.css';
 
 /**
@@ -37,6 +38,7 @@ export default function ChatWidget({ socket, gameSessionId, username, onMessageS
                 username: data.username,
                 message: data.message,
                 timestamp: data.timestamp,
+                tier: data.tier, // Nuevo: Incluir tier del usuario
                 isOwn: data.username === username
             }]);
 
@@ -137,7 +139,10 @@ export default function ChatWidget({ socket, gameSessionId, username, onMessageS
                                     className={`chat-message ${msg.isOwn ? 'own' : ''}`}
                                 >
                                     <div className="message-header">
-                                        <span className="message-username">{msg.username}</span>
+                                        <span className="message-username">
+                                            {msg.username}
+                                            {msg.tier && <VIPBadge tier={msg.tier} size="small" />}
+                                        </span>
                                         <span className="message-time">
                                             {new Date(msg.timestamp).toLocaleTimeString('es-AR', {
                                                 hour: '2-digit',

@@ -20,11 +20,48 @@ const {
 } = require('../socket/winnerEvents');
 const metricsService = require('./metricsService');
 const sessionHistoryService = require('./sessionHistoryService');
+const redis = require('../redis'); // NEW: Redis for persistent state
 
 class GameEngineAuto {
   constructor(io) {
     this.io = io;
-    this.activeGames = new Map(); // gameSessionId -> gameState
+    this.activeGames = new Map(); // Still used for local intervals, but state moves to Redis
+    this.REDIS_PREFIX = 'game:state:';
+  }
+
+  // --- REDIS HELPERS ---
+  _getRedisKey(sessionId) {
+    return `${this.REDIS_PREFIX}${sessionId}`;
+  }
+
+  async saveGameStateToRedis(sessionId, state) {
+    try {
+      // Excluir el objeto de intervalo antes de guardar en Redis
+      const stateToSave = { ...state };
+      delete stateToSave.interval;
+
+      await redis.set(this._getRedisKey(sessionId), JSON.stringify(stateToSave), 'EX', 7200); // 2 horas TTL
+    } catch (error) {
+      console.error(`[Redis] Error saving state for session ${sessionId}:`, error);
+    }
+  }
+
+  async getGameStateFromRedis(sessionId) {
+    try {
+      const data = await redis.get(this._getRedisKey(sessionId));
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      console.error(`[Redis] Error getting state for session ${sessionId}:`, error);
+      return null;
+    }
+  }
+
+  async deleteGameStateFromRedis(sessionId) {
+    try {
+      await redis.del(this._getRedisKey(sessionId));
+    } catch (error) {
+      console.error(`[Redis] Error deleting state for session ${sessionId}:`, error);
+    }
   }
 
   /**
@@ -68,22 +105,16 @@ class GameEngineAuto {
         console.error('[GameEngine] Error en limpieza/regeneración al iniciar:', err);
       });
 
-      // Estado del juego
-      const gameState = {
-        sessionId: gameSessionId,
-        roomId: session.room,
-        ballsDrawn: [],
-        availableBalls: this.generateBallPool(),
-        interval: null,
-        isPaused: false,
-        lineWinnersPaid: false,           // Solo se paga UNA VEZ la primera línea
-        lineWinnersThisBall: [],          // Ganadores de línea en esta bolilla
-        bingoWinnersPaid: false,          // Control de BINGO pagado
-        bingoWinnersThisBall: []          // Ganadores de BINGO en esta bolilla
-      };
+      gameState.ballsDrawn = existingBalls.map(b => b.ball_number);
+      gameState.availableBalls = gameState.availableBalls.filter(
+        b => !gameState.ballsDrawn.includes(b)
+      );
+
+      // Guardar en Redis antes de iniciar
+      await this.saveGameStateToRedis(gameSessionId, gameState);
 
       this.activeGames.set(gameSessionId, gameState);
-      console.log(`[GameEngine] ✅ GameState creado y guardado`);
+      console.log(`[GameEngine] ✅ GameState creado y sincronizado con Redis`);
 
       // LIMPIAR bolas de sorteos anteriores si la sesión se está reiniciando
       await pool.query(
@@ -157,7 +188,20 @@ class GameEngineAuto {
 
     console.log(`[GameEngine] ⏱️ Configurando intervalo de ${drawInterval}ms para sesión ${gameSessionId}`);
     gameState.interval = setInterval(async () => {
-      if (gameState.isPaused) return;
+      // Fetch the latest state from Redis before each draw to ensure consistency
+      const latestGameState = await this.getGameStateFromRedis(gameSessionId);
+      if (!latestGameState || latestGameState.isPaused || latestGameState.bingoWinnersPaid) {
+        // If paused, or game ended, or state not found, do nothing or clear interval
+        if (latestGameState && latestGameState.bingoWinnersPaid) {
+          console.log(`[GameEngine] Bingo already won for session ${gameSessionId}. Clearing interval.`);
+          clearInterval(gameState.interval);
+          gameState.interval = null;
+          this.activeGames.delete(gameSessionId); // Remove from local active games
+        }
+        return;
+      }
+      // Update local gameState with latest from Redis for interval context
+      Object.assign(gameState, latestGameState);
 
       try {
         await this.drawNextBall(gameSessionId, pauseOnWinner);
@@ -194,36 +238,45 @@ class GameEngineAuto {
         const gameSessionId = session.id;
         console.log(`[GameEngine] 🛠️ Recuperando sesión ${gameSessionId} (${session.room})...`);
 
-        // Obtener bolas ya sorteadas
-        const [balls] = await pool.query(
-          'SELECT ball_number, ball_letter FROM game_session_balls WHERE game_session_id = ? ORDER BY draw_order',
-          [gameSessionId]
-        );
+        // Try to get state from Redis first
+        let gameState = await this.getGameStateFromRedis(gameSessionId);
 
-        const ballsDrawn = balls.map(b => b.ball_number);
+        if (!gameState) {
+          console.warn(`[GameEngine] ⚠️ No se encontró estado en Redis para sesión ${gameSessionId}. Reconstruyendo desde DB.`);
+          // Obtener bolas ya sorteadas
+          const [balls] = await pool.query(
+            'SELECT ball_number, ball_letter FROM game_session_balls WHERE game_session_id = ? ORDER BY draw_order',
+            [gameSessionId]
+          );
 
-        // Verificar si la línea ya fue pagada revisando si hay alguien con line_won en validated_cards o card_pool
-        const [lineWinners] = await pool.query(
-          `SELECT COUNT(*) as count FROM game_winners WHERE game_session_id = ? AND prize_type = 'linea'`,
-          [gameSessionId]
-        );
+          const ballsDrawn = balls.map(b => b.ball_number);
 
-        const gameState = {
-          sessionId: gameSessionId,
-          roomId: session.room,
-          ballsDrawn: ballsDrawn,
-          lastBall: balls.length > 0 ? {
-            number: balls[balls.length - 1].ball_number,
-            letter: balls[balls.length - 1].ball_letter
-          } : null,
-          availableBalls: this.generateBallPool().filter(b => !ballsDrawn.includes(b)),
-          interval: null,
-          isPaused: false,
-          lineWinnersPaid: lineWinners[0].count > 0,
-          lineWinnersThisBall: [],
-          bingoWinnersPaid: false, // Si estuviera pagado, la sesión no estaría en 'playing'
-          bingoWinnersThisBall: []
-        };
+          // Verificar si la línea ya fue pagada revisando si hay alguien con line_won en validated_cards o card_pool
+          const [lineWinners] = await pool.query(
+            `SELECT COUNT(*) as count FROM game_winners WHERE game_session_id = ? AND prize_type = 'linea'`,
+            [gameSessionId]
+          );
+
+          gameState = {
+            sessionId: gameSessionId,
+            roomId: session.room,
+            ballsDrawn: ballsDrawn,
+            lastBall: balls.length > 0 ? {
+              number: balls[balls.length - 1].ball_number,
+              letter: balls[balls.length - 1].ball_letter
+            } : null,
+            availableBalls: this.generateBallPool().filter(b => !ballsDrawn.includes(b)),
+            interval: null,
+            isPaused: false,
+            lineWinnersPaid: lineWinners[0].count > 0,
+            lineWinnersThisBall: [],
+            bingoWinnersPaid: false, // Si estuviera pagado, la sesión no estaría en 'playing'
+            bingoWinnersThisBall: []
+          };
+          await this.saveGameStateToRedis(gameSessionId, gameState); // Save reconstructed state to Redis
+        } else {
+          console.log(`[GameEngine] ✅ Estado de sesión ${gameSessionId} cargado desde Redis.`);
+        }
 
         this.activeGames.set(gameSessionId, gameState);
 
@@ -231,7 +284,7 @@ class GameEngineAuto {
         // Podríamos guardar el drawInterval en la BD para mayor precisión
         this._startDrawInterval(gameSessionId, 5000, 2000);
 
-        console.log(`[GameEngine] ✅ Sesión ${gameSessionId} recuperada con ${ballsDrawn.length} bolas.`);
+        console.log(`[GameEngine] ✅ Sesión ${gameSessionId} recuperada con ${gameState.ballsDrawn.length} bolas.`);
       }
 
     } catch (error) {
@@ -251,8 +304,12 @@ class GameEngineAuto {
         );
 
         for (const session of playingSessions) {
-          if (!this.activeGames.has(session.id)) {
-            console.warn(`[GameEngine Watchdog] ⚠️ Sesión ${session.id} está en 'playing' pero el motor está inactivo. Recuperando...`);
+          // Check if it's in local memory AND in Redis
+          const localState = this.activeGames.get(session.id);
+          const redisState = await this.getGameStateFromRedis(session.id);
+
+          if (!localState || !redisState) {
+            console.warn(`[GameEngine Watchdog] ⚠️ Sesión ${session.id} está en 'playing' pero el motor (local o Redis) está inactivo. Recuperando...`);
             // Recuperar esta sesión específica
             await this.resumeSpecificSession(session.id);
           }
@@ -269,32 +326,40 @@ class GameEngineAuto {
       if (sessions.length === 0) return;
       const session = sessions[0];
 
-      const [balls] = await pool.query(
-        'SELECT ball_number, ball_letter FROM game_session_balls WHERE game_session_id = ? ORDER BY draw_order',
-        [gameSessionId]
-      );
-      const ballsDrawn = balls.map(b => b.ball_number);
-      const [lineWinners] = await pool.query(
-        `SELECT COUNT(*) as count FROM game_winners WHERE game_session_id = ? AND prize_type = 'linea'`,
-        [gameSessionId]
-      );
+      let gameState = await this.getGameStateFromRedis(gameSessionId);
 
-      const gameState = {
-        sessionId: gameSessionId,
-        roomId: session.room,
-        ballsDrawn: ballsDrawn,
-        lastBall: balls.length > 0 ? {
-          number: balls[balls.length - 1].ball_number,
-          letter: balls[balls.length - 1].ball_letter
-        } : null,
-        availableBalls: this.generateBallPool().filter(b => !ballsDrawn.includes(b)),
-        interval: null,
-        isPaused: false,
-        lineWinnersPaid: lineWinners[0].count > 0,
-        lineWinnersThisBall: [],
-        bingoWinnersPaid: false,
-        bingoWinnersThisBall: []
-      };
+      if (!gameState) {
+        console.warn(`[GameEngine] ⚠️ No se encontró estado en Redis para sesión ${gameSessionId} durante resumeSpecificSession. Reconstruyendo.`);
+        const [balls] = await pool.query(
+          'SELECT ball_number, ball_letter FROM game_session_balls WHERE game_session_id = ? ORDER BY draw_order',
+          [gameSessionId]
+        );
+        const ballsDrawn = balls.map(b => b.ball_number);
+        const [lineWinners] = await pool.query(
+          `SELECT COUNT(*) as count FROM game_winners WHERE game_session_id = ? AND prize_type = 'linea'`,
+          [gameSessionId]
+        );
+
+        gameState = {
+          sessionId: gameSessionId,
+          roomId: session.room,
+          ballsDrawn: ballsDrawn,
+          lastBall: balls.length > 0 ? {
+            number: balls[balls.length - 1].ball_number,
+            letter: balls[balls.length - 1].ball_letter
+          } : null,
+          availableBalls: this.generateBallPool().filter(b => !ballsDrawn.includes(b)),
+          interval: null,
+          isPaused: false,
+          lineWinnersPaid: lineWinners[0].count > 0,
+          lineWinnersThisBall: [],
+          bingoWinnersPaid: false,
+          bingoWinnersThisBall: []
+        };
+        await this.saveGameStateToRedis(gameSessionId, gameState);
+      } else {
+        console.log(`[GameEngine] ✅ Estado de sesión ${gameSessionId} cargado desde Redis para resumeSpecificSession.`);
+      }
 
       this.activeGames.set(gameSessionId, gameState);
       this._startDrawInterval(gameSessionId, 5000, 2000);
@@ -307,27 +372,64 @@ class GameEngineAuto {
   /**
    * Obtiene el estado actual de una sesión
    */
-  getGameState(sessionId) {
-    const gameState = this.activeGames.get(parseInt(sessionId));
-    if (!gameState) return null;
+  async getGameState(sessionId) {
+    // Intentar obtener de memoria local primero (por el objeto interval)
+    let state = this.activeGames.get(sessionId);
+
+    // Si no está en memoria (ej. tras reinicio), buscar en Redis
+    if (!state) {
+      state = await this.getGameStateFromRedis(sessionId);
+      if (state) {
+        // Restaurar en memoria local (sin el intervalo por ahora, 
+        // el watchdog o resume lo iniciará si es necesario)
+        this.activeGames.set(sessionId, state);
+      }
+    }
+
+    if (!state) return null;
 
     return {
-      gameSessionId: gameState.sessionId,
-      ballsDrawn: gameState.ballsDrawn,
-      lastBall: gameState.lastBall,
-      drawOrder: gameState.ballsDrawn.length,
-      isPaused: gameState.isPaused,
-      lineWinnersPaid: gameState.lineWinnersPaid
+      gameSessionId: state.sessionId,
+      ballsDrawn: state.ballsDrawn,
+      lastBall: state.lastBall,
+      drawOrder: state.ballsDrawn.length,
+      isPaused: state.isPaused,
+      lineWinnersPaid: state.lineWinnersPaid
     };
   }
 
   /**
    * Obtiene el estado de juego de una sala específica (útil para espectadores)
    */
-  getRoomGameState(roomName) {
-    for (const gameState of this.activeGames.values()) {
-      if (gameState.roomId === roomName) {
-        return this.getGameState(gameState.sessionId);
+  async getRoomGameState(roomName) {
+    // Iterate through activeGames (which might have been populated from Redis by getGameState)
+    for (const [sessionId, localState] of this.activeGames.entries()) {
+      if (localState.roomId === roomName) {
+        // Call getGameState to ensure we have the most up-to-date state, potentially from Redis
+        const gameState = await this.getGameState(sessionId);
+        if (gameState) {
+          return gameState;
+        }
+      }
+    }
+
+    // If not found in local activeGames, try to find it in Redis directly
+    // This is a fallback and might be less efficient if many sessions are in Redis
+    const allRedisKeys = await redis.keys(`${this.REDIS_PREFIX}*`);
+    for (const key of allRedisKeys) {
+      const sessionId = key.replace(this.REDIS_PREFIX, '');
+      const state = await this.getGameStateFromRedis(sessionId);
+      if (state && state.roomId === roomName) {
+        // If found, also add to local cache for future calls
+        this.activeGames.set(sessionId, state);
+        return {
+          gameSessionId: state.sessionId,
+          ballsDrawn: state.ballsDrawn,
+          lastBall: state.lastBall,
+          drawOrder: state.ballsDrawn.length,
+          isPaused: state.isPaused,
+          lineWinnersPaid: state.lineWinnersPaid
+        };
       }
     }
     return null;
@@ -337,12 +439,12 @@ class GameEngineAuto {
    * Canta el siguiente número y valida TODOS los cartones automáticamente
    */
   async drawNextBall(gameSessionId, pauseOnWinner = 2000) {
-    const gameState = this.activeGames.get(gameSessionId);
-    if (!gameState) throw new Error('Juego no encontrado');
-
-    if (gameState.availableBalls.length === 0) {
-      console.log(`[GameEngine] Juego ${gameSessionId} terminado - no hay más bolas`);
-      await this.endGame(gameSessionId, 'completed');
+    const gameState = await this.getGameState(gameSessionId); // Usar el nuevo getter async
+    if (!gameState || gameState.availableBalls.length === 0 || gameState.isPaused) {
+      // Si el bingo ya se cantó, detener el intervalo
+      if (gameState && gameState.bingoWinnersPaid) {
+        this.stopGame(gameSessionId);
+      }
       return;
     }
 
@@ -357,6 +459,9 @@ class GameEngineAuto {
 
     // Actualizar estado de la última bola para sincronización
     gameState.lastBall = { number: ballNumber, letter: ballLetter };
+
+    // --- PERSISTENCIA EN REDIS ---
+    await this.saveGameStateToRedis(gameSessionId, gameState);
 
     try {
       await pool.query(
@@ -389,7 +494,7 @@ class GameEngineAuto {
       room: gameState.roomId // Agregar info de sala
     };
 
-    console.log(`[GameEngine] 📡 EMITIENDO 'number_drawn' a room: ${sessionRoom}`);
+    console.log(`[GameEngine] 📡 EMITIENDO 'ball_drawn' a room: ${sessionRoom}`);
     console.log(`[GameEngine] 📦 Datos del evento:`, JSON.stringify(eventData));
 
     // Verificar cuántos clientes están en el room de sesión
@@ -398,16 +503,16 @@ class GameEngineAuto {
     console.log(`[GameEngine] 👥 Clientes conectados en ${sessionRoom}: ${clientsInRoom}`);
 
     // EMISIÓN 1: A la sesión específica (participantes con cartones)
-    this.io.to(sessionRoom).emit('number_drawn', eventData);
-    console.log(`[GameEngine] ✅ Evento 'number_drawn' emitido a ${sessionRoom}`);
+    this.io.to(sessionRoom).emit('ball_drawn', eventData);
+    console.log(`[GameEngine] ✅ Evento 'ball_drawn' emitido a ${sessionRoom}`);
 
     // EMISIÓN 2: A la sala global (espectadores públicos)
     const globalRoom = `room_${gameState.roomId}`;
     const globalRoomClients = this.io.sockets.adapter.rooms.get(globalRoom);
     const spectators = globalRoomClients ? globalRoomClients.size : 0;
 
-    this.io.to(globalRoom).emit('number_drawn', eventData);
-    console.log(`[GameEngine] 📺 Evento 'number_drawn' emitido a ${globalRoom} (${spectators} espectadores)`);
+    this.io.to(globalRoom).emit('ball_drawn', eventData);
+    console.log(`[GameEngine] 📺 Evento 'ball_drawn' emitido a ${globalRoom} (${spectators} espectadores)`);
 
     metricsService.increment('eventsEmitted');
 
@@ -463,7 +568,7 @@ class GameEngineAuto {
         if (userCards.length <= 1) continue; // Skip si tiene 1 o menos cartones
 
         // Obtener números cantados
-        const gameState = this.activeGames.get(gameSessionId);
+        const gameState = await this.getGameState(gameSessionId); // Use async getter
         const calledNumbers = gameState ? gameState.ballsDrawn : [];
 
         // Analizar con CardAnalyzer
@@ -502,7 +607,8 @@ class GameEngineAuto {
    * - BINGO: cartón completo (15/15), división si múltiples ganadores
    */
   async validateAllCards(gameSessionId, pauseOnWinner) {
-    const gameState = this.activeGames.get(gameSessionId);
+    const gameState = await this.getGameState(gameSessionId); // Use async getter
+    if (!gameState) return;
 
     const [cards] = await pool.query(
       `SELECT vc.id, vc.player_id as user_id, u.username, vc.grid_numbers as grid_data
@@ -560,11 +666,14 @@ class GameEngineAuto {
       if (gameState.lineWinnersThisBall.length > 0) {
         await this.payLineWinners(gameSessionId, gameState.lineWinnersThisBall);
         gameState.lineWinnersPaid = true;
+        await this.saveGameStateToRedis(gameSessionId, gameState); // Save updated state
 
         // PAUSAR para celebrar
         gameState.isPaused = true;
-        setTimeout(() => {
+        await this.saveGameStateToRedis(gameSessionId, gameState); // Save paused state
+        setTimeout(async () => {
           gameState.isPaused = false;
+          await this.saveGameStateToRedis(gameSessionId, gameState); // Save unpaused state
         }, pauseOnWinner);
       }
     }
@@ -606,6 +715,7 @@ class GameEngineAuto {
       if (gameState.bingoWinnersThisBall.length > 0) {
         await this.payBingoWinners(gameSessionId, gameState.bingoWinnersThisBall);
         gameState.bingoWinnersPaid = true;
+        await this.saveGameStateToRedis(gameSessionId, gameState); // Save updated state
         await this.endGame(gameSessionId, 'completed');
       }
     }
@@ -667,7 +777,7 @@ class GameEngineAuto {
     const totalPrize = session[0].line_prize || 2500;
     const prizePerWinner = totalPrize / winners.length;
 
-    const gameState = this.activeGames.get(gameSessionId);
+    const gameState = await this.getGameState(gameSessionId); // Use async getter
 
     console.log(`[GameEngine] 🎉 LÍNEA COMPLETADA - ${winners.length} ganador(es)`);
 
@@ -724,7 +834,7 @@ class GameEngineAuto {
     const totalPrize = session[0].bingo_prize || 25000;
     const prizePerWinner = totalPrize / winners.length;
 
-    const gameState = this.activeGames.get(gameSessionId);
+    const gameState = await this.getGameState(gameSessionId); // Use async getter
 
     console.log(`[GameEngine] 🎊 BINGO COMPLETADO - ${winners.length} ganador(es)`);
 
@@ -756,12 +866,20 @@ class GameEngineAuto {
    * Termina el juego y muestra formularios de pago
    */
   async endGame(gameSessionId, status = 'completed') {
-    const gameState = this.activeGames.get(gameSessionId);
+    const gameState = await this.getGameState(gameSessionId);
     if (!gameState) return;
 
-    if (gameState.interval) {
-      clearInterval(gameState.interval);
-      gameState.interval = null;
+    console.log(`[GameEngine] 🏁 FINALIZANDO JUEGO ${gameSessionId}...`);
+
+    try {
+      if (gameState.interval) {
+        clearInterval(gameState.interval);
+      }
+
+      this.activeGames.delete(gameSessionId);
+      await this.deleteGameStateFromRedis(gameSessionId); // NEW: Limpiar Redis
+    } catch (error) {
+      console.error(`[GameEngine] Error al limpiar estado del juego ${gameSessionId}:`, error);
     }
 
     // PERSISTIR RESULTADOS EN game_sessions antes de archivar
@@ -1164,9 +1282,17 @@ class GameEngineAuto {
       console.log(`🎉 [OfflineWinners] ${shareCount} GANADORES DE LÍNEA en bolilla ${ballNumber}. Pozo: $${totalPrize} -> $${individualPrize} c/u`);
 
       for (const winner of winners) {
-        // Obtener nombre de usuario
-        const [u] = await pool.query(`SELECT username FROM users WHERE id = ?`, [winner.user_id]);
+        // Obtener nombre de usuario y tier
+        const [u] = await pool.query(`
+          SELECT u.username, m.name as tier_name
+          FROM users u
+          LEFT JOIN user_subscriptions us ON u.id = us.user_id AND us.status = 'active'
+          LEFT JOIN memberships m ON us.membership_id = m.id
+          WHERE u.id = ?
+        `, [winner.user_id]);
+
         const username = u[0]?.username || 'Usuario';
+        const tier = u[0]?.tier_name || null;
 
         // Marcar cartón en la tabla correspondiente
         if (winner.room_type === 'paga') {
@@ -1186,7 +1312,16 @@ class GameEngineAuto {
         `, [gameSessionId, winner.user_id, winner.card_id, JSON.stringify(winner.cardData), ballNumber, JSON.stringify(gameState.ballsDrawn), individualPrize, shareCount]);
 
         // Notificar via Socket
-        const eventData = { userId: winner.user_id, username, cardId: winner.card_id, ballNumber, prize: individualPrize, shareCount, timestamp: new Date() };
+        const eventData = {
+          userId: winner.user_id,
+          username,
+          tier, // Nuevo: Incluir tier del ganador
+          cardId: winner.card_id,
+          ballNumber,
+          prize: individualPrize,
+          shareCount,
+          timestamp: new Date()
+        };
         this.io.to(`session_${gameSessionId}`).emit('line_winner', eventData);
         this.io.to(`room_${gameState.roomId}`).emit('line_winner', eventData);
       }
@@ -1228,9 +1363,17 @@ class GameEngineAuto {
       console.log(`🏆 [OfflineWinners] ${shareCount} GANADORES DE BINGO en bolilla ${ballNumber}. Premio Total: $${totalBingoPrize} -> $${individualPrize} c/u`);
 
       for (const winner of winners) {
-        // Obtener nombre de usuario
-        const [u] = await pool.query(`SELECT username FROM users WHERE id = ?`, [winner.user_id]);
+        // Obtener nombre de usuario y tier
+        const [u] = await pool.query(`
+          SELECT u.username, m.name as tier_name
+          FROM users u
+          LEFT JOIN user_subscriptions us ON u.id = us.user_id AND us.status = 'active'
+          LEFT JOIN memberships m ON us.membership_id = m.id
+          WHERE u.id = ?
+        `, [winner.user_id]);
+
         const username = u[0]?.username || 'Usuario';
+        const tier = u[0]?.tier_name || null;
 
         // Marcar cartón en la tabla correspondiente
         if (winner.room_type === 'paga') {
@@ -1250,7 +1393,17 @@ class GameEngineAuto {
         `, [gameSessionId, winner.user_id, winner.card_id, JSON.stringify(winner.cardData), pre40Won ? 'bingo_pre40' : 'bingo', ballNumber, JSON.stringify(gameState.ballsDrawn), individualPrize, shareCount]);
 
         // Notificar via Socket
-        const eventData = { userId: winner.user_id, username, cardId: winner.card_id, ballNumber, prize: individualPrize, shareCount, isPre40: pre40Won, timestamp: new Date() };
+        const eventData = {
+          userId: winner.user_id,
+          username,
+          tier, // Nuevo: Incluir tier del ganador
+          cardId: winner.card_id,
+          ballNumber,
+          prize: individualPrize,
+          shareCount,
+          isPre40: pre40Won,
+          timestamp: new Date()
+        };
         this.io.to(`session_${gameSessionId}`).emit('bingo_winner', eventData);
         this.io.to(`room_${gameState.roomId}`).emit('bingo_winner', eventData);
       }

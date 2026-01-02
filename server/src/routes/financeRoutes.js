@@ -1,6 +1,11 @@
 const express = require('express');
+// const financeController = require('../controllers/financeController');
 const authMiddleware = require('../middleware/authMiddleware');
+// const upload = require('../middleware/uploadMiddleware');
+const { paymentLimiter } = require('../middleware/security');
+const validate = require('../middleware/validationMiddleware');
 const validateWithdrawal = require('../middleware/validateWithdrawal');
+// const { depositRequestSchema } = require('../utils/schemas');
 
 const router = express.Router();
 
@@ -78,16 +83,16 @@ router.post('/withdrawal', validateWithdrawal, async (req, res) => {
 
       // Registrar claim
       const result = await client.query(
-        `INSERT INTO prize_claims (user_id, amount, cbu_alias, whatsapp, status)
-         VALUES ($1, $2, $3, $4, 'pending')
+        `INSERT INTO prize_claims(user_id, amount, cbu_alias, whatsapp, status)
+VALUES($1, $2, $3, $4, 'pending')
          RETURNING id`,
         [userId, amount, cbu_alias, whatsapp]
       );
 
       // Auditoría
       await client.query(
-        `INSERT INTO audit_revenue (player_id, amount, transaction_type)
-         VALUES ($1, $2, 'withdrawal_requested')`,
+        `INSERT INTO audit_revenue(player_id, amount, transaction_type)
+VALUES($1, $2, 'withdrawal_requested')`,
         [userId, amount]
       );
 
@@ -159,8 +164,8 @@ router.post('/deposit', async (req, res) => {
 
       // Auditoría
       await client.query(
-        `INSERT INTO audit_revenue (player_id, amount, transaction_type)
-         VALUES ($1, $2, 'deposit_admin')`,
+        `INSERT INTO audit_revenue(player_id, amount, transaction_type)
+VALUES($1, $2, 'deposit_admin')`,
         [userId, amount]
       );
 

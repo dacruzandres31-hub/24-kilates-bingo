@@ -684,7 +684,7 @@ async function getUsersHierarchy(req, res) {
       allUsers = await dbHelper.query(`
         SELECT u.id, u.username, u.role, u.parent_id, u.balance, u.created_at,
                u.nombre_completo, u.documento, u.email, u.telefono,
-               u.is_blocked, u.block_reason, u.blocked_at, u.blocked_by,
+               u.is_blocked, u.block_reason, u.blocked_at, u.blocked_by, u.subscription_tier_id,
                COALESCE(SUM(CASE WHEN uci.room = 'bronce' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_bronce,
                COALESCE(SUM(CASE WHEN uci.room = 'plata' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_plata,
                COALESCE(SUM(CASE WHEN uci.room = 'oro' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_oro,
@@ -706,7 +706,7 @@ async function getUsersHierarchy(req, res) {
       const currentUserRow = await dbHelper.queryOne(`
         SELECT u.id, u.username, u.role, u.parent_id, u.balance, u.created_at,
                u.nombre_completo, u.documento, u.email, u.telefono,
-               u.is_blocked, u.block_reason, u.blocked_at, u.blocked_by,
+               u.is_blocked, u.block_reason, u.blocked_at, u.blocked_by, u.subscription_tier_id,
                COALESCE(SUM(CASE WHEN uci.room = 'bronce' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_bronce,
                COALESCE(SUM(CASE WHEN uci.room = 'plata' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_plata,
                COALESCE(SUM(CASE WHEN uci.room = 'oro' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_oro,
@@ -724,12 +724,12 @@ async function getUsersHierarchy(req, res) {
       // Obtener red descendente (CTE recursivo)
       const networkUsers = await dbHelper.query(`
         WITH RECURSIVE network AS (
-          SELECT id, username, role, parent_id, balance, created_at, nombre_completo, documento, email, telefono, is_blocked, block_reason, blocked_at, blocked_by 
+          SELECT id, username, role, parent_id, balance, created_at, nombre_completo, documento, email, telefono, is_blocked, block_reason, blocked_at, blocked_by, subscription_tier_id 
           FROM users WHERE parent_id = ?
           
           UNION ALL
           
-          SELECT u.id, u.username, u.role, u.parent_id, u.balance, u.created_at, u.nombre_completo, u.documento, u.email, u.telefono, u.is_blocked, u.block_reason, u.blocked_at, u.blocked_by
+          SELECT u.id, u.username, u.role, u.parent_id, u.balance, u.created_at, u.nombre_completo, u.documento, u.email, u.telefono, u.is_blocked, u.block_reason, u.blocked_at, u.blocked_by, u.subscription_tier_id
           FROM users u
           INNER JOIN network n ON u.parent_id = n.id
         )
@@ -742,7 +742,7 @@ async function getUsersHierarchy(req, res) {
           COALESCE(SUM(CASE WHEN uci.room = 'oro' AND uci.is_gift = TRUE THEN uci.quantity ELSE 0 END), 0) as gift_oro
         FROM network n
         LEFT JOIN user_card_inventory uci ON n.id = uci.user_id
-        GROUP BY n.id, n.username, n.role, n.parent_id, n.balance, n.created_at, n.nombre_completo, n.documento, n.email, n.telefono, n.is_blocked, n.block_reason, n.blocked_at, n.blocked_by
+        GROUP BY n.id, n.username, n.role, n.parent_id, n.balance, n.created_at, n.nombre_completo, n.documento, n.email, n.telefono, n.is_blocked, n.block_reason, n.blocked_at, n.blocked_by, n.subscription_tier_id
         ORDER BY n.id
       `, [currentUserId], 'GetUsersHierarchy_AgentNetwork');
 

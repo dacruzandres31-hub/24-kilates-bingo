@@ -30,6 +30,8 @@ const gameAdminController = require('./controllers/gameAdminController');
 const cardPoolService = require('./services/cardPoolService');
 const activityHistoryRoutes = require('./routes/activityHistoryRoutes');
 const whatsappRoutes = require('./routes/whatsappRoutes'); // Nueva ruta
+const membershipRoutes = require('./routes/membershipRoutes'); // NEW: Membership Routes
+const referralRoutes = require('./routes/referralRoutes');
 const db = require('./db');
 const fs = require('fs');
 const path = require('path');
@@ -77,6 +79,10 @@ app.use(cors(corsOptions));
 // BODY PARSER
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+// SECURITY: Global Rate Limiting
+const { globalLimiter } = require('./middleware/security');
+app.use('/api/', globalLimiter); // Apply only to API routes
 
 // SOCKET.IO
 const server = http.createServer(app);
@@ -134,16 +140,38 @@ io.on('connection', (socket) => {
   });
 
   // Chat en vivo
-  socket.on('chat_message', (data) => {
-    const { gameSessionId, username, message, timestamp } = data;
-    console.log(`[Socket.IO] Chat message from ${username} in session ${gameSessionId}`);
+  socket.on('chat_message', async (data) => {
+    const { gameSessionId, message } = data;
+    const userId = socket.user?.id;
+    const username = socket.user?.username || 'Anónimo';
 
-    // Broadcast a todos en la sesión
-    io.to(`session_${gameSessionId}`).emit('chat_message', {
-      username,
-      message,
-      timestamp
-    });
+    try {
+      // Obtener el tier del usuario
+      const [userTier] = await db.query(`
+        SELECT m.name as tier_name
+        FROM user_subscriptions us
+        JOIN memberships m ON us.membership_id = m.id
+        WHERE us.user_id = ? AND us.status = 'active'
+        LIMIT 1
+      `, [userId]);
+
+      const tier = userTier.length > 0 ? userTier[0].tier_name : null;
+
+      io.to(`session_${gameSessionId}`).emit('chat_message', {
+        username,
+        message,
+        timestamp: new Date().toISOString(),
+        tier: tier
+      });
+    } catch (error) {
+      console.error('Error in chat_message:', error);
+      // Emitir sin tier en caso de error
+      io.to(`session_${gameSessionId}`).emit('chat_message', {
+        username,
+        message,
+        timestamp: new Date().toISOString()
+      });
+    }
   });
 
   // Reacciones emoji
@@ -238,6 +266,7 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/shop', shopRoutes);
 app.use('/api/chips', chipsRoutes);
 app.use('/api/withdrawals', withdrawalRoutes);
+app.use('/api/referrals', referralRoutes);
 app.use('/api/deposits', require('./routes/depositRoutes')); // Nueva ruta de depósitos
 app.use('/api/commissions', require('./routes/commissionRoutes')); // Sistema de comisiones
 app.use('/api/winners-payment', winnersPaymentRoutes);
@@ -245,6 +274,9 @@ app.use('/api/superadmin', superAdminRoutes);
 app.use('/api/game-admin', gameAdminRoutes);
 app.use('/api/support', require('./routes/supportRoutes'));
 app.use('/api/whatsapp', whatsappRoutes); // Montar nuevas rutas
+app.use('/api/memberships', membershipRoutes); // NEW: Memberships Endpoint
+app.use('/api/wheel', require('./routes/wheelRoutes')); // VIP Extra Wheel Spins
+
 
 // HEALTH CHECK
 app.get('/health', (req, res) => {
