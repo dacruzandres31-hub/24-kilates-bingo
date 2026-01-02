@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 
-export default function Sidebar({ isOpen, onClose, activeSections, onToggleSection, userRole, userData }) {
+export default function Sidebar({ isOpen, onClose, activeSections, onToggleSection, userRole, userData, isCollapsed, onToggleCollapse }) {
   const [expandedMenus, setExpandedMenus] = useState({
     estadisticas: true,
     finanzas: true,
@@ -86,9 +86,20 @@ export default function Sidebar({ isOpen, onClose, activeSections, onToggleSecti
   ];
 
   return (
-    <aside className="w-64 bg-slate-800 border-r border-slate-700 h-full overflow-y-auto">
+    <aside className={`bg-slate-800 border-r border-slate-700 h-full overflow-y-auto transition-all duration-300 ${isCollapsed ? 'w-16' : 'w-64'}`}>
+      {/* Toggle Button */}
+      <div className="p-2 border-b border-slate-700 flex justify-end">
+        <button
+          onClick={onToggleCollapse}
+          className="p-2 rounded-lg hover:bg-slate-700 transition-colors text-slate-300"
+          title={isCollapsed ? 'Expandir sidebar' : 'Colapsar sidebar'}
+        >
+          {isCollapsed ? '→' : '←'}
+        </button>
+      </div>
+
       <div className="p-4">
-        <h2 className="text-lg font-bold text-slate-300 mb-4">Navegación</h2>
+        {!isCollapsed && <h2 className="text-lg font-bold text-slate-300 mb-4">Navegación</h2>}
 
         <nav className="space-y-2">
           {menuItems.map((menu) => (
@@ -98,19 +109,19 @@ export default function Sidebar({ isOpen, onClose, activeSections, onToggleSecti
                 id={`nav-group-${menu.id}`}
                 onClick={() => {
                   if (menu.sections.length === 0) {
-                    // Si no tiene secciones, activar directamente
                     onToggleSection(menu.id);
                   } else {
                     toggleMenu(menu.id);
                   }
                 }}
                 className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-slate-700 transition-colors text-left"
+                title={isCollapsed ? menu.title : ''}
               >
                 <span className="flex items-center gap-2 text-slate-200 font-medium">
                   <span>{menu.icon}</span>
-                  <span className="text-sm">{menu.title}</span>
+                  {!isCollapsed && <span className="text-sm">{menu.title}</span>}
                 </span>
-                {menu.sections.length > 0 && (
+                {!isCollapsed && menu.sections.length > 0 && (
                   expandedMenus[menu.id] ? (
                     <ChevronDown className="w-4 h-4 text-slate-400" />
                   ) : (
@@ -120,20 +131,26 @@ export default function Sidebar({ isOpen, onClose, activeSections, onToggleSecti
               </button>
 
               {/* Submenu Items */}
-              {menu.sections.length > 0 && expandedMenus[menu.id] && (
+              {!isCollapsed && menu.sections.length > 0 && expandedMenus[menu.id] && (
                 <div className="ml-6 mt-1 space-y-1">
                   {menu.sections
                     .filter(section => {
                       const isAndy = userData?.username?.toLowerCase() === 'andy';
 
-                      // Sesiones Control: Solo para Andy
-                      if (section.id === 'sesiones-control') return isAndy;
+                      // Andy-only sections
+                      const andyOnlySections = [
+                        'membership-accounting',  // Contabilidad Membresías
+                        'withdrawals',            // Gestionar Retiros
+                        'room-config',            // Configuración de Salas
+                        'horarios-config',        // Configuración de Horarios
+                        'audit-logs',             // Log de Auditoría
+                        'support'                 // Soporte Técnico
+                      ];
 
-                      // SuperAdmin Only: Solo para superadmin (excepto Andy que ya manejamos arriba)
+                      if (andyOnlySections.includes(section.id) && !isAndy) return false;
+
+                      // Legacy superAdminOnly check (for other sections)
                       if (section.superAdminOnly && userRole !== 'superadmin' && !isAndy) return false;
-
-                      // Secciones especiales de Andy (24Kilates)
-                      if ((section.id === 'support' || section.id === 'withdrawals' || section.andyOnly) && !isAndy) return false;
 
                       return true;
                     })

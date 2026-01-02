@@ -62,6 +62,11 @@ export default function Dashboard() {
   const stockButtonRef = useRef(null);
   const perfilButtonRef = useRef(null);
   const [dropdownPositions, setDropdownPositions] = useState({ stock: {}, perfil: {} });
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    const saved = localStorage.getItem('adminSidebarCollapsed');
+    return saved ? JSON.parse(saved) : false;
+  });
+
   const [activeSections, setActiveSections] = useState({
     'estadisticas-generales': true,
     'usuarios': false,
@@ -285,10 +290,16 @@ export default function Dashboard() {
         onToggleSection={handleToggleSection}
         userData={userData}
         userRole={userData?.role}
+        isCollapsed={sidebarCollapsed}
+        onToggleCollapse={() => {
+          const newState = !sidebarCollapsed;
+          setSidebarCollapsed(newState);
+          localStorage.setItem('adminSidebarCollapsed', JSON.stringify(newState));
+        }}
       />
 
       {/* Contenido Principal */}
-      <div className="flex-1 ml-64 p-8 relative z-0 overflow-y-auto h-screen">
+      <div className={`flex-1 p-6 relative z-0 overflow-y-auto h-screen transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
 
 
 

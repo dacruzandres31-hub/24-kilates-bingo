@@ -524,6 +524,7 @@ const CasinoLobby = ({ user, onLogout }) => {
 
             <div className="profile-menu-container">
               <button
+                id="cartones-dropdown-btn"
                 className="btn-profile"
                 onClick={() => setShowTicketsDropdown(!showTicketsDropdown)}
               >
@@ -608,6 +609,7 @@ const CasinoLobby = ({ user, onLogout }) => {
           </button>
 
           <button
+            id="club-vip-btn"
             className="btn-profile btn-vip"
             onClick={() => navigate('/membresia')}
           >
@@ -616,6 +618,7 @@ const CasinoLobby = ({ user, onLogout }) => {
           </button>
 
           <button
+            id="referrals-btn"
             className="btn-profile btn-referral"
             style={{
               background: 'linear-gradient(45deg, #8b5cf6, #6366f1)',
@@ -631,6 +634,7 @@ const CasinoLobby = ({ user, onLogout }) => {
           </button>
 
           <button
+            id="invite-btn"
             className={`btn-profile btn-invite ${copiedLink ? 'bg-emerald-600' : ''}`}
             style={{
               background: copiedLink ? '#10b981' : 'linear-gradient(45deg, #f59e0b, #d97706)',
@@ -1134,6 +1138,9 @@ const CasinoLobby = ({ user, onLogout }) => {
         <ReferralDashboard onClose={() => setShowReferralDashboard(false)} />,
         document.body
       )}
+
+      {/* Tour */}
+      <CustomTour runTour={runTour} onTourEnd={() => setRunTour(false)} />
     </div>
   );
 };

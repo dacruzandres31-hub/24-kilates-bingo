@@ -1,8 +1,7 @@
-// TOUR REWRITTEN - Version 2.0 - 2026-01-02 17:10
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaTimes, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import './CustomTour.css';
+import { FaChevronRight, FaChevronLeft, FaTimes } from 'react-icons/fa';
 
 const tourSteps = [
     {
@@ -101,12 +100,13 @@ const tourSteps = [
 
 const CustomTour = ({ runTour, onTourEnd }) => {
     const navigate = useNavigate();
-    const [currentStep, setCurrentStep] = useState(0);
+    const [stepIndex, setStepIndex] = useState(0);
+    const [coords, setCoords] = useState(null);
     const [isVisible, setIsVisible] = useState(false);
 
     useEffect(() => {
         if (runTour) {
-            setCurrentStep(0);
+            setStepIndex(0);
             setIsVisible(true);
         } else {
             setIsVisible(false);
@@ -116,28 +116,72 @@ const CustomTour = ({ runTour, onTourEnd }) => {
     useEffect(() => {
         if (!isVisible) return;
 
-        const step = tourSteps[currentStep];
-        const element = document.querySelector(step.target);
+        const updatePosition = () => {
+            const step = tourSteps[stepIndex];
+            const element = document.querySelector(step.target);
 
+            if (element) {
+                const rect = element.getBoundingClientRect();
+                let width = rect.width;
+                let height = rect.height;
+                let top = rect.top;
+                let left = rect.left;
+
+                // Support for custom spotlight dimensions (centered)
+                if (step.customWidth) {
+                    const diffW = width - step.customWidth;
+                    width = step.customWidth;
+                    left += diffW / 2;
+                }
+                if (step.customHeight) {
+                    const diffH = height - step.customHeight;
+                    height = step.customHeight;
+                    top += diffH / 2;
+                }
+
+                setCoords({
+                    top,
+                    left,
+                    width,
+                    height,
+                    position: step.position
+                });
+            }
+        };
+
+        // Scroll into view
+        const step = tourSteps[stepIndex];
+        const element = document.querySelector(step.target);
         if (element) {
             element.scrollIntoView({
                 behavior: 'smooth',
                 block: step.scrollBlock || 'center'
             });
         }
-    }, [currentStep, isVisible]);
+
+        // Update position after scroll settles
+        const timer = setTimeout(updatePosition, 400);
+
+        // Only listen to resize, not scroll (scroll was causing infinite loop)
+        window.addEventListener('resize', updatePosition);
+
+        return () => {
+            window.removeEventListener('resize', updatePosition);
+            clearTimeout(timer);
+        };
+    }, [stepIndex, isVisible]);
 
     const handleNext = () => {
-        if (currentStep < tourSteps.length - 1) {
-            setCurrentStep(prev => prev + 1);
+        if (stepIndex < tourSteps.length - 1) {
+            setStepIndex(prev => prev + 1);
         } else {
             handleClose();
         }
     };
 
     const handlePrev = () => {
-        if (currentStep > 0) {
-            setCurrentStep(prev => prev - 1);
+        if (stepIndex > 0) {
+            setStepIndex(prev => prev - 1);
         }
     };
 
@@ -145,89 +189,97 @@ const CustomTour = ({ runTour, onTourEnd }) => {
         setIsVisible(false);
         if (onTourEnd) onTourEnd();
 
-        if (currentStep === tourSteps.length - 1) {
+        // If finished successfully (last step), redirect to room with tour
+        if (stepIndex === tourSteps.length - 1) {
             navigate('/sala/starter?tour=true');
         }
     };
 
-    if (!isVisible) return null;
+    if (!isVisible || !coords) return null;
 
-    const step = tourSteps[currentStep];
-    const element = document.querySelector(step.target);
+    const currentStep = tourSteps[stepIndex];
 
-    if (!element) return null;
-
-    const rect = element.getBoundingClientRect();
-
-    // Calculate spotlight position
-    const spotlightStyle = {
-        top: `${rect.top}px`,
-        left: `${rect.left}px`,
-        width: `${rect.width}px`,
-        height: `${rect.height}px`,
-    };
-
-    // Calculate card position
+    // Calculate clamped position
     const cardWidth = 300;
-    const cardHeight = 200;
+    const cardHeight = 200; // Approximate
     const safetyMargin = 20;
 
-    let cardLeft = rect.left + (rect.width / 2) - (cardWidth / 2);
-    if (cardLeft < safetyMargin) cardLeft = safetyMargin;
-    if (cardLeft + cardWidth > window.innerWidth - safetyMargin) {
-        cardLeft = window.innerWidth - cardWidth - safetyMargin;
+    // Center card relative to focus element
+    let leftPos = coords.left + (coords.width / 2) - (cardWidth / 2);
+
+    // Clamp Left/Right to Viewport
+    if (leftPos < safetyMargin) leftPos = safetyMargin;
+    if (leftPos + cardWidth > window.innerWidth - safetyMargin) {
+        leftPos = window.innerWidth - cardWidth - safetyMargin;
     }
 
-    let cardTop;
-    if (step.position === 'bottom') {
-        cardTop = rect.top + rect.height + 20;
-        if (cardTop + cardHeight > window.innerHeight - safetyMargin) {
-            cardTop = rect.top - cardHeight - 20;
+    let topPos;
+    if (coords.position === 'bottom') {
+        topPos = coords.top + coords.height + 20;
+        // Flip if not enough space below
+        if (topPos + cardHeight > window.innerHeight) {
+            topPos = coords.top - cardHeight - 20;
+        }
+    } else if (coords.position === 'top') {
+        // Position above the element
+        topPos = coords.top - cardHeight - 20;
+        // Flip if not enough space above
+        if (topPos < safetyMargin) {
+            topPos = coords.top + coords.height + 20;
         }
     } else {
-        cardTop = rect.top - cardHeight - 20;
-        if (cardTop < safetyMargin) {
-            cardTop = rect.top + rect.height + 20;
+        // Default: try top first
+        topPos = coords.top - cardHeight - 20;
+        if (topPos < safetyMargin) {
+            topPos = coords.top + coords.height + 20;
         }
     }
 
-    if (cardTop < safetyMargin) cardTop = safetyMargin;
-    if (cardTop + cardHeight > window.innerHeight - safetyMargin) {
-        cardTop = window.innerHeight - cardHeight - safetyMargin;
+    // Final safety check: ensure card is within viewport
+    if (topPos < safetyMargin) topPos = safetyMargin;
+    if (topPos + cardHeight > window.innerHeight - safetyMargin) {
+        topPos = window.innerHeight - cardHeight - safetyMargin;
     }
 
-    const cardStyle = {
-        top: `${cardTop}px`,
-        left: `${cardLeft}px`,
+    const spotlightStyle = {
+        top: coords.top,
+        left: coords.left,
+        width: coords.width,
+        height: coords.height,
     };
 
     return (
         <div className="custom-tour-overlay">
-            <div className="tour-spotlight" style={spotlightStyle} />
+            {/* Spotlight Effect */}
+            <div
+                className="tour-spotlight"
+                style={spotlightStyle}
+            />
 
-            <div className="tour-card" style={cardStyle}>
+            {/* Content Card */}
+            <div
+                className={`tour-card ${coords.position}`}
+                style={{
+                    top: topPos,
+                    left: leftPos,
+                }}
+            >
                 <div className="tour-header">
-                    <h3>{step.title}</h3>
-                    <button onClick={handleClose} className="tour-close">
-                        <FaTimes />
-                    </button>
+                    <h3>{currentStep.title}</h3>
+                    <button onClick={handleClose} className="tour-close"><FaTimes /></button>
                 </div>
                 <div className="tour-body">
-                    <p>{step.content}</p>
+                    <p>{currentStep.content}</p>
                 </div>
                 <div className="tour-footer">
-                    <span className="tour-counter">{currentStep + 1} / {tourSteps.length}</span>
+                    <span className="tour-counter">{stepIndex + 1} / {tourSteps.length}</span>
                     <div className="tour-actions">
-                        <button
-                            onClick={handlePrev}
-                            disabled={currentStep === 0}
-                            className="tour-btn secondary"
-                        >
+                        <button onClick={handlePrev} disabled={stepIndex === 0} className="tour-btn secondary">
                             <FaChevronLeft />
                         </button>
                         <button onClick={handleNext} className="tour-btn primary">
-                            {currentStep === tourSteps.length - 1 ? '¡A Jugar!' : 'Siguiente'}
-                            {currentStep < tourSteps.length - 1 && <FaChevronRight />}
+                            {stepIndex === tourSteps.length - 1 ? '¡A Jugar!' : 'Siguiente'}
+                            {stepIndex < tourSteps.length - 1 && <FaChevronRight />}
                         </button>
                     </div>
                 </div>
