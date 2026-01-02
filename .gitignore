@@ -43,7 +43,7 @@ temp/
 *.tmp
 
 # Database
-*.sql
+*.sql\n!server/database/bingo_24k_launch.sql
 *.sql.backup
 *.db
 *.sqlite
