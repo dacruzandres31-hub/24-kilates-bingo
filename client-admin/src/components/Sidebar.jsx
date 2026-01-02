@@ -95,6 +95,7 @@ export default function Sidebar({ isOpen, onClose, activeSections, onToggleSecti
             <div key={menu.id}>
               {/* Menu Header */}
               <button
+                id={`nav-group-${menu.id}`}
                 onClick={() => {
                   if (menu.sections.length === 0) {
                     // Si no tiene secciones, activar directamente
@@ -139,6 +140,7 @@ export default function Sidebar({ isOpen, onClose, activeSections, onToggleSecti
                     .map((section) => (
                       <button
                         key={section.id}
+                        id={`nav-${section.id}`}
                         onClick={() => onToggleSection(section.id)}
                         className={`w-full px-3 py-2 rounded-lg text-left text-sm transition-all ${activeSections[section.id]
                           ? 'bg-gold-500/20 text-gold-300 border-l-2 border-gold-500'
@@ -157,6 +159,12 @@ export default function Sidebar({ isOpen, onClose, activeSections, onToggleSecti
 
       {/* Footer del Sidebar */}
       <div className="p-4 border-t border-slate-700 mt-auto">
+        <button
+          onClick={() => window.dispatchEvent(new CustomEvent('startAdminTour'))}
+          className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-sm font-bold py-2 px-4 rounded-lg shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 mb-3"
+        >
+          <span>🎓</span> Iniciar Tour
+        </button>
         <p className="text-xs text-slate-500 text-center">
           Panel Admin v1.0
         </p>

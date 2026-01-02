@@ -27,6 +27,29 @@ import RoomConfigPanel from '../components/RoomConfigPanel';
 import ScheduleGridPanel from '../components/ScheduleGridPanel';
 import PaymentAccountsPanel from '../components/PaymentAccountsPanel';
 import SystemHealthPanel from '../components/SystemHealthPanel';
+import AdminTour from '../components/AdminTour';
+
+// ... (existing imports)
+
+export default function Dashboard() {
+  // ... (existing state)
+  const [runTour, setRunTour] = useState(false);
+
+  useEffect(() => {
+    const handleStartTour = () => setRunTour(true);
+    window.addEventListener('startAdminTour', handleStartTour);
+    return () => window.removeEventListener('startAdminTour', handleStartTour);
+  }, []);
+
+  // ... (existing logic)
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex">
+      {/* Tour Component */}
+      <AdminTour runTour={runTour} onTourEnd={() => setRunTour(false)} />
+
+      {/* Sidebar */}
+      <Sidebar
 import AdminAuditLog from '../components/AdminAuditLog';
 import MyReferralsPanel from '../components/MyReferralsPanel';
 import { ChevronDown, ChevronRight, Share2, Copy, Check } from 'lucide-react';
@@ -35,6 +58,7 @@ export default function Dashboard() {
   const [userData, setUserData] = useState(null);
   const [financialData, setFinancialData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [runTour, setRunTour] = useState(false);
   const [cartonesStock, setCartonesStock] = useState({
     bronce: 0,
     plata: 0,
@@ -88,7 +112,17 @@ export default function Dashboard() {
   useEffect(() => {
     fetchDashboardData();
     const interval = setInterval(fetchDashboardData, 10000); // Actualizar cada 10s
-    return () => clearInterval(interval);
+
+    const handleStartTour = () => {
+        console.log('🏁 Arrancando Tour de Agente...');
+        setRunTour(true);
+    };
+    window.addEventListener('startAdminTour', handleStartTour);
+
+    return () => {
+        clearInterval(interval);
+        window.removeEventListener('startAdminTour', handleStartTour);
+    };
   }, []);
 
   useEffect(() => {
@@ -314,6 +348,8 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex">
+      <AdminTour runTour={runTour} onTourEnd={() => setRunTour(false)} />
+      
       {/* Sidebar */}
       <Sidebar
         activeSections={activeSections}
