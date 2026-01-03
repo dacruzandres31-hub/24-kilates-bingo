@@ -8,7 +8,7 @@ const pool = mysql.createPool({
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'bingo_24k',
   waitForConnections: true,
-  connectionLimit: 50, // Increased for concurrent dashboards and active game sessions
+  connectionLimit: 20, // Adjusted for cluster mode (20 per core)
   queueLimit: 0,
   enableKeepAlive: true,
   keepAliveInitialDelay: 10000,

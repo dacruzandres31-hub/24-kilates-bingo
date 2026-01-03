@@ -43,6 +43,9 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 // EXPRESS APP
 const app = express();
 
+// Configurar trust proxy para express-rate-limit en producción (detrás de nginx)
+app.set('trust proxy', 1);
+
 // GLOBAL DEBUG LOGGER
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', serverTime: new Date() });
@@ -105,6 +108,28 @@ app.set('io', io);
 
 // También hacer io accesible globalmente para servicios
 global.io = io;
+
+// REDIS ADAPTER PARA CLUSTERING
+const setupRedisAdapter = async () => {
+  if (process.env.NODE_ENV === 'production') {
+    try {
+      const { createAdapter } = require('@socket.io/redis-adapter');
+      const { createClient } = require('redis');
+
+      const pubClient = createClient({
+        url: `redis://${process.env.REDIS_HOST || 'localhost'}:${process.env.REDIS_PORT || 6379}`
+      });
+      const subClient = pubClient.duplicate();
+
+      await Promise.all([pubClient.connect(), subClient.connect()]);
+      io.adapter(createAdapter(pubClient, subClient));
+      console.log('✅ Socket.IO Redis Adapter conectado (Cluster Mode)');
+    } catch (err) {
+      console.error('❌ Error configurando Socket.IO Redis Adapter:', err.message);
+    }
+  }
+};
+setupRedisAdapter();
 
 const metricsService = require('./services/metricsService'); // Add import
 
