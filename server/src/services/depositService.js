@@ -34,12 +34,25 @@ class DepositService {
     // ============================================
     // CREAR SOLICITUD DE DEPÓSITO (ORDEN)
     // ============================================
-    static async createDepositRequest(userId, accountId, amount, proofUrl, details = null, requestType = 'balance') {
+    static async createDepositRequest(userId, accountId, amount, proofUrl, details = null, requestType = 'balance', io = null) {
         const connection = await pool.getConnection();
         try {
             await connection.beginTransaction();
 
             const detailsJson = details ? JSON.stringify(details) : null;
+
+            // VALIDACIÓN: Si es compra de membresía, verificar que no tenga otra pendiente
+            if (requestType === 'membership_purchase') {
+                const [existingPending] = await connection.query(`
+                    SELECT id FROM deposit_requests 
+                    WHERE user_id = ? AND request_type = 'membership_purchase' AND status = 'pending'
+                    LIMIT 1
+                `, [userId]);
+                
+                if (existingPending.length > 0) {
+                    throw new Error('Ya tienes una solicitud de membresía pendiente. Espera a que sea procesada.');
+                }
+            }
 
             // 1. Obtener el dueño de la cuenta (target_user_id)
             const [accountRows] = await connection.query('SELECT owner_id FROM payment_accounts WHERE id = ? FOR UPDATE', [accountId]);
@@ -64,6 +77,30 @@ class DepositService {
 
             await connection.commit();
 
+            // -----------------------------------------------------
+            // NOTIFICACIONES REAL-TIME (SOCKET.IO)
+            // -----------------------------------------------------
+            if (io || global.io) {
+                const socketIo = io || global.io;
+                
+                // Obtener username del solicitante
+                const [userRows] = await pool.query('SELECT username FROM users WHERE id = ?', [userId]);
+                const username = userRows.length > 0 ? userRows[0].username : 'Usuario';
+                
+                // Notificar a todos los admins/cajeros que hay nueva solicitud
+                socketIo.emit('deposit_request_created', {
+                    requestId: result.insertId,
+                    userId: userId,
+                    username: username,
+                    amount: MoneyMath.toNumber(amount),
+                    requestType: requestType,
+                    details: details,
+                    timestamp: new Date().toISOString()
+                });
+                
+                console.log(`[DepositService] 📡 Emitido deposit_request_created para request #${result.insertId}`);
+            }
+
             return {
                 depositId: result.insertId,
                 message: 'Orden de compra creada exitosamente'
@@ -81,6 +118,7 @@ class DepositService {
     // ============================================
     static async approveDeposit(depositId, reviewerId, io = null) {
         const connection = await pool.getConnection();
+        let membershipTicket = null; // Para comprobante de membresía
 
         try {
             await connection.beginTransaction();
@@ -102,7 +140,7 @@ class DepositService {
 
             // 2. Acreditar fichas al usuario
             const [users] = await connection.query(
-                `SELECT balance, role FROM users WHERE id = ? FOR UPDATE`,
+                `SELECT balance, role, username, subscription_tier_id FROM users WHERE id = ? FOR UPDATE`,
                 [deposit.user_id]
             );
 
@@ -213,14 +251,6 @@ class DepositService {
                 }
 
                 // Activar membresía SIN descontar saldo (ya pagó por transferencia)
-                // Usamos MembershipService pero necesitamos pasarlo o requerirlo. (Added require at top)
-                // NOTA: MembershipService usa su propia conexión/transacción.
-                // Para consistencia transaccional ideal, MembershipService debería aceptar una conexión externa,
-                // Pero por simplicidad en MVP, y dado que `activateSubscription` es robusto, lo llamaremos post-commit o asumimos riesgo bajo.
-                // MEJOR OPCIÓN: Copiar lógica o refactorizar service. 
-                // Dado el tiempo, ejecutaremos la lógica de activación AQUÍ dentro de la transacción actual.
-
-                // --- ACTIVACIÓN IN-LINE ---
                 const membershipId = details.membershipId;
 
                 // 1. Validar Plan
@@ -228,37 +258,104 @@ class DepositService {
                 if (plans.length === 0) throw new Error('Plan de membresía no encontrado');
                 const plan = plans[0];
                 const config = typeof plan.benefits_config === 'string' ? JSON.parse(plan.benefits_config) : plan.benefits_config;
+                const planNameLower = plan.name.toLowerCase();
+                const isEmbajador = planNameLower.includes('embajador');
 
-                // 2. Desactivar anterior si existe
-                if (users[0].subscription_tier_id) {
-                    await connection.query("UPDATE user_subscriptions SET status = 'replaced' WHERE user_id = ? AND status = 'active'", [deposit.user_id]);
+                // 2. Obtener suscripciones activas actuales
+                const [activeSubs] = await connection.query(`
+                    SELECT us.*, m.name as plan_name, m.price 
+                    FROM user_subscriptions us 
+                    JOIN memberships m ON us.membership_id = m.id
+                    WHERE us.user_id = ? AND us.status = 'active'
+                `, [deposit.user_id]);
+
+                const currentEmbajador = activeSubs.find(s => s.plan_name.toLowerCase().includes('embajador'));
+                const currentTier = activeSubs.find(s => !s.plan_name.toLowerCase().includes('embajador'));
+
+                // 3. Lógica de combinación/reemplazo
+                if (isEmbajador) {
+                    // Embajador: verificar que no tenga ya Embajador activo
+                    if (currentEmbajador) {
+                        throw new Error('Ya tienes la membresía Embajador activa');
+                    }
+                    // Embajador es combinable con cualquier tier, no reemplazamos nada
+                } else {
+                    // Tier regular (Bronce/Plata/Oro)
+                    if (currentTier) {
+                        const currentTierName = currentTier.plan_name.toLowerCase();
+                        
+                        // Definir jerarquía: bronce=1, plata=2, oro=3
+                        const getTierLevel = (name) => {
+                            if (name.includes('oro')) return 3;
+                            if (name.includes('plata')) return 2;
+                            if (name.includes('bronce')) return 1;
+                            return 0;
+                        };
+                        
+                        const currentLevel = getTierLevel(currentTierName);
+                        const newLevel = getTierLevel(planNameLower);
+                        
+                        // Oro no puede ser reemplazada
+                        if (currentLevel === 3) {
+                            throw new Error('Ya tienes la membresía Oro activa. No puede ser reemplazada.');
+                        }
+                        
+                        // Solo se puede subir de nivel, no bajar
+                        if (newLevel <= currentLevel) {
+                            throw new Error(`No puedes cambiar de ${currentTier.plan_name} a ${plan.name}. Solo puedes subir de nivel.`);
+                        }
+                        
+                        // Marcar tier actual como reemplazado
+                        await connection.query(
+                            "UPDATE user_subscriptions SET status = 'replaced' WHERE id = ?",
+                            [currentTier.id]
+                        );
+                    }
                 }
 
-                // 3. Crear Subscripción
+                // 4. Crear Subscripción
                 const nextBilling = new Date();
                 nextBilling.setMonth(nextBilling.getMonth() + 1);
 
-                await connection.query(`
+                const [subResult] = await connection.query(`
                     INSERT INTO user_subscriptions 
                     (user_id, membership_id, status, start_date, next_billing_date, auto_renew)
                     VALUES (?, ?, 'active', NOW(), ?, true)
                 `, [deposit.user_id, membershipId, nextBilling]);
 
-                // 4. Actualizar Usuario (Beneficios)
+                // 5. Actualizar Usuario (Beneficios) - solo para tier principal, no embajador
                 const monthlyCards = config.monthly_free_cards || 0;
                 const dailySpins = config.wheel_daily_spins || 0;
 
-                await connection.query(`
-                    UPDATE users 
-                    SET 
-                      subscription_tier_id = ?,
-                      monthly_free_cards_balance = ?,
-                      daily_wheel_spins_balance = ?,
-                      last_benefit_reset = NOW()
-                    WHERE id = ?
-                `, [membershipId, monthlyCards, dailySpins, deposit.user_id]);
+                if (!isEmbajador) {
+                    await connection.query(`
+                        UPDATE users 
+                        SET 
+                          subscription_tier_id = ?,
+                          monthly_free_cards_balance = ?,
+                          daily_wheel_spins_balance = ?,
+                          last_benefit_reset = NOW()
+                        WHERE id = ?
+                    `, [membershipId, monthlyCards, dailySpins, deposit.user_id]);
+                }
 
                 balanceAfter = balanceBefore; // El dinero fue para la membresía, no al saldo
+                
+                // Guardar datos para el ticket/comprobante
+                membershipTicket = {
+                    subscriptionId: subResult.insertId,
+                    planName: plan.name,
+                    planPrice: plan.price,
+                    username: users[0].username,
+                    userId: deposit.user_id,
+                    activatedAt: new Date().toISOString(),
+                    expiresAt: nextBilling.toISOString(),
+                    benefits: {
+                        monthlyCards,
+                        dailySpins,
+                        dailyBronzeCards: config.daily_bronze_cards || 0
+                    }
+                };
             }
             else {
                 // --- CASO NORMAL: Acreditar balance de dinero ---
@@ -321,6 +418,26 @@ class DepositService {
                         to: deposit.user_id
                     });
                 }
+                
+                // 3. Evento específico para membresías
+                if (deposit.request_type === 'membership_purchase') {
+                    io.to(`user_${deposit.user_id}`).emit('membership_status_updated', {
+                        status: 'approved',
+                        requestId: depositId,
+                        membershipTicket: membershipTicket,
+                        message: '¡Tu membresía ha sido activada!'
+                    });
+                }
+                
+                // 4. Notificar a todos los admins que el depósito fue procesado
+                io.emit('deposit_request_processed', {
+                    requestId: depositId,
+                    status: 'approved',
+                    userId: deposit.user_id,
+                    requestType: deposit.request_type,
+                    processedBy: reviewerId,
+                    timestamp: new Date().toISOString()
+                });
             }
 
             // -----------------------------------------------------
@@ -348,7 +465,8 @@ class DepositService {
 
             return {
                 success: true,
-                newBalance: MoneyMath.toNumber(balanceAfter)
+                newBalance: MoneyMath.toNumber(balanceAfter),
+                membershipTicket // Incluye datos del comprobante si fue membresía
             };
 
         } catch (error) {
@@ -362,14 +480,16 @@ class DepositService {
     // ============================================
     // RECHAZAR DEPÓSITO
     // ============================================
-    static async rejectDeposit(depositId, reviewerId, reason) {
+    static async rejectDeposit(depositId, reviewerId, reason, io = null) {
         const connection = await pool.getConnection();
         try {
             await connection.beginTransaction();
 
             // 1. Obtener datos del depósito para saber cuánto descontar y de qué cuenta
             const [rows] = await connection.query(
-                `SELECT account_id, amount_declared, status FROM deposit_requests WHERE id = ? FOR UPDATE`,
+                `SELECT dr.*, u.username FROM deposit_requests dr 
+                 JOIN users u ON dr.user_id = u.id 
+                 WHERE dr.id = ? FOR UPDATE`,
                 [depositId]
             );
 
@@ -402,6 +522,41 @@ class DepositService {
             }
 
             await connection.commit();
+            
+            // -----------------------------------------------------
+            // NOTIFICACIONES REAL-TIME (SOCKET.IO)
+            // -----------------------------------------------------
+            const socketIo = io || global.io;
+            if (socketIo) {
+                // 1. Notificar al usuario que su solicitud fue rechazada
+                socketIo.to(`user_${deposit.user_id}`).emit('resources_updated', {
+                    trigger: 'deposit_rejected',
+                    type: deposit.request_type,
+                    reason: reason
+                });
+                
+                // 2. Evento específico para membresías rechazadas
+                if (deposit.request_type === 'membership_purchase') {
+                    socketIo.to(`user_${deposit.user_id}`).emit('membership_status_updated', {
+                        status: 'rejected',
+                        requestId: depositId,
+                        reason: reason,
+                        message: 'Tu solicitud de membresía fue rechazada'
+                    });
+                }
+                
+                // 3. Notificar a todos los admins que el depósito fue procesado
+                socketIo.emit('deposit_request_processed', {
+                    requestId: depositId,
+                    status: 'rejected',
+                    userId: deposit.user_id,
+                    requestType: deposit.request_type,
+                    processedBy: reviewerId,
+                    reason: reason,
+                    timestamp: new Date().toISOString()
+                });
+            }
+            
             return { success: true, message: 'Solicitud rechazada y volumen corregido' };
 
         } catch (error) {

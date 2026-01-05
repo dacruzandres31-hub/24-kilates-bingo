@@ -44,8 +44,8 @@ const BattlePass = ({ onClose }) => {
             const headers = { Authorization: `Bearer ${token}` };
 
             const [levelsRes, progressRes] = await Promise.all([
-                axios.get('http://localhost:3001/api/gamification/levels', { headers }),
-                axios.get('http://localhost:3001/api/gamification/progress', { headers })
+                axios.get('/api/gamification/levels', { headers }),
+                axios.get('/api/gamification/progress', { headers })
             ]);
 
             if (levelsRes.data.success) {

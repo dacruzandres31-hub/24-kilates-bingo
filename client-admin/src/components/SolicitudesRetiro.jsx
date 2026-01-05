@@ -8,8 +8,9 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Copy, Share2 } from 'lucide-react';
 import CardReceiptModal from './CardReceiptModal';
+import { io } from 'socket.io-client';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : 'http://localhost:3001';
 
 export default function SolicitudesRetiro({ userData }) {
   const [solicitudes, setSolicitudes] = useState([]);
@@ -35,6 +36,25 @@ export default function SolicitudesRetiro({ userData }) {
 
   useEffect(() => {
     fetchSolicitudes();
+    
+    // Socket.IO para actualizaciones en tiempo real
+    const socket = io(API_URL || window.location.origin);
+    
+    socket.on('withdrawal_request_created', (data) => {
+      console.log('📩 Nueva solicitud de retiro:', data);
+      fetchSolicitudes();
+    });
+    
+    socket.on('withdrawal_request_processed', (data) => {
+      console.log('✅ Retiro procesado:', data);
+      fetchSolicitudes();
+    });
+    
+    return () => {
+      socket.off('withdrawal_request_created');
+      socket.off('withdrawal_request_processed');
+      socket.disconnect();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtroEstado]);
 
@@ -163,7 +183,8 @@ export default function SolicitudesRetiro({ userData }) {
 
   const handleOpenReceipt = (req) => {
     setModalData({
-      type: 'dinero',
+      type: 'retiro',
+      operationType: 'withdrawal',
       operation: 'RETIRO EXITOSO',
       quantity: parseFloat(req.amount),
       userName: req.username,
@@ -367,7 +388,7 @@ export default function SolicitudesRetiro({ userData }) {
                   {/* Mensaje para agentes */}
                   {solicitud.status === 'pending' && !isSuperAdmin && (
                     <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-4 mt-4">
-                      <p className="text-yellow-400 text-sm">⏳ Pendiente de aprobación por Andy</p>
+                      <p className="text-yellow-400 text-sm">⏳ Pendiente de aprobación por 24Kilates</p>
                     </div>
                   )}
                 </div>

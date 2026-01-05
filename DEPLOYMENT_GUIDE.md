@@ -1,8 +1,8 @@
-# 🚀 Deployment Guide - Bingo 24 Kilates
+# 🚀 Deployment Guide - Bingo 24 Kilates (Cloud VPS / Vultr / Digital Ocean)
 
-## Digital Ocean Production Deployment
+## Producción en VPS Cloud (Ubuntu 22.04)
 
-Este documento describe cómo desplegar Bingo 24 Kilates en Digital Ocean como una PWA de alto rendimiento.
+Este documento describe cómo desplegar Bingo 24 Kilates en cualquier proveedor de VPS (Vultr, Digital Ocean, Linode, AWS) como una PWA de alto rendimiento usando Docker.
 
 ---
 

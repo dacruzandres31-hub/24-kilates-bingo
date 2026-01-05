@@ -20,14 +20,21 @@ class MembershipController {
                 return res.status(401).json({ error: 'Usuario no autenticado' });
             }
 
-            const subscription = await membershipService.getUserSubscription(req.user.id);
-            const pendingRequest = await membershipService.getPendingPurchase(req.user.id);
+            // Get ALL active subscriptions (can have Embajador + another)
+            const activeSubscriptions = await membershipService.getUserSubscriptions(req.user.id);
+            const pendingRequests = await membershipService.getPendingPurchases(req.user.id);
+
+            // Separate Embajador from regular tier
+            const embajadorSub = activeSubscriptions.find(s => s.plan_name && s.plan_name.toLowerCase().includes('embajador'));
+            const tierSub = activeSubscriptions.find(s => s.plan_name && !s.plan_name.toLowerCase().includes('embajador'));
 
             res.json({
-                subscription: subscription || null, // Ensure consistent structure
-                pendingRequest: pendingRequest || null,
-                status: subscription ? 'active' : 'none', // Legacy support if needed
-                message: subscription ? undefined : 'No tienes suscripción activa'
+                subscription: tierSub || null, // Main tier (Bronce/Plata/Oro)
+                embajadorSubscription: embajadorSub || null, // Embajador if active
+                activeSubscriptions: activeSubscriptions, // All active subs
+                pendingRequests: pendingRequests || [],
+                status: activeSubscriptions.length > 0 ? 'active' : 'none',
+                message: activeSubscriptions.length === 0 ? 'No tienes suscripción activa' : undefined
             });
         } catch (error) {
             console.error('Error fetching subscription:', error);
@@ -54,11 +61,11 @@ class MembershipController {
     async getSubscription(req, res) {
         try {
             const subscription = await membershipService.getUserSubscription(req.user.id);
-            const pendingRequest = await membershipService.getPendingPurchase(req.user.id);
+            const pendingRequests = await membershipService.getPendingPurchases(req.user.id);
 
             res.json({
                 subscription: subscription || null,
-                pendingRequest: pendingRequest || null
+                pendingRequests: pendingRequests || []
             });
         } catch (error) {
             console.error(error);

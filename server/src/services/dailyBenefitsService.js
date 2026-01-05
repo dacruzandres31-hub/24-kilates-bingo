@@ -1,11 +1,29 @@
 const dbHelper = require('../helpers/dbHelper');
 
 /**
- * Obtiene la cantidad de cartones gratis diarios según el tier
+ * Obtiene los beneficios de membresía desde la config de BD
+ * @param {Object} benefitsConfig - Configuración JSON de la membresía
+ * @returns {Object} - { dailyBronzeCards, dailyOroCards, dailySpins }
+ */
+function getBenefitsFromConfig(benefitsConfig) {
+    if (!benefitsConfig) return { dailyBronzeCards: 0, dailyOroCards: 0, dailySpins: 0 };
+    
+    const config = typeof benefitsConfig === 'string' ? JSON.parse(benefitsConfig) : benefitsConfig;
+    
+    return {
+        dailyBronzeCards: config.daily_bronze_cards || 0,
+        dailyOroCards: config.daily_oro_cards || 0,
+        dailySpins: config.wheel_daily_spins || 0
+    };
+}
+
+/**
+ * Obtiene la cantidad de cartones gratis diarios según el tier (legacy - mantener compatibilidad)
  */
 function getDailyCardsByTier(tierName) {
     if (!tierName) return 0;
 
+    // Membresía Socio Bronce/Plata/Oro dan cartones ORO
     if (tierName.toLowerCase().includes('bronce')) return 1;
     if (tierName.toLowerCase().includes('plata')) return 2;
     if (tierName.toLowerCase().includes('oro')) return 3;
@@ -14,7 +32,7 @@ function getDailyCardsByTier(tierName) {
 }
 
 /**
- * Obtiene la cantidad de giros extra diarios según el tier
+ * Obtiene la cantidad de giros extra diarios según el tier (legacy)
  * Bronce NO tiene giros diarios (solo 1 al renovar)
  */
 function getDailySpinsByTier(tierName) {
@@ -23,24 +41,27 @@ function getDailySpinsByTier(tierName) {
     if (tierName.toLowerCase().includes('plata')) return 1;
     if (tierName.toLowerCase().includes('oro')) return 2;
 
-    return 0; // Bronce no tiene giros diarios
+    return 0; // Bronce y Embajador no tienen giros diarios
 }
 
 /**
- * Verifica y resetea TODOS los beneficios diarios si es necesario
- * Retorna los beneficios disponibles
+ * Verifica y retorna los beneficios disponibles del usuario
+ * Los cartones se entregan via cron diario (membershipService.resetDailyBenefits)
+ * Esta función solo consulta los balances actuales
  */
 async function checkAndResetDailyBenefits(userId) {
     try {
-        // Obtener usuario con suscripción
+        // Obtener usuario con suscripción y sus gift cards
         const user = await dbHelper.queryOne(
             `SELECT u.id, 
-                    u.daily_free_cards_balance, 
-                    u.daily_free_cards_last_reset,
+                    u.gift_cards_bronce,
+                    u.gift_cards_plata,
+                    u.gift_cards_oro,
                     u.daily_wheel_spins_balance,
-                    u.daily_wheel_spins_last_reset,
+                    u.last_benefit_reset,
                     us.membership_id, 
-                    m.name as tier_name
+                    m.name as tier_name,
+                    m.benefits_config
              FROM users u
              LEFT JOIN user_subscriptions us ON u.id = us.user_id AND us.status = 'active'
              LEFT JOIN memberships m ON us.membership_id = m.id
@@ -53,54 +74,32 @@ async function checkAndResetDailyBenefits(userId) {
             throw new Error('Usuario no encontrado');
         }
 
-        // Si no tiene membresía activa, retornar 0
+        // Si no tiene membresía activa, retornar solo las gift cards que tenga
         if (!user.membership_id) {
             return {
-                freeCards: 0,
-                extraSpins: 0,
+                giftCardsBronce: user.gift_cards_bronce || 0,
+                giftCardsPlata: user.gift_cards_plata || 0,
+                giftCardsOro: user.gift_cards_oro || 0,
+                extraSpins: user.daily_wheel_spins_balance || 0,
                 tierName: null
             };
         }
 
-        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-        let updates = {};
-        let freeCards = user.daily_free_cards_balance || 0;
-        let extraSpins = user.daily_wheel_spins_balance || 0;
-
-        // Reset cartones gratis si es necesario
-        if (user.daily_free_cards_last_reset !== today) {
-            const dailyCards = getDailyCardsByTier(user.tier_name);
-            updates.daily_free_cards_balance = dailyCards;
-            updates.daily_free_cards_last_reset = today;
-            freeCards = dailyCards;
-            console.log(`[DailyBenefits] 🎁 Reset cartones para usuario ${userId}: ${dailyCards} (${user.tier_name})`);
-        }
-
-        // Reset giros extra si es necesario
-        if (user.daily_wheel_spins_last_reset !== today) {
-            const dailySpins = getDailySpinsByTier(user.tier_name);
-            updates.daily_wheel_spins_balance = dailySpins;
-            updates.daily_wheel_spins_last_reset = today;
-            extraSpins = dailySpins;
-            console.log(`[DailyBenefits] 🎰 Reset giros para usuario ${userId}: ${dailySpins} (${user.tier_name})`);
-        }
-
-        // Aplicar updates si hay cambios
-        if (Object.keys(updates).length > 0) {
-            const setClauses = Object.keys(updates).map(key => `${key} = ?`).join(', ');
-            const values = [...Object.values(updates), userId];
-
-            await dbHelper.query(
-                `UPDATE users SET ${setClauses} WHERE id = ?`,
-                values,
-                'ResetDailyBenefits'
-            );
-        }
+        // Obtener beneficios configurados para esta membresía
+        const benefits = getBenefitsFromConfig(user.benefits_config);
 
         return {
-            freeCards,
-            extraSpins,
-            tierName: user.tier_name
+            giftCardsBronce: user.gift_cards_bronce || 0,
+            giftCardsPlata: user.gift_cards_plata || 0,
+            giftCardsOro: user.gift_cards_oro || 0,
+            extraSpins: user.daily_wheel_spins_balance || 0,
+            tierName: user.tier_name,
+            // Info de beneficios diarios que recibe
+            dailyBenefits: {
+                bronzeCards: benefits.dailyBronzeCards,
+                oroCards: benefits.dailyOroCards,
+                spins: benefits.dailySpins
+            }
         };
 
     } catch (error) {
@@ -110,39 +109,62 @@ async function checkAndResetDailyBenefits(userId) {
 }
 
 /**
- * Reduce el balance de cartones gratis después de reclamarlos
+ * Consume cartones de regalo de una sala específica
+ * @param {number} userId - ID del usuario
+ * @param {string} room - Sala: 'bronce', 'plata', 'oro'
+ * @param {number} quantity - Cantidad a consumir
  */
-async function consumeDailyCards(userId, quantity) {
+async function consumeGiftCards(userId, room, quantity) {
     try {
+        const columnMap = {
+            'bronce': 'gift_cards_bronce',
+            'plata': 'gift_cards_plata',
+            'oro': 'gift_cards_oro'
+        };
+
+        const column = columnMap[room.toLowerCase()];
+        if (!column) {
+            throw new Error(`Sala inválida: ${room}`);
+        }
+
         const user = await dbHelper.queryOne(
-            'SELECT daily_free_cards_balance FROM users WHERE id = ?',
+            `SELECT ${column} as balance FROM users WHERE id = ?`,
             [userId],
-            'GetDailyCardsBalance'
+            'GetGiftCardsBalance'
         );
 
         if (!user) {
             throw new Error('Usuario no encontrado');
         }
 
-        if (user.daily_free_cards_balance < quantity) {
-            throw new Error(`No tienes suficientes cartones gratis. Disponibles: ${user.daily_free_cards_balance}, Solicitados: ${quantity}`);
+        if (user.balance < quantity) {
+            throw new Error(`No tienes suficientes cartones de ${room.toUpperCase()}. Disponibles: ${user.balance}, Solicitados: ${quantity}`);
         }
 
         await dbHelper.query(
-            'UPDATE users SET daily_free_cards_balance = daily_free_cards_balance - ? WHERE id = ?',
+            `UPDATE users SET ${column} = ${column} - ? WHERE id = ?`,
             [quantity, userId],
-            'ConsumeDailyCards'
+            'ConsumeGiftCards'
         );
 
-        const newBalance = user.daily_free_cards_balance - quantity;
-        console.log(`[DailyBenefits] ✅ Usuario ${userId} consumió ${quantity} cartones. Balance restante: ${newBalance}`);
+        const newBalance = user.balance - quantity;
+        console.log(`[DailyBenefits] ✅ Usuario ${userId} consumió ${quantity} cartones ${room.toUpperCase()}. Balance restante: ${newBalance}`);
 
         return newBalance;
 
     } catch (error) {
-        console.error('[DailyBenefits] Error en consumeDailyCards:', error);
+        console.error('[DailyBenefits] Error en consumeGiftCards:', error);
         throw error;
     }
+}
+
+/**
+ * Consume cartones gratis diarios (legacy - redirige a consumeGiftCards con oro)
+ * @deprecated Usar consumeGiftCards directamente
+ */
+async function consumeDailyCards(userId, quantity) {
+    // Los cartones gratis diarios son de ORO para Bronce/Plata/Oro
+    return consumeGiftCards(userId, 'oro', quantity);
 }
 
 /**
@@ -184,7 +206,9 @@ async function consumeDailySpins(userId, quantity = 1) {
 module.exports = {
     getDailyCardsByTier,
     getDailySpinsByTier,
+    getBenefitsFromConfig,
     checkAndResetDailyBenefits,
+    consumeGiftCards,
     consumeDailyCards,
     consumeDailySpins
 };

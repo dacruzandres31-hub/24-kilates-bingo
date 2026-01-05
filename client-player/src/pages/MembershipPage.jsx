@@ -1,44 +1,101 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { FaGem, FaCrown, FaStar, FaCheck, FaArrowLeft, FaGift, FaSync, FaMoneyBillWave } from 'react-icons/fa';
+import { FaGem, FaCrown, FaStar, FaCheck, FaArrowLeft, FaGift, FaSync, FaMoneyBillWave, FaClock, FaExclamationTriangle } from 'react-icons/fa';
 import '../styles/MembershipPage.css';
 import logoFull from '../assets/logo.png'; // Import Logo
 import MembershipPurchaseModal from '../components/MembershipPurchaseModal'; // Import Modal
+import { io } from 'socket.io-client';
 
 const MembershipPage = ({ user, onLogout }) => {
     const [plans, setPlans] = useState([]);
-    const [currentSub, setCurrentSub] = useState(null);
-    const [pendingReq, setPendingReq] = useState(null); // New state for pending request
+    const [currentSub, setCurrentSub] = useState(null);         // Main tier (Bronce/Plata/Oro)
+    const [embajadorSub, setEmbajadorSub] = useState(null);     // Embajador sub (can combine)
+    const [activeSubscriptions, setActiveSubscriptions] = useState([]); // All active subs
+    const [pendingRequests, setPendingRequests] = useState([]); // Array of pending requests
     const [loading, setLoading] = useState(true);
     const [message, setMessage] = useState(null);
 
     // Modal State
     const [selectedPlan, setSelectedPlan] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    
+    // Upgrade confirmation modal
+    const [upgradeConfirmModal, setUpgradeConfirmModal] = useState({ show: false, plan: null, currentTier: null });
 
     const navigate = useNavigate();
 
     useEffect(() => {
         fetchData();
+        
+        // Socket.IO para actualizaciones en tiempo real
+        const API_URL = import.meta.env.VITE_API_URL || window.location.origin;
+        const socket = io(API_URL);
+        
+        // Escuchar cambios de estado de membresía
+        socket.on('membership_status_updated', (data) => {
+            console.log('📩 Estado de membresía actualizado:', data);
+            if (data.status === 'approved') {
+                setMessage({ type: 'success', text: '✅ ¡Tu membresía ha sido activada!' });
+            } else if (data.status === 'rejected') {
+                setMessage({ type: 'error', text: `❌ Solicitud rechazada: ${data.reason || 'Ver detalles con soporte'}` });
+            }
+            fetchData(); // Refrescar datos
+        });
+        
+        // Escuchar actualizaciones de recursos
+        socket.on('resources_updated', (data) => {
+            if (data.type === 'membership_purchase') {
+                fetchData(); // Refrescar datos
+            }
+        });
+        
+        return () => {
+            socket.off('membership_status_updated');
+            socket.off('resources_updated');
+            socket.disconnect();
+        };
     }, []);
 
     const fetchData = async () => {
         try {
-            const [plansRes, subRes] = await Promise.all([
-                axios.get('/api/memberships'),
-                axios.get('/api/memberships/my-subscription')
-            ]);
-            setPlans(plansRes.data);
-
-            if (subRes.data) {
-                if (subRes.data.subscription && subRes.data.subscription.status === 'active') {
-                    setCurrentSub(subRes.data.subscription);
-                } else {
-                    setCurrentSub(null);
+            // Fetch plans first (public endpoint)
+            const plansRes = await axios.get('/api/memberships');
+            setPlans(plansRes.data || []);
+            
+            // Then try to fetch subscription (requires auth)
+            try {
+                const token = localStorage.getItem('playerToken');
+                if (token) {
+                    const subRes = await axios.get('/api/memberships/my-subscription', {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    if (subRes.data) {
+                        // Handle new structure with separate subscription and embajadorSubscription
+                        if (subRes.data.subscription && subRes.data.subscription.status === 'active') {
+                            setCurrentSub(subRes.data.subscription);
+                        } else {
+                            setCurrentSub(null);
+                        }
+                        
+                        // Handle Embajador subscription separately
+                        if (subRes.data.embajadorSubscription && subRes.data.embajadorSubscription.status === 'active') {
+                            setEmbajadorSub(subRes.data.embajadorSubscription);
+                        } else {
+                            setEmbajadorSub(null);
+                        }
+                        
+                        // Store all active subscriptions
+                        setActiveSubscriptions(subRes.data.activeSubscriptions || []);
+                        
+                        // Handle both old (pendingRequest) and new (pendingRequests) format
+                        setPendingRequests(subRes.data.pendingRequests || (subRes.data.pendingRequest ? [subRes.data.pendingRequest] : []));
+                    }
                 }
-                setPendingReq(subRes.data.pendingRequest || null);
+            } catch (subError) {
+                console.log('No subscription found or not logged in');
             }
+            
             setLoading(false);
         } catch (error) {
             console.error('Error loading membership data:', error);
@@ -46,8 +103,55 @@ const MembershipPage = ({ user, onLogout }) => {
         }
     };
 
+    // Get tier level for hierarchy (bronce=1, plata=2, oro=3)
+    const getTierLevel = (planName) => {
+        const name = planName.toLowerCase();
+        if (name.includes('oro')) return 3;
+        if (name.includes('plata')) return 2;
+        if (name.includes('bronce')) return 1;
+        return 0;
+    };
+
     const handleOpenPurchase = (plan) => {
+        const planName = plan.name.toLowerCase();
+        const isEmbajador = planName.includes('embajador');
+        
+        // If buying Embajador and already have it active
+        if (isEmbajador && embajadorSub) {
+            setMessage({ type: 'error', text: 'Ya tienes la membresía Embajador activa.' });
+            return;
+        }
+        
+        // If buying a tier (not Embajador) and have an active tier
+        if (!isEmbajador && currentSub) {
+            const currentLevel = getTierLevel(currentSub.plan_name);
+            const newLevel = getTierLevel(plan.name);
+            
+            // If current is Oro, can't replace
+            if (currentLevel === 3) {
+                setMessage({ type: 'error', text: 'Ya tienes la membresía Oro activa. No puede ser reemplazada.' });
+                return;
+            }
+            
+            // If trying to downgrade
+            if (newLevel <= currentLevel) {
+                setMessage({ type: 'error', text: `No puedes cambiar de ${currentSub.plan_name} a ${plan.name}. Solo puedes subir de nivel.` });
+                return;
+            }
+            
+            // Show upgrade confirmation
+            setUpgradeConfirmModal({ show: true, plan, currentTier: currentSub });
+            return;
+        }
+        
+        // Normal purchase (no conflict)
         setSelectedPlan(plan);
+        setIsModalOpen(true);
+    };
+
+    const handleConfirmUpgrade = () => {
+        setSelectedPlan(upgradeConfirmModal.plan);
+        setUpgradeConfirmModal({ show: false, plan: null, currentTier: null });
         setIsModalOpen(true);
     };
 
@@ -61,6 +165,32 @@ const MembershipPage = ({ user, onLogout }) => {
         } catch (error) {
             setMessage({ type: 'error', text: error.response?.data?.error || 'Error al cancelar' });
         }
+    };
+
+    // Check if a specific plan has a pending request
+    const isPlanPending = (planId) => {
+        return pendingRequests.some(req => {
+            let details = req.details;
+            if (typeof details === 'string') {
+                try { details = JSON.parse(details); } catch (e) { return false; }
+            }
+            return details && details.membershipId == planId;
+        });
+    };
+
+    // Check if plan is active for current user (check both tier and embajador)
+    const isPlanActive = (planId, planName) => {
+        const name = planName.toLowerCase();
+        if (name.includes('embajador')) {
+            return embajadorSub && embajadorSub.membership_id === planId;
+        }
+        return currentSub && (currentSub.membership_id === planId || currentSub.subscription_tier_id === planId);
+    };
+
+    // Get days remaining for a specific subscription
+    const getDaysRemaining = (sub) => {
+        if (!sub || !sub.next_billing_date) return 0;
+        return Math.max(0, Math.ceil((new Date(sub.next_billing_date) - new Date()) / (1000 * 60 * 60 * 24)));
     };
 
     const getTierIcon = (name) => {
@@ -90,6 +220,35 @@ const MembershipPage = ({ user, onLogout }) => {
                 onSuccess={fetchData} // Refresh state immediately after success
             />
 
+            {/* Upgrade Confirmation Modal */}
+            {upgradeConfirmModal.show && (
+                <div className="upgrade-modal-overlay">
+                    <div className="upgrade-modal">
+                        <div className="upgrade-modal-icon">
+                            <FaExclamationTriangle />
+                        </div>
+                        <h3>⚠️ Cambio de Membresía</h3>
+                        <p>
+                            Actualmente tienes la membresía <strong>{upgradeConfirmModal.currentTier?.plan_name}</strong>.
+                        </p>
+                        <p>
+                            Al comprar <strong>{upgradeConfirmModal.plan?.name}</strong>, tu membresía anterior será <span className="highlight-text">reemplazada</span>.
+                        </p>
+                        <p className="upgrade-note">
+                            Los días restantes de tu membresía actual no se acumulan.
+                        </p>
+                        <div className="upgrade-modal-buttons">
+                            <button className="cancel-btn" onClick={() => setUpgradeConfirmModal({ show: false, plan: null, currentTier: null })}>
+                                Cancelar
+                            </button>
+                            <button className="confirm-btn" onClick={handleConfirmUpgrade}>
+                                Sí, Cambiar a {upgradeConfirmModal.plan?.name}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="membership-header">
                 <button onClick={() => navigate('/')} className="back-btn">
                     <FaArrowLeft /> Volver al Lobby
@@ -110,47 +269,69 @@ const MembershipPage = ({ user, onLogout }) => {
                 </div>
             )}
 
-            {currentSub && (
-                <div className="current-subscription-status">
-                    <p>Tu Membresía Actual: <strong className="gold-text">{currentSub.plan_name}</strong></p>
-                    <p className="small-text">Renueva en: {Math.max(0, Math.ceil((new Date(currentSub.next_billing_date) - new Date()) / (1000 * 60 * 60 * 24)))} Días</p>
-                </div>
-            )}
-
             <div className="plans-container">
                 {plans.map(plan => {
                     const config = (typeof plan.benefits_config === 'string' ? JSON.parse(plan.benefits_config) : plan.benefits_config) || {};
                     const tierName = plan.name.toUpperCase().replace('SOCIO ', '').replace('PLAN ', '');
 
-                    const isActive = currentSub && (currentSub.membership_id === plan.id || currentSub.subscription_tier_id === plan.id);
+                    const isActive = isPlanActive(plan.id, plan.name);
+                    const isPending = isPlanPending(plan.id);
+                    const isEmbajador = plan.name.toLowerCase().includes('embajador');
+                    const activeSub = isEmbajador ? embajadorSub : currentSub;
+                    const daysRemaining = isActive ? getDaysRemaining(activeSub) : 0;
 
-                    // Logic for "Combinable":
-                    // Ambassador is combinable with everything.
-                    // Others are mutually exclusive unless upgrading/switching.
-                    // Since backend only supports 1 tier ID right now, "combining" might strictly mean "Upgrade to Combo" or we need to handle it.
-                    // BUT user said: "Ambassador is the only one that can be combined".
-                    // User also said: "Bronze/Silver should be able to renew to others at any time".
-                    // So we ALWAYS enable the buy button, unless it's the SAME active plan (then it's renew).
+                    // If active, show ACTIVE badge with tier color
+                    if (isActive) {
+                        const tierClass = getTierColorClass(plan.name);
+                        return (
+                            <div key={plan.id} className={`plan-card ${tierClass} active-card`}>
+                                {/* Pulsing ACTIVA badge with tier color */}
+                                <div className={`active-badge-floating ${tierClass.replace('tier-', 'badge-')}`}>
+                                    <span className="badge-text">ACTIVA</span>
+                                    <div className="badge-reflection"></div>
+                                </div>
 
-                    let isPending = false;
-                    if (pendingReq && pendingReq.details) {
-                        let details = pendingReq.details;
-                        if (typeof details === 'string') {
-                            try { details = JSON.parse(details); } catch (e) { }
-                        }
-                        if (details.membershipId == plan.id) isPending = true;
+                                <div className="card-content-wrapper">
+                                    <div className="card-header">
+                                        <div className="tier-icon">{getTierIcon(plan.name)}</div>
+                                        <h2 className="tier-name">SOCIO {tierName.replace(' 24K', '')}</h2>
+                                    </div>
+                                    
+                                    <div className={`active-timer ${tierClass.replace('tier-', 'timer-')}`}>
+                                        <FaClock className="timer-icon" />
+                                        <div className="timer-content">
+                                            <span className="timer-label">Tiempo Restante</span>
+                                            <span className="timer-value">{daysRemaining} días</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="credential-benefits-summary">
+                                        <p>✓ Beneficios VIP Activos</p>
+                                        <p>✓ Cartones Gratis Diarios</p>
+                                        <p>✓ Insignia Exclusiva</p>
+                                    </div>
+
+                                    <button
+                                        className={`subscribe-btn renew-btn ${tierClass.replace('tier-', 'renew-')}`}
+                                        onClick={() => handleOpenPurchase(plan)}
+                                    >
+                                        🔄 RENOVAR MEMBRESÍA
+                                    </button>
+                                </div>
+                            </div>
+                        );
                     }
 
                     return (
-                        <div key={plan.id} className={`plan-card ${getTierColorClass(plan.name)} ${isActive ? 'active-card-border' : ''}`}>
-                            {plan.name.includes('Embajador') && (
+                        <div key={plan.id} className={`plan-card ${getTierColorClass(plan.name)} ${isPending ? 'pending-card' : ''}`}>
+                            {plan.name.includes('Embajador') && !isPending && (
                                 <div className="ambassador-banner">
                                     <span>GANANCIA</span>
                                     <span className="x-mark">X</span>
                                     <span>REFERIDOS</span>
                                 </div>
                             )}
-                            {isActive && <div className="active-badge"><FaCheck /> ACTIVO</div>}
+                            {isPending && <div className="pending-badge">⏳ EN TRÁMITE</div>}
 
                             <div className="card-content-wrapper">
                                 <div className="card-header">
@@ -220,11 +401,11 @@ const MembershipPage = ({ user, onLogout }) => {
                                     )}
                                 </div>
                                 <button
-                                    className={`subscribe-btn ${isPending ? 'pending' : ''} ${isActive ? 'renew-btn-small' : ''}`}
+                                    className={`subscribe-btn ${isPending ? 'pending' : ''}`}
                                     onClick={() => !isPending && handleOpenPurchase(plan)}
                                     disabled={isPending}
                                 >
-                                    {isPending ? 'EN TRÁMITE ⏳' : isActive ? 'RENOVAR AHORA' : '¡QUIERO SER VIP!'}
+                                    {isPending ? 'EN TRÁMITE ⏳' : '¡QUIERO SER VIP!'}
                                 </button>
                             </div>
                         </div>

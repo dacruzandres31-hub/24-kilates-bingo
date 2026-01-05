@@ -1,8 +1,50 @@
 const dbHelper = require('../helpers/dbHelper');
 const responseHelper = require('../helpers/responseHelper');
+const referralHelper = require('../helpers/referralHelper');
 
 /**
  * REFERRAL CONTROLLER
+ * Usa parent_id para la jerarquía de referidos
+ */
+
+/**
+ * GET /api/referrals/my-link
+ * Obtiene el link de referido del usuario actual
+ */
+exports.getMyReferralLink = async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        // Obtener código de referido actual
+        const [user] = await dbHelper.query(
+            'SELECT referral_code FROM users WHERE id = ?',
+            [userId],
+            'GetMyReferralLink'
+        );
+
+        let referralCode = user?.referral_code;
+
+        // Si no tiene código, generar uno
+        if (!referralCode) {
+            referralCode = await referralHelper.assignCodeToUser(userId);
+        }
+
+        // Generar link completo
+        const referralLink = referralHelper.generateReferralLink(referralCode);
+
+        return responseHelper.success(res, {
+            referral_code: referralCode,
+            referral_link: referralLink
+        });
+
+    } catch (error) {
+        return responseHelper.error(res, 500, 'Error al obtener link de referido', error.message);
+    }
+};
+
+/**
+ * GET /api/referrals/my-referrals
+ * Obtiene los referidos del usuario actual
  */
 exports.getMyReferrals = async (req, res) => {
     try {
@@ -12,32 +54,29 @@ exports.getMyReferrals = async (req, res) => {
         const referrals = await dbHelper.query(
             `WITH RECURSIVE referral_tree AS (
                 -- Nivel 1: Directos
-                SELECT id, username, referred_by, created_at, subscription_tier_id, 1 as level
+                SELECT id, username, parent_id, created_at, subscription_tier_id, 1 as level
                 FROM users
-                WHERE referred_by = ?
+                WHERE parent_id = ?
                 
                 UNION ALL
                 
                 -- Niveles 2-4: Indirectos
-                SELECT u.id, u.username, u.referred_by, u.created_at, u.subscription_tier_id, rt.level + 1
+                SELECT u.id, u.username, u.parent_id, u.created_at, u.subscription_tier_id, rt.level + 1
                 FROM users u
-                INNER JOIN referral_tree rt ON u.referred_by = rt.id
+                INNER JOIN referral_tree rt ON u.parent_id = rt.id
                 WHERE rt.level < 4
             )
-            SELECT rt.*, m.name as tier_name, rw.amount as reward_amount, rw.id as reward_id
+            SELECT rt.*, m.name as tier_name
             FROM referral_tree rt
             LEFT JOIN memberships m ON rt.subscription_tier_id = m.id
-            LEFT JOIN referral_rewards rw ON (rt.id = rw.referred_user_id AND rw.referrer_id = ?)
             ORDER BY rt.level ASC, rt.created_at DESC`,
-            [userId, userId],
+            [userId],
             'GetMyReferrals_Tree'
         );
 
-        // 2. Calculate stats
+        // 2. Calculate stats por nivel
         const stats = {
             total_registered: referrals.length,
-            total_rewarded: referrals.filter(r => r.reward_id).length,
-            total_earned: referrals.reduce((sum, r) => sum + (r.reward_amount || 0), 0),
             levels: {
                 l1: referrals.filter(r => r.level === 1).length,
                 l2: referrals.filter(r => r.level === 2).length,
@@ -46,37 +85,37 @@ exports.getMyReferrals = async (req, res) => {
             }
         };
 
-        // 3. Get detailed rewards history (all statuses)
-        const rewardsHistory = await dbHelper.query(
-            `SELECT rw.*, u.username as source_username
-             FROM referral_rewards rw
-             JOIN users u ON rw.referred_user_id = u.id
-             WHERE rw.referrer_id = ?
-             ORDER BY rw.created_at DESC`,
+        // 3. Obtener comisiones generadas
+        const [commissions] = await dbHelper.query(
+            `SELECT COALESCE(SUM(amount), 0) as total 
+             FROM chips_movements 
+             WHERE user_id = ? AND movement_type = 'commission'`,
             [userId],
-            'GetMyReferrals_RewardsHistory'
+            'GetMyReferrals_Commissions'
+        );
+
+        // 4. Obtener mi código de referido
+        const [user] = await dbHelper.query(
+            'SELECT referral_code FROM users WHERE id = ?',
+            [userId],
+            'GetMyReferrals_Code'
         );
 
         return responseHelper.success(res, {
+            referral_code: user?.referral_code || null,
+            referral_link: user?.referral_code 
+                ? referralHelper.generateReferralLink(user.referral_code) 
+                : null,
             referrals: referrals.map(r => ({
+                id: r.id,
                 username: r.username,
                 created_at: r.created_at,
                 level: r.level,
-                tier_name: r.tier_name,
-                is_ambassador: r.tier_name === 'Socio Embajador 24K'
-            })),
-            rewards: rewardsHistory.map(rw => ({
-                id: rw.id,
-                source_username: rw.source_username,
-                amount: rw.amount,
-                status: rw.status,
-                created_at: rw.created_at,
-                credited_at: rw.credited_at
+                tier_name: r.tier_name || 'Sin membresía'
             })),
             stats: {
                 registered: stats.total_registered,
-                rewarded: stats.total_rewarded,
-                totalEarned: stats.total_earned,
+                totalCommissions: parseFloat(commissions?.total || 0),
                 levels: stats.levels
             }
         });

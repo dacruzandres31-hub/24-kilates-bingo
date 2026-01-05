@@ -556,6 +556,11 @@ export default function GestionUsuarios({ sharedUserData, sharedCartonesStock, o
         documento: '',
         email: '',
         telefono: ''
+      },
+      datosBancarios: {
+        cbu: '',
+        alias: '',
+        bank_name: ''
       }
     });
   };

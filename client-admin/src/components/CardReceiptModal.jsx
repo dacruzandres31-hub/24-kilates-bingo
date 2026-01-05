@@ -8,14 +8,15 @@ const CardReceiptModal = ({ isOpen, onClose, data }) => {
     if (!isOpen || !data) return null;
 
     const {
-        type,        // 'cartones', 'dinero'
-        operation,   // 'Carga', 'Descarga', 'Transferencia'
+        type,        // 'cartones', 'dinero', 'membresia', 'retiro'
+        operation,   // 'Carga', 'Descarga', 'Transferencia', 'COMPRA MEMBRESÍA', 'RETIRO EXITOSO'
         userName,
         quantity,
         room,        // 'bronce', 'plata', 'oro' (solo para cartones)
         timestamp,
         transactionId,
-        recipientId // Asegurarnos de recibir esto
+        recipientId, // Asegurarnos de recibir esto
+        operationType // 'membership', 'withdrawal', 'deposit', 'cards' - para colores
     } = data;
 
     const [waConfig, setWaConfig] = useState(null);
@@ -133,6 +134,63 @@ const CardReceiptModal = ({ isOpen, onClose, data }) => {
         }
     };
 
+    // Colores según tipo de operación
+    const getOperationColor = () => {
+        // Si hay operationType específico, usarlo
+        if (operationType) {
+            switch (operationType) {
+                case 'membership': return 'from-amber-500 via-yellow-400 to-amber-600'; // Dorado VIP
+                case 'withdrawal': return 'from-emerald-500 to-green-600'; // Verde éxito
+                case 'deposit': return 'from-blue-500 to-indigo-600'; // Azul depósito
+                case 'cards': return room ? getRoomColor(room) : 'from-purple-500 to-indigo-600'; // Color de sala o púrpura
+                default: break;
+            }
+        }
+        // Fallback: detectar por operación
+        const op = operation?.toLowerCase() || '';
+        if (op.includes('membresía') || op.includes('membresia') || op.includes('vip')) {
+            return 'from-amber-500 via-yellow-400 to-amber-600';
+        }
+        if (op.includes('retiro') || op.includes('premio')) {
+            return 'from-emerald-500 to-green-600';
+        }
+        if (op.includes('depósito') || op.includes('deposito') || op.includes('acredit')) {
+            return 'from-blue-500 to-indigo-600';
+        }
+        // Default: usar color de sala si hay, sino azul
+        return room ? getRoomColor(room) : 'from-blue-500 to-indigo-600';
+    };
+
+    // Mensaje de felicitación según tipo
+    const getCelebrationMessage = () => {
+        if (operationType === 'membership' || operation?.toLowerCase().includes('membresía')) {
+            return '¡BIENVENIDO AL CLUB VIP!';
+        }
+        if (operationType === 'withdrawal' || operation?.toLowerCase().includes('retiro')) {
+            return '¡MUCHAS FELICIDADES!';
+        }
+        if (type === 'dinero') {
+            return '¡SALDO ACREDITADO!';
+        }
+        return '¡BUENA SUERTE!';
+    };
+
+    // Color del monto según tipo
+    const getAmountColor = () => {
+        if (operationType === 'membership') return 'text-amber-600';
+        if (operationType === 'withdrawal') return 'text-emerald-600';
+        if (type === 'dinero') return 'text-green-600';
+        return 'text-indigo-600';
+    };
+
+    // Color del mensaje según tipo
+    const getMessageColor = () => {
+        if (operationType === 'membership') return 'text-amber-600';
+        if (operationType === 'withdrawal') return 'text-emerald-600';
+        if (type === 'dinero') return 'text-blue-600';
+        return 'text-blue-600';
+    };
+
     return (
         <div className="fixed inset-0 z-[11000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
             <div className="w-full max-w-sm">
@@ -142,7 +200,7 @@ const CardReceiptModal = ({ isOpen, onClose, data }) => {
                     className="bg-white rounded-t-2xl overflow-hidden shadow-2xl relative"
                 >
                     {/* Header con Perforación Decorativa */}
-                    <div className={`h-24 bg-gradient-to-r ${getRoomColor(room)} flex items-center justify-center relative`}>
+                    <div className={`h-24 bg-gradient-to-r ${getOperationColor()} flex items-center justify-center relative`}>
                         <div className="text-white text-center">
                             <h2 className="text-2xl font-black tracking-tighter">BINGO 24K</h2>
                             <p className="text-[10px] uppercase tracking-widest opacity-80 font-bold">Comprobante Oficial</p>
@@ -222,19 +280,21 @@ const CardReceiptModal = ({ isOpen, onClose, data }) => {
 
                             <div className="py-6 text-center">
                                 <p className="text-gray-400 text-xs mb-1">CANTIDAD TOTAL</p>
-                                <p className={`text-5xl font-black tracking-tighter ${type === 'dinero' ? 'text-green-600' : 'text-indigo-600'}`}>
-                                    {type === 'dinero' ? `$${quantity.toLocaleString('es-CO')}` : quantity}
+                                <p className={`text-5xl font-black tracking-tighter ${getAmountColor()}`}>
+                                    {type === 'dinero' || type === 'membresia' || type === 'retiro' ? `$${quantity.toLocaleString('es-CO')}` : quantity}
                                 </p>
                                 <p className="text-[10px] text-gray-400 mt-2">
-                                    {type === 'dinero' ? 'fichas acreditadas' : 'cartones transferidos'}
+                                    {type === 'membresia' ? 'membresía activada' : 
+                                     type === 'retiro' ? 'fichas acreditadas' :
+                                     type === 'dinero' ? 'fichas acreditadas' : 'cartones transferidos'}
                                 </p>
                             </div>
                         </div>
 
                         {/* Footer del Ticket */}
                         <div className="mt-8 pt-4 border-t-2 border-dashed border-gray-100 text-center">
-                            <p className="text-xs font-bold text-blue-600 mb-1 tracking-widest">
-                                {type === 'dinero' ? '¡MUCHAS FELICIDADES!' : '¡BUENA SUERTE!'}
+                            <p className={`text-xs font-bold ${getMessageColor()} mb-1 tracking-widest`}>
+                                {getCelebrationMessage()}
                             </p>
                             <p className="text-[9px] text-gray-400">Este es un comprobante digital de 24 Kilates.</p>
                         </div>

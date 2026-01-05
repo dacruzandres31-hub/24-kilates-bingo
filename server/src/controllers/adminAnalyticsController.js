@@ -1,4 +1,4 @@
-const pool = require('../helpers/database');
+const pool = require('../db');
 
 /**
  * Controlador de Analíticas para el Dashboard Admin
@@ -16,17 +16,17 @@ exports.getMonthlyNetwin = async (req, res) => {
         DATE_FORMAT(created_at, '%b-%y') as fecha,
         YEAR(created_at) as year,
         MONTH(created_at) as month,
-        SUM(CASE 
-          WHEN type IN ('card_purchase', 'balance_add', 'card_sale') 
-          THEN amount 
+        COALESCE(SUM(CASE 
+          WHEN movement_type IN ('purchase', 'deposit') 
+          THEN ABS(amount) 
           ELSE 0 
-        END) as ganancia,
-        SUM(CASE 
-          WHEN type IN ('prize_payout', 'withdrawal', 'balance_deduct') 
-          THEN amount 
+        END), 0) as ganancia,
+        COALESCE(SUM(CASE 
+          WHEN movement_type IN ('prize', 'withdrawal', 'bonus', 'refund') 
+          THEN ABS(amount) 
           ELSE 0 
-        END) as gasto
-      FROM transactions
+        END), 0) as gasto
+      FROM chips_movements
       WHERE created_at >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
       GROUP BY YEAR(created_at), MONTH(created_at)
       ORDER BY year ASC, month ASC
@@ -73,17 +73,17 @@ exports.getDailyNetwin = async (req, res) => {
         const query = `
       SELECT 
         LPAD(HOUR(created_at), 2, '0') as hora,
-        SUM(CASE 
-          WHEN type IN ('card_purchase', 'balance_add', 'card_sale') 
-          THEN amount 
+        COALESCE(SUM(CASE 
+          WHEN movement_type IN ('purchase', 'deposit') 
+          THEN ABS(amount) 
           ELSE 0 
-        END) as ganancia,
-        SUM(CASE 
-          WHEN type IN ('prize_payout', 'withdrawal', 'balance_deduct') 
-          THEN amount 
+        END), 0) as ganancia,
+        COALESCE(SUM(CASE 
+          WHEN movement_type IN ('prize', 'withdrawal', 'bonus', 'refund') 
+          THEN ABS(amount) 
           ELSE 0 
-        END) as gasto
-      FROM transactions
+        END), 0) as gasto
+      FROM chips_movements
       WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
       GROUP BY HOUR(created_at)
       ORDER BY HOUR(created_at) ASC
@@ -128,9 +128,9 @@ exports.getTopAgents = async (req, res) => {
     try {
         // Primero obtener el total de ventas del mes
         const [totalRows] = await pool.query(`
-      SELECT COALESCE(SUM(amount), 0) as total
-      FROM transactions
-      WHERE type IN ('card_purchase', 'card_sale')
+      SELECT COALESCE(SUM(ABS(amount)), 0) as total
+      FROM chips_movements
+      WHERE movement_type = 'purchase'
         AND MONTH(created_at) = MONTH(NOW())
         AND YEAR(created_at) = YEAR(NOW())
     `);
@@ -150,13 +150,13 @@ exports.getTopAgents = async (req, res) => {
       SELECT 
         u.id,
         u.username as name,
-        COALESCE(SUM(t.amount), 0) as total_sales
+        COALESCE(SUM(ABS(cm.amount)), 0) as total_sales
       FROM users u
-      LEFT JOIN transactions t ON (
-        t.user_id = u.id 
-        AND t.type IN ('card_purchase', 'card_sale')
-        AND MONTH(t.created_at) = MONTH(NOW())
-        AND YEAR(t.created_at) = YEAR(NOW())
+      LEFT JOIN chips_movements cm ON (
+        cm.created_by = u.id 
+        AND cm.movement_type IN ('deposit', 'purchase')
+        AND MONTH(cm.created_at) = MONTH(NOW())
+        AND YEAR(cm.created_at) = YEAR(NOW())
       )
       WHERE u.role = 'agente'
       GROUP BY u.id, u.username
@@ -215,16 +215,16 @@ exports.getNetProfitComparison = async (req, res) => {
         const [currentMonthRows] = await pool.query(`
       SELECT 
         COALESCE(SUM(CASE 
-          WHEN type IN ('card_purchase', 'balance_add', 'card_sale') 
-          THEN amount 
+          WHEN movement_type IN ('purchase', 'deposit') 
+          THEN ABS(amount) 
           ELSE 0 
         END), 0) as ganancia,
         COALESCE(SUM(CASE 
-          WHEN type IN ('prize_payout', 'withdrawal', 'balance_deduct') 
-          THEN amount 
+          WHEN movement_type IN ('prize', 'withdrawal', 'bonus', 'refund') 
+          THEN ABS(amount) 
           ELSE 0 
         END), 0) as gasto
-      FROM transactions
+      FROM chips_movements
       WHERE MONTH(created_at) = MONTH(NOW())
         AND YEAR(created_at) = YEAR(NOW())
     `);
@@ -233,16 +233,16 @@ exports.getNetProfitComparison = async (req, res) => {
         const [previousMonthRows] = await pool.query(`
       SELECT 
         COALESCE(SUM(CASE 
-          WHEN type IN ('card_purchase', 'balance_add', 'card_sale') 
-          THEN amount 
+          WHEN movement_type IN ('purchase', 'deposit') 
+          THEN ABS(amount) 
           ELSE 0 
         END), 0) as ganancia,
         COALESCE(SUM(CASE 
-          WHEN type IN ('prize_payout', 'withdrawal', 'balance_deduct') 
-          THEN amount 
+          WHEN movement_type IN ('prize', 'withdrawal', 'bonus', 'refund') 
+          THEN ABS(amount) 
           ELSE 0 
         END), 0) as gasto
-      FROM transactions
+      FROM chips_movements
       WHERE MONTH(created_at) = MONTH(DATE_SUB(NOW(), INTERVAL 1 MONTH))
         AND YEAR(created_at) = YEAR(DATE_SUB(NOW(), INTERVAL 1 MONTH))
     `);

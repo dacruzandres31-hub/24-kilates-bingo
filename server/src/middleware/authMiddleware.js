@@ -72,13 +72,26 @@ const isCajeroOrAdmin = (req, res, next) => {
 };
 
 // Middleware: Solo usuario Andy
-const isAndy = (req, res, next) => {
+const isAndy = async (req, res, next) => {
   if (!req.user) {
     return res.status(401).json({ error: 'No autenticado' });
   }
 
-  // Verificar username exacto (o ID si es fijo, username es más legible)
-  if (req.user.username?.toLowerCase() !== 'andy') {
+  // Verificar username exacto - primero del token, luego de la BD si no está
+  let username = req.user.username;
+  
+  // Si no hay username en el token, buscarlo en BD
+  if (!username && req.user.id) {
+    try {
+      const db = require('../db');
+      const [users] = await db.query('SELECT username FROM users WHERE id = ?', [req.user.id]);
+      username = users[0]?.username;
+    } catch (err) {
+      console.error('Error fetching username for isAndy check:', err);
+    }
+  }
+
+  if (username?.toLowerCase() !== 'andy') {
     return res.status(403).json({
       error: 'Acceso denegado. Exclusivo para Andy.'
     });

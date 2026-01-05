@@ -3,7 +3,7 @@ import axios from 'axios';
 import { FaCopy, FaCheck, FaTimes, FaCamera, FaUpload, FaMoneyBillWave, FaCrown } from 'react-icons/fa';
 
 const MembershipPurchaseModal = ({ isOpen, onClose, plan, themeColor = '#ffd700', onSuccess }) => {
-    const [step, setStep] = useState(1); // 1: Info CBU, 2: Upload Proof
+    const [step, setStep] = useState(1); // 1: Info CBU, 2: Upload Proof, 3: Success
     const [account, setAccount] = useState(null);
     const [loading, setLoading] = useState(true);
     const [proofUrl, setProofUrl] = useState('');
@@ -62,9 +62,9 @@ const MembershipPurchaseModal = ({ isOpen, onClose, plan, themeColor = '#ffd700'
                 headers: { Authorization: `Bearer ${token}` }
             });
 
-            alert(`✅ Solicitud enviada. Tu membresía ${plan.name} se activará en cuanto Andy confirme el pago.`);
+            // Show success step instead of alert
+            setStep(3);
             if (onSuccess) onSuccess(); // Notify parent to refresh
-            onClose();
         } catch (error) {
             alert('❌ Error: ' + (error.response?.data?.message || error.message));
         } finally {
@@ -140,6 +140,60 @@ const MembershipPurchaseModal = ({ isOpen, onClose, plan, themeColor = '#ffd700'
                     ) : !account ? (
                         <div style={{ color: '#ef4444', textAlign: 'center' }}>
                             ⚠️ No hay cuentas disponibles para transferir. Intenta más tarde.
+                        </div>
+                    ) : step === 3 ? (
+                        /* SUCCESS STEP */
+                        <div className="animate-fade-in" style={{ textAlign: 'center', padding: '1rem 0' }}>
+                            <div style={{
+                                width: '80px',
+                                height: '80px',
+                                background: 'linear-gradient(135deg, #10b981, #059669)',
+                                borderRadius: '50%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                margin: '0 auto 1.5rem',
+                                boxShadow: '0 0 30px rgba(16, 185, 129, 0.5)'
+                            }}>
+                                <FaCheck size={40} color="white" />
+                            </div>
+                            <h3 style={{ color: '#10b981', fontSize: '1.5rem', marginBottom: '1rem' }}>
+                                ¡Solicitud Enviada!
+                            </h3>
+                            <p style={{ color: '#e2e8f0', fontSize: '1.1rem', marginBottom: '0.5rem' }}>
+                                Tu membresía <b style={{ color: themeColor }}>{plan.name}</b>
+                            </p>
+                            <p style={{ color: '#94a3b8', fontSize: '1rem', marginBottom: '2rem' }}>
+                                está en proceso de ser activada.
+                            </p>
+                            <div style={{
+                                background: 'rgba(255, 215, 0, 0.1)',
+                                border: '1px solid rgba(255, 215, 0, 0.3)',
+                                borderRadius: '1rem',
+                                padding: '1rem',
+                                marginBottom: '1.5rem'
+                            }}>
+                                <p style={{ color: '#fbbf24', fontSize: '0.9rem', margin: 0 }}>
+                                    ⏳ 24Kilates revisará tu comprobante y activará tu membresía en breve.
+                                </p>
+                            </div>
+                            <button
+                                onClick={onClose}
+                                style={{
+                                    width: '100%',
+                                    padding: '1rem',
+                                    background: `linear-gradient(90deg, ${themeColor}, #b8860b)`,
+                                    border: 'none',
+                                    color: '#000',
+                                    fontWeight: 'bold',
+                                    borderRadius: '0.8rem',
+                                    fontSize: '1.1rem',
+                                    cursor: 'pointer',
+                                    boxShadow: `0 4px 15px ${themeColor}50`
+                                }}
+                            >
+                                Entendido ✓
+                            </button>
                         </div>
                     ) : step === 1 ? (
                         <div className="animate-fade-in">

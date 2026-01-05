@@ -1014,22 +1014,17 @@
     padding: 1rem;
     border: none;
     border-radius: 8px;
-    background: linear-gradient(135deg, #FFD700 0%, #FFAA00 100%);
-    color: #000;
     font-weight: 800;
     font-size: 1.1rem;
     text-transform: uppercase;
     letter-spacing: 2px;
     cursor: pointer;
-    box-shadow: 0 4px 15px rgba(255, 215, 0, 0.2);
     transition: all 0.3s ease;
     clip-path: polygon(15px 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%, 0 15px);
 }
 
 .renew-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(255, 215, 0, 0.4);
-    background: linear-gradient(135deg, #FFE066 0%, #FFCC00 100%);
+    transform: translateY(-2px) scale(1.02);
 }
 
 .subscribe-btn:disabled {
@@ -1040,6 +1035,326 @@
 .subscribe-btn:hover:not(:disabled) {
     transform: scale(1.02);
     filter: brightness(1.1);
+}
+
+/* PENDING/PROCESSING STATE */
+.subscribe-btn.pending {
+    cursor: wait;
+    animation: pendingPulse 2s ease-in-out infinite;
+}
+
+/* Pending button colors per tier */
+.tier-ambassador .subscribe-btn.pending {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
+}
+
+.tier-bronze .subscribe-btn.pending {
+    background: linear-gradient(135deg, #cd7f32 0%, #a05c1f 100%) !important;
+    box-shadow: 0 0 20px rgba(205, 127, 50, 0.4);
+}
+
+.tier-silver .subscribe-btn.pending {
+    background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%) !important;
+    box-shadow: 0 0 20px rgba(156, 163, 175, 0.4);
+}
+
+.tier-gold .subscribe-btn.pending {
+    background: linear-gradient(135deg, #fbbf24 0%, #d97706 100%) !important;
+    box-shadow: 0 0 20px rgba(251, 191, 36, 0.4);
+}
+
+@keyframes pendingPulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.85;
+    }
+}
+
+.subscribe-btn.pending::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.2),
+        transparent
+    );
+    animation: pendingShine 2s ease-in-out infinite;
+}
+
+@keyframes pendingShine {
+    0% {
+        left: -100%;
+    }
+    100% {
+        left: 100%;
+    }
+}
+
+/* ===== ACTIVE CARD STYLES - Keep original tier colors ===== */
+.active-card {
+    position: relative;
+}
+
+/* ===== FLOATING PULSING BADGE "ACTIVA" ===== */
+.active-badge-floating {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    padding: 0.5rem 1.2rem;
+    border-radius: 25px;
+    font-weight: 800;
+    font-size: 0.9rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    z-index: 10;
+    animation: badgePulse 1.5s ease-in-out infinite;
+    overflow: visible;
+}
+
+.active-badge-floating .badge-text {
+    position: relative;
+    z-index: 2;
+}
+
+/* Reflection/Glow behind badge */
+.active-badge-floating .badge-reflection {
+    position: absolute;
+    inset: -4px;
+    border-radius: 30px;
+    filter: blur(10px);
+    opacity: 0.6;
+    z-index: 1;
+    animation: reflectionPulse 1.5s ease-in-out infinite;
+}
+
+/* Badge colors per tier */
+.badge-ambassador {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: #fff;
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.6);
+}
+.badge-ambassador .badge-reflection {
+    background: #10b981;
+}
+
+.badge-bronze {
+    background: linear-gradient(135deg, #cd7f32, #a05a2c);
+    color: #fff;
+    box-shadow: 0 0 20px rgba(205, 127, 50, 0.6);
+}
+.badge-bronze .badge-reflection {
+    background: #cd7f32;
+}
+
+.badge-silver {
+    background: linear-gradient(135deg, #c0c0c0, #888);
+    color: #222;
+    box-shadow: 0 0 20px rgba(192, 192, 192, 0.6);
+}
+.badge-silver .badge-reflection {
+    background: #c0c0c0;
+}
+
+.badge-gold {
+    background: linear-gradient(135deg, #ffd700, #ff8c00);
+    color: #000;
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+}
+.badge-gold .badge-reflection {
+    background: #ffd700;
+}
+
+@keyframes badgePulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.08);
+    }
+}
+
+@keyframes reflectionPulse {
+    0%, 100% {
+        opacity: 0.4;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.8;
+        transform: scale(1.3);
+    }
+}
+
+/* ===== ACTIVE TIMER per tier ===== */
+.active-timer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    border-radius: 1rem;
+    padding: 1.2rem;
+    margin: 1.5rem 0;
+}
+
+.timer-ambassador {
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+.timer-ambassador .timer-icon,
+.timer-ambassador .timer-value {
+    color: #10b981;
+}
+
+.timer-bronze {
+    background: rgba(205, 127, 50, 0.15);
+    border: 1px solid rgba(205, 127, 50, 0.3);
+}
+.timer-bronze .timer-icon,
+.timer-bronze .timer-value {
+    color: #cd7f32;
+}
+
+.timer-silver {
+    background: rgba(192, 192, 192, 0.15);
+    border: 1px solid rgba(192, 192, 192, 0.3);
+}
+.timer-silver .timer-icon,
+.timer-silver .timer-value {
+    color: #c0c0c0;
+}
+
+.timer-gold {
+    background: rgba(255, 215, 0, 0.15);
+    border: 1px solid rgba(255, 215, 0, 0.3);
+}
+.timer-gold .timer-icon,
+.timer-gold .timer-value {
+    color: #ffd700;
+}
+
+/* ===== RENEW BUTTON per tier ===== */
+.renew-ambassador {
+    background: linear-gradient(135deg, #10b981, #059669) !important;
+    color: #fff !important;
+    box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+}
+.renew-ambassador:hover {
+    box-shadow: 0 0 25px rgba(16, 185, 129, 0.7);
+}
+
+.renew-bronze {
+    background: linear-gradient(135deg, #cd7f32, #a05a2c) !important;
+    color: #fff !important;
+    box-shadow: 0 0 15px rgba(205, 127, 50, 0.4);
+}
+.renew-bronze:hover {
+    box-shadow: 0 0 25px rgba(205, 127, 50, 0.7);
+}
+
+.renew-silver {
+    background: linear-gradient(135deg, #c0c0c0, #888) !important;
+    color: #222 !important;
+    box-shadow: 0 0 15px rgba(192, 192, 192, 0.4);
+}
+.renew-silver:hover {
+    box-shadow: 0 0 25px rgba(192, 192, 192, 0.7);
+}
+
+.renew-gold {
+    background: linear-gradient(135deg, #ffd700, #ff8c00) !important;
+    color: #000 !important;
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.4);
+}
+.renew-gold:hover {
+    box-shadow: 0 0 25px rgba(255, 215, 0, 0.7);
+}
+
+.timer-icon {
+    font-size: 2rem;
+    animation: timerPulse 2s ease-in-out infinite;
+}
+
+@keyframes timerPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.7; transform: scale(1.1); }
+}
+
+.timer-content {
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+}
+
+.timer-label {
+    font-size: 0.85rem;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.timer-value {
+    font-size: 1.8rem;
+    font-weight: 800;
+    text-shadow: 0 0 10px currentColor;
+}
+
+.credential-benefits-summary {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.credential-benefits-summary p {
+    color: #e2e8f0;
+    margin: 0.5rem 0;
+    font-size: 0.95rem;
+}
+
+/* ===== PENDING CARD STYLES ===== */
+.pending-card {
+    opacity: 0.95;
+}
+
+.pending-badge {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(90deg, rgba(0,0,0,0.7), rgba(0,0,0,0.8));
+    color: white;
+    padding: 0.6rem 1rem;
+    font-weight: 800;
+    text-align: center;
+    font-size: 0.9rem;
+    letter-spacing: 1px;
+    animation: pendingPulse 2s ease-in-out infinite;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+/* Badge colors per tier */
+.tier-ambassador .pending-badge {
+    background: linear-gradient(90deg, #10b981, #059669);
+}
+
+.tier-bronze .pending-badge {
+    background: linear-gradient(90deg, #cd7f32, #a05c1f);
+}
+
+.tier-silver .pending-badge {
+    background: linear-gradient(90deg, #9ca3af, #6b7280);
+}
+
+.tier-gold .pending-badge {
+    background: linear-gradient(90deg, #fbbf24, #d97706);
 }
 
 /* MESSAGES */
@@ -1108,4 +1423,162 @@
 
 .cancel-btn:hover {
     background: rgba(248, 113, 113, 0.1);
+}
+
+/* === UPGRADE CONFIRMATION MODAL === */
+.upgrade-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    backdrop-filter: blur(5px);
+}
+
+.upgrade-modal {
+    background: linear-gradient(145deg, #1a1a22, #0f0f14);
+    border: 1px solid rgba(255, 193, 7, 0.4);
+    border-radius: 20px;
+    padding: 2.5rem;
+    max-width: 450px;
+    text-align: center;
+    animation: modalSlideIn 0.3s ease;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-30px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.upgrade-modal-icon {
+    font-size: 3rem;
+    color: #ffc107;
+    margin-bottom: 1rem;
+    animation: warningPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes warningPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+.upgrade-modal h3 {
+    color: #ffc107;
+    font-size: 1.6rem;
+    margin-bottom: 1.5rem;
+}
+
+.upgrade-modal p {
+    color: #ccc;
+    font-size: 1rem;
+    margin-bottom: 0.8rem;
+    line-height: 1.5;
+}
+
+.upgrade-modal .highlight-text {
+    color: #f87171;
+    font-weight: bold;
+}
+
+.upgrade-modal .upgrade-note {
+    background: rgba(248, 113, 113, 0.15);
+    border: 1px solid rgba(248, 113, 113, 0.3);
+    border-radius: 10px;
+    padding: 1rem;
+    margin-top: 1rem;
+    font-size: 0.9rem;
+    color: #f87171;
+}
+
+.upgrade-modal-buttons {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    justify-content: center;
+}
+
+.upgrade-modal-buttons .cancel-btn {
+    background: transparent;
+    border: 1px solid #888;
+    color: #888;
+    padding: 0.8rem 1.5rem;
+    border-radius: 25px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s;
+}
+
+.upgrade-modal-buttons .cancel-btn:hover {
+    border-color: #fff;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.upgrade-modal-buttons .confirm-btn {
+    background: linear-gradient(90deg, #fbbf24, #d97706);
+    border: none;
+    color: #000;
+    padding: 0.8rem 1.5rem;
+    border-radius: 25px;
+    cursor: pointer;
+    font-weight: 700;
+    transition: all 0.3s;
+}
+
+.upgrade-modal-buttons .confirm-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 20px rgba(251, 191, 36, 0.5);
+}
+
+/* === ACTIVE MEMBERSHIPS SUMMARY (Header) === */
+.active-memberships-summary {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.active-memberships-summary .active-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.2rem;
+    border-radius: 25px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.active-memberships-summary .active-badge.ambassador {
+    background: linear-gradient(90deg, #10b981, #059669);
+    color: #fff;
+    box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+}
+
+.active-memberships-summary .active-badge.bronze {
+    background: linear-gradient(90deg, #cd7f32, #a0522d);
+    color: #fff;
+    box-shadow: 0 0 15px rgba(205, 127, 50, 0.4);
+}
+
+.active-memberships-summary .active-badge.silver {
+    background: linear-gradient(90deg, #a8a8a8, #6b7280);
+    color: #fff;
+    box-shadow: 0 0 15px rgba(168, 168, 168, 0.4);
+}
+
+.active-memberships-summary .active-badge.gold {
+    background: linear-gradient(90deg, #fbbf24, #d97706);
+    color: #000;
+    box-shadow: 0 0 15px rgba(251, 191, 36, 0.4);
 }

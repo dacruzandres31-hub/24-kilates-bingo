@@ -16,7 +16,33 @@ class MembershipService {
     }
 
     /**
-     * Get formatted subscription details for a user
+     * Get ALL active subscription details for a user (can have Embajador + another)
+     */
+    async getUserSubscriptions(userId) {
+        const query = `
+      SELECT 
+        us.*, 
+        m.name as plan_name, 
+        m.price, 
+        m.benefits_config
+      FROM user_subscriptions us
+      JOIN memberships m ON us.membership_id = m.id
+      WHERE us.user_id = ? AND us.status = 'active'
+      ORDER BY m.price ASC
+    `;
+
+        const [rows] = await pool.query(query, [userId]);
+
+        return rows.map(sub => {
+            if (typeof sub.benefits_config === 'string') {
+                sub.benefits_config = JSON.parse(sub.benefits_config);
+            }
+            return sub;
+        });
+    }
+
+    /**
+     * Get formatted subscription details for a user (legacy - returns main non-embajador sub)
      */
     async getUserSubscription(userId) {
         const query = `
@@ -188,19 +214,39 @@ class MembershipService {
                 VALUES (?, ?, 'active', NOW(), ?, true)
             `, [userId, membershipId, nextBilling]);
 
-            // 4. Update User Benefits
-            const monthlyCards = config.monthly_free_cards || 0;
+            // 4. Update User Benefits - Entregar cartones y spins del primer día
             const dailySpins = config.wheel_daily_spins || 0;
+            const dailyBronzeCards = config.daily_bronze_cards || 0;
+            const dailyOroCards = config.daily_oro_cards || 0;
 
+            // Actualizar tier y resetear beneficios
             await connection.query(`
                 UPDATE users 
                 SET 
                   subscription_tier_id = ?,
-                  monthly_free_cards_balance = ?,
                   daily_wheel_spins_balance = ?,
                   last_benefit_reset = NOW()
                 WHERE id = ?
-            `, [membershipId, monthlyCards, dailySpins, userId]);
+            `, [membershipId, dailySpins, userId]);
+
+            // Entregar cartones del primer día según el tipo de membresía
+            if (dailyBronzeCards > 0) {
+                await connection.query(`
+                    UPDATE users 
+                    SET gift_cards_bronce = gift_cards_bronce + ?
+                    WHERE id = ?
+                `, [dailyBronzeCards, userId]);
+                console.log(`🎁 [MEMBERSHIP_ACTIVATE] Delivered ${dailyBronzeCards} BRONCE cards to user ${userId}`);
+            }
+
+            if (dailyOroCards > 0) {
+                await connection.query(`
+                    UPDATE users 
+                    SET gift_cards_oro = gift_cards_oro + ?
+                    WHERE id = ?
+                `, [dailyOroCards, userId]);
+                console.log(`🏆 [MEMBERSHIP_ACTIVATE] Delivered ${dailyOroCards} ORO cards to user ${userId}`);
+            }
 
             await connection.commit();
 
@@ -223,17 +269,17 @@ class MembershipService {
         }
     }
 
-    async getPendingPurchase(userId) {
+    async getPendingPurchases(userId) {
+        // Return ALL pending membership purchases for this user
         const [rows] = await pool.query(`
             SELECT id, details, created_at 
             FROM deposit_requests 
             WHERE user_id = ? 
             AND status = 'pending' 
             AND request_type = 'membership_purchase'
-            ORDER BY created_at DESC 
-            LIMIT 1
+            ORDER BY created_at DESC
         `, [userId]);
-        return rows[0];
+        return rows; // Return array of all pending requests
     }
 
     /**
@@ -243,31 +289,42 @@ class MembershipService {
     async resetDailyBenefits() {
         console.log('🔄 Running Daily Membership Benefit Reset...');
 
-        const [tiers] = await pool.query('SELECT id, benefits_config FROM memberships');
+        const [tiers] = await pool.query('SELECT id, name, benefits_config FROM memberships');
 
         for (const tier of tiers) {
             const config = typeof tier.benefits_config === 'string' ? JSON.parse(tier.benefits_config) : tier.benefits_config;
             const dailySpins = config.wheel_daily_spins || 0;
             const dailyBronzeCards = config.daily_bronze_cards || 0;
+            const dailyOroCards = config.daily_oro_cards || 0;
 
+            // Resetear ruedas diarias
             if (dailySpins > 0) {
                 await pool.query(`
                   UPDATE users 
                   SET daily_wheel_spins_balance = ? 
                   WHERE subscription_tier_id = ?
               `, [dailySpins, tier.id]);
+                console.log(`🎰 Resetting ${dailySpins} wheel spins for ${tier.name} members`);
             }
 
+            // Entregar cartones de BRONCE diarios (Embajador)
             if (dailyBronzeCards > 0) {
-                console.log(`🎁 Awarding ${dailyBronzeCards} Bronze cards to ${tier.name} members...`);
-                // Se las sumamos a su inventario de tickets bronce
-                // Importante: No pisamos, sumamos.
+                console.log(`🎁 Awarding ${dailyBronzeCards} BRONCE cards to ${tier.name} members...`);
                 await pool.query(`
                     UPDATE users 
-                    SET 
-                      gift_cards_bronce = gift_cards_bronce + ?
+                    SET gift_cards_bronce = gift_cards_bronce + ?
                     WHERE subscription_tier_id = ?
                 `, [dailyBronzeCards, tier.id]);
+            }
+
+            // Entregar cartones de ORO diarios (Bronce/Plata/Oro members)
+            if (dailyOroCards > 0) {
+                console.log(`🏆 Awarding ${dailyOroCards} ORO cards to ${tier.name} members...`);
+                await pool.query(`
+                    UPDATE users 
+                    SET gift_cards_oro = gift_cards_oro + ?
+                    WHERE subscription_tier_id = ?
+                `, [dailyOroCards, tier.id]);
             }
         }
         console.log('✅ Daily benefits reset complete.');

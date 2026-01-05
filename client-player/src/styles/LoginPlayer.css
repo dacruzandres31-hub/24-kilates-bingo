@@ -54,17 +54,24 @@
 
 .form-input {
   width: 100%;
+  box-sizing: border-box;
   padding: 0.75rem 1rem;
   background: #0f172a;
   border: 1px solid #475569;
   border-radius: 0.5rem;
-  color: white;
+  color: white !important;
   font-size: 1rem;
   transition: all 0.2s;
+  -webkit-text-fill-color: white !important;
+}
+
+.login-button {
+  box-sizing: border-box;
 }
 
 .form-input::placeholder {
   color: #64748b;
+  -webkit-text-fill-color: #64748b;
 }
 
 .form-input:focus {
@@ -72,6 +79,20 @@
   ring: 2px solid #fbbf24;
   border-color: transparent;
   box-shadow: 0 0 0 2px #fbbf24;
+  color: white !important;
+  -webkit-text-fill-color: white !important;
+}
+
+/* Force white text on browser autofill */
+.form-input:-webkit-autofill,
+.form-input:-webkit-autofill:hover,
+.form-input:-webkit-autofill:focus,
+.form-input:-webkit-autofill:active {
+  -webkit-text-fill-color: white !important;
+  -webkit-box-shadow: 0 0 0 1000px #0f172a inset !important;
+  box-shadow: 0 0 0 1000px #0f172a inset !important;
+  transition: background-color 5000s ease-in-out 0s;
+  caret-color: white !important;
 }
 
 .password-container {

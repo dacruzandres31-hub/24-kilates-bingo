@@ -468,8 +468,7 @@ exports.getAllInventories = async (req, res) => {
            i.room,
            i.normal_cards,
            i.gift_cards,
-           i.total_cards,
-           i.free_percentage
+           i.total_cards
          FROM v_superadmin_inventory i
          JOIN user_hierarchy uh ON i.user_id = uh.id
          ORDER BY uh.username, 
@@ -492,11 +491,15 @@ exports.getAllInventories = async (req, res) => {
           };
         }
 
+        const totalCards = Number(item.total_cards) || 0;
+        const giftCards = Number(item.gift_cards) || 0;
+        const freePercentage = totalCards > 0 ? Math.round((giftCards / totalCards) * 100) : 0;
+
         acc[item.user_id].rooms[item.room] = {
           normal_cards: item.normal_cards,
           gift_cards: item.gift_cards,
           total_cards: item.total_cards,
-          free_percentage: item.free_percentage
+          free_percentage: freePercentage
         };
 
         acc[item.user_id].total_all += Number(item.total_cards) || 0;

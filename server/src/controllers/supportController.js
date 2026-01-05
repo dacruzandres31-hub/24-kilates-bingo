@@ -23,7 +23,7 @@ exports.createTicket = async (req, res) => {
 
         // Create First Message
         await connection.query(
-            `INSERT INTO support_messages (ticket_id, sender_id, sender_role, message) VALUES (?, ?, 'user', ?)`,
+            `INSERT INTO support_messages (ticket_id, user_id, is_admin, message) VALUES (?, ?, 0, ?)`,
             [ticketId, userId, message]
         );
 
@@ -82,7 +82,7 @@ exports.getTicketDetails = async (req, res) => {
         const [messages] = await pool.query(
             `SELECT m.*, u.username as sender_name 
        FROM support_messages m 
-       LEFT JOIN users u ON m.sender_id = u.id 
+       LEFT JOIN users u ON m.user_id = u.id 
        WHERE m.ticket_id = ? 
        ORDER BY m.created_at ASC`,
             [id]
@@ -112,8 +112,8 @@ exports.replyToTicket = async (req, res) => {
         }
 
         await pool.query(
-            `INSERT INTO support_messages (ticket_id, sender_id, sender_role, message) VALUES (?, ?, ?, ?)`,
-            [id, userId, userRole, message]
+            `INSERT INTO support_messages (ticket_id, user_id, is_admin, message) VALUES (?, ?, ?, ?)`,
+            [id, userId, userRole === 'admin' ? 1 : 0, message]
         );
 
         // Update ticket 'updated_at' and status if needed (e.g. reopen if user replies)

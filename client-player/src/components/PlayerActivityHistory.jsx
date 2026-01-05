@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import ReplayViewer from './ReplayViewer';
 import '../styles/PlayerActivityHistory.css';
 
 const PlayerActivityHistory = ({ onClose }) => {
@@ -9,7 +8,6 @@ const PlayerActivityHistory = ({ onClose }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedSession, setSelectedSession] = useState(null);
-  const [showReplay, setShowReplay] = useState(false);
 
   useEffect(() => {
     loadHistory();
@@ -20,17 +18,17 @@ const PlayerActivityHistory = ({ onClose }) => {
       setLoading(true);
       // Buscar token en ambas ubicaciones (playerToken es el correcto)
       const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
-
+      
       // Si no hay token, mostrar error y no intentar cargar
       if (!token) {
         setError('Sesión expirada. Por favor, cierra sesión y vuelve a iniciar sesión.');
         setLoading(false);
         return;
       }
-
-      console.log('🔍 Cargando historial desde: /api/activity-history');
+      
+      console.log('🔍 Cargando historial desde:', `${import.meta.env.VITE_API_URL}/activity-history`);
       console.log('🔑 Token encontrado:', token ? 'Sí' : 'No');
-      const response = await axios.get('/api/activity-history', {
+      const response = await axios.get(`${import.meta.env.VITE_API_URL}/activity-history`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       console.log('✅ Historial cargado:', response.data);
@@ -39,7 +37,7 @@ const PlayerActivityHistory = ({ onClose }) => {
     } catch (err) {
       console.error('❌ Error cargando historial:', err);
       console.error('Response:', err.response);
-
+      
       // Si es 401, token expirado - mostrar mensaje sin redirigir
       if (err.response?.status === 401) {
         setError('Tu sesión ha expirado. Por favor, cierra sesión y vuelve a iniciar sesión desde el menú de Perfil.');
@@ -55,7 +53,7 @@ const PlayerActivityHistory = ({ onClose }) => {
     try {
       const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
       const response = await axios.get(
-        `/api/activity-history/session/${sessionId}`,
+        `${import.meta.env.VITE_API_URL}/activity-history/session/${sessionId}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setSelectedSession(response.data.session);
@@ -78,11 +76,12 @@ const PlayerActivityHistory = ({ onClose }) => {
   };
 
   const formatMoney = (amount) => {
+    const num = parseFloat(amount) || 0;
     return new Intl.NumberFormat('es-AR', {
       style: 'currency',
       currency: 'ARS',
       minimumFractionDigits: 0
-    }).format(amount);
+    }).format(num);
   };
 
   const getRoomName = (room) => {
@@ -125,37 +124,37 @@ const PlayerActivityHistory = ({ onClose }) => {
   const renderSummary = () => {
     if (!history?.summary) return null;
     const s = history.summary;
-
+    
     return (
       <div className="summary-section">
         <h3>📊 Resumen de Actividad</h3>
         <div className="summary-grid">
-          <div className="summary-card">
+          <div className="summary-card clickable" onClick={() => setActiveTab('tickets')}>
             <div className="summary-icon">🎫</div>
             <div className="summary-value">{s.total_ticket_purchases}</div>
             <div className="summary-label">Compras de Tickets</div>
           </div>
-          <div className="summary-card">
+          <div className="summary-card clickable" onClick={() => setActiveTab('cards')}>
             <div className="summary-icon">🎴</div>
             <div className="summary-value">{s.total_cards_used}</div>
             <div className="summary-label">Cartones Canjeados</div>
           </div>
-          <div className="summary-card">
+          <div className="summary-card clickable" onClick={() => setActiveTab('sessions')}>
             <div className="summary-icon">🎮</div>
             <div className="summary-value">{s.sessions_played}</div>
             <div className="summary-label">Sorteos Jugados</div>
           </div>
-          <div className="summary-card">
+          <div className="summary-card clickable" onClick={() => setActiveTab('prizes')}>
             <div className="summary-icon">🏆</div>
             <div className="summary-value">{s.prizes_won}</div>
             <div className="summary-label">Premios Ganados</div>
           </div>
-          <div className="summary-card highlight">
+          <div className="summary-card highlight clickable" onClick={() => setActiveTab('balance')}>
             <div className="summary-icon">💰</div>
             <div className="summary-value">{formatMoney(s.total_prizes_paid)}</div>
             <div className="summary-label">Total Cobrado</div>
           </div>
-          <div className="summary-card">
+          <div className="summary-card clickable" onClick={() => setActiveTab('withdrawals')}>
             <div className="summary-icon">📤</div>
             <div className="summary-value">{s.withdrawals_approved}</div>
             <div className="summary-label">Retiros Aprobados</div>
@@ -259,7 +258,7 @@ const PlayerActivityHistory = ({ onClose }) => {
                   {session.draw_date} {session.draw_time}
                 </div>
               </div>
-
+              
               <div className="session-body">
                 <div className="session-stat">
                   <span>Mis cartones:</span>
@@ -269,7 +268,7 @@ const PlayerActivityHistory = ({ onClose }) => {
                   <span>Total participantes:</span>
                   <strong>{session.total_cards} cartones</strong>
                 </div>
-
+                
                 {session.winner_linea_username && (
                   <div className={`winner-info ${session.is_winner_linea ? 'highlight' : ''}`}>
                     <span>🏁 Línea:</span>
@@ -280,7 +279,7 @@ const PlayerActivityHistory = ({ onClose }) => {
                     <small>Bolilla {session.linea_ball_index + 1}: #{session.linea_ball_number}</small>
                   </div>
                 )}
-
+                
                 {session.winner_bingo_username && (
                   <div className={`winner-info ${session.is_winner_bingo ? 'highlight' : ''}`}>
                     <span>🏆 BINGO:</span>
@@ -293,7 +292,7 @@ const PlayerActivityHistory = ({ onClose }) => {
                 )}
               </div>
 
-              <button
+              <button 
                 className="btn-details"
                 onClick={() => loadSessionDetails(session.game_session_id)}
               >
@@ -390,44 +389,6 @@ const PlayerActivityHistory = ({ onClose }) => {
     );
   };
 
-  const renderDeposits = () => {
-    if (!history?.depositRequests?.length) {
-      return <div className="no-data">No hay solicitudes de compra/depósito</div>;
-    }
-
-    return (
-      <div className="deposits-list">
-        <h3>🛒 Historial de Compras y Depósitos</h3>
-        <table className="history-table">
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Tipo</th>
-              <th>Monto</th>
-              <th>Estado</th>
-              <th>Notas</th>
-            </tr>
-          </thead>
-          <tbody>
-            {history.depositRequests.map((dep) => (
-              <tr key={dep.id}>
-                <td>{formatDate(dep.created_at)}</td>
-                <td>
-                  <span className={`movement-type ${dep.request_type === 'card_purchase' ? 'purchase' : 'deposit'}`}>
-                    {dep.request_type === 'card_purchase' ? 'Compra Cartones' : 'Carga Saldo'}
-                  </span>
-                </td>
-                <td className="amount">{formatMoney(dep.amount_declared)}</td>
-                <td>{getStatusBadge(dep.status)}</td>
-                <td className="notes">{dep.admin_notes || '-'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    );
-  };
-
   const renderBalance = () => {
     if (!history?.balanceMovements?.length) {
       return <div className="no-data">No hay movimientos de balance</div>;
@@ -478,17 +439,9 @@ const PlayerActivityHistory = ({ onClose }) => {
         <div className="session-details-modal" onClick={e => e.stopPropagation()}>
           <div className="modal-header">
             <h2>Detalles del Sorteo</h2>
-            <div className="header-actions">
-              <button
-                className="btn-replay-action"
-                onClick={() => setShowReplay(true)}
-              >
-                🎬 Reproducir Replay
-              </button>
-              <button className="btn-close" onClick={() => setSelectedSession(null)}>×</button>
-            </div>
+            <button className="btn-close" onClick={() => setSelectedSession(null)}>×</button>
           </div>
-
+          
           <div className="modal-body">
             <div className="session-info-grid">
               <div className="info-item">
@@ -554,10 +507,12 @@ const PlayerActivityHistory = ({ onClose }) => {
 
   if (loading) {
     return (
-      <div className="activity-history-modal">
-        <div className="loading-spinner">
-          <div className="spinner"></div>
-          <p>Cargando historial...</p>
+      <div className="activity-history-portal">
+        <div className="activity-history-modal">
+          <div className="loading-spinner">
+            <div className="spinner"></div>
+            <p>Cargando historial...</p>
+          </div>
         </div>
       </div>
     );
@@ -565,67 +520,73 @@ const PlayerActivityHistory = ({ onClose }) => {
 
   if (error) {
     return (
-      <div className="activity-history-modal">
-        <div className="error-message">
-          <p>{error}</p>
-          <button onClick={loadHistory}>Reintentar</button>
+      <div className="activity-history-portal">
+        <div className="activity-history-modal">
+          <div className="modal-header">
+            <button className="btn-back-lobby" onClick={onClose}>
+              ← Regresar al Lobby
+            </button>
+            <h2>📋 Mi Historial</h2>
+            <button className="btn-close" onClick={onClose}>×</button>
+          </div>
+          <div className="error-message">
+            <p>{error}</p>
+            <button onClick={loadHistory}>Reintentar</button>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <>
+    <div className="activity-history-portal">
       <div className="activity-history-modal">
         <div className="modal-header">
+          <button className="btn-back-lobby" onClick={onClose}>
+            ← Regresar al Lobby
+          </button>
           <h2>📋 Mi Historial de Actividad</h2>
           <button className="btn-close" onClick={onClose}>×</button>
         </div>
 
         <div className="tabs">
-          <button
+          <button 
             className={`tab ${activeTab === 'summary' ? 'active' : ''}`}
             onClick={() => setActiveTab('summary')}
           >
             📊 Resumen
           </button>
-          <button
+          <button 
             className={`tab ${activeTab === 'tickets' ? 'active' : ''}`}
             onClick={() => setActiveTab('tickets')}
           >
             🎫 Tickets
           </button>
-          <button
+          <button 
             className={`tab ${activeTab === 'cards' ? 'active' : ''}`}
             onClick={() => setActiveTab('cards')}
           >
             🎴 Cartones
           </button>
-          <button
+          <button 
             className={`tab ${activeTab === 'sessions' ? 'active' : ''}`}
             onClick={() => setActiveTab('sessions')}
           >
             🎮 Sorteos
           </button>
-          <button
+          <button 
             className={`tab ${activeTab === 'prizes' ? 'active' : ''}`}
             onClick={() => setActiveTab('prizes')}
           >
             🏆 Premios
           </button>
-          <button
+          <button 
             className={`tab ${activeTab === 'withdrawals' ? 'active' : ''}`}
             onClick={() => setActiveTab('withdrawals')}
           >
             📤 Retiros
           </button>
-          <button
-            className={`tab ${activeTab === 'purchases' ? 'active' : ''}`}
-            onClick={() => setActiveTab('purchases')}
-          >
-            🛒 Compras
-          </button>
-          <button
+          <button 
             className={`tab ${activeTab === 'balance' ? 'active' : ''}`}
             onClick={() => setActiveTab('balance')}
           >
@@ -640,20 +601,12 @@ const PlayerActivityHistory = ({ onClose }) => {
           {activeTab === 'sessions' && renderSessions()}
           {activeTab === 'prizes' && renderPrizes()}
           {activeTab === 'withdrawals' && renderWithdrawals()}
-          {activeTab === 'purchases' && renderDeposits()}
           {activeTab === 'balance' && renderBalance()}
         </div>
       </div>
 
       {renderSessionDetailsModal()}
-
-      {showReplay && selectedSession && (
-        <ReplayViewer
-          session={selectedSession}
-          onClose={() => setShowReplay(false)}
-        />
-      )}
-    </>
+    </div>
   );
 };
 

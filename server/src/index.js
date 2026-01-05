@@ -1,4 +1,3 @@
-// Forces restart
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -19,6 +18,7 @@ const inventoryRoutes = require('./routes/inventoryRoutes');
 const shopRoutes = require('./routes/shopRoutes');
 const chipsRoutes = require('./routes/chipsRoutes');
 const withdrawalRoutes = require('./routes/withdrawalRoutes');
+const depositRoutes = require('./routes/depositRoutes');
 const winnersPaymentRoutes = require('./routes/winnersPaymentRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const superAdminRoutes = require('./routes/superAdminRoutes');
@@ -26,41 +26,19 @@ const gameAdminRoutes = require('./routes/gameAdminRoutes');
 const starterRoomRoutes = require('./routes/starterRoom');
 const giftCardsRoutes = require('./routes/giftCards');
 const cardsRoutes = require('./routes/cardsRoutes');
+const membershipRoutes = require('./routes/membershipRoutes');
 const gameAdminController = require('./controllers/gameAdminController');
 const cardPoolService = require('./services/cardPoolService');
-const activityHistoryRoutes = require('./routes/activityHistoryRoutes');
-const whatsappRoutes = require('./routes/whatsappRoutes'); // Nueva ruta
-const membershipRoutes = require('./routes/membershipRoutes'); // NEW: Membership Routes
-const referralRoutes = require('./routes/referralRoutes');
 const db = require('./db');
-const fs = require('fs');
-const path = require('path');
 
 // CONFIGURACIÓN INICIAL
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
 // EXPRESS APP
 const app = express();
 
-// Configurar trust proxy para express-rate-limit en producción (detrás de nginx)
-app.set('trust proxy', 1);
-
-// GLOBAL DEBUG LOGGER
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', serverTime: new Date() });
-});
-
-const logFile = path.join(__dirname, '..', 'live_debug.log');
-const logStream = fs.createWriteStream(logFile, { flags: 'a' });
-
-app.use((req, res, next) => {
-  const logMsg = `[${new Date().toISOString()}] ${req.method} ${req.originalUrl}\n`;
-  logStream.write(logMsg);
-  console.log(logMsg);
-  next();
-});
-
+// MIDDLEWARE SEGURIDAD
 app.use(helmet());
 app.use(morgan('combined'));
 
@@ -68,8 +46,7 @@ app.use(morgan('combined'));
 const corsOptions = {
   origin: [
     'http://localhost:5173',  // Player dev
-    'http://localhost:5174',  // Admin dev (default)
-    'http://localhost:3000',  // Admin dev (forced port)
+    'http://localhost:5174',  // Admin dev
     process.env.CORS_ORIGIN_PLAYER,
     process.env.CORS_ORIGIN_ADMIN
   ].filter(Boolean),
@@ -82,10 +59,6 @@ app.use(cors(corsOptions));
 // BODY PARSER
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
-
-// SECURITY: Global Rate Limiting
-const { globalLimiter } = require('./middleware/security');
-app.use('/api/', globalLimiter); // Apply only to API routes
 
 // SOCKET.IO
 const server = http.createServer(app);
@@ -106,158 +79,46 @@ gameAdminController.initGameEngine(io);
 // Almacenar instancia de Socket.IO en app para acceso desde controllers
 app.set('io', io);
 
-// También hacer io accesible globalmente para servicios
-global.io = io;
-
-// REDIS ADAPTER PARA CLUSTERING
-const setupRedisAdapter = async () => {
-  if (process.env.NODE_ENV === 'production') {
-    try {
-      const { createAdapter } = require('@socket.io/redis-adapter');
-      const { createClient } = require('redis');
-
-      const pubClient = createClient({
-        url: `redis://${process.env.REDIS_HOST || 'localhost'}:${process.env.REDIS_PORT || 6379}`
-      });
-      const subClient = pubClient.duplicate();
-
-      await Promise.all([pubClient.connect(), subClient.connect()]);
-      io.adapter(createAdapter(pubClient, subClient));
-      console.log('✅ Socket.IO Redis Adapter conectado (Cluster Mode)');
-    } catch (err) {
-      console.error('❌ Error configurando Socket.IO Redis Adapter:', err.message);
-    }
-  }
-};
-setupRedisAdapter();
-
-const metricsService = require('./services/metricsService'); // Add import
-
-// ...
-
 // SOCKET.IO - Event handlers
-const chatEvents = require('./socket/chatEvents'); // Importar lógica de chat
-
 io.on('connection', (socket) => {
-  metricsService.increment('activeConnections');
-  metricsService.increment('totalConnections');
   console.log(`[Socket.IO] Cliente conectado: ${socket.id}`);
 
-  // Entregar gestión de chat
-  chatEvents(io, socket);
-
-  // Handler para unirse a room personal (para actualizaciones de balance en tiempo real)
-  socket.on('join_personal_room', ({ userId }) => {
+  // Join a room personal del usuario
+  socket.on('join_personal_room', (data) => {
+    const { userId } = data;
     if (userId) {
-      const roomName = `user_${userId}`;
-      socket.join(roomName);
-      console.log(`[Socket.IO] 📍 Usuario ${userId} unido a room personal: ${roomName}`);
+      socket.join(`user_${userId}`);
+      console.log(`[Socket.IO] Usuario ${userId} joined personal room: user_${userId}`);
     }
   });
 
-  // Handler para unirse a una sala de juego (DEPRECATED - Usar join_session)
-  socket.on('join_game', ({ room }) => {
-    if (room) {
-      const roomName = `room_${room}`;
-      socket.join(roomName);
-      console.log(`[Socket.IO] 🎮 Socket ${socket.id} unido a sala de juego: ${roomName}`);
-    }
+  // Eventos del juego
+  socket.on('join_game', (data) => {
+    console.log(`[Socket.IO] Join game: ${data.userId} en sala ${data.room}`);
+    socket.join(`game_${data.room}`);
   });
 
-  // Chat en vivo
-  socket.on('chat_message', async (data) => {
-    const { gameSessionId, message } = data;
-    const userId = socket.user?.id;
-    const username = socket.user?.username || 'Anónimo';
-
-    try {
-      // Obtener el tier del usuario
-      const [userTier] = await db.query(`
-        SELECT m.name as tier_name
-        FROM user_subscriptions us
-        JOIN memberships m ON us.membership_id = m.id
-        WHERE us.user_id = ? AND us.status = 'active'
-        LIMIT 1
-      `, [userId]);
-
-      const tier = userTier.length > 0 ? userTier[0].tier_name : null;
-
-      io.to(`session_${gameSessionId}`).emit('chat_message', {
-        username,
-        message,
-        timestamp: new Date().toISOString(),
-        tier: tier
-      });
-    } catch (error) {
-      console.error('Error in chat_message:', error);
-      // Emitir sin tier en caso de error
-      io.to(`session_${gameSessionId}`).emit('chat_message', {
-        username,
-        message,
-        timestamp: new Date().toISOString()
-      });
-    }
+  socket.on('number_drawn', (data) => {
+    console.log(`[Socket.IO] Número sorteado: ${data.number}`);
+    io.to(`game_${data.room}`).emit('number_drawn', data);
   });
 
-  // Reacciones emoji
-  socket.on('emoji_reaction', (data) => {
-    const { gameSessionId, emoji } = data;
-    const userData = socket.userData || {};
-    console.log(`[Socket.IO] Emoji reaction ${emoji} from ${userData.username} in session ${gameSessionId}`);
-
-    // Broadcast a todos en la sesión
-    io.to(`session_${gameSessionId}`).emit('emoji_reaction', {
-      emoji,
-      username: userData.username || 'Anónimo'
-    });
+  socket.on('winner_detected', (data) => {
+    console.log(`[Socket.IO] Ganador detectado: ${data.userId}`);
+    io.to(`game_${data.room}`).emit('winner_detected', data);
   });
 
-  // NEW: Handler para unirse a una sesión específica (Sincronización v2.0)
-  socket.on('join_session', ({ sessionId }) => {
-    if (sessionId) {
-      const sessionRoom = `session_${sessionId}`;
-      socket.join(sessionRoom);
-      console.log(`[Socket.IO] 🎲 Socket ${socket.id} unido a sesión: ${sessionRoom}`);
-
-      // Enviar estado actual si el juego está en curso
-      if (gameAdminController.gameEngine) {
-        const state = gameAdminController.gameEngine.getGameState(sessionId);
-        if (state) {
-          socket.emit('current_game_state', state);
-        }
-      }
-    }
+  socket.on('pot_update', (data) => {
+    console.log(`[Socket.IO] Actualización de pots`);
+    io.emit('pot_update', data);
   });
 
-  // NEW: Handler para unirse a sala global como espectador (Transmisión Pública)
-  socket.on('join_room_spectator', ({ room }) => {
-    if (room) {
-      const globalRoom = `room_${room}`;
-      socket.join(globalRoom);
-      console.log(`[Socket.IO] 📺 Socket ${socket.id} unido como espectador a: ${globalRoom}`);
-
-      // Enviar estado actual de cualquier sorteo activo en esta sala
-      if (gameAdminController.gameEngine) {
-        const state = gameAdminController.gameEngine.getRoomGameState(room);
-        if (state) {
-          socket.emit('current_game_state', state);
-        }
-      }
-    }
+  socket.on('cascade_transfer', (data) => {
+    console.log(`[Socket.IO] Cascada de jackpot transferida`);
+    io.emit('cascade_transfer', data);
   });
-
-  // NEW: Handler para salir de sala global
-  socket.on('leave_room_spectator', ({ room }) => {
-    if (room) {
-      const globalRoom = `room_${room}`;
-      socket.leave(globalRoom);
-      console.log(`[Socket.IO] 👋 Socket ${socket.id} salió de: ${globalRoom}`);
-    }
-  });
-
 
   socket.on('disconnect', () => {
-    metricsService.increment('activeConnections', -1);
     console.log(`[Socket.IO] Cliente desconectado: ${socket.id}`);
   });
 
@@ -267,18 +128,6 @@ io.on('connection', (socket) => {
 });
 
 // RUTAS API
-console.log('🚀 [Server] Rutas cargadas: ' + new Date().toLocaleTimeString());
-
-// Middleware para debuguear rutas admin
-app.use('/api/admin', (req, res, next) => {
-  console.log(`📡 [Admin Request] ${req.method} ${req.url}`);
-  next();
-});
-
-// ADMIN ROUTES (Higher priority to avoid shadowing)
-app.use('/api/admin/gift-cards', giftCardsRoutes);
-app.use('/api/admin', adminRoutes);
-
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/activity-history', require('./routes/activityHistoryRoutes')); // Historial del jugador
@@ -291,17 +140,16 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/shop', shopRoutes);
 app.use('/api/chips', chipsRoutes);
 app.use('/api/withdrawals', withdrawalRoutes);
-app.use('/api/referrals', referralRoutes);
-app.use('/api/deposits', require('./routes/depositRoutes')); // Nueva ruta de depósitos
+app.use('/api/deposits', depositRoutes);
 app.use('/api/commissions', require('./routes/commissionRoutes')); // Sistema de comisiones
+app.use('/api/support', require('./routes/supportRoutes')); // Soporte técnico
 app.use('/api/winners-payment', winnersPaymentRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/admin/gift-cards', giftCardsRoutes);
 app.use('/api/superadmin', superAdminRoutes);
 app.use('/api/game-admin', gameAdminRoutes);
-app.use('/api/support', require('./routes/supportRoutes'));
-app.use('/api/whatsapp', whatsappRoutes); // Montar nuevas rutas
-app.use('/api/memberships', membershipRoutes); // NEW: Memberships Endpoint
-app.use('/api/wheel', require('./routes/wheelRoutes')); // VIP Extra Wheel Spins
-
+app.use('/api/whatsapp', require('./routes/whatsapp24KRoutes')); // WhatsApp 24K Premium
+app.use('/api/memberships', membershipRoutes); // Sistema de membresías Club VIP
 
 // HEALTH CHECK
 app.get('/health', (req, res) => {
@@ -330,7 +178,7 @@ app.use((req, res) => {
 async function loadExistingPools() {
   try {
     console.log('🎫 Cargando pools de cartones desde BD...');
-
+    
     // Buscar sesiones recientes de Starter con cartones
     const [sessions] = await db.query(`
       SELECT DISTINCT cp.session_id, COUNT(*) as card_count
@@ -362,41 +210,9 @@ async function loadExistingPools() {
   }
 }
 
-// MIGRACIÓN AUTOMÁTICA DE BASE DE DATOS (IF NOT EXISTS)
-async function updateDatabaseSchema() {
-  try {
-    const sqlPath = path.join(__dirname, '..', 'ADD_WHATSAPP_CONFIGS.sql');
-    if (fs.existsSync(sqlPath)) {
-      console.log('🔄 Verificando esquema de base de datos (WhatsApp)...');
-      const sql = fs.readFileSync(sqlPath, 'utf8');
-      const statements = sql
-        .replace(/\r?\n/g, ' ')
-        .split(';')
-        .filter(st => st.trim().length > 0);
-
-      for (let statement of statements) {
-        try {
-          await db.query(statement);
-        } catch (err) {
-          // Ignorar errores de "ya existe" (IF NOT EXISTS maneja tablas, pero no columnas)
-          if (err.code !== 'ER_DUP_FIELDNAME' && err.code !== 'ER_TABLE_EXISTS_ERROR') {
-            // console.warn(`[Migration] Nota: ${err.message}`);
-          }
-        }
-      }
-      console.log('✅ Esquema de WhatsApp verificado.');
-    }
-  } catch (error) {
-    console.error('❌ Error en auto-migración:', error.message);
-  }
-}
-
 // INICIAR SERVIDOR
 const startServer = async () => {
   try {
-    // Aplicar actualizaciones de esquema si existen
-    await updateDatabaseSchema();
-
     // Cargar pools de cartones existentes desde BD
     await loadExistingPools();
 
@@ -408,23 +224,10 @@ const startServer = async () => {
     console.log('✅ Card Pool Manager inicializado:', initResults);
     console.log('');
 
-    // Inicializar motor de juego automático
-    const gameAdminController = require('./controllers/gameAdminController');
-    gameAdminController.initGameEngine(io);
-    console.log('✅ Motor de juego automático inicializado');
-
-    // [NUEVO] Recuperar sesiones interrumpidas y activar Watchdog
-    if (gameAdminController.gameEngine) {
-      gameAdminController.gameEngine.resumeActiveSessions();
-      gameAdminController.gameEngine.startWatchdog();
-    }
-    console.log('');
-
-    // Inicializar inicio automático de sorteos programados
-    const { AutoDrawStarter } = require('./services/sessionScheduler');
-    const autoDrawStarter = new AutoDrawStarter(gameAdminController.gameEngine);
-    autoDrawStarter.start();
-    console.log('✅ Inicio automático de sorteos programados activado');
+    // Inicializar WhatsApp 24K Service
+    console.log('📱 Inicializando WhatsApp 24K Service...');
+    const whatsapp24KService = require('./services/whatsapp24KService');
+    await whatsapp24KService.initialize();
     console.log('');
 
     // Iniciar scheduler
@@ -457,16 +260,16 @@ let isShuttingDown = false;
 process.on('SIGTERM', async () => {
   if (isShuttingDown) return;
   isShuttingDown = true;
-
+  
   console.log('\n📛 SIGTERM recibido, apagando servidor...');
-
+  
   try {
     await scheduler.stop();
     server.close(() => {
       console.log('✅ Servidor apagado correctamente');
       process.exit(0);
     });
-
+    
     // Forzar salida después de 10 segundos
     setTimeout(() => {
       console.log('⏱️ Tiempo agotado, forzando salida...');
@@ -481,16 +284,16 @@ process.on('SIGTERM', async () => {
 process.on('SIGINT', async () => {
   if (isShuttingDown) return;
   isShuttingDown = true;
-
+  
   console.log('\n📛 SIGINT recibido (Ctrl+C), apagando servidor...');
-
+  
   try {
     await scheduler.stop();
     server.close(() => {
       console.log('✅ Servidor apagado correctamente');
       process.exit(0);
     });
-
+    
     // Forzar salida después de 10 segundos
     setTimeout(() => {
       console.log('⏱️ Tiempo agotado, forzando salida...');

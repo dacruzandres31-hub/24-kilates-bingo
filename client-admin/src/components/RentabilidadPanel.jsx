@@ -11,7 +11,7 @@ import {
     AreaChart, Area
 } from 'recharts';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : 'http://localhost:3001';
 
 export default function RentabilidadPanel() {
     const [data, setData] = useState(null);

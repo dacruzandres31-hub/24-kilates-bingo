@@ -60,7 +60,7 @@
   top: 0;
   left: 0;
   right: 0;
-  z-index: 100;
+  z-index: 10000;
   flex-wrap: nowrap;
   /* Prevent wrapping if possible */
   gap: 1rem;
@@ -194,6 +194,7 @@
 
 .profile-menu-container {
   position: relative;
+  z-index: 9999;
 }
 
 .btn-profile {
@@ -367,8 +368,8 @@
   border-radius: 10px;
   padding: 0.5rem;
   min-width: 220px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-  z-index: 1000;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+  z-index: 99999;
 }
 
 .dropdown-item {
@@ -2383,4 +2384,213 @@
 
 .support-button-sidebar .support-icon {
   font-size: 1.3rem;
+}
+
+/* ============================================
+   MOBILE RESPONSIVE - HORIZONTAL SCROLL
+   Barra superior y salas deslizables horizontalmente
+   ============================================ */
+@media (max-width: 768px) {
+  /* Barra superior deslizable */
+  .user-top-bar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 0.5rem 0;
+    position: relative;
+  }
+  
+  .user-top-bar::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* Indicador de scroll en barra superior */
+  .user-top-bar::after {
+    content: '→';
+    position: fixed;
+    right: 5px;
+    top: 12px;
+    font-size: 1.2rem;
+    color: rgba(212, 175, 55, 0.7);
+    animation: pulse-arrow 1.5s ease-in-out infinite;
+    z-index: 101;
+    pointer-events: none;
+    text-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
+  }
+  
+  @keyframes pulse-arrow {
+    0%, 100% { opacity: 0.5; transform: translateX(0); }
+    50% { opacity: 1; transform: translateX(3px); }
+  }
+  
+  .user-info-section {
+    flex-shrink: 0;
+    padding-left: 0.75rem;
+  }
+  
+  .user-resources {
+    flex-shrink: 0;
+  }
+  
+  .user-actions {
+    flex-shrink: 0;
+    padding-right: 2rem; /* Espacio para el indicador */
+  }
+  
+  /* Logo más pequeño en móvil */
+  .lobby-header {
+    padding: 10px !important;
+    margin-top: 60px !important;
+  }
+  
+  .logo-container {
+    transform: scale(0.45) !important;
+    margin: -40px 0 -30px 0 !important;
+    transform-origin: center center !important;
+  }
+  
+  .logo-image {
+    width: 250px !important;
+    max-width: 90vw !important;
+  }
+  
+  .lobby-title h2 {
+    font-size: 1.1rem !important;
+    margin-top: -10px !important;
+  }
+  
+  .lobby-title p {
+    font-size: 0.75rem !important;
+  }
+  
+  /* Header stats más compactos */
+  .header-stats {
+    gap: 0.5rem;
+  }
+  
+  .stat-box {
+    padding: 0.5rem 0.75rem;
+    min-width: auto;
+  }
+  
+  .stat-value {
+    font-size: 1rem;
+  }
+  
+  .stat-label {
+    font-size: 0.6rem;
+  }
+}
+
+/* Los estilos de .rooms-grid, .room-link y .room-card 
+   están consolidados al final del archivo en MOBILE OVERRIDE FINAL */
+
+/* ============================================
+   MOBILE OVERRIDE FINAL - MÁXIMA PRIORIDAD
+   Estos estilos van AL FINAL para máxima cascada
+   ============================================ */
+@media screen and (max-width: 768px) {
+  /* Ocultar fondo con logo en móvil */
+  .casino-lobby {
+    background-image: linear-gradient(rgba(13, 12, 15, 0.95), rgba(13, 12, 15, 0.95)) !important;
+    background-size: cover !important;
+  }
+  
+  /* Ocultar logo en móvil para dar espacio a las tarjetas */
+  .casino-lobby .logo-container,
+  .casino-lobby .lobby-header {
+    display: none !important;
+  }
+  
+  /* Forzar flex horizontal para salas */
+  .casino-lobby .rooms-grid {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    grid-template-columns: unset !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scroll-snap-type: x mandatory !important;
+    -webkit-overflow-scrolling: touch !important;
+    gap: 12px !important;
+    padding: 10px 4vw 20px 4vw !important;
+    max-width: 100vw !important;
+    margin: 0 !important;
+    margin-top: 70px !important; /* Espacio para barra superior */
+    scrollbar-width: none !important;
+  }
+  
+  .casino-lobby .rooms-grid::-webkit-scrollbar {
+    display: none !important;
+  }
+  
+  /* Cada sala ocupa 75% del ancho - más pequeñas para ver varias */
+  .casino-lobby .rooms-grid .room-link {
+    flex: 0 0 75vw !important;
+    max-width: 75vw !important;
+    min-width: 75vw !important;
+    scroll-snap-align: center !important;
+  }
+  
+  /* Tarjeta más compacta */
+  .casino-lobby .rooms-grid .room-card {
+    width: 100% !important;
+    min-height: 280px !important;
+    max-height: 65vh !important;
+    padding: 15px !important;
+  }
+  
+  /* Contenido de tarjetas más compacto */
+  .casino-lobby .room-icon-img {
+    width: 60px !important;
+    height: 60px !important;
+  }
+  
+  .casino-lobby .room-name {
+    font-size: 1.5rem !important;
+  }
+  
+  .casino-lobby .room-price {
+    font-size: 1.2rem !important;
+  }
+  
+  .casino-lobby .countdown-number {
+    font-size: 1.4rem !important;
+  }
+  
+  .casino-lobby .pot-main .pot-amount {
+    font-size: 1.2rem !important;
+  }
+  
+  .casino-lobby .pots-container {
+    padding: 8px !important;
+    gap: 5px !important;
+  }
+  
+  .casino-lobby .pots-secondary {
+    gap: 5px !important;
+  }
+  
+  /* Indicador de deslizar */
+  .casino-lobby .rooms-grid::after {
+    content: '← Desliza →';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.75rem;
+    color: rgba(212, 175, 55, 0.7);
+    letter-spacing: 2px;
+    animation: fade-hint 4s ease-in-out forwards;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+}
+
+@keyframes fade-hint {
+  0% { opacity: 1; }
+  75% { opacity: 1; }
+  100% { opacity: 0; }
 }

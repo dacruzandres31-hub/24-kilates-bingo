@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import axios from 'axios';
 import { Check, X, Eye, RefreshCw, AlertTriangle, Calculator } from 'lucide-react';
+import CardReceiptModal from './CardReceiptModal';
+import { io } from 'socket.io-client';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : 'http://localhost:3001';
 
 export default function DepositInbox() {
     const [deposits, setDeposits] = useState([]);
@@ -11,6 +13,7 @@ export default function DepositInbox() {
     const [selectedProof, setSelectedProof] = useState(null);
     const [processing, setProcessing] = useState(null);
     const [confirmModal, setConfirmModal] = useState({ open: false, deposit: null });
+    const [modalRecibo, setModalRecibo] = useState({ isOpen: false, data: null }); // Receipt modal state
 
     const fetchDeposits = async () => {
         try {
@@ -29,8 +32,30 @@ export default function DepositInbox() {
 
     useEffect(() => {
         fetchDeposits();
-        const interval = setInterval(fetchDeposits, 15000);
-        return () => clearInterval(interval);
+        
+        // Socket.IO para actualizaciones en tiempo real
+        const socket = io(API_URL || window.location.origin);
+        
+        // Escuchar nuevas solicitudes
+        socket.on('deposit_request_created', (data) => {
+            console.log('📩 Nueva solicitud de depósito:', data);
+            fetchDeposits(); // Refrescar lista
+        });
+        
+        // Escuchar cuando otra persona procesa un depósito
+        socket.on('deposit_request_processed', (data) => {
+            console.log('✅ Depósito procesado:', data);
+            fetchDeposits(); // Actualizar lista
+        });
+        
+        const interval = setInterval(fetchDeposits, 15000); // Backup polling
+        
+        return () => {
+            clearInterval(interval);
+            socket.off('deposit_request_created');
+            socket.off('deposit_request_processed');
+            socket.disconnect();
+        };
     }, []);
 
     const handleApproveClick = (deposit) => {
@@ -46,9 +71,76 @@ export default function DepositInbox() {
 
         try {
             const token = localStorage.getItem('adminToken');
-            await axios.post(`${API_URL}/api/deposits/${deposit.id}/approve`, {}, {
+            const response = await axios.post(`${API_URL}/api/deposits/${deposit.id}/approve`, {}, {
                 headers: { Authorization: `Bearer ${token}` }
             });
+            
+            // Determinar tipo de transacción y mostrar recibo apropiado
+            const items = getDepositItems(deposit);
+            const isCardPurchase = deposit.request_type === 'card_purchase' || deposit.request_type === 'b2b_stock';
+            const isMembership = deposit.request_type === 'membership_purchase';
+            
+            if (isMembership && response.data?.data?.membershipTicket) {
+                // Membresía - usar CardReceiptModal con color dorado
+                const ticket = response.data.data.membershipTicket;
+                const details = typeof deposit.details === 'string' ? JSON.parse(deposit.details) : deposit.details;
+                setModalRecibo({
+                    isOpen: true,
+                    data: {
+                        type: 'membresia',
+                        operationType: 'membership',
+                        operation: `MEMBRESÍA ${details?.planName?.toUpperCase() || 'VIP'}`,
+                        userName: deposit.username,
+                        recipientId: deposit.user_id,
+                        quantity: parseFloat(deposit.amount_declared),
+                        timestamp: new Date().toLocaleString(),
+                        transactionId: `VIP-${deposit.id}`,
+                        extraDetails: {
+                            plan: ticket.planName,
+                            activacion: new Date(ticket.activatedAt).toLocaleDateString('es-AR'),
+                            vencimiento: new Date(ticket.expiresAt).toLocaleDateString('es-AR')
+                        }
+                    }
+                });
+            } else if (isCardPurchase && items.length > 0) {
+                // Compra de cartones - color púrpura/sala
+                setModalRecibo({
+                    isOpen: true,
+                    data: {
+                        type: 'cartones',
+                        operationType: 'cards',
+                        operation: 'VENTA DE CARTONES',
+                        userName: deposit.username,
+                        recipientId: deposit.user_id,
+                        quantity: items.reduce((sum, item) => sum + (item.quantity || 0), 0),
+                        room: items.length === 1 ? items[0].room : null,
+                        timestamp: new Date().toLocaleString(),
+                        transactionId: `STK-${deposit.id}`,
+                        items: items.map(i => ({ room: i.room, qty: i.quantity })),
+                        extraDetails: null
+                    }
+                });
+            } else {
+                // Depósito de dinero/fichas - color azul
+                setModalRecibo({
+                    isOpen: true,
+                    data: {
+                        type: 'dinero',
+                        operationType: 'deposit',
+                        operation: 'DEPÓSITO ACREDITADO',
+                        userName: deposit.username,
+                        recipientId: deposit.user_id,
+                        quantity: parseFloat(deposit.amount_declared),
+                        timestamp: new Date().toLocaleString(),
+                        transactionId: `DEP-${deposit.id}`,
+                        extraDetails: deposit.bank_name ? {
+                            bank: deposit.bank_name,
+                            alias: deposit.account_alias
+                        } : null
+                    }
+                });
+            }
+            
             fetchDeposits();
         } catch (error) {
             const msg = error.response?.data?.message || error.message;
@@ -336,6 +428,16 @@ export default function DepositInbox() {
                         <X size={40} strokeWidth={3} className="drop-shadow-lg" />
                     </button>
                 </div>,
+                document.body
+            )}
+
+            {/* Receipt Modal for deposits and card purchases */}
+            {modalRecibo.isOpen && createPortal(
+                <CardReceiptModal
+                    isOpen={modalRecibo.isOpen}
+                    onClose={() => setModalRecibo({ isOpen: false, data: null })}
+                    data={modalRecibo.data}
+                />,
                 document.body
             )}
         </div>

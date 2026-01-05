@@ -3,8 +3,8 @@ import ReactDOM from 'react-dom/client'
 import axios from 'axios'
 import App from './App.jsx'
 
-// Configurar axios baseURL
-axios.defaults.baseURL = 'http://localhost:3001';
+// Configurar axios baseURL - vacío para usar rutas relativas en producción
+axios.defaults.baseURL = '';
 
 import ErrorBoundary from './helpers/ErrorBoundary.jsx'
 

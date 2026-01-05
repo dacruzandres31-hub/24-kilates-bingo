@@ -49,6 +49,8 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
         skipWaiting: true,
         clientsClaim: true,
+        // Excluir /admin del Service Worker para que nginx lo maneje
+        navigateFallbackDenylist: [/^\/admin/],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,

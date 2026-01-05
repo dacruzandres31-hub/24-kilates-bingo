@@ -104,6 +104,15 @@ class ChipsService {
       throw new Error('Datos bancarios incompletos');
     }
 
+    // Validar CBU/CVU: si es solo números, debe tener 22 dígitos
+    const onlyDigits = cbu.replace(/\D/g, '');
+    if (onlyDigits.length > 0 && onlyDigits.length === cbu.length) {
+      // Es un CBU/CVU numérico
+      if (onlyDigits.length !== 22) {
+        throw new Error('El CBU/CVU debe tener exactamente 22 dígitos');
+      }
+    }
+
     // --- REGLA: Retiro de ganancias por referidos solo del 1 al 10 ---
     if (isReferralEarnings) {
       const today = new Date().getDate();
@@ -177,6 +186,19 @@ class ChipsService {
 
       await connection.query('COMMIT');
 
+      // Emitir evento WebSocket para nueva solicitud de retiro
+      if (global.io) {
+        // Notificar a todos los admins
+        global.io.emit('withdrawal_request_created', {
+          requestId: result.insertId,
+          userId,
+          amount,
+          username: users[0].username,
+          timestamp: new Date().toISOString()
+        });
+        console.log(`[ChipsService] 📡 Emitido withdrawal_request_created para request #${result.insertId}`);
+      }
+
       return {
         success: true,
         withdrawalRequestId: result.insertId,
@@ -217,24 +239,35 @@ class ChipsService {
       const userId = request.user_id;
       const amount = parseFloat(request.amount);
 
-      // Verificar regla de 20 minutos usando función SQL
-      const [canProcess] = await connection.query(
-        'SELECT can_process_withdrawal_time_rule(?, ?, ?) as can_process',
-        [userId, amount, processorRole]
-      );
-
-      if (!canProcess[0].can_process) {
-        const [minutesData] = await connection.query(
-          'SELECT get_minutes_since_last_credit(?) as minutes',
+      // Verificar regla de 20 minutos - lógica en JavaScript
+      // SuperAdmin siempre puede procesar
+      if (processorRole !== 'superadmin') {
+        // Obtener última acreditación de fichas
+        const [creditData] = await connection.query(
+          `SELECT MAX(created_at) as last_credit 
+           FROM chips_movements 
+           WHERE user_id = ? 
+             AND movement_type IN ('deposit', 'win', 'bonus', 'transfer_in')
+             AND amount > 0`,
           [userId]
         );
-        const minutes = minutesData[0].minutes;
 
-        throw new Error(
-          `No tiene permisos para procesar este retiro. ` +
-          `Han pasado ${minutes} minutos desde la última acreditación. ` +
-          `Solo un superadmin puede procesar retiros después de 20 minutos.`
-        );
+        const lastCredit = creditData[0].last_credit;
+        
+        if (!lastCredit) {
+          throw new Error('No hay acreditaciones registradas para este usuario.');
+        }
+
+        const minutesElapsed = Math.floor((Date.now() - new Date(lastCredit).getTime()) / 60000);
+
+        // Cajero solo puede procesar si pasaron MENOS de 20 minutos
+        if (minutesElapsed >= 20) {
+          throw new Error(
+            `No tiene permisos para procesar este retiro. ` +
+            `Han pasado ${minutesElapsed} minutos desde la última acreditación. ` +
+            `Solo un superadmin puede procesar retiros después de 20 minutos.`
+          );
+        }
       }
 
       // YA NO DEBITAMOS AQUÍ (Se debitó al solicitar)
@@ -257,6 +290,27 @@ class ChipsService {
       );
 
       await connection.query('COMMIT');
+
+      // Emitir eventos WebSocket
+      if (global.io) {
+        // Notificar al jugador
+        global.io.to(`user_${userId}`).emit('withdrawal_status_updated', {
+          status: 'completed',
+          requestId: withdrawalRequestId,
+          amount: amount,
+          message: '✅ Tu retiro ha sido procesado exitosamente'
+        });
+        
+        // Notificar a todos los admins
+        global.io.emit('withdrawal_request_processed', {
+          requestId: withdrawalRequestId,
+          status: 'completed',
+          userId,
+          amount,
+          processedBy: processorId,
+          timestamp: new Date().toISOString()
+        });
+      }
 
       return {
         success: true,
@@ -338,6 +392,35 @@ class ChipsService {
       }
 
       await connection.query('COMMIT');
+
+      // Emitir eventos WebSocket
+      if (global.io) {
+        // Notificar al jugador que su retiro fue rechazado y el dinero devuelto
+        global.io.to(`user_${userId}`).emit('withdrawal_status_updated', {
+          status: 'rejected',
+          requestId: withdrawalRequestId,
+          amount: MoneyMath.toNumber(amountDecimal),
+          reason: rejectionReason,
+          message: `❌ Tu retiro fue rechazado. Razón: ${rejectionReason}. El monto fue devuelto a tu balance.`
+        });
+        
+        // También notificar resources_updated para que se actualice el balance en UI
+        global.io.to(`user_${userId}`).emit('resources_updated', {
+          trigger: 'withdrawal_rejected',
+          balance: MoneyMath.toNumber(balanceAfter)
+        });
+        
+        // Notificar a todos los admins
+        global.io.emit('withdrawal_request_processed', {
+          requestId: withdrawalRequestId,
+          status: 'rejected',
+          userId,
+          amount: MoneyMath.toNumber(amountDecimal),
+          processedBy: processorId,
+          reason: rejectionReason,
+          timestamp: new Date().toISOString()
+        });
+      }
 
       return {
         success: true,
@@ -708,11 +791,9 @@ class ChipsService {
     let query = `
       SELECT 
         cm.*,
-        u_admin.username as admin_username,
-        u_related.username as related_username
+        u_admin.username as admin_username
       FROM chips_movements cm
-      LEFT JOIN users u_admin ON cm.admin_id = u_admin.id
-      LEFT JOIN users u_related ON cm.related_user_id = u_related.id
+      LEFT JOIN users u_admin ON cm.created_by = u_admin.id
       WHERE cm.user_id = ?
     `;
     const params = [userId];

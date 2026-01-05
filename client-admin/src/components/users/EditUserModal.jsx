@@ -81,10 +81,14 @@ const EditUserModal = ({
                                 <input
                                     type="text"
                                     value={datosBancarios.cbu}
-                                    onChange={(e) => onBankDataChange('cbu', e.target.value)}
+                                    onChange={(e) => onBankDataChange('cbu', e.target.value.replace(/\D/g, '').slice(0, 22))}
                                     placeholder="CBU (22 dígitos)"
+                                    maxLength={22}
                                     className="w-full px-4 py-3 bg-gray-700/50 border-b-2 border-gray-600 focus:outline-none focus:border-blue-500 text-white placeholder-gray-400 transition-colors"
                                 />
+                                {datosBancarios.cbu && datosBancarios.cbu.length !== 22 && datosBancarios.cbu.length > 0 && (
+                                    <span className="text-yellow-400 text-xs">{datosBancarios.cbu.length}/22 dígitos</span>
+                                )}
                                 <input
                                     type="text"
                                     value={datosBancarios.alias}

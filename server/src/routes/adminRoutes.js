@@ -8,7 +8,8 @@ router.use((req, res, next) => {
 
 const {
   authenticateToken,
-  isAdmin
+  isAdmin,
+  isAndy
 } = require('../middleware/authMiddleware');
 const {
   getAdminProfile,
@@ -192,6 +193,173 @@ router.get('/analytics/net-profit-comparison', authenticateToken, isAdmin, admin
 // ========================================
 const getMembershipAccounting = require('../controllers/membershipAccountingController');
 router.get('/memberships/accounting', authenticateToken, isAdmin, getMembershipAccounting);
+
+// Actualizar precio de membresía (Solo Andy)
+router.put('/memberships/:id/price', authenticateToken, isAndy, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { price } = req.body;
+    
+    if (!price || isNaN(parseFloat(price)) || parseFloat(price) < 0) {
+      return res.status(400).json({ error: 'Precio inválido' });
+    }
+    
+    const db = require('../db');
+    await db.query('UPDATE memberships SET price = ? WHERE id = ?', [parseFloat(price), id]);
+    
+    console.log(`💎 [MEMBERSHIP] Andy actualizó precio de membresía ${id} a $${price}`);
+    
+    res.json({ success: true, message: 'Precio actualizado correctamente' });
+  } catch (error) {
+    console.error('Error updating membership price:', error);
+    res.status(500).json({ error: 'Error al actualizar precio' });
+  }
+});
+
+// ========================================
+// 👥 GESTIÓN DE SUSCRIPCIONES ACTIVAS (Andy Only)
+// ========================================
+
+// Listar todos los usuarios con membresías activas (agrupado por usuario)
+router.get('/memberships/active-users', authenticateToken, isAndy, async (req, res) => {
+  try {
+    const db = require('../db');
+    const [rows] = await db.query(`
+      SELECT 
+        us.id as subscription_id,
+        us.user_id,
+        u.username,
+        m.id as membership_id,
+        m.name as plan_name,
+        m.price,
+        us.status,
+        us.start_date,
+        us.next_billing_date,
+        us.auto_renew,
+        us.created_at
+      FROM user_subscriptions us
+      JOIN users u ON us.user_id = u.id
+      JOIN memberships m ON us.membership_id = m.id
+      WHERE us.status = 'active'
+      ORDER BY u.username ASC, m.price ASC
+    `);
+    
+    // Agrupar por usuario
+    const usersMap = new Map();
+    for (const row of rows) {
+      if (!usersMap.has(row.user_id)) {
+        usersMap.set(row.user_id, {
+          user_id: row.user_id,
+          username: row.username,
+          subscriptions: []
+        });
+      }
+      usersMap.get(row.user_id).subscriptions.push({
+        subscription_id: row.subscription_id,
+        membership_id: row.membership_id,
+        plan_name: row.plan_name,
+        price: row.price,
+        start_date: row.start_date,
+        next_billing_date: row.next_billing_date,
+        auto_renew: row.auto_renew
+      });
+    }
+    
+    const groupedUsers = Array.from(usersMap.values());
+    
+    res.json({ success: true, data: groupedUsers });
+  } catch (error) {
+    console.error('Error fetching active memberships:', error);
+    res.status(500).json({ error: 'Error al obtener membresías activas' });
+  }
+});
+
+// Renovar membresía por 1 mes
+router.post('/memberships/subscriptions/:subscriptionId/renew', authenticateToken, isAndy, async (req, res) => {
+  try {
+    const { subscriptionId } = req.params;
+    const db = require('../db');
+    
+    // Obtener suscripción actual
+    const [subs] = await db.query(`
+      SELECT us.*, m.name as plan_name, u.username
+      FROM user_subscriptions us
+      JOIN memberships m ON us.membership_id = m.id
+      JOIN users u ON us.user_id = u.id
+      WHERE us.id = ?
+    `, [subscriptionId]);
+    
+    if (!subs.length) {
+      return res.status(404).json({ error: 'Suscripción no encontrada' });
+    }
+    
+    const sub = subs[0];
+    
+    // Calcular nueva fecha de vencimiento (+1 mes desde la actual o desde hoy si ya venció)
+    const currentExpiry = new Date(sub.next_billing_date);
+    const now = new Date();
+    const baseDate = currentExpiry > now ? currentExpiry : now;
+    const newExpiry = new Date(baseDate);
+    newExpiry.setMonth(newExpiry.getMonth() + 1);
+    
+    await db.query(`
+      UPDATE user_subscriptions 
+      SET next_billing_date = ?, status = 'active', auto_renew = 1
+      WHERE id = ?
+    `, [newExpiry, subscriptionId]);
+    
+    console.log(`💎 [MEMBERSHIP] Andy renovó membresía de ${sub.username} (${sub.plan_name}) hasta ${newExpiry.toISOString().split('T')[0]}`);
+    
+    res.json({ 
+      success: true, 
+      message: `Membresía renovada hasta ${newExpiry.toLocaleDateString('es-AR')}`,
+      newExpiryDate: newExpiry
+    });
+  } catch (error) {
+    console.error('Error renewing membership:', error);
+    res.status(500).json({ error: 'Error al renovar membresía' });
+  }
+});
+
+// Eliminar/Cancelar membresía
+router.delete('/memberships/subscriptions/:subscriptionId', authenticateToken, isAndy, async (req, res) => {
+  try {
+    const { subscriptionId } = req.params;
+    const db = require('../db');
+    
+    // Obtener suscripción actual para el log
+    const [subs] = await db.query(`
+      SELECT us.*, m.name as plan_name, u.username
+      FROM user_subscriptions us
+      JOIN memberships m ON us.membership_id = m.id
+      JOIN users u ON us.user_id = u.id
+      WHERE us.id = ?
+    `, [subscriptionId]);
+    
+    if (!subs.length) {
+      return res.status(404).json({ error: 'Suscripción no encontrada' });
+    }
+    
+    const sub = subs[0];
+    
+    // Marcar como cancelada (no eliminar para mantener historial)
+    await db.query(`
+      UPDATE user_subscriptions 
+      SET status = 'cancelled', auto_renew = 0
+      WHERE id = ?
+    `, [subscriptionId]);
+    
+    console.log(`💎 [MEMBERSHIP] Andy eliminó membresía de ${sub.username} (${sub.plan_name})`);
+    
+    res.json({ 
+      success: true, 
+      message: `Membresía de ${sub.username} eliminada correctamente`
+    });
+  } catch (error) {
+    console.error('Error deleting membership:', error);
+    res.status(500).json({ error: 'Error al eliminar membresía' });
+  }
+});
 
 
 // CATCH-ALL 404 FOR ADMIN ROUTES

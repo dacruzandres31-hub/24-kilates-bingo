@@ -42,7 +42,7 @@ const getTargetTime = (hour) => {
   return target;
 };
 
-const RoomCard = ({ room }) => {
+const RoomCard = ({ room, style }) => {
   const statusText = {
     active: 'Habilitada',
     playing: 'Sorteando',
@@ -65,7 +65,7 @@ const RoomCard = ({ room }) => {
   };
 
   return (
-    <Link to={room.path} className={`room-link ${room.className} ${room.featured ? 'featured' : ''}`} id={room.id === 'starter' ? 'btn-room-starter' : undefined}>
+    <Link to={room.path} className={`room-link ${room.className} ${room.featured ? 'featured' : ''}`} id={room.id === 'starter' ? 'btn-room-starter' : undefined} style={style}>
       <div className="room-card">
         {room.id === 'starter' && (
           <div className="ribbon-wrapper">
@@ -176,6 +176,15 @@ const CasinoLobby = ({ user, onLogout }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [userData, setUserData] = useState(null);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  
+  // Detección de móvil para forzar estilos
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   const [showActivityHistory, setShowActivityHistory] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [passwordData, setPasswordData] = useState({
@@ -718,8 +727,8 @@ const CasinoLobby = ({ user, onLogout }) => {
 
       <CustomTour runTour={runTour} onTourEnd={handleTourEnd} />
 
-      {/* Header con Logo - Oculto si la rueda o el dashboard de referidos están abiertos */}
-      {!showWheel && !showReferralDashboard && (
+      {/* Header con Logo - Oculto si la rueda o el dashboard de referidos están abiertos O en móvil */}
+      {!showWheel && !showReferralDashboard && !isMobile && (
         <header className="lobby-header">
           {/* Stats Izquierda */}
           <div className="header-stats left">
@@ -776,7 +785,23 @@ const CasinoLobby = ({ user, onLogout }) => {
       )}
 
       {/* Grid de Salas */}
-      <div className="rooms-grid" id="rooms-grid">
+      <div 
+        className="rooms-grid" 
+        id="rooms-grid"
+        style={isMobile ? {
+          display: 'flex',
+          flexDirection: 'row',
+          flexWrap: 'nowrap',
+          overflowX: 'auto',
+          overflowY: 'hidden',
+          gap: '12px',
+          padding: '10px 4vw 20px',
+          maxWidth: '100vw',
+          marginTop: '70px',
+          scrollSnapType: 'x mandatory',
+          WebkitOverflowScrolling: 'touch'
+        } : {}}
+      >
         {roomsData.map((room, index) => (
           <RoomCard
             key={room.id}
@@ -784,7 +809,15 @@ const CasinoLobby = ({ user, onLogout }) => {
               ...room,
               isLive: liveDraws[room.backendId] || false
             }}
-            style={{ animationDelay: `${index * 100}ms` }}
+            style={{ 
+              animationDelay: `${index * 100}ms`,
+              ...(isMobile ? {
+                flex: '0 0 75vw',
+                maxWidth: '75vw',
+                minWidth: '75vw',
+                scrollSnapAlign: 'center'
+              } : {})
+            }}
           />
         ))}
       </div>

@@ -4,8 +4,8 @@ import App from './App';
 import './index.css';
 import axios from 'axios';
 
-// Configurar baseURL de axios
-axios.defaults.baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+// Configurar baseURL de axios - en producción usa URLs relativas
+axios.defaults.baseURL = import.meta.env.VITE_API_URL || '';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

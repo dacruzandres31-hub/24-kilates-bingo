@@ -7,6 +7,7 @@
 
 const pool = require('../db');
 const MoneyMath = require('../utils/moneyMath');
+const whatsapp24KService = require('./whatsapp24KService');
 
 class CommissionService {
 
@@ -180,6 +181,14 @@ class CommissionService {
           balanceBefore: MoneyMath.toNumber(balanceBefore),
           balanceAfter: MoneyMath.toNumber(balanceAfter)
         });
+
+        // 🔔 Notificación WhatsApp de comisión ganada
+        whatsapp24KService.notifyCommissionEarned(sellerId, {
+          playerName: `Sesión #${sessionId}`,
+          purchaseAmount: totalSales,
+          commission: commissionAmount,
+          newBalance: MoneyMath.toNumber(balanceAfter)
+        }).catch(err => console.error('[WhatsApp] Error notificando comisión:', err));
       }
 
       await connection.query('COMMIT');

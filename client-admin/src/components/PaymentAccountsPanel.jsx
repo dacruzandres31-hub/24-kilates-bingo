@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Trash2, Edit, Plus, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : 'http://localhost:3001';
 
 const ARG_BANKS = [
     'Mercado Pago',
@@ -62,6 +62,13 @@ export default function PaymentAccountsPanel() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        
+        // Validar CBU si se proporciona
+        if (formData.cbu && formData.cbu.length !== 22) {
+            alert('❌ El CBU debe tener exactamente 22 dígitos');
+            return;
+        }
+        
         try {
             const token = localStorage.getItem('adminToken');
 
@@ -305,11 +312,21 @@ export default function PaymentAccountsPanel() {
                             <div>
                                 <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">CBU / CVU (22 dígitos)</label>
                                 <input
-                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg p-3 text-white focus:border-emerald-500 outline-none transition-all"
+                                    className={`w-full bg-gray-900 border rounded-lg p-3 text-white focus:border-emerald-500 outline-none transition-all ${
+                                        formData.cbu && formData.cbu.length !== 22 ? 'border-red-500' : 'border-gray-600'
+                                    }`}
                                     value={formData.cbu}
-                                    onChange={e => setFormData({ ...formData, cbu: e.target.value })}
+                                    onChange={e => {
+                                        const value = e.target.value.replace(/\D/g, '').slice(0, 22);
+                                        setFormData({ ...formData, cbu: value });
+                                    }}
                                     placeholder="0000000000000000000000"
+                                    maxLength={22}
+                                    pattern="\d{22}"
                                 />
+                                {formData.cbu && formData.cbu.length !== 22 && (
+                                    <p className="text-xs text-red-400 mt-1">⚠️ El CBU debe tener exactamente 22 dígitos ({formData.cbu.length}/22)</p>
+                                )}
                             </div>
 
                             <div>

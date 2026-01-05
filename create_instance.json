@@ -1,0 +1,7 @@
+{
+  "instanceName": "bingo24k",
+  "qrcode": true,
+  "integration": "WHATSAPP-BAILEYS",
+  "reject_call": false,
+  "always_online": false
+}

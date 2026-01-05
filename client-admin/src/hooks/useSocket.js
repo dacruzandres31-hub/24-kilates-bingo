@@ -25,7 +25,7 @@ export function useSocket() {
         }
 
         // Crear nueva conexión
-        const serverUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+        const serverUrl = import.meta.env.VITE_API_URL !== undefined ? import.meta.env.VITE_API_URL : 'http://localhost:3001';
         const token = localStorage.getItem('adminToken');
 
         const newSocket = io(serverUrl, {

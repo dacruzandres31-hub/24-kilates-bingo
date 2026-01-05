@@ -52,23 +52,18 @@ router.post('/claim', authenticateToken, async (req, res) => {
         if (!amount || amount <= 0) return res.status(400).json({ error: 'Monto inválido' });
         if (!proofUrl) return res.status(400).json({ error: 'Falta comprobante' });
 
+        // Obtener io para notificaciones en tiempo real
+        const io = req.app.get('io');
+
         const result = await DepositService.createDepositRequest(
             req.user.id,
             accountId,
             amount,
             proofUrl,
             details,
-            requestType
+            requestType,
+            io
         );
-
-        // Notificar a admins (Socket.IO)
-        const io = req.app.get('io');
-        io.to('admins').emit('new_deposit_request', {
-            depositId: result.depositId,
-            amount,
-            username: req.user.username,
-            requestType: requestType || 'balance'
-        });
 
         res.json({ success: true, data: result });
 
@@ -108,8 +103,9 @@ router.post('/:id/reject', authenticateToken, isCajeroOrAdmin, async (req, res) 
     try {
         const { id } = req.params;
         const { reason } = req.body;
+        const io = req.app.get('io');
 
-        await DepositService.rejectDeposit(id, req.user.id, reason || 'Sin motivo');
+        await DepositService.rejectDeposit(id, req.user.id, reason || 'Sin motivo', io);
         res.json({ success: true, message: 'Depósito rechazado' });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });

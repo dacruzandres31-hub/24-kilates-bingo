@@ -1,5 +1,4 @@
 const pool = require('../db');
-const auditService = require('../services/auditService');
 
 /**
  * GET /api/superadmin/room-settings
@@ -15,7 +14,6 @@ exports.getRoomSettings = async (req, res) => {
         percentage_bingo,
         percentage_acumulado,
         accumulated_pot_pre40,
-        agent_bonus_percentage,
         updated_at
       FROM room_settings
       ORDER BY FIELD(room, 'bronce', 'plata', 'oro')
@@ -75,14 +73,6 @@ exports.updateRoomPrice = async (req, res) => {
 
     console.log(`[RoomSettings] 💰 Precio actualizado: ${room} → $${card_price}`);
 
-    // Audit Log
-    auditService.log({
-      adminId: userId,
-      action: 'UPDATE_ROOM_PRICE',
-      details: { room, card_price },
-      ipAddress: req.ip
-    });
-
     res.json({
       success: true,
       message: `Precio de sala ${room} actualizado correctamente`,
@@ -116,9 +106,9 @@ exports.updateRoomPercentages = async (req, res) => {
     }
 
     // Validar que los porcentajes sumen <= 100
-    const total = parseFloat(percentage_linea || 0) +
-      parseFloat(percentage_bingo || 0) +
-      parseFloat(percentage_acumulado || 0);
+    const total = parseFloat(percentage_linea || 0) + 
+                  parseFloat(percentage_bingo || 0) + 
+                  parseFloat(percentage_acumulado || 0);
 
     if (total > 100) {
       return res.status(400).json({
@@ -145,14 +135,6 @@ exports.updateRoomPercentages = async (req, res) => {
     );
 
     console.log(`[RoomSettings] 📊 Porcentajes actualizados: ${room}`);
-
-    // Audit Log
-    auditService.log({
-      adminId: userId,
-      action: 'UPDATE_ROOM_PERCENTAGES',
-      details: { room, percentage_linea, percentage_bingo, percentage_acumulado },
-      ipAddress: req.ip
-    });
 
     res.json({
       success: true,
@@ -194,14 +176,6 @@ exports.resetAccumulatedPot = async (req, res) => {
 
     console.log(`[RoomSettings] 🔄 Pozo acumulado reseteado: ${room}`);
 
-    // Audit Log
-    auditService.log({
-      adminId: userId,
-      action: 'RESET_ACCUMULATED_POT',
-      details: { room },
-      ipAddress: req.ip
-    });
-
     res.json({
       success: true,
       message: `Pozo acumulado de ${room} reseteado a $0`
@@ -229,8 +203,8 @@ exports.getCurrentPots = async (req, res) => {
         rs.room,
         rs.card_price,
         rs.accumulated_pot_pre40 AS jackpot,
-        COALESCE(latest.jackpot_linea, 0) AS current_pot_linea,
-        COALESCE(latest.jackpot_bingo, 0) AS current_pot_bingo,
+        COALESCE(latest.current_pot_linea, 0) AS current_pot_linea,
+        COALESCE(latest.current_pot_bingo, 0) AS current_pot_bingo,
         COALESCE(latest.total_cards_validated, 0) AS cards_sold,
         latest.status,
         latest.session_id
@@ -246,7 +220,7 @@ exports.getCurrentPots = async (req, res) => {
           WHERE status IN ('active', 'playing', 'pending')
           GROUP BY room
         ) gs2 ON gs1.id = gs2.max_id
-      ) latest ON latest.room COLLATE utf8mb4_unicode_ci = rs.room COLLATE utf8mb4_unicode_ci
+      ) latest ON latest.room COLLATE utf8mb4_0900_ai_ci = rs.room COLLATE utf8mb4_0900_ai_ci
       ORDER BY FIELD(rs.room, 'bronce', 'plata', 'oro')
     `);
 
@@ -307,10 +281,9 @@ exports.getLobbyData = async (req, res) => {
         rs.room,
         rs.card_price,
         rs.accumulated_pot_pre40 AS current_pot_jackpot,
-        COALESCE(latest.jackpot_linea, 0) AS current_pot_linea,
-        COALESCE(latest.jackpot_bingo, 0) AS current_pot_bingo,
-        latest.status,
-        latest.id AS session_id
+        COALESCE(latest.current_pot_linea, 0) AS current_pot_linea,
+        COALESCE(latest.current_pot_bingo, 0) AS current_pot_bingo,
+        latest.status
       FROM room_settings rs
       LEFT JOIN (
         SELECT 
@@ -322,7 +295,7 @@ exports.getLobbyData = async (req, res) => {
           WHERE status IN ('active', 'playing', 'pending')
           GROUP BY room
         ) gs2 ON gs1.id = gs2.max_id
-      ) latest ON latest.room COLLATE utf8mb4_unicode_ci = rs.room COLLATE utf8mb4_unicode_ci
+      ) latest ON latest.room COLLATE utf8mb4_0900_ai_ci = rs.room COLLATE utf8mb4_0900_ai_ci
       WHERE rs.room IN ('bronce', 'plata', 'oro')
       ORDER BY FIELD(rs.room, 'bronce', 'plata', 'oro')
     `);
@@ -347,7 +320,7 @@ exports.getLobbyData = async (req, res) => {
       roomSchedules.forEach(schedule => {
         const [hour, minute, second] = schedule.hour.split(':').map(Number);
         const scheduleTime = hour * 3600 + minute * 60 + (second || 0);
-
+        
         // Calcular diferencia en días y segundos
         let dayDiff = schedule.day_of_week - currentDay;
         let timeDiff = scheduleTime - currentTime;
@@ -356,7 +329,7 @@ exports.getLobbyData = async (req, res) => {
         if (dayDiff === 0 && timeDiff <= 0) {
           dayDiff = 7;
         }
-
+        
         // Si es un día anterior de la semana, agregar días hasta la próxima semana
         if (dayDiff < 0) {
           dayDiff += 7;
@@ -395,15 +368,17 @@ exports.getLobbyData = async (req, res) => {
       }
     });
 
-    // Obtener configuración de premios de Starter
+    // Obtener configuración de premios de Starter (usar tabla directamente)
     const [starterConfig] = await pool.query(`
       SELECT prizes_linea, ticket_room_linea, prizes_bingo, ticket_room_bingo
-      FROM v_starter_config
+      FROM starter_room_config
+      ORDER BY id DESC
+      LIMIT 1
     `);
 
     // Obtener status actual de la sala Starter
     const [starterStatus] = await pool.query(`
-      SELECT id, status
+      SELECT status
       FROM game_sessions
       WHERE room = 'free_starter'
         AND status IN ('active', 'playing', 'pending', 'waiting')
@@ -430,7 +405,6 @@ exports.getLobbyData = async (req, res) => {
     // Formatear respuesta para cada sala
     const lobbyData = {
       starter: {
-        sessionId: starterStatus.length > 0 ? starterStatus[0].id : null,
         price: 0,
         prizes: {
           line: {
@@ -454,7 +428,7 @@ exports.getLobbyData = async (req, res) => {
       // - Si tiene próxima sesión (pending/active) → Habilitada (se pueden comprar cartones)
       // - Si no hay sesión → Cerrada
       let computedStatus = 'closed';
-
+      
       if (room.status === 'playing') {
         computedStatus = 'playing'; // Sorteando
       } else if (nextSessionMap[room.room]) {
@@ -462,7 +436,6 @@ exports.getLobbyData = async (req, res) => {
       }
 
       lobbyData[room.room] = {
-        sessionId: room.session_id,
         price: parseFloat(room.card_price),
         pots: {
           bingo: parseFloat(room.current_pot_bingo) || 0,
@@ -474,45 +447,11 @@ exports.getLobbyData = async (req, res) => {
       };
     });
 
-    // --- ESTADÍSTICAS GLOBALES PARA EL TICKER ---
-    // 1. Jugadores activos y premios pagados hoy
-    const [globalStats] = await pool.query(`
-      SELECT 
-        COUNT(DISTINCT user_id) as active_players,
-        COALESCE(SUM(CASE WHEN movement_type = 'win' THEN amount ELSE 0 END), 0) as prizes_paid
-      FROM chips_movements 
-      WHERE DATE(created_at) = CURDATE()
-    `);
-
-    // 2. Top 5 Jugadores (Ranking)
-    const [topPlayers] = await pool.query(`
-      SELECT username, level, current_xp 
-      FROM users 
-      WHERE role = 'jugador' 
-      ORDER BY level DESC, current_xp DESC 
-      LIMIT 5
-    `);
-
-    // 3. Conteo de salas VIP (dinero real)
-    const vipRoomsCount = moneyRooms.length;
-
-    const stats = {
-      activePlayers: parseInt(globalStats[0]?.active_players || 0) + 124, // Offset para que parezca más concurrido
-      prizesPaidToday: parseFloat(globalStats[0]?.prizes_paid || 0),
-      vipRooms: vipRoomsCount,
-      topPlayers: topPlayers.map(p => ({
-        username: p.username,
-        level: p.level,
-        xp: p.current_xp
-      }))
-    };
-
-    console.log('[RoomSettings] 📊 Datos del lobby preparados:', JSON.stringify({ ...lobbyData, stats }, null, 2));
+    console.log('[RoomSettings] 📊 Datos del lobby preparados:', JSON.stringify(lobbyData, null, 2));
 
     res.json({
       success: true,
-      data: lobbyData,
-      stats: stats
+      data: lobbyData
     });
   } catch (error) {
     console.error('[RoomSettings] Error al obtener datos del lobby:', error);

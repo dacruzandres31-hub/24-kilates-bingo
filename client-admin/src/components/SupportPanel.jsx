@@ -2,6 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { RefreshCw, MessageSquare, Check, X, Bell } from 'lucide-react';
 
+// Traducción de categorías
+const categoryLabels = {
+    'payment': 'Problema de Pago / Depósito',
+    'game_bug': 'Error en el Juego',
+    'account': 'Cuenta y Acceso',
+    'other': 'Otro'
+};
+
 export default function SupportPanel() {
     const [tickets, setTickets] = useState([]);
     const [selectedTicket, setSelectedTicket] = useState(null);
@@ -126,7 +134,9 @@ export default function SupportPanel() {
                                         ticket.status === 'in_progress' ? 'bg-orange-600 text-white' :
                                             'bg-green-600 text-white'}`
                                 }>
-                                    {ticket.status}
+                                    {ticket.status === 'open' ? 'ABIERTO' : 
+                                     ticket.status === 'in_progress' ? 'EN PROGRESO' : 
+                                     ticket.status === 'resolved' ? 'RESUELTO' : 'CERRADO'}
                                 </span>
                             </div>
                             <div className="mt-1 flex justify-between items-center text-xs text-gray-400">
@@ -166,7 +176,7 @@ export default function SupportPanel() {
                                 <h3 className="text-lg font-bold text-white">#{selectedTicket.id} - {selectedTicket.subject}</h3>
                                 <p className="text-sm text-gray-400">
                                     Usuario: <span className="text-purple-400">{selectedTicket.username}</span> |
-                                    Categoría: {selectedTicket.category}
+                                    Categoría: {categoryLabels[selectedTicket.category] || selectedTicket.category}
                                 </p>
                             </div>
                             <div className="flex gap-2">
@@ -185,13 +195,13 @@ export default function SupportPanel() {
 
                         <div className="flex-1 overflow-y-auto space-y-4 p-2 mb-4 bg-gray-900/30 rounded-lg">
                             {ticketMessages.map((msg, idx) => (
-                                <div key={idx} className={`flex flex-col ${msg.sender_role === 'admin' ? 'items-end' : 'items-start'}`}>
-                                    <div className={`max-w-[80%] rounded-lg p-3 ${msg.sender_role === 'admin'
+                                <div key={idx} className={`flex flex-col ${msg.is_admin ? 'items-end' : 'items-start'}`}>
+                                    <div className={`max-w-[80%] rounded-lg p-3 ${msg.is_admin
                                             ? 'bg-purple-900/50 border border-purple-700/50 text-gray-200'
                                             : 'bg-gray-700/50 border border-gray-600/50 text-gray-300'
                                         }`}>
                                         <div className="text-xs font-bold mb-1 opacity-75">
-                                            {msg.sender_role === 'admin' ? 'Admin (Tú)' : `Usuario: ${selectedTicket.username}`}
+                                            {msg.is_admin ? 'Admin (Tú)' : `Usuario: ${selectedTicket.username}`}
                                         </div>
                                         <p className="whitespace-pre-wrap">{msg.message}</p>
                                         <div className="text-[10px] opacity-50 text-right mt-1">

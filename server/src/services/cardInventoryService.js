@@ -102,7 +102,8 @@ class CardInventoryService {
       // Verificar inventario del remitente
       const [fromInventory] = await connection.query(
         `SELECT is_gift, quantity FROM user_card_inventory 
-         WHERE user_id = ? AND room = ?`,
+         WHERE user_id = ? AND room = ?
+         ORDER BY is_gift ASC`,
         [fromUserId, room]
       );
 
@@ -116,10 +117,49 @@ class CardInventoryService {
         throw new Error(`Solo tiene ${totalAvailable} cartones disponibles, intentó transferir ${quantity}`);
       }
 
-      // Llamar al procedimiento almacenado que maneja la proporción
+      // Implementación directa en JS (evita stored procedure con collation issues)
+      let remaining = quantity;
+      
+      for (const item of fromInventory) {
+        if (remaining <= 0) break;
+        
+        const toTransfer = Math.min(remaining, item.quantity);
+        const isGift = item.is_gift ? 1 : 0;
+        
+        // Deducir del origen
+        await connection.query(
+          `UPDATE user_card_inventory SET quantity = quantity - ? 
+           WHERE user_id = ? AND room = ? AND is_gift = ?`,
+          [toTransfer, fromUserId, room, isGift]
+        );
+        
+        // Acreditar al destino (INSERT ON DUPLICATE KEY UPDATE)
+        await connection.query(
+          `INSERT INTO user_card_inventory (user_id, room, is_gift, quantity)
+           VALUES (?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE quantity = quantity + VALUES(quantity)`,
+          [toUserId, room, isGift, toTransfer]
+        );
+        
+        // Log movimientos
+        await connection.query(
+          `INSERT INTO card_movements_log (user_id, room, movement_type, quantity, is_gift, to_user_id, executed_by, reason)
+           VALUES (?, ?, 'transfer_out', ?, ?, ?, ?, 'Transferencia de cartones')`,
+          [fromUserId, room, toTransfer, isGift, toUserId, executedBy]
+        );
+        
+        await connection.query(
+          `INSERT INTO card_movements_log (user_id, room, movement_type, quantity, is_gift, from_user_id, executed_by, reason)
+           VALUES (?, ?, 'transfer_in', ?, ?, ?, ?, 'Recepción de cartones')`,
+          [toUserId, room, toTransfer, isGift, fromUserId, executedBy]
+        );
+        
+        remaining -= toTransfer;
+      }
+      
+      // Limpiar registros con cantidad 0
       await connection.query(
-        'CALL sp_transfer_cards(?, ?, ?, ?, ?)',
-        [fromUserId, toUserId, room, quantity, executedBy]
+        `DELETE FROM user_card_inventory WHERE quantity = 0`
       );
 
       await connection.commit();

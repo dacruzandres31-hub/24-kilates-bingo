@@ -4,6 +4,7 @@ const stockManager = require('./stockManager');
 const dailyGenerator = require('./dailyGenerator');
 const questManager = require('./quest_manager');
 const rankingEngine = require('./ranking_engine');
+const membershipService = require('./membershipService');
 
 /**
  * SCHEDULER - Orquestación de Cron Jobs
@@ -94,7 +95,7 @@ class Scheduler {
     this.jobs.push({ name: 'Health Check', job: healthJob });
     console.log('[Scheduler] Job registrado: Health Check (cada 6h)');
 
-    // JOB 3: Cleanup Expired (cada día a las 00:05)
+    // JOB: Cleanup Expired (cada día a las 00:05)
     const cleanupJob = cron.schedule('5 0 * * *', async () => {
       try {
         await this.executeExpiredStockCleanup();
@@ -105,7 +106,20 @@ class Scheduler {
     this.jobs.push({ name: 'Expired Stock Cleanup', job: cleanupJob });
     console.log('[Scheduler] Job registrado: Cleanup Cartones Expirados (00:05 hs)');
 
-    // JOB 4: Sala Starter Free-to-Play (19:00 diariamente)
+    // JOB: Membership Daily Benefits (00:10 cada día - entregar cartones/spins a miembros VIP)
+    const membershipBenefitsJob = cron.schedule('10 0 * * *', async () => {
+      try {
+        console.log('[Scheduler] Ejecutando: Membership Daily Benefits');
+        await membershipService.resetDailyBenefits();
+        console.log('[Scheduler] ✅ Membership Daily Benefits completado');
+      } catch (error) {
+        console.error('[Scheduler] Membership Benefits error:', error.message);
+      }
+    });
+    this.jobs.push({ name: 'Membership Daily Benefits', job: membershipBenefitsJob });
+    console.log('[Scheduler] Job registrado: Membership Benefits (00:10 diario)');
+
+    // JOB: Sala Starter Free-to-Play (19:00 diariamente)
     const starterJob = cron.schedule('0 19 * * *', async () => {
       try {
         await this.createStarterSession();

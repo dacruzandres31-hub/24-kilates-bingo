@@ -1,11 +1,8 @@
-const dbHelper = require('../helpers/dbHelper');
-const responseHelper = require('../helpers/responseHelper');
-const validationHelper = require('../helpers/validationHelper');
+const pool = require('../db');
 const MoneyMath = require('../utils/moneyMath');
 const bcrypt = require('bcryptjs');
 const cardInventoryService = require('../services/cardInventoryService');
-const auditService = require('../services/auditService');
-const metricsService = require('../services/metricsService');
+const referralHelper = require('../helpers/referralHelper');
 
 /**
  * MÓDULO 7: API del Dashboard Administrativo
@@ -28,12 +25,10 @@ const metricsService = require('../services/metricsService');
 async function getAdminProfile(req, res) {
   try {
     const { userId, role } = req.user;
-    console.log(`🔎 [getAdminProfile] Buscando perfil para ID: ${userId}, Role: ${role}`);
 
-    let users;
-    // SuperAdmin (o Andy) ve cartones normales y regalo separados
-    if (role === 'superadmin' || req.user.username?.toLowerCase() === 'andy') {
-      users = await dbHelper.query(
+    // SuperAdmin ve cartones normales y regalo separados
+    if (role === 'superadmin') {
+      const [users] = await pool.query(
         `SELECT u.id, u.username, u.role, u.balance,
           COALESCE(SUM(CASE WHEN uci.room = 'bronce' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_bronce,
           COALESCE(SUM(CASE WHEN uci.room = 'plata' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_plata,
@@ -45,33 +40,38 @@ async function getAdminProfile(req, res) {
          LEFT JOIN user_card_inventory uci ON u.id = uci.user_id
          WHERE u.id = ?
          GROUP BY u.id`,
-        [userId], 'GetAdminProfileSuper'
+        [userId]
       );
-    } else {
-      // Agentes y jugadores ven solo el total (normales + regalo sumados)
-      users = await dbHelper.query(
-        `SELECT u.id, u.username, u.role, u.balance,
-            COALESCE(SUM(CASE WHEN uci.room = 'bronce' THEN uci.quantity ELSE 0 END), 0) as cards_bronce,
-            COALESCE(SUM(CASE WHEN uci.room = 'plata' THEN uci.quantity ELSE 0 END), 0) as cards_plata,
-            COALESCE(SUM(CASE WHEN uci.room = 'oro' THEN uci.quantity ELSE 0 END), 0) as cards_oro
-           FROM users u
-           LEFT JOIN user_card_inventory uci ON u.id = uci.user_id
-           WHERE u.id = ?
-           GROUP BY u.id`,
-        [userId], 'GetAdminProfileStandard'
-      );
+      
+      if (users.length === 0) {
+        return res.status(404).json({ error: 'Usuario no encontrado' });
+      }
+      
+      return res.json(users[0]);
+    }
+    
+    // Agentes y jugadores ven solo el total (normales + regalo sumados)
+    const [users] = await pool.query(
+      `SELECT u.id, u.username, u.role, u.balance,
+        COALESCE(SUM(CASE WHEN uci.room = 'bronce' THEN uci.quantity ELSE 0 END), 0) as cards_bronce,
+        COALESCE(SUM(CASE WHEN uci.room = 'plata' THEN uci.quantity ELSE 0 END), 0) as cards_plata,
+        COALESCE(SUM(CASE WHEN uci.room = 'oro' THEN uci.quantity ELSE 0 END), 0) as cards_oro
+       FROM users u
+       LEFT JOIN user_card_inventory uci ON u.id = uci.user_id
+       WHERE u.id = ?
+       GROUP BY u.id`,
+      [userId]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
     }
 
-    if (!users || users.length === 0) {
-      console.log(`❌ [getAdminProfile] Usuario ID ${userId} no encontrado en la base de datos`);
-      return responseHelper.notFound(res, 'Usuario no encontrado');
-    }
-
-    console.log(`✅ [getAdminProfile] Perfil encontrado para ${users[0].username}`);
-    return responseHelper.success(res, users[0]);
+    res.json(users[0]);
 
   } catch (error) {
-    return responseHelper.error(res, 500, 'Error obteniendo perfil', error.message);
+    console.error('❌ Error obteniendo perfil:', error);
+    res.status(500).json({ error: 'Error obteniendo perfil' });
   }
 }
 
@@ -81,114 +81,39 @@ async function getAdminProfile(req, res) {
  */
 async function getFinancialSummary(req, res) {
   try {
-    const todayStats = await dbHelper.queryOne(`
+    const [todayStats] = await pool.query(`
       SELECT 
         COALESCE(SUM(CASE WHEN movement_type = 'purchase' THEN amount ELSE 0 END), 0) as sales,
         COALESCE(SUM(CASE WHEN movement_type = 'prize' THEN amount ELSE 0 END), 0) as prizesDistributed,
         COUNT(DISTINCT user_id) as activeUsers
       FROM chips_movements 
       WHERE DATE(created_at) = CURDATE()
-    `, [], 'GetFinancialSummary');
+    `);
 
-    const stats = todayStats || {};
+    const stats = todayStats[0] || {};
     const netBalance = (stats.sales || 0) - (stats.prizesDistributed || 0);
 
-    return responseHelper.success(res, {
+    res.json({
+      success: true,
       today: {
-        sales: parseFloat(stats.sales || 0),
-        prizes: parseFloat(stats.prizesDistributed || 0),
-        net: netBalance,
-        activeUsers: parseInt(stats.activeUsers || 0)
-      }
-    });
-  } catch (error) {
-    return responseHelper.error(res, 500, 'Error obteniendo resumen financiero', error.message);
-  }
-}
-
-/**
- * GET /api/admin/finances/ggr
- * Reporte de Rentabilidad Real (GGR)
- * Entradas (Dinero Real) vs Salidas (Retiros Pagados)
- */
-async function getGGRStats(req, res) {
-  try {
-    const { startDate, endDate } = req.query;
-
-    // Filtros de fecha base
-    let dateFilter = '';
-    const params = [];
-
-    if (startDate && endDate) {
-      dateFilter = 'AND DATE(created_at) BETWEEN ? AND ?';
-      params.push(startDate, endDate);
-    } else {
-      // Default: Mes actual
-      dateFilter = 'AND MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())';
-    }
-
-    // 1. DINERO ENTRADO (Ventas de Cartones + Cargas Manuales)
-    // Ventas de cartones (Solo pagados, no regalo)
-    const salesResult = await dbHelper.queryOne(`
-      SELECT COALESCE(SUM(price), 0) as total
-      FROM daily_stock_cards
-      WHERE status = 'sold' 
-      AND price > 0
-      ${dateFilter.replace('created_at', 'play_date')} 
-    `, params, 'GGR_Sales');
-
-    // Cargas Manuales de Saldo (Admin Credits)
-    const manualLoadsResult = await dbHelper.queryOne(`
-      SELECT COALESCE(SUM(amount), 0) as total
-      FROM chips_movements
-      WHERE movement_type = 'admin_adjustment'
-      AND amount > 0
-      ${dateFilter}
-    `, params, 'GGR_Loads');
-
-    const totalIn = parseFloat(salesResult.total) + parseFloat(manualLoadsResult.total);
-
-    // 2. DINERO SALIDO (Retiros Pagados)
-    // Nota: params se duplican porque la query es nueva, hay que pasar params de nuevo
-    const withdrawalsResult = await dbHelper.queryOne(`
-      SELECT COALESCE(SUM(amount), 0) as total
-      FROM withdrawal_requests
-      WHERE status IN ('completed', 'approved')
-      ${dateFilter.replace('created_at', 'requested_at')} 
-    `, params, 'GGR_Withdrawals');
-
-    const totalOut = parseFloat(withdrawalsResult.total);
-
-    // 3. PASIVO (Liability) - Dinero de jugadores aun no retirado
-    const liabilityResult = await dbHelper.queryOne(`
-      SELECT COALESCE(SUM(balance), 0) as total FROM users WHERE role = 'jugador'
-    `, [], 'GGR_Liability');
-    const currentLiability = parseFloat(liabilityResult.total);
-
-    // 4. GGR CÁLCULO
-    const ggr = totalIn - totalOut;
-    const margin = totalIn > 0 ? ((ggr / totalIn) * 100).toFixed(2) : 0;
-
-    return responseHelper.success(res, {
-      data: {
-        period: { startDate, endDate },
-        metrics: {
-          totalIn,
-          totalOut,
-          ggr,
-          margin: parseFloat(margin),
-          currentLiability
-        },
-        breakdown: {
-          sales: parseFloat(salesResult.total),
-          manualLoads: parseFloat(manualLoadsResult.total),
-          withdrawals: totalOut
-        }
+        sales: stats.sales || 0,
+        prizesDistributed: stats.prizesDistributed || 0,
+        netBalance: netBalance,
+        activeUsers: stats.activeUsers || 0
+      },
+      pots: {
+        linea: 0,
+        bingo: 0,
+        acumulado: 0
       }
     });
 
   } catch (error) {
-    return responseHelper.error(res, 500, 'Error calculando rentabilidad', error.message);
+    console.error('❌ Error obteniendo resumen financiero:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Error obteniendo resumen financiero' 
+    });
   }
 }
 
@@ -208,14 +133,14 @@ async function getDashboardStats(req, res) {
       recentMovementsResult
     ] = await Promise.all([
       // 1. Contar usuarios por rol
-      dbHelper.query(`
+      pool.query(`
         SELECT role, COUNT(*) as count 
         FROM users 
         GROUP BY role
-      `, [], 'Dash_Users'),
-
-      // 2. Calcular ventas del día
-      dbHelper.query(`
+      `),
+      
+      // 2. Calcular ventas del día (basado en chips_movements)
+      pool.query(`
         SELECT 
           SUM(CASE WHEN movement_type = 'deposit' THEN amount ELSE 0 END) as total_deposits,
           SUM(CASE WHEN movement_type = 'withdrawal' THEN amount ELSE 0 END) as total_withdrawals,
@@ -224,10 +149,10 @@ async function getDashboardStats(req, res) {
           COUNT(DISTINCT user_id) as active_users_today
         FROM chips_movements 
         WHERE DATE(created_at) = CURDATE()
-      `, [], 'Dash_Sales'),
+      `),
 
-      // 3. Estado de sesiones de juego
-      dbHelper.query(`
+      // 3. Estado de sesiones de juego (pozos actuales)
+      pool.query(`
         SELECT 
           id,
           room,
@@ -242,28 +167,28 @@ async function getDashboardStats(req, res) {
         WHERE status IN ('pending', 'active', 'completed')
         ORDER BY start_time DESC 
         LIMIT 10
-      `, [], 'Dash_Sessions'),
+      `),
 
       // 4. Balance total del sistema
-      dbHelper.query(`
+      pool.query(`
         SELECT 
           SUM(balance) as total_balance,
           COUNT(*) as users_with_balance
         FROM users 
         WHERE balance > 0
-      `, [], 'Dash_Balances'),
+      `),
 
       // 5. Retiros pendientes
-      dbHelper.query(`
+      pool.query(`
         SELECT 
           COUNT(*) as pending_count,
           SUM(amount) as pending_amount
         FROM withdrawal_requests 
         WHERE status = 'pending'
-      `, [], 'Dash_Withdrawals'),
+      `),
 
-      // 6. Movimientos recientes
-      dbHelper.query(`
+      // 6. Movimientos recientes (últimos 20)
+      pool.query(`
         SELECT 
           cm.id,
           cm.user_id,
@@ -277,56 +202,66 @@ async function getDashboardStats(req, res) {
         JOIN users u ON cm.user_id = u.id
         ORDER BY cm.created_at DESC
         LIMIT 20
-      `, [], 'Dash_Movements')
+      `)
     ]);
 
     // Procesar datos de usuarios
+    const [usersRows] = usersResult;
     const usuariosStats = {
-      total: usersResult.reduce((sum, r) => sum + parseInt(r.count), 0),
-      jugadores: usersResult.find(r => r.role === 'player')?.count || 0,
-      cajeros: usersResult.find(r => r.role === 'cajero')?.count || 0,
-      admins: usersResult.find(r => r.role === 'admin')?.count || 0,
-      superadmins: usersResult.find(r => r.role === 'superadmin')?.count || 0
+      total: usersRows.reduce((sum, r) => sum + parseInt(r.count), 0),
+      jugadores: usersRows.find(r => r.role === 'player')?.count || 0,
+      cajeros: usersRows.find(r => r.role === 'cajero')?.count || 0,
+      admins: usersRows.find(r => r.role === 'admin')?.count || 0,
+      superadmins: usersRows.find(r => r.role === 'superadmin')?.count || 0
     };
 
-    // 💰 Procesar datos financieros
-    const salesData = salesResult[0] || {};
-
+    // 💰 Procesar datos financieros con MoneyMath
+    const [salesRows] = salesResult;
+    const salesData = salesRows[0] || {};
+    
     const totalDeposits = MoneyMath.decimal(salesData.total_deposits || 0);
     const totalWithdrawals = MoneyMath.decimal(salesData.total_withdrawals || 0);
     const totalBets = MoneyMath.decimal(salesData.total_bets || 0);
     const totalWins = MoneyMath.decimal(salesData.total_wins || 0);
-
+    
+    // Calcular ventas netas del día (depósitos - retiros)
     const ventasNetas = MoneyMath.subtract(
       MoneyMath.toNumber(totalDeposits),
       MoneyMath.toNumber(totalWithdrawals)
     );
 
+    // Aplicar reglas de distribución:
+    // - 10% Casa (ganancia neta)
+    // - 5% Admins (deuda con socios)
+    // - 15% Cajeros (comisiones)
+    // - 70% Pozos y premios
     const finanzasHoy = {
       ventas_brutas: MoneyMath.toNumber(totalDeposits),
       ventas_netas: ventasNetas,
       total_retiros: MoneyMath.toNumber(totalWithdrawals),
       total_apuestas: MoneyMath.toNumber(totalBets),
       total_premios: MoneyMath.toNumber(totalWins),
-
-      // 💵 Distribución
+      
+      // 💵 Distribución según reglas del negocio
       ganancia_casa_10: MoneyMath.percentage(ventasNetas, 10),
       comisiones_admin_5: MoneyMath.percentage(ventasNetas, 5),
       comisiones_cajero_15: MoneyMath.percentage(ventasNetas, 15),
       para_pozos_70: MoneyMath.percentage(ventasNetas, 70),
-
+      
       usuarios_activos_hoy: salesData.active_users_today || 0
     };
 
-    // Procesar sesiones de juego
-    const sesionesActivas = sessionsResult.filter(s => s.status === 'active');
-    const sesionesPendientes = sessionsResult.filter(s => s.status === 'pending');
-
+    // Procesar sesiones de juego (pozos)
+    const [sessionsRows] = sessionsResult;
+    const sesionesActivas = sessionsRows.filter(s => s.status === 'active');
+    const sesionesPendientes = sessionsRows.filter(s => s.status === 'pending');
+    
+    // Calcular pozos totales
     let totalPozosLinea = MoneyMath.decimal(0);
     let totalPozosBingo = MoneyMath.decimal(0);
     let totalPozosAcumulativos = MoneyMath.decimal(0);
 
-    for (const session of sessionsResult) {
+    for (const session of sessionsRows) {
       totalPozosLinea = totalPozosLinea.plus(session.current_pot_linea || 0);
       totalPozosBingo = totalPozosBingo.plus(session.current_pot_bingo || 0);
       totalPozosAcumulativos = totalPozosAcumulativos.plus(session.accumulated_pot || 0);
@@ -335,11 +270,12 @@ async function getDashboardStats(req, res) {
     const juegoStats = {
       sesiones_activas: sesionesActivas.length,
       sesiones_pendientes: sesionesPendientes.length,
-      sesiones_completadas_hoy: sessionsResult.filter(s =>
-        s.status === 'completed' &&
+      sesiones_completadas_hoy: sessionsRows.filter(s => 
+        s.status === 'completed' && 
         new Date(s.end_time).toDateString() === new Date().toDateString()
       ).length,
-
+      
+      // Estado de pozos (3 salas: sala1, sala2, sala3)
       pozos: {
         total_linea: MoneyMath.toNumber(totalPozosLinea),
         total_bingo: MoneyMath.toNumber(totalPozosBingo),
@@ -348,7 +284,8 @@ async function getDashboardStats(req, res) {
           totalPozosLinea.plus(totalPozosBingo).plus(totalPozosAcumulativos)
         )
       },
-
+      
+      // Próximas sesiones por sala
       proximas_sesiones: sesionesPendientes.slice(0, 3).map(s => ({
         id: s.id,
         sala: s.room,
@@ -360,7 +297,9 @@ async function getDashboardStats(req, res) {
     };
 
     // Procesar balances
-    const balanceData = balancesResult[0] || {};
+    const [balancesRows] = balancesResult;
+    const balanceData = balancesRows[0] || {};
+    
     const sistemaStats = {
       balance_total_usuarios: balanceData.total_balance || 0,
       usuarios_con_saldo: balanceData.users_with_balance || 0,
@@ -369,7 +308,9 @@ async function getDashboardStats(req, res) {
     };
 
     // Procesar retiros pendientes
-    const withdrawalData = withdrawalsResult[0] || {};
+    const [withdrawalsRows] = withdrawalsResult;
+    const withdrawalData = withdrawalsRows[0] || {};
+    
     const retirosStats = {
       pendientes_count: withdrawalData.pending_count || 0,
       pendientes_monto: withdrawalData.pending_amount || 0,
@@ -377,7 +318,8 @@ async function getDashboardStats(req, res) {
     };
 
     // Procesar movimientos recientes
-    const movimientosRecientes = recentMovementsResult.map(m => ({
+    const [movementsRows] = recentMovementsResult;
+    const movimientosRecientes = movementsRows.map(m => ({
       id: m.id,
       usuario: m.username,
       tipo: m.movement_type,
@@ -387,31 +329,42 @@ async function getDashboardStats(req, res) {
       fecha: m.created_at
     }));
 
-    return responseHelper.success(res, {
-      data: {
-        usuarios: usuariosStats,
-        finanzas_hoy: finanzasHoy,
-        juego: juegoStats,
-        sistema: sistemaStats,
-        retiros: retirosStats,
-        movimientos_recientes: movimientosRecientes,
-        alertas: [
-          ...(retirosStats.requiere_atencion ? [{
-            tipo: 'warning',
-            mensaje: `${retirosStats.pendientes_count} retiros pendientes por $${MoneyMath.format(retirosStats.pendientes_monto)}`,
-            accion: '/admin/withdrawals'
-          }] : []),
-          ...(juegoStats.sesiones_activas === 0 ? [{
-            tipo: 'info',
-            mensaje: 'No hay sesiones activas en este momento',
-            accion: '/admin/sessions/create'
-          }] : [])
-        ]
-      }
+    // 📊 Respuesta consolidada
+    const stats = {
+      usuarios: usuariosStats,
+      finanzas_hoy: finanzasHoy,
+      juego: juegoStats,
+      sistema: sistemaStats,
+      retiros: retirosStats,
+      movimientos_recientes: movimientosRecientes,
+      
+      // Alertas automáticas
+      alertas: [
+        ...(retirosStats.requiere_atencion ? [{
+          tipo: 'warning',
+          mensaje: `${retirosStats.pendientes_count} retiros pendientes por $${MoneyMath.format(retirosStats.pendientes_monto)}`,
+          accion: '/admin/withdrawals'
+        }] : []),
+        ...(juegoStats.sesiones_activas === 0 ? [{
+          tipo: 'info',
+          mensaje: 'No hay sesiones activas en este momento',
+          accion: '/admin/sessions/create'
+        }] : [])
+      ]
+    };
+
+    res.json({
+      success: true,
+      data: stats
     });
 
   } catch (error) {
-    return responseHelper.error(res, 500, 'Error obteniendo estadísticas del dashboard', error.message);
+    console.error('❌ Error obteniendo estadísticas del dashboard:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Error obteniendo estadísticas del dashboard',
+      details: error.message 
+    });
   }
 }
 
@@ -429,14 +382,26 @@ async function getDashboardStats(req, res) {
 async function sendGlobalMessage(req, res) {
   try {
     const { message, type = 'info', priority = 'medium' } = req.body;
-
+    
+    // Validar mensaje
     if (!message || message.trim().length === 0) {
-      return responseHelper.error(res, 400, 'El mensaje no puede estar vacío');
+      return res.status(400).json({
+        success: false,
+        error: 'El mensaje no puede estar vacío'
+      });
     }
 
+    // Obtener instancia de Socket.IO desde el servidor
     const io = req.app.get('io');
-    if (!io) return responseHelper.error(res, 500, 'Socket.IO no está disponible');
+    
+    if (!io) {
+      return res.status(500).json({
+        success: false,
+        error: 'Socket.IO no está disponible'
+      });
+    }
 
+    // 📢 Emitir mensaje a TODOS los clientes conectados
     const notification = {
       text: message,
       type: type,
@@ -447,21 +412,28 @@ async function sendGlobalMessage(req, res) {
 
     io.emit('admin_notification', notification);
 
-    await dbHelper.query(`
+    // Registrar en base de datos (opcional)
+    await pool.query(`
       INSERT INTO system_notifications (message, type, priority, created_at)
       VALUES (?, ?, ?, NOW())
-    `, [message, type, priority], 'AdminBroadcastLog');
+    `, [message, type, priority]);
 
     console.log(`📢 Mensaje global enviado: "${message}" [${type}]`);
 
-    return responseHelper.success(res, {
+    res.json({ 
+      success: true, 
       message: 'Anuncio enviado a toda la red',
       recipients: io.sockets.sockets.size,
       notification
     });
 
   } catch (error) {
-    return responseHelper.error(res, 500, 'Error enviando mensaje global', error.message);
+    console.error('❌ Error enviando mensaje global:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Error enviando mensaje global',
+      details: error.message 
+    });
   }
 }
 
@@ -472,7 +444,7 @@ async function sendGlobalMessage(req, res) {
 async function getSessionStats(req, res) {
   try {
     const { period = 'today' } = req.query; // 'today', 'week', 'month'
-
+    
     let dateFilter = 'DATE(start_time) = CURDATE()';
     if (period === 'week') {
       dateFilter = 'start_time >= DATE_SUB(NOW(), INTERVAL 7 DAY)';
@@ -480,7 +452,7 @@ async function getSessionStats(req, res) {
       dateFilter = 'start_time >= DATE_SUB(NOW(), INTERVAL 30 DAY)';
     }
 
-    const stats = await dbHelper.queryOne(`
+    const [sessionsResult] = await pool.query(`
       SELECT 
         COUNT(*) as total_sessions,
         SUM(total_cards_validated) as total_cards,
@@ -489,9 +461,12 @@ async function getSessionStats(req, res) {
         SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_sessions
       FROM game_sessions
       WHERE ${dateFilter}
-    `, [], 'SessionStats') || {};
+    `);
 
-    return responseHelper.success(res, {
+    const stats = sessionsResult[0];
+
+    res.json({
+      success: true,
       period,
       data: {
         total_sesiones: stats.total_sessions || 0,
@@ -499,14 +474,19 @@ async function getSessionStats(req, res) {
         ingresos_totales: stats.total_revenue || 0,
         duracion_promedio_minutos: Math.round(stats.avg_duration_minutes || 0),
         sesiones_completadas: stats.completed_sessions || 0,
-        tasa_completado: stats.total_sessions > 0
+        tasa_completado: stats.total_sessions > 0 
           ? ((stats.completed_sessions / stats.total_sessions) * 100).toFixed(2) + '%'
           : '0%'
       }
     });
 
   } catch (error) {
-    return responseHelper.error(res, 500, 'Error obteniendo estadísticas de sesiones', error.message);
+    console.error('❌ Error obteniendo estadísticas de sesiones:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Error obteniendo estadísticas de sesiones',
+      details: error.message 
+    });
   }
 }
 
@@ -516,7 +496,7 @@ async function getSessionStats(req, res) {
  */
 async function getUserStats(req, res) {
   try {
-    const stats = await dbHelper.queryOne(`
+    const [statsResult] = await pool.query(`
       SELECT 
         COUNT(*) as total_users,
         SUM(CASE WHEN balance > 0 THEN 1 ELSE 0 END) as users_with_balance,
@@ -526,10 +506,12 @@ async function getUserStats(req, res) {
         COUNT(CASE WHEN DATE(created_at) = CURDATE() THEN 1 END) as new_users_today,
         COUNT(CASE WHEN DATE(last_login) = CURDATE() THEN 1 END) as active_users_today
       FROM users
-    `, [], 'UserStats') || {};
+    `);
+
+    const stats = statsResult[0];
 
     // Top 10 usuarios por balance
-    const topUsersResult = await dbHelper.query(`
+    const [topUsersResult] = await pool.query(`
       SELECT 
         id,
         username,
@@ -539,9 +521,10 @@ async function getUserStats(req, res) {
       FROM users
       ORDER BY balance DESC
       LIMIT 10
-    `, [], 'TopUsers');
+    `);
 
-    return responseHelper.success(res, {
+    res.json({
+      success: true,
       data: {
         total_usuarios: stats.total_users || 0,
         usuarios_con_saldo: stats.users_with_balance || 0,
@@ -555,7 +538,12 @@ async function getUserStats(req, res) {
     });
 
   } catch (error) {
-    return responseHelper.error(res, 500, 'Error obteniendo estadísticas de usuarios', error.message);
+    console.error('❌ Error obteniendo estadísticas de usuarios:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Error obteniendo estadísticas de usuarios',
+      details: error.message 
+    });
   }
 }
 
@@ -568,7 +556,7 @@ async function getRevenueBreakdown(req, res) {
     const { date = new Date().toISOString().split('T')[0] } = req.query;
 
     // Obtener todos los movimientos del día
-    const movementsResult = await dbHelper.query(`
+    const [movementsResult] = await pool.query(`
       SELECT 
         movement_type,
         SUM(amount) as total_amount,
@@ -576,7 +564,7 @@ async function getRevenueBreakdown(req, res) {
       FROM chips_movements
       WHERE DATE(created_at) = ?
       GROUP BY movement_type
-    `, [date], 'RevenueBreakdown');
+    `, [date]);
 
     // Calcular distribución
     const movements = {};
@@ -597,7 +585,8 @@ async function getRevenueBreakdown(req, res) {
       MoneyMath.toNumber(withdrawals)
     );
 
-    return responseHelper.success(res, {
+    res.json({
+      success: true,
       date,
       data: {
         ingresos: {
@@ -610,7 +599,7 @@ async function getRevenueBreakdown(req, res) {
           transacciones: (movements.withdrawal?.count || 0) + (movements.win?.count || 0)
         },
         balance_neto: netRevenue,
-
+        
         // Distribución según reglas (10% casa, 5% admin, 15% cajeros, 70% pozos)
         distribucion: {
           casa_10: MoneyMath.percentage(netRevenue, 10),
@@ -618,13 +607,18 @@ async function getRevenueBreakdown(req, res) {
           cajeros_15: MoneyMath.percentage(netRevenue, 15),
           pozos_70: MoneyMath.percentage(netRevenue, 70)
         },
-
+        
         movimientos_detalle: movements
       }
     });
 
   } catch (error) {
-    return responseHelper.error(res, 500, 'Error obteniendo desglose de ingresos', error.message);
+    console.error('❌ Error obteniendo desglose de ingresos:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Error obteniendo desglose de ingresos',
+      details: error.message 
+    });
   }
 }
 
@@ -635,8 +629,8 @@ async function getRevenueBreakdown(req, res) {
 async function getStockSummary(req, res) {
   try {
     const today = new Date().toISOString().split('T')[0];
-
-    const stockResults = await dbHelper.query(`
+    
+    const [stockResults] = await pool.query(`
       SELECT 
         room,
         COUNT(*) as total,
@@ -645,9 +639,13 @@ async function getStockSummary(req, res) {
       FROM daily_stock_cards
       WHERE play_date = ?
       GROUP BY room
-    `, [today], 'StockSummary');
+    `, [today]);
 
-    const stockByRoom = { bronce: 0, plata: 0, oro: 0 };
+    const stockByRoom = {
+      bronce: 0,
+      plata: 0,
+      oro: 0
+    };
 
     stockResults.forEach(row => {
       const room = row.room.toLowerCase();
@@ -656,13 +654,21 @@ async function getStockSummary(req, res) {
       }
     });
 
-    return responseHelper.success(res, {
-      ...stockByRoom,
+    res.json({
+      success: true,
+      bronce: stockByRoom.bronce,
+      plata: stockByRoom.plata,
+      oro: stockByRoom.oro,
       fecha: today
     });
 
   } catch (error) {
-    return responseHelper.error(res, 500, 'Error obteniendo stock de cartones', error.message);
+    console.error('❌ Error obteniendo stock de cartones:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Error obteniendo stock de cartones',
+      details: error.message 
+    });
   }
 }
 
@@ -679,12 +685,11 @@ async function getUsersHierarchy(req, res) {
     let allUsers;
     let currentUserData;
 
-    // SuperAdmin (o Andy) ve TODOS los usuarios con cartones normales y regalo separados
-    if (currentUserRole === 'superadmin' || req.user.username?.toLowerCase() === 'andy') {
-      allUsers = await dbHelper.query(`
+    // SuperAdmin ve TODOS los usuarios con cartones normales y regalo separados
+    if (currentUserRole === 'superadmin') {
+      [allUsers] = await pool.query(`
         SELECT u.id, u.username, u.role, u.parent_id, u.balance, u.created_at,
-               u.nombre_completo, u.documento, u.email, u.telefono,
-               u.is_blocked, u.block_reason, u.blocked_at, u.blocked_by, u.subscription_tier_id,
+               u.is_blocked, u.block_reason, u.blocked_at, u.blocked_by,
                COALESCE(SUM(CASE WHEN uci.room = 'bronce' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_bronce,
                COALESCE(SUM(CASE WHEN uci.room = 'plata' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_plata,
                COALESCE(SUM(CASE WHEN uci.room = 'oro' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_oro,
@@ -695,18 +700,17 @@ async function getUsersHierarchy(req, res) {
         LEFT JOIN user_card_inventory uci ON u.id = uci.user_id
         GROUP BY u.id
         ORDER BY u.id
-      `, [], 'GetUsersHierarchy_Super');
-
+      `);
+      
       // Obtener datos del usuario actual
       currentUserData = allUsers.find(u => u.id === currentUserId);
-    }
+    } 
     // Agentes solo ven su RED (hijos directos y todos los descendientes)
     else if (currentUserRole === 'agente') {
-      // Primero obtener datos del agente actual
-      const currentUserRow = await dbHelper.queryOne(`
+      // Primero obtener datos del agente actual (con cartones normales y regalo separados)
+      const [currentUserRow] = await pool.query(`
         SELECT u.id, u.username, u.role, u.parent_id, u.balance, u.created_at,
-               u.nombre_completo, u.documento, u.email, u.telefono,
-               u.is_blocked, u.block_reason, u.blocked_at, u.blocked_by, u.subscription_tier_id,
+               u.is_blocked, u.block_reason, u.blocked_at, u.blocked_by,
                COALESCE(SUM(CASE WHEN uci.room = 'bronce' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_bronce,
                COALESCE(SUM(CASE WHEN uci.room = 'plata' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_plata,
                COALESCE(SUM(CASE WHEN uci.room = 'oro' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_oro,
@@ -717,23 +721,38 @@ async function getUsersHierarchy(req, res) {
         LEFT JOIN user_card_inventory uci ON u.id = uci.user_id
         WHERE u.id = ?
         GROUP BY u.id
-      `, [currentUserId], 'GetUsersHierarchy_AgentSelf');
-
-      currentUserData = currentUserRow;
-
-      // Obtener red descendente (CTE recursivo)
-      const networkUsers = await dbHelper.query(`
+      `, [currentUserId]);
+      
+      currentUserData = currentUserRow[0];
+      
+      // Usar CTE recursivo para obtener toda la red del agente
+      const [networkUsers] = await pool.query(`
         WITH RECURSIVE network AS (
-          SELECT id, username, role, parent_id, balance, created_at, nombre_completo, documento, email, telefono, is_blocked, block_reason, blocked_at, blocked_by, subscription_tier_id 
-          FROM users WHERE parent_id = ?
+          -- Caso base: hijos directos del agente actual
+          SELECT id, username, role, parent_id, balance, created_at,
+                 is_blocked, block_reason, blocked_at, blocked_by
+          FROM users 
+          WHERE parent_id = ?
           
           UNION ALL
           
-          SELECT u.id, u.username, u.role, u.parent_id, u.balance, u.created_at, u.nombre_completo, u.documento, u.email, u.telefono, u.is_blocked, u.block_reason, u.blocked_at, u.blocked_by, u.subscription_tier_id
+          -- Caso recursivo: hijos de los hijos
+          SELECT u.id, u.username, u.role, u.parent_id, u.balance, u.created_at,
+                 u.is_blocked, u.block_reason, u.blocked_at, u.blocked_by
           FROM users u
           INNER JOIN network n ON u.parent_id = n.id
         )
-        SELECT n.*,
+        SELECT 
+          n.id, 
+          n.username, 
+          n.role, 
+          n.parent_id, 
+          n.balance,
+          n.created_at,
+          n.is_blocked,
+          n.block_reason,
+          n.blocked_at,
+          n.blocked_by,
           COALESCE(SUM(CASE WHEN uci.room = 'bronce' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_bronce,
           COALESCE(SUM(CASE WHEN uci.room = 'plata' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_plata,
           COALESCE(SUM(CASE WHEN uci.room = 'oro' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_oro,
@@ -742,17 +761,22 @@ async function getUsersHierarchy(req, res) {
           COALESCE(SUM(CASE WHEN uci.room = 'oro' AND uci.is_gift = TRUE THEN uci.quantity ELSE 0 END), 0) as gift_oro
         FROM network n
         LEFT JOIN user_card_inventory uci ON n.id = uci.user_id
-        GROUP BY n.id, n.username, n.role, n.parent_id, n.balance, n.created_at, n.nombre_completo, n.documento, n.email, n.telefono, n.is_blocked, n.block_reason, n.blocked_at, n.blocked_by, n.subscription_tier_id
+        GROUP BY n.id, n.username, n.role, n.parent_id, n.balance, n.created_at, n.is_blocked, n.block_reason, n.blocked_at, n.blocked_by
         ORDER BY n.id
-      `, [currentUserId], 'GetUsersHierarchy_AgentNetwork');
-
+      `, [currentUserId]);
+      
+      // Combinar: agente actual + su red
       allUsers = [currentUserData, ...networkUsers];
     }
+    // Jugadores no tienen acceso a este endpoint (pero por si acaso)
     else {
-      return responseHelper.error(res, 403, 'No tienes permisos para ver usuarios');
+      return res.status(403).json({
+        success: false,
+        error: 'No tienes permisos para ver usuarios'
+      });
     }
 
-    // Construir árbol jerárquico (JS-only, safe)
+    // Construir árbol jerárquico
     const buildTree = (parentId = null) => {
       return allUsers
         .filter(u => u.parent_id === parentId)
@@ -762,12 +786,14 @@ async function getUsersHierarchy(req, res) {
         }));
     };
 
+    // Crear árbol con el usuario actual como raíz
     const tree = [{
       ...currentUserData,
       children: buildTree(currentUserId)
     }];
 
-    return responseHelper.success(res, {
+    res.json({
+      success: true,
       tree,
       all: allUsers,
       currentUser: {
@@ -778,7 +804,12 @@ async function getUsersHierarchy(req, res) {
     });
 
   } catch (error) {
-    return responseHelper.error(res, 500, 'Error obteniendo jerarquía de usuarios', error.message);
+    console.error('❌ Error obteniendo jerarquía:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Error obteniendo jerarquía de usuarios',
+      details: error.message 
+    });
   }
 }
 
@@ -792,96 +823,141 @@ async function getUsersHierarchy(req, res) {
  */
 async function createUser(req, res) {
   try {
-    const {
-      username, password, role, parent_id,
-      nombre_completo, documento, email, telefono,
-      cbu, alias, bank_name
-    } = req.body;
+    console.log('🔍 [CREATE-USER] req.user =', JSON.stringify(req.user));
+    console.log('🔍 [CREATE-USER] req.body =', JSON.stringify(req.body));
+    
+    const { username, password, role, parent_id, nombre_completo, documento, email, telefono } = req.body;
     const currentUserId = req.user.id;
     const currentUserRole = req.user.role;
 
-    // Validaciones basicas
+    console.log('🔍 [CREATE-USER] Parsed - username:', username, 'role:', role, 'parent_id:', parent_id, 'currentUserId:', currentUserId, 'currentUserRole:', currentUserRole);
+
     if (!username || !password || !role) {
-      return responseHelper.error(res, 400, 'Faltan campos requeridos: username, password, role');
+      return res.status(400).json({
+        success: false,
+        error: 'Faltan campos requeridos: username, password, role'
+      });
     }
 
-    const validRoles = ['superadmin', 'admin', 'agente', 'jugador'];
+    // Validar que el role sea válido
+    const validRoles = ['superadmin', 'agente', 'jugador'];
     if (!validRoles.includes(role)) {
-      return responseHelper.error(res, 400, 'Rol inválido. Debe ser: superadmin, admin, agente o jugador');
+      return res.status(400).json({
+        success: false,
+        error: 'Rol inválido. Debe ser: superadmin, agente o jugador'
+      });
     }
 
-    // Determinar parent_id
+    // Determinar el parent_id según la lógica jerárquica
     let finalParentId;
+
     if (currentUserRole === 'superadmin') {
+      // SuperAdmin puede especificar parent_id o dejarlo null (raíz)
       finalParentId = parent_id || null;
-    } else if (currentUserRole === 'admin') {
-      finalParentId = currentUserId;
-      // Admin no puede crear SuperAdmin ni otros Admin
-      if (role === 'superadmin' || role === 'admin') {
-        return responseHelper.error(res, 403, `No tienes permisos para crear el rol "${role}"`);
-      }
     } else if (currentUserRole === 'agente') {
+      // Agentes siempre crean usuarios bajo su red
       finalParentId = currentUserId;
-      // Agente no puede crear SuperAdmin ni Admin
-      if (role === 'superadmin' || role === 'admin') {
-        return responseHelper.error(res, 403, `No tienes permisos para crear el rol "${role}"`);
+
+      // Agentes NO pueden crear SuperAdmins
+      if (role === 'superadmin') {
+        return res.status(403).json({
+          success: false,
+          error: 'No tienes permisos para crear SuperAdmins'
+        });
       }
     } else {
-      return responseHelper.error(res, 403, 'No tienes permisos para crear usuarios');
+      // Jugadores no pueden crear usuarios
+      return res.status(403).json({
+        success: false,
+        error: 'No tienes permisos para crear usuarios'
+      });
     }
 
-    // Verificar existencia
-    const existingUser = await dbHelper.queryOne('SELECT id, username FROM users WHERE username = ?', [username], 'CheckUserExists');
-    if (existingUser) {
-      return responseHelper.error(res, 409, `El usuario "${username}" ya existe. Por favor elige otro nombre.`);
+    // Verificar si el usuario ya existe
+    const [existingUser] = await pool.query(
+      'SELECT id, username FROM users WHERE username = ?',
+      [username]
+    );
+
+    if (existingUser.length > 0) {
+      return res.status(409).json({
+        success: false,
+        error: `El usuario "${username}" ya existe. Por favor elige otro nombre.`
+      });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Transacción para crear usuario y metadatos
-    const result = await dbHelper.transaction(async (connection) => {
-      const [insertResult] = await connection.query(
-        `INSERT INTO users (username, password_hash, role, parent_id, balance)
-         VALUES (?, ?, ?, ?, ?)`,
-        [username, hashedPassword, role, finalParentId, 0]
-      );
+    // DEBUG: Log para verificar parent_id
+    console.log(`🔍 [JWT-FIX] Creating user: ${username}, Role: ${role}, CurrentUser: ${currentUserId}, CurrentRole: ${currentUserRole}, FinalParentId: ${finalParentId}, ReqUser:`, JSON.stringify(req.user));
 
-      const newUserId = insertResult.insertId;
+    // Generar código de referido único para el nuevo usuario
+    const newReferralCode = await referralHelper.generateUniqueCode();
 
-      // Campos opcionales
-      const updates = [];
-      const values = [];
+    // Insertar usuario con campos básicos + referral_code
+    const [result] = await pool.query(
+      `INSERT INTO users (username, password_hash, role, parent_id, balance, referral_code)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [username, hashedPassword, role, finalParentId, 0, newReferralCode]
+    );
 
-      if (nombre_completo) { updates.push('nombre_completo = ?'); values.push(nombre_completo); }
-      if (documento) { updates.push('documento = ?'); values.push(documento); }
-      if (email) { updates.push('email = ?'); values.push(email); }
-      if (telefono) { updates.push('telefono = ?'); values.push(telefono); }
-      if (cbu) { updates.push('cbu = ?'); values.push(cbu); }
-      if (alias) { updates.push('alias = ?'); values.push(alias); }
-      if (bank_name) { updates.push('bank_name = ?'); values.push(bank_name); }
+    // Intentar actualizar campos opcionales si existen
+    if (nombre_completo || documento || email || telefono) {
+      try {
+        const updates = [];
+        const values = [];
+        
+        if (nombre_completo) {
+          updates.push('nombre_completo = ?');
+          values.push(nombre_completo);
+        }
+        if (documento) {
+          updates.push('documento = ?');
+          values.push(documento);
+        }
+        if (email) {
+          updates.push('email = ?');
+          values.push(email);
+        }
+        if (telefono) {
+          updates.push('telefono = ?');
+          values.push(telefono);
+        }
 
-      if (updates.length > 0) {
-        values.push(newUserId);
-        await connection.query(
-          `UPDATE users SET ${updates.join(', ')} WHERE id = ?`,
-          values
-        );
+        if (updates.length > 0) {
+          values.push(result.insertId);
+          await pool.query(
+            `UPDATE users SET ${updates.join(', ')} WHERE id = ?`,
+            values
+          );
+        }
+      } catch (updateError) {
+        // Ignorar errores de campos opcionales que no existen en la tabla
+        console.log('⚠️  Campos opcionales no disponibles en la tabla:', updateError.message);
       }
+    }
 
-      return newUserId;
-    });
-
-    return responseHelper.success(res, {
-      userId: result,
+    res.json({
+      success: true,
+      userId: result.insertId,
       message: `${role.toUpperCase()} "${username}" creado exitosamente bajo ${currentUserRole === 'agente' ? 'tu red' : 'la jerarquía especificada'}`,
       parent_id: finalParentId
     });
 
   } catch (error) {
     if (error.code === 'ER_DUP_ENTRY') {
-      return responseHelper.error(res, 409, 'El nombre de usuario ya existe');
+      return res.status(409).json({
+        success: false,
+        error: 'El nombre de usuario ya existe'
+      });
     }
-    return responseHelper.error(res, 500, 'Error creando usuario', error.message);
+
+    console.error('❌ Error creando usuario:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Error creando usuario',
+      details: error.message 
+    });
   }
 }
 
@@ -891,28 +967,35 @@ async function createUser(req, res) {
  */
 async function canModifyUser(currentUserId, currentUserRole, targetUserId) {
   // SuperAdmin puede modificar a todos
-  if (currentUserRole === 'superadmin') return true;
+  if (currentUserRole === 'superadmin') {
+    return true;
+  }
 
   // Agentes pueden modificarse a sí mismos
-  if (currentUserRole === 'agente' && parseInt(currentUserId) === parseInt(targetUserId)) return true;
+  if (currentUserRole === 'agente' && currentUserId === targetUserId) {
+    return true;
+  }
 
   // Agentes pueden modificar TODOS sus descendientes (sin límite de profundidad)
   if (currentUserRole === 'agente') {
-    const result = await dbHelper.queryOne(`
+    const [result] = await pool.query(`
       WITH RECURSIVE network AS (
-        -- Caso base
+        -- Caso base: el agente mismo y sus hijos directos
         SELECT id FROM users WHERE id = ? OR parent_id = ?
+        
         UNION ALL
-        -- Recursion
+        
+        -- Caso recursivo: todos los descendientes en cascada
         SELECT u.id FROM users u
         INNER JOIN network n ON u.parent_id = n.id
       )
       SELECT COUNT(*) as count FROM network WHERE id = ?
-    `, [currentUserId, currentUserId, targetUserId], 'CanModifyUserCheck');
+    `, [currentUserId, currentUserId, targetUserId]);
 
-    return result.count > 0;
+    return result[0].count > 0;
   }
 
+  // Jugadores no pueden modificar a nadie
   return false;
 }
 
@@ -928,165 +1011,240 @@ async function addCardsToUser(req, res) {
     const currentUserRole = req.user.role;
 
     if (!userId || !room || quantity === undefined) {
-      return responseHelper.error(res, 400, 'Faltan campos requeridos');
+      return res.status(400).json({
+        success: false,
+        error: 'Faltan campos requeridos'
+      });
     }
 
+    // VALIDACIÓN JERÁRQUICA: Verificar permisos
     const hasPermission = await canModifyUser(currentUserId, currentUserRole, userId);
-    if (!hasPermission) return responseHelper.error(res, 403, 'No tienes permisos para modificar a este usuario');
+    if (!hasPermission) {
+      return res.status(403).json({
+        success: false,
+        error: 'No tienes permisos para modificar a este usuario (fuera de tu red)'
+      });
+    }
 
+    // Validar que la sala sea válida
     const validRooms = ['bronce', 'plata', 'oro'];
-    if (!validRooms.includes(room)) return responseHelper.error(res, 400, 'Sala inválida');
+    if (!validRooms.includes(room)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Sala inválida. Debe ser: bronce, plata u oro'
+      });
+    }
+
+    // Obtener rol del usuario destino para saber si aplica bonus
+    const [targetUserData] = await pool.query(
+      'SELECT role FROM users WHERE id = ?',
+      [userId]
+    );
+    const targetRole = targetUserData[0]?.role || 'jugador';
+    console.log(`📋 [addCardsToUser] userId=${userId}, targetRole=${targetRole}, quantity=${quantity}, room=${room}`);
 
     // Agregar o quitar cartones
     if (quantity > 0) {
-      // Verificar rol del destinatario
-      const recipientData = await dbHelper.queryOne('SELECT role FROM users WHERE id = ?', [userId], 'GetRole');
-      const recipientRole = recipientData?.role;
+      // AGREGAR cartones = Transferir desde inventario del admin (para todos)
+      // SuperAdmin debe cargar su inventario primero usando Card Inventory panel
+      await cardInventoryService.transferCards(
+        currentUserId,  // from (admin)
+        userId,         // to (usuario)
+        room,
+        quantity,
+        currentUserId   // executedBy
+      );
 
-      if (recipientRole === 'agente') {
-        // --- CASO AGENTE: CARGA 100% + BONO EXTRA 10% ---
-        await cardInventoryService.transferCards(currentUserId, userId, room, quantity, currentUserId);
-
-        // ACREDITACIÓN AUTOMÁTICA DE BONO (10%)
+      // ============================================
+      // REGLA 10%: Si el destino es AGENTE, acreditar 10% como regalo
+      // ============================================
+      if (targetRole === 'agente') {
         try {
-          const roomSettings = await dbHelper.queryOne('SELECT agent_bonus_percentage FROM room_settings WHERE room = ?', [room], 'GetBonusPct');
-          const bonusPct = roomSettings ? parseFloat(roomSettings.agent_bonus_percentage) : 10.0;
-          const bonusQty = Math.floor(quantity * (bonusPct / 100));
-
-          if (bonusQty > 0) {
-            await dbHelper.transaction(async (connection) => {
-              await connection.query(
-                `INSERT INTO user_card_inventory (user_id, room, quantity, is_gift) VALUES (?, ?, ?, TRUE)
-                 ON DUPLICATE KEY UPDATE quantity = quantity + ?, updated_at = CURRENT_TIMESTAMP`,
-                [userId, room, bonusQty, bonusQty]
-              );
-              await connection.query(
-                `INSERT INTO card_movements_log (user_id, from_user_id, to_user_id, room, quantity, movement_type, is_gift, reason, executed_by)
-                 VALUES (?, ?, ?, ?, ?, 'transfer_bonus', TRUE, 'Bono automático Agente', ?)`,
-                [userId, currentUserId, userId, room, bonusQty, currentUserId]
-              );
-            });
-            console.log(`🎁 [Bonus] Acreditando bono extra: ${bonusQty} regalo para agente ${userId}`);
-          }
-        } catch (err) {
-          console.error('❌ Error bono agente:', err);
-        }
-      } else {
-        // --- CASO JUGADOR: SPLIT 90/10 ---
-        console.log(`👤 [Transfer] Destinatario es JUGADOR. Aplicando Split 90/10.`);
-        const targetPaid = Math.floor(quantity * 0.9);
-        const targetGift = quantity - targetPaid;
-
-        await dbHelper.transaction(async (connection) => {
-          // 1. Obtener stock disponible
-          const [stocks] = await connection.query(
-            `SELECT is_gift, SUM(quantity) as total FROM user_card_inventory 
-             WHERE user_id = ? AND room = ? GROUP BY is_gift`,
-            [currentUserId, room]
+          // Obtener porcentaje de bonificación de la sala (default 10%)
+          const [roomSettings] = await pool.query(
+            'SELECT agent_bonus_percentage FROM room_settings WHERE room = ?',
+            [room]
           );
-
-          let senderPaid = 0; let senderGift = 0;
-          if (stocks && stocks.length) {
-            stocks.forEach(s => { if (s.is_gift) senderGift = parseInt(s.total) || 0; else senderPaid = parseInt(s.total) || 0; });
+          
+          const bonusPercentage = roomSettings.length > 0
+            ? parseFloat(roomSettings[0].agent_bonus_percentage)
+            : 10.00;
+          
+          const bonusQuantity = Math.floor(quantity * (bonusPercentage / 100));
+          
+          if (bonusQuantity > 0) {
+            console.log(`🎁 [Bonus 10%] Agente ${userId} recibe ${bonusQuantity} cartones de regalo (${bonusPercentage}% de ${quantity})`);
+            
+            // Verificar si ya tiene inventario de regalo de esta sala
+            const [existingGift] = await pool.query(
+              `SELECT id, quantity FROM user_card_inventory 
+               WHERE user_id = ? AND room = ? AND is_gift = TRUE
+               LIMIT 1`,
+              [userId, room]
+            );
+            
+            if (existingGift.length > 0) {
+              await pool.query(
+                `UPDATE user_card_inventory 
+                 SET quantity = quantity + ?, updated_at = CURRENT_TIMESTAMP
+                 WHERE id = ?`,
+                [bonusQuantity, existingGift[0].id]
+              );
+            } else {
+              await pool.query(
+                `INSERT INTO user_card_inventory 
+                 (user_id, room, quantity, is_gift, created_at, updated_at)
+                 VALUES (?, ?, ?, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+                [userId, room, bonusQuantity]
+              );
+            }
+            
+            // Registrar en log de movimientos
+            await pool.query(
+              `INSERT INTO card_movements_log 
+               (user_id, room, movement_type, quantity, is_gift, reason, executed_by, created_at)
+               VALUES (?, ?, 'credit', ?, TRUE, ?, ?, CURRENT_TIMESTAMP)`,
+              [userId, room, bonusQuantity, `Bono automático ${bonusPercentage}% por carga de cartones`, currentUserId]
+            );
           }
-
-          let tPaid = Math.min(targetPaid, senderPaid);
-          let tGift = Math.min(targetGift, senderGift);
-
-          // Si falta stock
-          if (tPaid + tGift < quantity) {
-            let needed = quantity - (tPaid + tGift);
-            if (tPaid < targetPaid) {
-              let extra = Math.min(needed, senderGift - tGift);
-              tGift += extra; needed -= extra;
-            }
-            if (needed > 0 && tGift < targetGift) {
-              let extra = Math.min(needed, senderPaid - tPaid);
-              tPaid += extra; needed -= extra;
-            }
-            if (tPaid + tGift < quantity) throw new Error(`Stock insuficiente. Solo tienes ${tPaid + tGift} cartones.`);
-          }
-
-          // Función interna para transferir
-          const executeTransfer = async (conn, from, to, q, isGift) => {
-            if (q <= 0) return;
-            let rem = q;
-            const [recs] = await conn.query(`SELECT id, quantity FROM user_card_inventory WHERE user_id = ? AND room = ? AND is_gift = ? ORDER BY id ASC`, [from, room, isGift]);
-            for (const r of recs) {
-              if (rem <= 0) break;
-              const sub = Math.min(r.quantity, rem);
-              await conn.query(`UPDATE user_card_inventory SET quantity = quantity - ? WHERE id = ?`, [sub, r.id]);
-              rem -= sub;
-            }
-            await conn.query(`INSERT INTO user_card_inventory (user_id, room, quantity, is_gift) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE quantity = quantity + ?`, [to, room, q, isGift, q]);
-            await conn.query(`INSERT INTO card_movements_log (user_id, from_user_id, to_user_id, room, quantity, movement_type, is_gift, reason, executed_by)
-                             VALUES (?, ?, ?, ?, ?, 'transfer', ?, 'Venta Jugador (Split)', ?)`, [to, from, to, room, q, isGift, from]);
-          };
-
-          await executeTransfer(connection, currentUserId, userId, tPaid, false);
-          await executeTransfer(connection, currentUserId, userId, tGift, true);
-        });
-
-        console.log(`✅ [Split] Transferidos ${tPaid} pagos y ${tGift} regalo a jugador ${userId}`);
+        } catch (bonusError) {
+          console.error('❌ Error aplicando bono 10% a agente:', bonusError);
+          // No fallar la operación principal por el bonus
+        }
       }
     } else if (quantity < 0) {
-      // QUITAR cartones
+      // QUITAR cartones = Eliminar del usuario y crear para el admin
       const quantityToRemove = Math.abs(quantity);
+      
+      const connection = await pool.getConnection();
+      try {
+        await connection.beginTransaction();
 
-      await dbHelper.transaction(async (connection) => {
+        // 1. Verificar que el usuario tenga suficientes cartones
         const [inventory] = await connection.query(
-          `SELECT COALESCE(SUM(quantity), 0) as total FROM user_card_inventory WHERE user_id = ? AND room = ?`,
+          `SELECT COALESCE(SUM(quantity), 0) as total 
+           FROM user_card_inventory 
+           WHERE user_id = ? AND room = ?`,
           [userId, room]
         );
-        const totalAvailable = parseInt(inventory[0]?.total || 0);
+
+        const totalAvailable = parseInt(inventory[0]?.total) || 0;
 
         if (totalAvailable < quantityToRemove) {
-          throw new Error(`Usuario solo tiene ${totalAvailable} cartones de ${room}, no se pueden quitar ${quantityToRemove}`);
+          await connection.rollback();
+          connection.release();
+          return res.status(400).json({
+            success: false,
+            error: `Usuario solo tiene ${totalAvailable} cartones de ${room}, no se pueden quitar ${quantityToRemove}`
+          });
         }
 
+        // 2. Eliminar cartones del usuario (primero normales, luego gift)
         let remaining = quantityToRemove;
+        
+        // Eliminar de cartones normales primero
+        const [normalCards] = await connection.query(
+          `SELECT id, quantity FROM user_card_inventory 
+           WHERE user_id = ? AND room = ? AND is_gift = FALSE
+           ORDER BY id ASC`,
+          [userId, room]
+        );
 
-        // Función interna para quitar
-        const removeCards = async (isGift) => {
-          if (remaining <= 0) return;
-          const [cards] = await connection.query(
-            `SELECT id, quantity FROM user_card_inventory WHERE user_id = ? AND room = ? AND is_gift = ? ORDER BY id ASC`,
-            [userId, room, isGift]
+        for (const card of normalCards) {
+          if (remaining <= 0) break;
+          
+          const toRemove = Math.min(card.quantity, remaining);
+          await connection.query(
+            `UPDATE user_card_inventory 
+             SET quantity = quantity - ?, updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?`,
+            [toRemove, card.id]
           );
-          for (const card of cards) {
+          
+          remaining -= toRemove;
+        }
+
+        // Si quedan por quitar, sacar de gift cards
+        if (remaining > 0) {
+          const [giftCards] = await connection.query(
+            `SELECT id, quantity FROM user_card_inventory 
+             WHERE user_id = ? AND room = ? AND is_gift = TRUE
+             ORDER BY id ASC`,
+            [userId, room]
+          );
+
+          for (const card of giftCards) {
             if (remaining <= 0) break;
+            
             const toRemove = Math.min(card.quantity, remaining);
-            await connection.query(`UPDATE user_card_inventory SET quantity = quantity - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [toRemove, card.id]);
+            await connection.query(
+              `UPDATE user_card_inventory 
+               SET quantity = quantity - ?, updated_at = CURRENT_TIMESTAMP
+               WHERE id = ?`,
+              [toRemove, card.id]
+            );
+            
             remaining -= toRemove;
           }
-        };
+        }
 
-        await removeCards(0); // Primero normales
-        await removeCards(1); // Luego gift
-
-        await connection.query(`DELETE FROM user_card_inventory WHERE quantity = 0`);
-
-        // Devolver al admin
+        // Eliminar registros con cantidad 0
         await connection.query(
-          `INSERT INTO user_card_inventory (user_id, room, quantity, is_gift, created_at)
-             VALUES (?, ?, ?, FALSE, CURRENT_TIMESTAMP)
-             ON DUPLICATE KEY UPDATE quantity = quantity + ?`,
-          [currentUserId, room, quantityToRemove, quantityToRemove]
+          `DELETE FROM user_card_inventory WHERE quantity = 0`
         );
 
-        // Logs
-        await connection.query(
-          `INSERT INTO card_movements_log (user_id, room, movement_type, quantity, is_gift, reason, executed_by, created_at)
-           VALUES (?, ?, 'debit', ?, FALSE, 'Cartones quitados por admin', ?, CURRENT_TIMESTAMP),
-                  (?, ?, 'credit', ?, FALSE, 'Cartones recuperados de usuario', ?, CURRENT_TIMESTAMP)`,
-          [userId, room, quantityToRemove, currentUserId, currentUserId, room, quantityToRemove, currentUserId]
+        // 3. Crear cartones para el admin (como normales, no regalo)
+        // Verificar si ya tiene un registro
+        const [existingAdmin] = await connection.query(
+          `SELECT id, quantity FROM user_card_inventory 
+           WHERE user_id = ? AND room = ? AND is_gift = FALSE
+           LIMIT 1`,
+          [currentUserId, room]
         );
-      });
-      console.log(`✅ Cartones quitados: ${quantityToRemove} ${room} de usuario ${userId} → admin ${currentUserId}`);
+
+        if (existingAdmin.length > 0) {
+          // Actualizar registro existente
+          await connection.query(
+            `UPDATE user_card_inventory 
+             SET quantity = quantity + ?, updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?`,
+            [quantityToRemove, existingAdmin[0].id]
+          );
+        } else {
+          // Crear nuevo registro
+          await connection.query(
+            `INSERT INTO user_card_inventory 
+             (user_id, room, quantity, is_gift, created_at, updated_at)
+             VALUES (?, ?, ?, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+            [currentUserId, room, quantityToRemove]
+          );
+        }
+
+        // 4. Registrar movimientos en log
+        await connection.query(
+          `INSERT INTO card_movements_log 
+           (user_id, room, movement_type, quantity, is_gift, reason, executed_by, created_at)
+           VALUES 
+           (?, ?, 'debit', ?, FALSE, 'Cartones quitados por admin', ?, CURRENT_TIMESTAMP),
+           (?, ?, 'credit', ?, FALSE, 'Cartones recuperados de usuario', ?, CURRENT_TIMESTAMP)`,
+          [userId, room, quantityToRemove, currentUserId, 
+           currentUserId, room, quantityToRemove, currentUserId]
+        );
+
+        await connection.commit();
+        connection.release();
+        
+        console.log(`✅ Cartones quitados: ${quantityToRemove} ${room} de usuario ${userId} → admin ${currentUserId}`);
+        
+      } catch (error) {
+        await connection.rollback();
+        connection.release();
+        throw error;
+      }
     }
 
-    // Respuesta y WebSocket logic
-    const updatedUser = await dbHelper.queryOne(
+    // Obtener datos actualizados del usuario para devolver (con normales + regalo separados)
+    const [updatedUser] = await pool.query(
       `SELECT u.*, 
         COALESCE(SUM(CASE WHEN uci.room = 'bronce' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_bronce,
         COALESCE(SUM(CASE WHEN uci.room = 'plata' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_plata,
@@ -1098,102 +1256,74 @@ async function addCardsToUser(req, res) {
        LEFT JOIN user_card_inventory uci ON u.id = uci.user_id
        WHERE u.id = ?
        GROUP BY u.id`,
-      [userId], 'GetUserAfterTransfer'
+      [userId]
     );
 
-    // Emitir evento WebSocket (Simplificado para el refactor, pero manteniendo lógica)
+    // Emitir evento WebSocket para actualizar cartones en client-player
     const io = req.app.get('io');
     if (io) {
-      // Reutilizar lógica existente para emitir eventos
-      // ... (La lógica de socket se mantuvo compleja en el original, la resumiré un poco manteniendo funcionalidad)
-      // Obtener inventario detallado
-      const updatedInventory = await dbHelper.queryOne(`
-        SELECT 
-          COALESCE(SUM(CASE WHEN room = 'bronce' AND is_gift = FALSE THEN quantity ELSE 0 END), 0) as cards_bronce,
-          COALESCE(SUM(CASE WHEN room = 'plata' AND is_gift = FALSE THEN quantity ELSE 0 END), 0) as cards_plata,
-          COALESCE(SUM(CASE WHEN room = 'oro' AND is_gift = FALSE THEN quantity ELSE 0 END), 0) as cards_oro,
-          COALESCE(SUM(CASE WHEN room = 'bronce' AND is_gift = TRUE THEN quantity ELSE 0 END), 0) as gift_bronce,
-          COALESCE(SUM(CASE WHEN room = 'plata' AND is_gift = TRUE THEN quantity ELSE 0 END), 0) as gift_plata,
-          COALESCE(SUM(CASE WHEN room = 'oro' AND is_gift = TRUE THEN quantity ELSE 0 END), 0) as gift_oro
-        FROM user_card_inventory
-        WHERE user_id = ?
-      `, [userId], 'GetInvForSocket');
-
-      const inv = updatedInventory || {};
-      const cartonesTotal = {
-        bronce: (parseInt(inv.cards_bronce) || 0) + (parseInt(inv.gift_bronce) || 0),
-        plata: (parseInt(inv.cards_plata) || 0) + (parseInt(inv.gift_plata) || 0),
-        oro: (parseInt(inv.cards_oro) || 0) + (parseInt(inv.gift_oro) || 0)
-      };
-
       io.to(`user_${userId}`).emit('resources_updated', {
-        userId,
-        cartones: cartonesTotal,
-        cards_bronce: parseInt(inv.cards_bronce) || 0,
-        cards_plata: parseInt(inv.cards_plata) || 0,
-        cards_oro: parseInt(inv.cards_oro) || 0,
-        gift_bronce: parseInt(inv.gift_bronce) || 0,
-        gift_plata: parseInt(inv.gift_plata) || 0,
-        gift_oro: parseInt(inv.gift_oro) || 0,
+        cartones: {
+          bronce: (parseInt(updatedUser[0].cards_bronce) || 0) + (parseInt(updatedUser[0].gift_bronce) || 0),
+          plata: (parseInt(updatedUser[0].cards_plata) || 0) + (parseInt(updatedUser[0].gift_plata) || 0),
+          oro: (parseInt(updatedUser[0].cards_oro) || 0) + (parseInt(updatedUser[0].gift_oro) || 0)
+        },
         message: `Tus cartones ${room} han sido ${quantity > 0 ? 'incrementados' : 'reducidos'} en ${Math.abs(quantity)}`
       });
-
-      io.emit('resources_updated', {
-        userId,
-        cartones: cartonesTotal,
-        cards_bronce: parseInt(inv.cards_bronce) || 0,
-        cards_plata: parseInt(inv.cards_plata) || 0,
-        cards_oro: parseInt(inv.cards_oro) || 0,
-        gift_bronce: parseInt(inv.gift_bronce) || 0,
-        gift_plata: parseInt(inv.gift_plata) || 0,
-        gift_oro: parseInt(inv.gift_oro) || 0
-      });
-
+      console.log(`📡 [WebSocket] Cartones actualizados para user_${userId}: ${room}=${(parseInt(updatedUser[0]['cards_' + room]) || 0) + (parseInt(updatedUser[0]['gift_' + room]) || 0)}`);
+      
+      // Si es una transferencia (no es el mismo usuario), actualizar también al admin
       if (userId !== currentUserId) {
-        // Notificar al admin (sender)
-        const adminUser = await dbHelper.queryOne(`
-           SELECT 
-             COALESCE(SUM(CASE WHEN uci.room = 'bronce' THEN uci.quantity ELSE 0 END), 0) as cards_bronce,
-             COALESCE(SUM(CASE WHEN uci.room = 'plata' THEN uci.quantity ELSE 0 END), 0) as cards_plata,
-             COALESCE(SUM(CASE WHEN uci.room = 'oro' THEN uci.quantity ELSE 0 END), 0) as cards_oro
-            FROM users u
-            LEFT JOIN user_card_inventory uci ON u.id = uci.user_id
-            WHERE u.id = ?
-            GROUP BY u.id
-        `, [currentUserId], 'GetAdminInvForSocket');
-
-        if (adminUser) {
+        const [adminUser] = await pool.query(
+          `SELECT u.*, 
+            COALESCE(SUM(CASE WHEN uci.room = 'bronce' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_bronce,
+            COALESCE(SUM(CASE WHEN uci.room = 'plata' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_plata,
+            COALESCE(SUM(CASE WHEN uci.room = 'oro' AND uci.is_gift = FALSE THEN uci.quantity ELSE 0 END), 0) as cards_oro,
+            COALESCE(SUM(CASE WHEN uci.room = 'bronce' AND uci.is_gift = TRUE THEN uci.quantity ELSE 0 END), 0) as gift_bronce,
+            COALESCE(SUM(CASE WHEN uci.room = 'plata' AND uci.is_gift = TRUE THEN uci.quantity ELSE 0 END), 0) as gift_plata,
+            COALESCE(SUM(CASE WHEN uci.room = 'oro' AND uci.is_gift = TRUE THEN uci.quantity ELSE 0 END), 0) as gift_oro
+           FROM users u
+           LEFT JOIN user_card_inventory uci ON u.id = uci.user_id
+           WHERE u.id = ?
+           GROUP BY u.id`,
+          [currentUserId]
+        );
+        
+        if (adminUser.length > 0) {
+          // Para agentes: sumar normales + regalo, para SuperAdmin: solo normales
+          const isAgente = adminUser[0].role === 'agente';
           io.to(`user_${currentUserId}`).emit('resources_updated', {
             cartones: {
-              bronce: parseInt(adminUser.cards_bronce) || 0,
-              plata: parseInt(adminUser.cards_plata) || 0,
-              oro: parseInt(adminUser.cards_oro) || 0
+              bronce: isAgente 
+                ? (parseInt(adminUser[0].cards_bronce) || 0) + (parseInt(adminUser[0].gift_bronce) || 0)
+                : parseInt(adminUser[0].cards_bronce) || 0,
+              plata: isAgente
+                ? (parseInt(adminUser[0].cards_plata) || 0) + (parseInt(adminUser[0].gift_plata) || 0)
+                : parseInt(adminUser[0].cards_plata) || 0,
+              oro: isAgente
+                ? (parseInt(adminUser[0].cards_oro) || 0) + (parseInt(adminUser[0].gift_oro) || 0)
+                : parseInt(adminUser[0].cards_oro) || 0
             },
             message: `Transferencia de cartones ${quantity > 0 ? 'enviada' : 'recibida'}`
           });
+          console.log(`📡 [WebSocket] Cartones actualizados para admin ${currentUserId}`);
         }
       }
     }
 
-    // Audit Log
-    auditService.log({
-      adminId: currentUserId,
-      action: quantity > 0 ? 'ADD_CARDS' : 'REMOVE_CARDS',
-      targetUserId: parseInt(userId),
-      details: { room, quantity, isGift },
-      ipAddress: req.ip
-    });
-
-    return responseHelper.success(res, {
+    res.json({
+      success: true,
       message: `${Math.abs(quantity)} cartón(es) de ${room} ${quantity > 0 ? 'agregado(s)' : 'descargado(s)'} exitosamente`,
-      user: updatedUser
+      user: updatedUser[0]
     });
 
   } catch (error) {
-    if (error.message.includes('Stock insuficiente') || error.message.includes('Usuario solo tiene')) {
-      return responseHelper.error(res, 400, error.message);
-    }
-    return responseHelper.error(res, 500, 'Error gestionando cartones', error.message);
+    console.error('❌ Error gestionando cartones:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Error gestionando cartones',
+      details: error.message 
+    });
   }
 }
 
@@ -1207,96 +1337,184 @@ async function addBalanceToUser(req, res) {
     const currentUserId = req.user.id;
     const currentUserRole = req.user.role;
 
-    if (!userId || amount === undefined) return responseHelper.error(res, 400, 'Faltan campos requeridos (userId, amount)');
+    if (!userId || amount === undefined) {
+      return res.status(400).json({
+        success: false,
+        error: 'Faltan campos requeridos (userId, amount)'
+      });
+    }
 
+    // VALIDACIÓN JERÁRQUICA: Verificar permisos
     const hasPermission = await canModifyUser(currentUserId, currentUserRole, userId);
-    if (!hasPermission) return responseHelper.error(res, 403, 'No tienes permisos para modificar a este usuario');
+    if (!hasPermission) {
+      return res.status(403).json({
+        success: false,
+        error: 'No tienes permisos para modificar a este usuario (fuera de tu red)'
+      });
+    }
 
-    if (isNaN(amount)) return responseHelper.error(res, 400, 'El monto debe ser un número válido');
+    // Validar que amount sea un número válido
+    if (isNaN(amount)) {
+      return res.status(400).json({
+        success: false,
+        error: 'El monto debe ser un número válido'
+      });
+    }
 
     const amountDecimal = MoneyMath.decimal(amount);
 
-    const user = await dbHelper.queryOne('SELECT username, balance FROM users WHERE id = ?', [userId], 'GetUserForBalance');
-    if (!user) return responseHelper.notFound(res, 'Usuario no encontrado');
+    // Obtener balance actual y username
+    const [users] = await pool.query(
+      'SELECT username, balance FROM users WHERE id = ?',
+      [userId]
+    );
 
-    const currentBalance = MoneyMath.decimal(user.balance);
-    const username = user.username;
-    const newBalance = currentBalance.plus(amountDecimal);
-
-    if (amount < 0) {
-      if (currentBalance.lessThanOrEqualTo(0)) return responseHelper.error(res, 400, `El usuario ${username} no tiene saldo disponible para descargar`);
-      if (newBalance.lessThan(0)) return responseHelper.error(res, 400, `El usuario solo tiene $${MoneyMath.toNumber(currentBalance).toLocaleString('es-CO')}, no se pueden descargar $${Math.abs(amount).toLocaleString('es-CO')}`);
+    if (users.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Usuario no encontrado'
+      });
     }
 
-    await dbHelper.transaction(async (connection) => {
-      // Actualizar usuario
-      await connection.query('UPDATE users SET balance = ? WHERE id = ?', [MoneyMath.toNumber(newBalance), userId]);
+    const currentBalance = MoneyMath.decimal(users[0].balance);
+    const username = users[0].username;
+    const newBalance = currentBalance.plus(amountDecimal);
 
-      // Si es descarga y no es auto-descarga, acreditar al admin
-      if (amount < 0 && parseInt(userId) !== parseInt(currentUserId)) {
-        const adminData = await connection.query('SELECT balance FROM users WHERE id = ?', [currentUserId]);
-        if (adminData.length > 0) {
-          const adminB = MoneyMath.decimal(adminData[0].balance);
-          const newAdminB = adminB.plus(MoneyMath.decimal(Math.abs(amount)));
-          await connection.query('UPDATE users SET balance = ? WHERE id = ?', [MoneyMath.toNumber(newAdminB), currentUserId]);
-          await connection.query('INSERT INTO chips_movements (user_id, movement_type, amount, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, NOW())',
-            [currentUserId, 'deposit', Math.abs(amount), MoneyMath.toNumber(newAdminB), `Descarga desde usuario ${username}`]);
-        }
-      }
-      // Si es carga y no es auto-carga, debitar al admin
-      else if (amount > 0 && parseInt(userId) !== parseInt(currentUserId)) {
-        const adminData = await connection.query('SELECT balance FROM users WHERE id = ?', [currentUserId]);
-        if (adminData.length > 0) {
-          const adminB = MoneyMath.decimal(adminData[0].balance);
-          const newAdminB = adminB.minus(amountDecimal);
-          await connection.query('UPDATE users SET balance = ? WHERE id = ?', [MoneyMath.toNumber(newAdminB), currentUserId]);
-          await connection.query('INSERT INTO chips_movements (user_id, movement_type, amount, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, NOW())',
-            [currentUserId, 'withdrawal', amount, MoneyMath.toNumber(newAdminB), `Carga a usuario ${username}`]);
-        }
+    // Validaciones específicas para descarga de saldo
+    if (amount < 0) {
+      // Verificar que tenga saldo disponible
+      if (currentBalance.lessThanOrEqualTo(0)) {
+        return res.status(400).json({
+          success: false,
+          error: `El usuario ${username} no tiene saldo disponible para descargar`
+        });
       }
 
-      const mType = amount > 0 ? 'deposit' : 'withdrawal';
-      const desc = amount > 0 ? 'Carga manual desde panel admin' : 'Descarga manual desde panel admin';
-      await connection.query('INSERT INTO chips_movements (user_id, movement_type, amount, balance_after, description, created_at) VALUES (?, ?, ?, ?, ?, NOW())',
-        [userId, mType, Math.abs(amount), MoneyMath.toNumber(newBalance), desc]);
-    });
+      // Verificar que no se descargue más de lo que tiene
+      if (newBalance.lessThan(0)) {
+        return res.status(400).json({
+          success: false,
+          error: `El usuario solo tiene $${MoneyMath.toNumber(currentBalance).toLocaleString('es-CO')}, no se pueden descargar $${Math.abs(amount).toLocaleString('es-CO')}`
+        });
+      }
+    }
 
-    // Socket emission logic remains similar but using helper/safe patterns
+    // Actualizar balance
+    await pool.query(
+      'UPDATE users SET balance = ? WHERE id = ?',
+      [MoneyMath.toNumber(newBalance), userId]
+    );
+
+    // Si el admin está descargando dinero de otro usuario, acreditárselo
+    if (amount < 0 && userId !== currentUserId) {
+      const [adminData] = await pool.query(
+        'SELECT balance FROM users WHERE id = ?',
+        [currentUserId]
+      );
+      
+      if (adminData.length > 0) {
+        const adminBalance = MoneyMath.decimal(adminData[0].balance);
+        const amountToCredit = MoneyMath.decimal(Math.abs(amount));
+        const newAdminBalance = adminBalance.plus(amountToCredit);
+        
+        await pool.query(
+          'UPDATE users SET balance = ? WHERE id = ?',
+          [MoneyMath.toNumber(newAdminBalance), currentUserId]
+        );
+        
+        // Registrar movimiento para el admin
+        await pool.query(
+          `INSERT INTO chips_movements 
+           (user_id, movement_type, amount, balance_after, description, created_at)
+           VALUES (?, ?, ?, ?, ?, NOW())`,
+          [currentUserId, 'deposit', Math.abs(amount), MoneyMath.toNumber(newAdminBalance), `Descarga desde usuario ${username}`]
+        );
+        
+        console.log(`💰 Dinero acreditado al admin: $${Math.abs(amount).toLocaleString('es-CO')}`);
+      }
+    }
+
+    // Si el admin está cargando dinero a otro usuario, debitarlo de su balance
+    if (amount > 0 && userId !== currentUserId) {
+      const [adminData] = await pool.query(
+        'SELECT balance FROM users WHERE id = ?',
+        [currentUserId]
+      );
+      
+      if (adminData.length > 0) {
+        const adminBalance = MoneyMath.decimal(adminData[0].balance);
+        const amountToDebit = MoneyMath.decimal(amount);
+        const newAdminBalance = adminBalance.minus(amountToDebit);
+        
+        await pool.query(
+          'UPDATE users SET balance = ? WHERE id = ?',
+          [MoneyMath.toNumber(newAdminBalance), currentUserId]
+        );
+        
+        // Registrar movimiento para el admin
+        await pool.query(
+          `INSERT INTO chips_movements 
+           (user_id, movement_type, amount, balance_after, description, created_at)
+           VALUES (?, ?, ?, ?, ?, NOW())`,
+          [currentUserId, 'withdrawal', amount, MoneyMath.toNumber(newAdminBalance), `Carga a usuario ${username}`]
+        );
+        
+        console.log(`💸 Dinero debitado del admin: $${amount.toLocaleString('es-CO')}`);
+      }
+    }
+
+    // Registrar movimiento
+    const movementType = amount > 0 ? 'deposit' : 'withdrawal';
+    const description = amount > 0 
+      ? `Carga manual desde panel admin` 
+      : `Descarga manual desde panel admin`;
+
+    await pool.query(
+      `INSERT INTO chips_movements 
+       (user_id, movement_type, amount, balance_after, description, created_at)
+       VALUES (?, ?, ?, ?, ?, NOW())`,
+      [userId, movementType, Math.abs(amount), MoneyMath.toNumber(newBalance), description]
+    );
+
+    // Emitir evento WebSocket para actualizar recursos en client-player
     const io = req.app.get('io');
     if (io) {
       io.to(`user_${userId}`).emit('resources_updated', {
         balance: MoneyMath.toNumber(newBalance),
         message: `Tu balance ha sido ${amount > 0 ? 'incrementado' : 'reducido'} en $${Math.abs(amount).toLocaleString('es-CO')}`
       });
-
-      if (parseInt(userId) !== parseInt(currentUserId)) {
-        // Re-fetch admin balance for accuracy
-        const admin = await dbHelper.queryOne('SELECT balance FROM users WHERE id = ?', [currentUserId], 'GetAdminBalSocket');
-        if (admin) {
+      console.log(`📡 [WebSocket] Balance actualizado para user_${userId}: $${MoneyMath.toNumber(newBalance).toLocaleString('es-CO')}`);
+      
+      // Si es una transferencia (no es el mismo usuario), actualizar también al admin
+      if (userId !== currentUserId) {
+        const [adminData] = await pool.query(
+          'SELECT balance FROM users WHERE id = ?',
+          [currentUserId]
+        );
+        
+        if (adminData.length > 0) {
           io.to(`user_${currentUserId}`).emit('resources_updated', {
-            balance: MoneyMath.toNumber(admin.balance),
+            balance: MoneyMath.toNumber(adminData[0].balance),
             message: `Transferencia ${amount > 0 ? 'enviada' : 'recibida'}`
           });
+          console.log(`📡 [WebSocket] Balance actualizado para admin ${currentUserId}: $${MoneyMath.toNumber(adminData[0].balance).toLocaleString('es-CO')}`);
         }
       }
     }
 
-    // Audit Log
-    auditService.log({
-      adminId: req.user.id,
-      action: 'ADD_BALANCE',
-      targetUserId: userId,
-      details: { amount: parseFloat(amount), newBalance: MoneyMath.toNumber(newBalance) },
-      ipAddress: req.ip
-    });
-
-    return responseHelper.success(res, {
-      newBalance: MoneyMath.toNumber(newBalance),
-      message: `Se han acreditado $${parseFloat(amount).toLocaleString('es-CO')} al usuario ${user.username}`
+    res.json({
+      success: true,
+      message: `${amount > 0 ? 'Cargado' : 'Descargado'} $${Math.abs(amount).toLocaleString('es-CO')} ${amount > 0 ? 'a' : 'de'} ${username}`,
+      newBalance: MoneyMath.toNumber(newBalance)
     });
 
   } catch (error) {
-    return responseHelper.error(res, 500, 'Error gestionando balance', error.message);
+    console.error('❌ Error gestionando balance:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Error gestionando balance',
+      details: error.message 
+    });
   }
 }
 
@@ -1306,14 +1524,25 @@ async function addBalanceToUser(req, res) {
  */
 async function getMyCardInventory(req, res) {
   try {
-    const inventory = await cardInventoryService.getInventory(req.user.id, false);
-    return responseHelper.success(res, {
+    const inventory = await cardInventoryService.getInventory(
+      req.user.id,
+      false  // isSuperAdmin = false (solo ve totales, NO regalo/normal)
+    );
+
+    res.json({
+      success: true,
       user_id: req.user.id,
       username: req.user.username,
       inventory: inventory
     });
+
   } catch (error) {
-    return responseHelper.error(res, 500, 'Error obteniendo inventario de cartones', error.message);
+    console.error('❌ Error obteniendo inventario de cartones:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error obteniendo inventario de cartones',
+      details: error.message
+    });
   }
 }
 
@@ -1325,13 +1554,31 @@ async function transferCardsToUser(req, res) {
   try {
     const { to_user_id, room, quantity } = req.body;
 
-    if (!to_user_id || !room || !quantity) return responseHelper.error(res, 400, 'Faltan campos requeridos: to_user_id, room, quantity');
-    if (!['bronce', 'plata', 'oro'].includes(room)) return responseHelper.error(res, 400, 'Sala inválida');
-    if (quantity <= 0) return responseHelper.error(res, 400, 'La cantidad debe ser mayor a 0');
+    // Validaciones
+    if (!to_user_id || !room || !quantity) {
+      return res.status(400).json({
+        success: false,
+        message: 'Faltan campos requeridos: to_user_id, room, quantity'
+      });
+    }
 
-    // Verificar red
-    const targetUser = await dbHelper.queryOne(`
-       WITH RECURSIVE network AS (
+    if (!['bronce', 'plata', 'oro'].includes(room)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Sala inválida. Debe ser: bronce, plata u oro'
+      });
+    }
+
+    if (quantity <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'La cantidad debe ser mayor a 0'
+      });
+    }
+
+    // Verificar que el destinatario esté en su red (jerárquicamente bajo él)
+    const [targetUser] = await pool.query(
+      `WITH RECURSIVE network AS (
          SELECT id, username, parent_id, 1 as level 
          FROM users WHERE id = ?
          UNION ALL
@@ -1340,70 +1587,33 @@ async function transferCardsToUser(req, res) {
          JOIN network n ON u.parent_id = n.id
        )
        SELECT id, username FROM network WHERE id = ?`,
-      [req.user.id, to_user_id], 'CheckTargetInNetwork');
+      [req.user.id, to_user_id]
+    );
 
-    if (!targetUser) return responseHelper.error(res, 403, 'Solo puede transferir cartones a usuarios de su red');
-
-    const result = await cardInventoryService.transferCards(req.user.id, to_user_id, room, quantity, req.user.id);
-
-    // Bono automático
-    try {
-      const roomSettings = await dbHelper.queryOne('SELECT agent_bonus_percentage FROM room_settings WHERE room = ?', [room], 'GetBonusForTransfer');
-      const bonusPercentage = roomSettings ? parseFloat(roomSettings.agent_bonus_percentage) : 10.00;
-      const bonusQuantity = Math.floor(quantity * (bonusPercentage / 100));
-
-      if (bonusQuantity > 0) {
-        await dbHelper.transaction(async (connection) => {
-          await connection.query(
-            `INSERT INTO user_card_inventory (user_id, room, quantity, is_gift) VALUES (?, ?, ?, TRUE)
-                 ON DUPLICATE KEY UPDATE quantity = quantity + ?`,
-            [to_user_id, room, bonusQuantity, bonusQuantity]
-          );
-          await connection.query(
-            `INSERT INTO card_movements_log (user_id, room, movement_type, quantity, is_gift, reason, executed_by)
-                 VALUES (?, ?, 'credit', ?, TRUE, ?, ?)`,
-            [to_user_id, room, bonusQuantity, `Bono automático ${bonusPercentage}% por compra de ${quantity} cartones`, req.user.id]
-          );
-        });
-      }
-    } catch (err) {
-      console.error('❌ Error aplicando bono automático:', err);
-    }
-
-    // Socket
-    const io = req.app.get('io');
-    if (io) {
-      const userData = await dbHelper.queryOne('SELECT balance FROM users WHERE id = ?', [to_user_id], 'GetUserBalSocket');
-      const inv = await dbHelper.queryOne(`
-          SELECT 
-            COALESCE(SUM(CASE WHEN room = 'bronce' AND is_gift = FALSE THEN quantity ELSE 0 END), 0) as cards_bronce,
-            COALESCE(SUM(CASE WHEN room = 'bronce' AND is_gift = TRUE THEN quantity ELSE 0 END), 0) as gift_bronce
-          FROM user_card_inventory WHERE user_id = ?
-        `, [to_user_id], 'GetInvSocket');
-
-      io.to(`user_${to_user_id}`).emit('resources_updated', {
-        userId: to_user_id,
-        balance: parseFloat(userData?.balance || 0),
-        cartones: result.targetNewStock,
-        cards_bronce: parseInt(inv?.cards_bronce) || 0,
-        gift_bronce: parseInt(inv?.gift_bronce) || 0,
-        message: `Has recibido ${quantity} cartones de ${room.toUpperCase()} 🎁`
+    if (targetUser.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: 'Solo puede transferir cartones a usuarios de su red'
       });
     }
 
-    // Audit Log
-    auditService.log({
-      adminId: req.user.id,
-      action: 'TRANSFER_CARDS',
-      targetUserId: to_user_id,
-      details: { room, quantity, fromUserId: req.user.id },
-      ipAddress: req.ip
-    });
+    const result = await cardInventoryService.transferCards(
+      req.user.id,
+      to_user_id,
+      room,
+      quantity,
+      req.user.id
+    );
 
-    return res.json(result); // cardInventoryService.transferCards already returns a structured object
+    res.json(result);
 
   } catch (error) {
-    return responseHelper.error(res, 500, 'Error transfiriendo cartones', error.message);
+    console.error('❌ Error transfiriendo cartones:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error transfiriendo cartones',
+      details: error.message
+    });
   }
 }
 
@@ -1414,15 +1624,26 @@ async function transferCardsToUser(req, res) {
 async function getMyCardMovements(req, res) {
   try {
     const limit = parseInt(req.query.limit) || 50;
-    const movements = await cardInventoryService.getMovementsLog(req.user.id, limit);
 
-    return responseHelper.success(res, {
+    const movements = await cardInventoryService.getMovementsLog(
+      req.user.id,
+      limit
+    );
+
+    res.json({
+      success: true,
       user_id: req.user.id,
       total: movements.length,
       movements: movements
     });
+
   } catch (error) {
-    return responseHelper.error(res, 500, 'Error obteniendo movimientos de cartones', error.message);
+    console.error('❌ Error obteniendo movimientos:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error obteniendo movimientos de cartones',
+      details: error.message
+    });
   }
 }
 
@@ -1435,32 +1656,67 @@ async function changePassword(req, res) {
     const { currentPassword, newPassword } = req.body;
     const userId = req.user.id;
 
-    if (!currentPassword || !newPassword) return responseHelper.error(res, 400, 'Faltan campos requeridos');
-    if (newPassword.length < 6) return responseHelper.error(res, 400, 'La nueva contraseña debe tener al menos 6 caracteres');
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        error: 'Faltan campos requeridos'
+      });
+    }
 
-    const user = await dbHelper.queryOne('SELECT id, username, password FROM users WHERE id = ?', [userId], 'GetUserForPassChange');
-    if (!user) return responseHelper.notFound(res, 'Usuario no encontrado');
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        error: 'La nueva contraseña debe tener al menos 6 caracteres'
+      });
+    }
 
+    // Obtener usuario actual
+    const [users] = await pool.query(
+      'SELECT id, username, password FROM users WHERE id = ?',
+      [userId]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Usuario no encontrado'
+      });
+    }
+
+    const user = users[0];
+
+    // Verificar contraseña actual
     const isValidPassword = await bcrypt.compare(currentPassword, user.password);
-    if (!isValidPassword) return responseHelper.error(res, 401, 'La contraseña actual es incorrecta');
+    if (!isValidPassword) {
+      return res.status(401).json({
+        success: false,
+        error: 'La contraseña actual es incorrecta'
+      });
+    }
 
+    // Hashear nueva contraseña
     const hashedPassword = await bcrypt.hash(newPassword, 10);
-    await dbHelper.query('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, userId]);
+
+    // Actualizar contraseña
+    await pool.query(
+      'UPDATE users SET password = ? WHERE id = ?',
+      [hashedPassword, userId]
+    );
 
     console.log(`✅ Contraseña cambiada para usuario ${user.username} (ID: ${userId})`);
-    // Audit Log
-    auditService.log({
-      adminId: req.user.id,
-      action: 'CHANGE_PASSWORD',
-      targetUserId: userId,
-      details: { targetUsername: user.username },
-      ipAddress: req.ip
+
+    res.json({
+      success: true,
+      message: 'Contraseña cambiada exitosamente'
     });
 
-    return responseHelper.success(res, 'Contraseña actualizada correctamente');
-
   } catch (error) {
-    return responseHelper.error(res, 500, 'Error al cambiar la contraseña', error.message);
+    console.error('❌ Error cambiando contraseña:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al cambiar la contraseña',
+      details: error.message
+    });
   }
 }
 
@@ -1475,42 +1731,83 @@ async function changeUserPassword(req, res) {
     const adminId = req.user.id;
     const adminRole = req.user.role;
 
-    if (!userId || !newPassword) return responseHelper.error(res, 400, 'userId y newPassword son requeridos');
-    if (newPassword.length < 6) return responseHelper.error(res, 400, 'La contraseña debe tener al menos 6 caracteres');
+    // Validar campos
+    if (!userId || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        error: 'userId y newPassword son requeridos'
+      });
+    }
 
-    const targetUser = await dbHelper.queryOne('SELECT id, username, role, parent_id FROM users WHERE id = ?', [userId], 'GetUserForAdminPassChange');
-    if (!targetUser) return responseHelper.notFound(res, 'Usuario no encontrado');
+    // Validar longitud mínima
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        error: 'La contraseña debe tener al menos 6 caracteres'
+      });
+    }
 
+    // Verificar que el usuario a modificar existe
+    const [userRows] = await pool.query(
+      'SELECT id, username, role, parent_id FROM users WHERE id = ?',
+      [userId]
+    );
+
+    if (userRows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Usuario no encontrado'
+      });
+    }
+
+    const targetUser = userRows[0];
+
+    // Verificar permisos: 
+    // - SuperAdmin puede cambiar contraseña de cualquiera
+    // - Agentes solo pueden cambiar contraseña de sus usuarios (hijos directos o descendientes)
     if (adminRole !== 'superadmin') {
-      const permission = await dbHelper.queryOne(`
+      // Verificar que el usuario esté en la red del agente
+      const [networkCheck] = await pool.query(`
         WITH RECURSIVE network AS (
           SELECT id FROM users WHERE id = ?
           UNION ALL
           SELECT u.id FROM users u
           INNER JOIN network n ON u.parent_id = n.id
         )
-        SELECT 1 FROM network WHERE id = ?`,
-        [adminId, userId], 'CheckPermissionAdminPassChange');
+        SELECT 1 FROM network WHERE id = ?
+      `, [adminId, userId]);
 
-      if (!permission) return responseHelper.error(res, 403, 'No tienes permisos para modificar este usuario');
+      if (networkCheck.length === 0) {
+        return res.status(403).json({
+          success: false,
+          error: 'No tienes permisos para modificar este usuario'
+        });
+      }
     }
 
+    // Hash de la nueva contraseña
     const hashedPassword = await bcrypt.hash(newPassword, 10);
-    await dbHelper.query('UPDATE users SET password_hash = ? WHERE id = ?', [hashedPassword, userId]);
+
+    // Actualizar contraseña
+    await pool.query(
+      'UPDATE users SET password = ? WHERE id = ?',
+      [hashedPassword, userId]
+    );
 
     console.log(`✅ Admin ${adminId} cambió contraseña del usuario ${userId} (${targetUser.username})`);
-    // Audit Log
-    auditService.log({
-      adminId: req.user.id,
-      action: 'CHANGE_USER_PASSWORD',
-      targetUserId: userId,
-      details: { targetUsername: targetUser.username },
-      ipAddress: req.ip
+
+    res.json({
+      success: true,
+      message: `Contraseña de ${targetUser.username} actualizada correctamente`
     });
-    return responseHelper.success(res, { message: `Contraseña de ${targetUser.username} actualizada correctamente` });
 
   } catch (error) {
-    return responseHelper.error(res, 500, 'Error al cambiar la contraseña', error.message);
+    console.error('❌ Error cambiando contraseña de usuario:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al cambiar la contraseña',
+      details: error.message
+    });
   }
 }
 
@@ -1522,341 +1819,285 @@ async function changeUserPassword(req, res) {
 async function updateUserPersonalData(req, res) {
   try {
     const { userId } = req.params;
-    const { nombre_completo, documento, email, telefono, cbu, alias, bank_name } = req.body;
+    const { nombre_completo, documento, email, telefono } = req.body;
     const adminId = req.user.id;
     const adminRole = req.user.role;
 
-    const targetUser = await dbHelper.queryOne('SELECT id, username, role, parent_id FROM users WHERE id = ?', [userId], 'GetUserForUpdate');
-    if (!targetUser) return responseHelper.notFound(res, 'Usuario no encontrado');
+    // Verificar que el usuario existe
+    const [userRows] = await pool.query(
+      'SELECT id, username, role, parent_id FROM users WHERE id = ?',
+      [userId]
+    );
 
+    if (userRows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Usuario no encontrado'
+      });
+    }
+
+    const targetUser = userRows[0];
+
+    // Verificar permisos: 
+    // - SuperAdmin puede modificar cualquiera
+    // - Agentes solo pueden modificar usuarios en su red
     if (adminRole !== 'superadmin') {
-      const permission = await dbHelper.queryOne(`
+      const [networkCheck] = await pool.query(`
         WITH RECURSIVE network AS (
           SELECT id FROM users WHERE id = ?
           UNION ALL
           SELECT u.id FROM users u
           INNER JOIN network n ON u.parent_id = n.id
         )
-        SELECT 1 FROM network WHERE id = ?`,
-        [adminId, userId], 'CheckPermissionUpdateUser');
+        SELECT 1 FROM network WHERE id = ?
+      `, [adminId, userId]);
 
-      if (!permission) return responseHelper.error(res, 403, 'No tienes permisos para modificar este usuario');
+      if (networkCheck.length === 0) {
+        return res.status(403).json({
+          success: false,
+          error: 'No tienes permisos para modificar este usuario'
+        });
+      }
     }
 
+    // Construir query de actualización dinámica
     const updates = [];
     const values = [];
-    const updatedFields = {};
 
-    if (nombre_completo !== undefined) { updates.push('nombre_completo = ?'); values.push(nombre_completo || null); updatedFields.nombre_completo = nombre_completo; }
-    if (documento !== undefined) { updates.push('documento = ?'); values.push(documento || null); updatedFields.documento = documento; }
-    if (email !== undefined) { updates.push('email = ?'); values.push(email || null); updatedFields.email = email; }
-    if (telefono !== undefined) { updates.push('telefono = ?'); values.push(telefono || null); updatedFields.telefono = telefono; }
-    if (cbu !== undefined) { updates.push('cbu = ?'); values.push(cbu || null); updatedFields.cbu = cbu; }
-    if (alias !== undefined) { updates.push('alias = ?'); values.push(alias || null); updatedFields.alias = alias; }
-    if (bank_name !== undefined) { updates.push('bank_name = ?'); values.push(bank_name || null); updatedFields.bank_name = bank_name; }
+    if (nombre_completo !== undefined) {
+      updates.push('nombre_completo = ?');
+      values.push(nombre_completo || null);
+    }
+    if (documento !== undefined) {
+      updates.push('documento = ?');
+      values.push(documento || null);
+    }
+    if (email !== undefined) {
+      updates.push('email = ?');
+      values.push(email || null);
+    }
+    if (telefono !== undefined) {
+      updates.push('telefono = ?');
+      values.push(telefono || null);
+    }
 
-    if (updates.length === 0) return responseHelper.error(res, 400, 'No se proporcionaron campos para actualizar');
+    if (updates.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No se proporcionaron campos para actualizar'
+      });
+    }
 
+    // Ejecutar actualización
     values.push(userId);
-    await dbHelper.query(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, values);
-
-    console.log(`✅ Admin ${adminId} actualizó datos personales del usuario ${userId} (${targetUser.username})`);
-    // Audit Log
-    auditService.log({
-      adminId: req.user.id,
-      action: 'UPDATE_USER_DATA',
-      targetUserId: parseInt(userId),
-      details: { targetUsername: targetUser.username, updatedFields },
-      ipAddress: req.ip
-    });
-    return responseHelper.success(res, { message: `Datos de ${targetUser.username} actualizados correctamente` });
-
-  } catch (error) {
-    return responseHelper.error(res, 500, 'Error al actualizar los datos', error.message);
-  }
-}
-
-const bulkTransferCards = async (req, res) => {
-  try {
-    const { targetUserId, items, applyBonus } = req.body;
-    // items: [{ room, quantity, bonusQuantity? }, ...]
-
-    if (!targetUserId || !items || !Array.isArray(items)) return responseHelper.error(res, 400, 'Datos de carga masiva inválidos.');
-
-    const adminId = req.user.id;
-    const results = [];
-
-    await dbHelper.transaction(async (connection) => {
-      for (const item of items) {
-        const { room, quantity } = item;
-        if (quantity <= 0) continue;
-
-        const recipientData = await connection.query('SELECT role FROM users WHERE id = ?', [targetUserId]);
-        const recipientRole = recipientData[0]?.role;
-
-        if (recipientRole === 'agente') {
-          const stock = await connection.query('SELECT quantity FROM user_card_inventory WHERE user_id = ? AND room = ? AND is_gift = FALSE FOR UPDATE', [adminId, room]);
-          if (!stock.length || stock[0].quantity < quantity) throw new Error(`Stock insuficiente de cartones pagos en sala ${room} para transferir a agente.`);
-
-          await connection.query('UPDATE user_card_inventory SET quantity = quantity - ? WHERE user_id = ? AND room = ? AND is_gift = FALSE', [quantity, adminId, room]);
-          await connection.query('INSERT INTO user_card_inventory (user_id, room, quantity, is_gift) VALUES (?, ?, ?, FALSE) ON DUPLICATE KEY UPDATE quantity = quantity + ?', [targetUserId, room, quantity, quantity]);
-          await connection.query('INSERT INTO card_movements_log (user_id, from_user_id, to_user_id, room, quantity, movement_type, is_gift, executed_by) VALUES (?, ?, ?, ?, ?, "transfer", FALSE, ?)', [targetUserId, adminId, targetUserId, room, quantity, adminId]);
-
-          let bonusQty = 0;
-          if (applyBonus) {
-            const roomSettings = await connection.query('SELECT agent_bonus_percentage FROM room_settings WHERE room = ?', [room]);
-            const bonusPct = roomSettings.length > 0 ? parseFloat(roomSettings[0].agent_bonus_percentage) : 10.0;
-            bonusQty = Math.floor(quantity * (bonusPct / 100));
-            if (bonusQty > 0) {
-              await connection.query('INSERT INTO user_card_inventory (user_id, room, quantity, is_gift) VALUES (?, ?, ?, TRUE) ON DUPLICATE KEY UPDATE quantity = quantity + ?', [targetUserId, room, bonusQty, bonusQty]);
-              await connection.query('INSERT INTO card_movements_log (user_id, from_user_id, to_user_id, room, quantity, movement_type, is_gift, reason, executed_by) VALUES (?, ?, ?, ?, ?, "transfer_bonus", TRUE, "Bono masivo Agente", ?)', [targetUserId, adminId, targetUserId, room, bonusQty, adminId]);
-            }
-          }
-          results.push({ room, quantity, bonusQty });
-        } else {
-          // Player split logic
-          const targetPaid = Math.floor(quantity * 0.9);
-          const targetGift = quantity - targetPaid;
-          const stocks = await connection.query('SELECT is_gift, SUM(quantity) as total FROM user_card_inventory WHERE user_id = ? AND room = ? GROUP BY is_gift', [adminId, room]);
-          let sPaid = 0, sGift = 0;
-          stocks.forEach(s => { if (s.is_gift) sGift = parseInt(s.total) || 0; else sPaid = parseInt(s.total) || 0; });
-
-          let tPaid = Math.min(targetPaid, sPaid);
-          let tGift = Math.min(targetGift, sGift);
-          if (tPaid + tGift < quantity) {
-            let needed = quantity - (tPaid + tGift);
-            if (tPaid < targetPaid) { let extra = Math.min(needed, sGift - tGift); tGift += extra; needed -= extra; }
-            if (needed > 0 && tGift < targetGift) { let extra = Math.min(needed, sPaid - tPaid); tPaid += extra; needed -= extra; }
-            if (tPaid + tGift < quantity) throw new Error(`Stock insuficiente en ${room}. Solo tienes ${tPaid + tGift} cartones totales.`);
-          }
-
-          const debitStock = async (conn, uid, rm, q, isG) => {
-            if (q <= 0) return;
-            let rem = q;
-            const recs = await conn.query('SELECT id, quantity FROM user_card_inventory WHERE user_id = ? AND room = ? AND is_gift = ? ORDER BY id ASC', [uid, rm, isG]);
-            for (const r of recs) {
-              if (rem <= 0) break;
-              const sub = Math.min(r.quantity, rem);
-              await conn.query('UPDATE user_card_inventory SET quantity = quantity - ? WHERE id = ?', [sub, r.id]);
-              rem -= sub;
-            }
-          };
-
-          if (tPaid > 0) {
-            await debitStock(connection, adminId, room, tPaid, false);
-            await connection.query('INSERT INTO user_card_inventory (user_id, room, quantity, is_gift) VALUES (?, ?, ?, FALSE) ON DUPLICATE KEY UPDATE quantity = quantity + ?', [targetUserId, room, tPaid, tPaid]);
-            await connection.query('INSERT INTO card_movements_log (user_id, from_user_id, to_user_id, room, quantity, movement_type, is_gift, reason, executed_by) VALUES (?, ?, ?, ?, ?, "transfer", FALSE, "Split Jugador", ?)', [targetUserId, adminId, targetUserId, room, tPaid, adminId]);
-          }
-          if (tGift > 0) {
-            await debitStock(connection, adminId, room, tGift, true);
-            await connection.query('INSERT INTO user_card_inventory (user_id, room, quantity, is_gift) VALUES (?, ?, ?, TRUE) ON DUPLICATE KEY UPDATE quantity = quantity + ?', [targetUserId, room, tGift, tGift]);
-            await connection.query('INSERT INTO card_movements_log (user_id, from_user_id, to_user_id, room, quantity, movement_type, is_gift, reason, executed_by) VALUES (?, ?, ?, ?, ?, "transfer", TRUE, "Split Jugador", ?)', [targetUserId, adminId, targetUserId, room, tGift, adminId]);
-          }
-          results.push({ room, quantity, tPaid, tGift });
-        }
-      }
-    });
-
-    // Socket emission
-    const io = req.app.get('io');
-    if (io) {
-      io.to(`user_${targetUserId}`).emit('resources_updated', { type: 'bulk_transfer', data: results });
-      io.to(`user_${adminId}`).emit('resources_updated', { type: 'bulk_transfer_sent', data: results });
-    }
-
-    // Audit Log
-    auditService.log({
-      adminId: req.user.id,
-      action: 'BULK_TRANSFER_CARDS',
-      targetUserId: targetUserId,
-      details: { items, applyBonus, results },
-      ipAddress: req.ip
-    });
-
-    return responseHelper.success(res, { message: 'Carga masiva completada', results });
-
-  } catch (error) {
-    return responseHelper.error(res, 500, error.message || 'Error en carga masiva');
-  }
-};
-
-
-
-/**
- * GET /api/admin/users
- * Obtiene lista de todos los usuarios
- */
-async function getAllUsers(req, res) {
-  try {
-    const users = await dbHelper.query(`
-      SELECT id, username, role, balance, created_at, phone_number,
-      (SELECT COUNT(*) FROM users u2 WHERE u2.created_by = u.id) as agents_count
-      FROM users u
-      ORDER BY created_at DESC
-    `, [], 'GetAllUsers');
-    return res.json(users);
-  } catch (error) {
-    return responseHelper.error(res, 500, 'Error obteniendo usuarios', error.message);
-  }
-}
-
-
-/**
- * POST /api/admin/users/remove-cards
- * Retira cartones de un usuario (Corrección)
- */
-async function removeCardsFromUser(req, res) {
-  try {
-    const { userId, room, quantity, isGift } = req.body;
-    const adminId = req.user.id;
-
-    if (!quantity || quantity <= 0) return responseHelper.error(res, 400, 'Cantidad inválida');
-
-    await dbHelper.transaction(async (connection) => {
-      await cardInventoryService.deductUserInventory(
-        connection,
-        userId,
-        room,
-        parseInt(quantity),
-        isGift || false
-      );
-
-      await connection.query(
-        `INSERT INTO chips_movements (user_id, amount, movement_type, description, created_by)
-           VALUES (?, 0, 'admin_adjustment', ?, ?)`,
-        [userId, `Retiro de ${quantity} cartones ${room} (Regalo: ${isGift ? 'SI' : 'NO'})`, adminId]
-      );
-    });
-
-    // Audit Log
-    auditService.log({
-      adminId: req.user.id,
-      action: 'REMOVE_CARDS_FORCE',
-      targetUserId: parseInt(userId),
-      details: { room, quantity, isGift },
-      ipAddress: req.ip
-    });
-
-    return responseHelper.success(res, { message: 'Cartones retirados exitosamente' });
-
-  } catch (error) {
-    return responseHelper.error(res, 500, error.message);
-  }
-}
-
-/**
- * GET /api/admin/users/superior-info
- * Obtiene la información del superior inmediato (CBU, Alias, Contacto)
- */
-async function getSuperiorInfo(req, res) {
-  try {
-    const userId = req.user.userId || req.user.id;
-
-    const user = await dbHelper.queryOne('SELECT parent_id FROM users WHERE id = ?', [userId], 'GetUserParent');
-    if (!user) return responseHelper.notFound(res, 'Usuario no encontrado');
-
-    let parentId = user.parent_id;
-    if (!parentId && userId !== 1) parentId = 1;
-
-    if (!parentId) return res.json({ hasSuperior: false, message: 'Eres Andy (SuperAdmin Raíz). No tienes superior para solicitudes.' });
-
-    const parent = await dbHelper.queryOne('SELECT id, username, email, cbu, alias, bank_name, phone_number FROM users WHERE id = ?', [parentId], 'GetSuperiorInfo');
-    if (!parent) return responseHelper.notFound(res, 'Superior no encontrado');
-
-    try {
-      const DepositService = require('../services/depositService');
-      const account = await DepositService.getActiveAccount(parentId);
-
-      return res.json({
-        hasSuperior: true,
-        superior: {
-          id: parent.id,
-          username: parent.username,
-          cbu: account.cbu || 'No definido',
-          alias: account.alias || 'No definido',
-          bank_name: account.bank_name || 'No definido',
-          holder_name: account.holder_name || parent.username,
-          contact: parent.phone_number || parent.email
-        }
-      });
-    } catch (accountError) {
-      console.warn('⚠️ Superior identified but has no active accounts with limit:', accountError.message);
-      return res.json({
-        hasSuperior: true,
-        error: 'Tu superior no tiene cuentas habilitadas con cupo diario en este momento.',
-        superior: {
-          id: parent.id,
-          username: parent.username,
-          cbu: 'No disponible',
-          alias: 'Sin cupo diario',
-          bank_name: 'Contactar superior',
-          holder_name: parent.username,
-          contact: parent.phone_number || parent.email
-        }
-      });
-    }
-  } catch (error) {
-    return responseHelper.error(res, 500, 'Error interno obteniendo info del superior', error.message);
-  }
-}
-
-/**
- * POST /api/admin/stock/request
- * Crea una solicitud de stock B2B hacia el superior
- */
-async function createStockRequest(req, res) {
-  try {
-    const { room, quantity, items, proofUrl, amount, superiorId } = req.body;
-    const userId = req.user.userId || req.user.id;
-
-    if (!superiorId) return responseHelper.error(res, 400, 'Superior ID requerido');
-
-    let detailsObj = null;
-    if (items && Array.isArray(items)) {
-      detailsObj = { items };
-    } else if (room && quantity) {
-      detailsObj = { room, quantity };
-    }
-
-    if (!detailsObj) return responseHelper.error(res, 400, 'Debe especificar al menos una sala y cantidad');
-
-    const result = await dbHelper.query(
-      `INSERT INTO deposit_requests 
-       (user_id, target_user_id, amount_declared, proof_image_url, status, details, request_type)
-       VALUES (?, ?, ?, ?, 'pending', ?, 'b2b_stock')`,
-      [
-        userId,
-        superiorId,
-        amount || 0,
-        proofUrl || null,
-        JSON.stringify(detailsObj)
-      ], 'CreateStockRequest'
+    await pool.query(
+      `UPDATE users SET ${updates.join(', ')} WHERE id = ?`,
+      values
     );
 
-    // Audit Log
-    auditService.log({
-      adminId: req.user.id,
-      action: 'CREATE_STOCK_REQUEST',
-      targetUserId: superiorId,
-      details: { requestId: result.insertId, room, quantity, items, amount },
-      ipAddress: req.ip
-    });
+    console.log(`✅ Admin ${adminId} actualizó datos personales del usuario ${userId} (${targetUser.username})`);
 
-    return responseHelper.success(res, {
-      requestId: result.insertId,
-      message: 'Solicitud enviada al superior'
+    res.json({
+      success: true,
+      message: `Datos de ${targetUser.username} actualizados correctamente`
     });
 
   } catch (error) {
-    return responseHelper.error(res, 500, 'Error al enviar solicitud', error.message);
+    console.error('❌ Error actualizando datos personales:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al actualizar los datos',
+      details: error.message
+    });
   }
+}
+
+// ========================================
+// FUNCIONES ADICIONALES (stubs temporales)
+// ========================================
+
+async function bulkTransferCards(req, res) {
+  try {
+    const { targetUserId, items, applyBonus } = req.body;
+    const adminId = req.user.id;
+    
+    console.log(`📦 [BulkTransfer] Admin ${adminId} → User ${targetUserId}, items:`, items);
+    
+    if (!targetUserId || !items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ success: false, error: 'Se requiere targetUserId y un array de items' });
+    }
+    
+    // Obtener rol del usuario destino
+    const [targetUserData] = await pool.query(
+      'SELECT role FROM users WHERE id = ?',
+      [targetUserId]
+    );
+    
+    if (!targetUserData || targetUserData.length === 0) {
+      return res.status(404).json({ success: false, error: 'Usuario destino no encontrado' });
+    }
+    
+    const targetRole = targetUserData[0].role;
+    const results = [];
+    let totalTransferred = 0;
+    let totalBonus = 0;
+    
+    for (const item of items) {
+      const { room, quantity } = item;
+      
+      if (!room || !quantity || quantity <= 0) {
+        results.push({ room, status: 'error', error: 'Datos inválidos' });
+        continue;
+      }
+      
+      try {
+        // 1. Transferir cartones normales desde admin al usuario
+        await cardInventoryService.transferCards(
+          adminId,        // from (admin)
+          targetUserId,   // to (usuario)
+          room,
+          quantity,
+          adminId         // executedBy
+        );
+        
+        totalTransferred += quantity;
+        
+        // 2. Aplicar bonus si es agente
+        if (targetRole === 'agente' && applyBonus !== false) {
+          // Obtener porcentaje de bonificación de la sala
+          const [roomSettings] = await pool.query(
+            'SELECT agent_bonus_percentage FROM room_settings WHERE room = ?',
+            [room]
+          );
+          
+          const bonusPercentage = roomSettings.length > 0 
+            ? parseFloat(roomSettings[0].agent_bonus_percentage) 
+            : 10.00;
+          
+          const bonusQuantity = Math.floor(quantity * (bonusPercentage / 100));
+          
+          if (bonusQuantity > 0) {
+            console.log(`🎁 [BulkTransfer Bonus] Agente ${targetUserId} recibe ${bonusQuantity} cartones regalo de ${room}`);
+            
+            // Verificar si ya tiene inventario de regalo de esta sala
+            const [existingGift] = await pool.query(
+              `SELECT id, quantity FROM user_card_inventory 
+               WHERE user_id = ? AND room = ? AND is_gift = TRUE 
+               LIMIT 1`,
+              [targetUserId, room]
+            );
+            
+            if (existingGift.length > 0) {
+              await pool.query(
+                `UPDATE user_card_inventory 
+                 SET quantity = quantity + ?, updated_at = CURRENT_TIMESTAMP 
+                 WHERE id = ?`,
+                [bonusQuantity, existingGift[0].id]
+              );
+            } else {
+              await pool.query(
+                `INSERT INTO user_card_inventory 
+                 (user_id, room, quantity, is_gift, created_at, updated_at) 
+                 VALUES (?, ?, ?, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+                [targetUserId, room, bonusQuantity]
+              );
+            }
+            
+            // Registrar en log de movimientos
+            await pool.query(
+              `INSERT INTO card_movements_log 
+               (user_id, room, movement_type, quantity, is_gift, reason, executed_by, created_at) 
+               VALUES (?, ?, 'credit', ?, TRUE, ?, ?, CURRENT_TIMESTAMP)`,
+              [targetUserId, room, bonusQuantity, `Bono automático ${bonusPercentage}% por carga masiva`, adminId]
+            );
+            
+            totalBonus += bonusQuantity;
+          }
+        }
+        
+        results.push({ room, quantity, status: 'success', bonus: targetRole === 'agente' ? Math.floor(quantity * 0.1) : 0 });
+        
+      } catch (err) {
+        console.error(`❌ [BulkTransfer] Error en ${room}:`, err);
+        results.push({ room, status: 'error', error: err.message });
+      }
+    }
+    
+    // Emitir actualización WebSocket
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user_${targetUserId}`).emit('cards_updated', { 
+        message: `Carga masiva: ${totalTransferred} cartones + ${totalBonus} bonus` 
+      });
+    }
+    
+    console.log(`✅ [BulkTransfer] Completado: ${totalTransferred} cartones + ${totalBonus} bonus a user ${targetUserId}`);
+    
+    res.json({ 
+      success: true, 
+      results,
+      summary: {
+        transferred: totalTransferred,
+        bonus: totalBonus,
+        total: totalTransferred + totalBonus
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error en bulk transfer:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+}
+
+async function getGGRStats(req, res) {
+  res.json({ success: true, data: { ggr: 0, message: 'GGR stats coming soon' } });
+}
+
+async function getSuperiorInfo(req, res) {
+  try {
+    const userId = req.user.id;
+    const [user] = await pool.query('SELECT parent_id FROM users WHERE id = ?', [userId]);
+    if (!user[0] || !user[0].parent_id) {
+      return res.json({ success: true, data: null });
+    }
+    const [superior] = await pool.query('SELECT id, username, role FROM users WHERE id = ?', [user[0].parent_id]);
+    res.json({ success: true, data: superior[0] || null });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+}
+
+async function createStockRequest(req, res) {
+  res.json({ success: true, message: 'Stock request feature coming soon' });
+}
+
+async function getAuditLogs(req, res) {
+  try {
+    const [logs] = await pool.query(`
+      SELECT * FROM audit_logs 
+      ORDER BY created_at DESC 
+      LIMIT 100
+    `);
+    res.json({ success: true, data: logs });
+  } catch (error) {
+    res.json({ success: true, data: [] }); // Return empty if table doesn't exist
+  }
+}
+
+async function getSystemHealth(req, res) {
+  res.json({ 
+    success: true, 
+    data: {
+      status: 'healthy',
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
+      timestamp: new Date().toISOString()
+    }
+  });
 }
 
 module.exports = {
   getAdminProfile,
   getFinancialSummary,
-  getGGRStats,
-  getAllUsers,
   getDashboardStats,
   sendGlobalMessage,
   getSessionStats,
@@ -1866,64 +2107,19 @@ module.exports = {
   getUsersHierarchy,
   createUser,
   addCardsToUser,
-  removeCardsFromUser,
   addBalanceToUser,
+  // Card Inventory (Admin/Cajero)
   getMyCardInventory,
   transferCardsToUser,
   getMyCardMovements,
   changePassword,
   changeUserPassword,
   updateUserPersonalData,
+  // Funciones adicionales
   bulkTransferCards,
+  getGGRStats,
   getSuperiorInfo,
   createStockRequest,
   getAuditLogs,
   getSystemHealth
 };
-
-/**
- * GET /api/admin/audit-logs
- * Fetch administrative action logs
- */
-async function getAuditLogs(req, res) {
-  try {
-    const { adminId, targetUserId, action, page = 1, limit = 50 } = req.query;
-    const offset = (parseInt(page) - 1) * parseInt(limit);
-
-    const result = await auditService.getLogs({
-      adminId,
-      targetUserId,
-      action
-    }, parseInt(limit), offset);
-
-    return responseHelper.success(res, result);
-  } catch (error) {
-    return responseHelper.error(res, 500, 'Error obteniendo logs de auditoría', error.message);
-  }
-}
-
-/**
- * GET /api/admin/system/health
- * Fetch real-time system metrics
- */
-async function getSystemHealth(req, res) {
-  try {
-    // Only SuperAdmin or Andy can see the full health stats
-    const isSuper = req.user.role === 'superadmin' || req.user.username?.toLowerCase() === 'andy';
-
-    const metrics = metricsService.getMetrics();
-
-    if (!isSuper) {
-      // Return a redacted version for standard admins
-      return responseHelper.success(res, {
-        status: 'ok',
-        uptime: metrics.uptimeSeconds,
-        timestamp: metrics.timestamp
-      });
-    }
-
-    return responseHelper.success(res, metrics);
-  } catch (error) {
-    return responseHelper.error(res, 500, 'Error obteniendo salud del sistema', error.message);
-  }
-}

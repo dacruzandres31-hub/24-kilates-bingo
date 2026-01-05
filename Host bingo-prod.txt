@@ -1,0 +1,4 @@
+Host bingo-prod
+    HostName 45.63.77.130
+    User root
+    IdentityFile ~/.ssh/id_ed25519

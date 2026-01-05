@@ -41,6 +41,14 @@ const paymentAccountsController = {
                 return res.status(400).json({ error: 'Alias y Titular son obligatorios' });
             }
 
+            // Validar CBU: si tiene valor y es solo números, debe tener 22 dígitos
+            if (cbu) {
+                const onlyDigits = cbu.replace(/\D/g, '');
+                if (onlyDigits.length > 0 && onlyDigits.length === cbu.length && onlyDigits.length !== 22) {
+                    return res.status(400).json({ error: 'El CBU debe tener exactamente 22 dígitos' });
+                }
+            }
+
             // Si es SuperAdmin, la cuenta es del SISTEMA (owner_id = NULL)
             // para rotación en VIP y ventas de cartones
             // Si es Agente, la cuenta es personal (owner_id = userId)
@@ -73,6 +81,14 @@ const paymentAccountsController = {
             const userRole = req.user.role;
             const { id } = req.params;
             const { alias, cbu, bank_name, holder_name, daily_limit, is_active } = req.body;
+
+            // Validar CBU: si tiene valor y es solo números, debe tener 22 dígitos
+            if (cbu) {
+                const onlyDigits = cbu.replace(/\D/g, '');
+                if (onlyDigits.length > 0 && onlyDigits.length === cbu.length && onlyDigits.length !== 22) {
+                    return res.status(400).json({ error: 'El CBU debe tener exactamente 22 dígitos' });
+                }
+            }
 
             // Verificar propiedad
             let checkQuery, checkParams;

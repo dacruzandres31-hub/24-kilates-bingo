@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import '../styles/LoginPlayer.css';
 import BlockedUserModal from '../components/BlockedUserModal';
+import AgeVerificationModal from '../components/AgeVerificationModal';
 
 export default function LoginPlayer({ onLogin }) {
   const navigate = useNavigate();
@@ -13,12 +14,32 @@ export default function LoginPlayer({ onLogin }) {
   const [showPassword, setShowPassword] = useState(false);
   const [showBlockedModal, setShowBlockedModal] = useState(false);
   const [blockedUserRole, setBlockedUserRole] = useState('');
+  const [showAgeModal, setShowAgeModal] = useState(false);
+  const [pendingLoginData, setPendingLoginData] = useState(null);
 
   // Debug: Monitorear cambios en showBlockedModal
   useEffect(() => {
     console.log('🔍 [MODAL-STATE] showBlockedModal cambió a:', showBlockedModal);
     console.log('🔍 [MODAL-STATE] blockedUserRole:', blockedUserRole);
   }, [showBlockedModal, blockedUserRole]);
+
+  const handleAgeConfirm = () => {
+    if (pendingLoginData) {
+      const { token, user, gamification } = pendingLoginData;
+      localStorage.setItem('playerToken', token);
+      localStorage.setItem('playerUser', JSON.stringify(user));
+      onLogin(token, user, gamification);
+    }
+    setShowAgeModal(false);
+    setPendingLoginData(null);
+  };
+
+  const handleAgeDecline = () => {
+    setShowAgeModal(false);
+    setPendingLoginData(null);
+    setPassword('');
+    setError('Debes ser mayor de 18 años para acceder.');
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -40,11 +61,10 @@ export default function LoginPlayer({ onLogin }) {
         return;
       }
 
-      // Guardar información del usuario
-      localStorage.setItem('playerToken', token);
-      localStorage.setItem('playerUser', JSON.stringify(user));
-
-      onLogin(token, user, gamification);
+      // Guardar información del usuario - pero primero confirmar edad
+      setPendingLoginData({ token, user, gamification });
+      setShowAgeModal(true);
+      setLoading(false);
     } catch (err) {
       console.log('🚫 Error en login:', err.response?.status, err.response?.data);
       // Verificar si el usuario está bloqueado
@@ -183,6 +203,14 @@ export default function LoginPlayer({ onLogin }) {
             setShowBlockedModal(false);
             setPassword(''); // Limpiar contraseña al cerrar
           }}
+        />
+      )}
+
+      {/* Modal de Verificación de Edad */}
+      {showAgeModal && (
+        <AgeVerificationModal
+          onConfirm={handleAgeConfirm}
+          onDecline={handleAgeDecline}
         />
       )}
     </div>
