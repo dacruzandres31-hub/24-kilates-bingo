@@ -1,4 +1,8 @@
 const pool = require('../db');
+const referralCommissionService = require('./referralCommissionService');
+
+// ID de membresía Embajador
+const EMBAJADOR_MEMBERSHIP_ID = 1;
 
 class MembershipService {
 
@@ -136,8 +140,8 @@ class MembershipService {
             // Assuming a transactions table exists, otherwise skip or add simple logging
             // await connection.query('INSERT INTO transactions ...') 
 
-            // 7. Distribute commissions inside the transaction for atomicity.
-            await this.distributeMembershipCommissions(userId, plan.price, connection);
+            // 7. Distribute commissions - solo aplica para Embajador
+            await this.distributeMembershipCommissions(userId, plan.price, connection, membershipId);
 
             await connection.commit();
 
@@ -250,10 +254,8 @@ class MembershipService {
 
             await connection.commit();
 
-            // Distribute commissions
-            await this.distributeMembershipCommissions(userId, plan.price, connection);
-
-            await connection.commit();
+            // Distribute commissions - solo aplica para Embajador
+            await this.distributeMembershipCommissions(userId, plan.price, connection, membershipId);
 
             return {
                 success: true,
@@ -341,56 +343,39 @@ class MembershipService {
     }
 
     /**
-     * Distribute commissions to parents if they have an active "Socio Embajador" membership
+     * Distribute commissions to parents when user buys EMBAJADOR membership
+     * 
+     * SOLO aplica cuando se compra membresía Embajador ($5,000)
+     * Porcentajes: L1=4%, L2=3%, L3=2%, L4=1%
+     * 
+     * Las comisiones quedan pendientes hasta que el usuario las cobra (1-10 del mes)
      */
-    async distributeMembershipCommissions(userId, amount, connection) {
-        console.log(`🔍 Distributing commissions for user ${userId}, amount ${amount}`);
+    async distributeMembershipCommissions(userId, amount, connection, membershipId = null, io = null) {
+        console.log(`🔍 Distributing commissions for user ${userId}, membership ${membershipId}, amount ${amount}`);
 
-        // 1. Get referral tree (parents up to 4 levels)
-        const [users] = await connection.query('SELECT referred_by, parent_id FROM users WHERE id = ?', [userId]);
-        if (users.length === 0) return;
+        // SOLO aplicar comisiones si es compra de EMBAJADOR
+        if (membershipId !== EMBAJADOR_MEMBERSHIP_ID) {
+            console.log(`ℹ️ Membresía ${membershipId} no es Embajador - no se generan comisiones por referidos`);
+            return;
+        }
 
-        const rates = [0.04, 0.03, 0.02, 0.01]; // L1, L2, L3, L4
-        let currentParentId = users[0].referred_by || users[0].parent_id;
-
-        // Get the ID of "Socio Embajador 24K" to check eligibility
-        const [ambassadorTier] = await connection.query('SELECT id FROM memberships WHERE name = "Socio Embajador 24K"');
-        if (ambassadorTier.length === 0) return;
-        const ambassadorTierId = ambassadorTier[0].id;
-
-        for (let level = 1; level <= 4; level++) {
-            if (!currentParentId) break;
-
-            // 2. Check if parent has active "Socio Embajador 24K" membership
-            const [parents] = await connection.query(
-                'SELECT id, subscription_tier_id, referral_balance FROM users WHERE id = ? FOR UPDATE',
-                [currentParentId]
+        try {
+            // Usar el nuevo servicio de comisiones por referidos
+            const commissions = await referralCommissionService.applyCommissions(
+                userId,
+                amount,
+                null, // purchaseId - podríamos pasar el ID de user_subscriptions
+                io
             );
 
-            if (parents.length > 0) {
-                const parent = parents[0];
-                if (parent.subscription_tier_id === ambassadorTierId) {
-                    const commission = amount * rates[level - 1];
-                    console.log(`✅ Awarding $${commission} to parent ${parent.id} (L${level})`);
+            console.log(`✅ Comisiones por referidos generadas: ${commissions.length}`);
+            commissions.forEach(c => {
+                console.log(`   L${c.level}: $${c.amount} para ${c.beneficiaryUsername}`);
+            });
 
-                    // 3. Acreditamos en su referral_balance
-                    await connection.query(
-                        'UPDATE users SET referral_balance = referral_balance + ? WHERE id = ?',
-                        [commission, parent.id]
-                    );
-
-                    // 4. Registrar movimiento de auditoría (opcional, pero recomendado)
-                    // Podríamos crear una tabla chips_movements para esto o una nueva referral_movements
-                } else {
-                    console.log(`ℹ️ Parent ${parent.id} (L${level}) doesn't have active Ambassador sub. Skipping.`);
-                }
-
-                // Prepare next level
-                const [nextParent] = await connection.query('SELECT referred_by, parent_id FROM users WHERE id = ?', [parent.id]);
-                currentParentId = nextParent.length > 0 ? (nextParent[0].referred_by || nextParent[0].parent_id) : null;
-            } else {
-                currentParentId = null;
-            }
+        } catch (error) {
+            console.error('❌ Error distribuyendo comisiones por referidos:', error);
+            // No lanzamos el error para no bloquear la compra
         }
     }
 }

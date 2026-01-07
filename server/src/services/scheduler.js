@@ -11,7 +11,7 @@ const membershipService = require('./membershipService');
  * 
  * Jobs:
  * 1. T-5 Closure (5 min antes de partida) - Bloquear ventas + limpiar cartones viejos
- * 2. End-Game Regeneration - Generar stock para día siguiente al terminar partida
+ * 2. Auto-Draw Starter - Cada minuto, verificar sesiones pendientes y arrancar sorteo
  * 3. Health Check - Verificar integridad del sistema cada 6 horas
  * 4. Weekly Ranking Reset - Lunes 00:00 calcular ranking y acreditar bonos
  * 5. Daily Quests Refresh - 00:01 crear nuevas misiones para todos
@@ -22,6 +22,15 @@ class Scheduler {
   constructor() {
     this.jobs = [];
     this.isRunning = false;
+    this.gameEngine = null; // Se inyecta desde index.js
+  }
+
+  /**
+   * Inyectar referencia al GameEngine para auto-start
+   */
+  setGameEngine(gameEngine) {
+    this.gameEngine = gameEngine;
+    console.log('[Scheduler] 🎮 GameEngine inyectado correctamente');
   }
 
   /**
@@ -35,6 +44,17 @@ class Scheduler {
 
     console.log('[Scheduler] Iniciando...');
     this.isRunning = true;
+
+    // JOB 0: Auto-Draw Starter - Cada minuto, arrancar sesiones cuyo start_time <= NOW()
+    const autoDrawJob = cron.schedule('* * * * *', async () => {
+      try {
+        await this.checkAndStartPendingSessions();
+      } catch (error) {
+        console.error('[Scheduler] Auto-Draw Starter error:', error.message);
+      }
+    });
+    this.jobs.push({ name: 'Auto-Draw Starter', job: autoDrawJob });
+    console.log('[Scheduler] Job registrado: 🎱 Auto-Draw Starter (cada minuto)');
 
     // JOB 1: T-5 Closure - Bloquear ventas (cada minuto, verificar si corresponde)
     const t5Job = cron.schedule('* * * * *', async () => {
@@ -226,6 +246,73 @@ class Scheduler {
       }
     } catch (error) {
       console.error('[Scheduler T-5] Error en closure:', error);
+    }
+  }
+
+  /**
+   * AUTO-DRAW STARTER
+   * Cada minuto busca sesiones pendientes cuyo start_time <= NOW()
+   * y las arranca automáticamente usando el gameEngine
+   */
+  async checkAndStartPendingSessions() {
+    try {
+      if (!this.gameEngine) {
+        // GameEngine no inyectado todavía - silently skip
+        return;
+      }
+
+      // Buscar sesiones pendientes que ya deberían haber empezado
+      const [pendingSessions] = await pool.query(
+        `SELECT id, room, start_time 
+         FROM game_sessions 
+         WHERE status = 'pending' 
+         AND start_time <= NOW()
+         ORDER BY start_time ASC`
+      );
+
+      if (pendingSessions.length === 0) {
+        return; // No hay sesiones para iniciar
+      }
+
+      for (const session of pendingSessions) {
+        try {
+          // Verificar si ya está en memoria (evitar duplicados)
+          if (this.gameEngine.activeGames && this.gameEngine.activeGames.has(session.id)) {
+            console.log(`[AutoDraw] 🎮 Sesión ${session.id} (${session.room}) ya está activa en memoria`);
+            continue;
+          }
+
+          console.log(`[AutoDraw] 🎱 Iniciando sorteo automático: Sesión #${session.id} (${session.room})`);
+          
+          // Cambiar status de 'pending' a 'active' ANTES de llamar startGame
+          await pool.query(
+            `UPDATE game_sessions SET status = 'active' WHERE id = ? AND status = 'pending'`,
+            [session.id]
+          );
+          console.log(`[AutoDraw] 📍 Sesión ${session.id} marcada como active`);
+          
+          // Arrancar el sorteo
+          await this.gameEngine.startGame(session.id, { autoStart: true });
+          
+          console.log(`[AutoDraw] ✅ Sorteo arrancado: ${session.room} - Sesión #${session.id}`);
+          
+        } catch (gameError) {
+          console.error(`[AutoDraw] ❌ Error iniciando sesión ${session.id}:`, gameError.message);
+          
+          // Si hay error, marcar sesión como cancelada para no reintentar infinitamente
+          try {
+            await pool.query(
+              `UPDATE game_sessions SET status = 'cancelled' WHERE id = ?`,
+              [session.id]
+            );
+            console.log(`[AutoDraw] 🚫 Sesión ${session.id} marcada como cancelled`);
+          } catch (updateError) {
+            console.error(`[AutoDraw] Error marcando sesión como cancelled:`, updateError.message);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('[AutoDraw] Error general:', error.message);
     }
   }
 

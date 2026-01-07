@@ -27,6 +27,7 @@ const starterRoomRoutes = require('./routes/starterRoom');
 const giftCardsRoutes = require('./routes/giftCards');
 const cardsRoutes = require('./routes/cardsRoutes');
 const membershipRoutes = require('./routes/membershipRoutes');
+const referralRoutes = require('./routes/referralRoutes');
 const gameAdminController = require('./controllers/gameAdminController');
 const cardPoolService = require('./services/cardPoolService');
 const db = require('./db');
@@ -40,7 +41,11 @@ const app = express();
 
 // MIDDLEWARE SEGURIDAD
 app.use(helmet());
-app.use(morgan('combined'));
+
+// Morgan logger - excluir webhook de WhatsApp para evitar spam
+app.use(morgan('combined', {
+  skip: (req) => req.url === '/api/webhook/whatsapp'
+}));
 
 // CORS
 const corsOptions = {
@@ -150,6 +155,10 @@ app.use('/api/superadmin', superAdminRoutes);
 app.use('/api/game-admin', gameAdminRoutes);
 app.use('/api/whatsapp', require('./routes/whatsapp24KRoutes')); // WhatsApp 24K Premium
 app.use('/api/memberships', membershipRoutes); // Sistema de membresías Club VIP
+app.use('/api/referrals', referralRoutes); // Sistema de referidos
+
+// WEBHOOK de WhatsApp Evolution API - Silenciar spam (responde 200 sin logging)
+app.post('/api/webhook/whatsapp', (req, res) => res.sendStatus(200));
 
 // HEALTH CHECK
 app.get('/health', (req, res) => {
@@ -177,35 +186,29 @@ app.use((req, res) => {
 // CARGAR POOLS EXISTENTES AL INICIAR
 async function loadExistingPools() {
   try {
-    console.log('🎫 Cargando pools de cartones desde BD...');
+    console.log('🎫 Verificando pools de cartones...');
     
-    // Buscar sesiones recientes de Starter con cartones
-    const [sessions] = await db.query(`
-      SELECT DISTINCT cp.session_id, COUNT(*) as card_count
-      FROM card_pool cp
-      INNER JOIN game_sessions gs ON cp.session_id = gs.id
-      WHERE gs.room = 'starter'
-      AND gs.created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)
-      GROUP BY cp.session_id
-      HAVING card_count > 0
-      ORDER BY gs.created_at DESC
-      LIMIT 5
+    // Verificar que hay cartones disponibles en el pool
+    const [countResult] = await db.query(`
+      SELECT room, COUNT(*) as card_count
+      FROM bingo_cards_pool
+      WHERE status = 'available'
+      GROUP BY room
     `);
 
-    if (sessions.length === 0) {
-      console.log('ℹ️  No hay pools para cargar');
+    if (countResult.length === 0) {
+      console.log('ℹ️  No hay cartones en el pool - se generarán al iniciar sorteos');
       return;
     }
 
-    // Cargar cada pool en memoria
-    for (const session of sessions) {
-      await cardPoolService.loadPoolFromDB(session.session_id);
-      console.log(`✅ Pool cargado: Sesión ${session.session_id} (${session.card_count} cartones)`);
+    // Mostrar estado de cada sala
+    for (const row of countResult) {
+      console.log(`   📦 ${row.room}: ${row.card_count} cartones disponibles`);
     }
 
-    console.log(`✅ ${sessions.length} pool(s) cargados en memoria\n`);
+    console.log(`✅ Pools verificados\n`);
   } catch (error) {
-    console.error('❌ Error cargando pools:', error.message);
+    console.error('❌ Error verificando pools:', error.message);
     // No fallar el inicio del servidor por esto
   }
 }
@@ -232,6 +235,13 @@ const startServer = async () => {
 
     // Iniciar scheduler
     scheduler.start();
+
+    // Inyectar gameEngine al scheduler para auto-start de sorteos
+    if (gameAdminController.gameEngine) {
+      scheduler.setGameEngine(gameAdminController.gameEngine);
+    } else {
+      console.warn('[Index] ⚠️ GameEngine no disponible para scheduler');
+    }
 
     // Iniciar servidor HTTP
     server.listen(PORT, () => {

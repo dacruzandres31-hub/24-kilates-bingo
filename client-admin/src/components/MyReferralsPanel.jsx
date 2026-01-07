@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Copy, Users, Gift, ChevronRight, Share2, CheckCircle, Trophy, TrendingUp } from 'lucide-react';
+import { Copy, Users, Gift, ChevronRight, Share2, CheckCircle, Trophy, TrendingUp, HelpCircle } from 'lucide-react';
 import axios from 'axios';
+import EmbajadorAgentInfoModal from './EmbajadorAgentInfoModal';
 
 const MyReferralsPanel = ({ userData }) => {
     const [referralCode, setReferralCode] = useState('');
@@ -15,6 +16,7 @@ const MyReferralsPanel = ({ userData }) => {
     });
     const [copied, setCopied] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [showInfoModal, setShowInfoModal] = useState(false);
 
     useEffect(() => {
         if (userData) {
@@ -88,14 +90,16 @@ const MyReferralsPanel = ({ userData }) => {
                 accountId: ambassadorAccount.id,
                 amount: 5000,
                 proofUrl: proofUrl,
-                requestType: 'ambassador_membership',
-                details: 'Pago Membresía Socio Embajador 24K'
+                requestType: 'ambassador_activation',
+                details: JSON.stringify({ 
+                    description: 'Activación Membresía Socio Embajador 24K para Agente'
+                })
             }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
             setShowAmbassadorModal(false);
-            alert('✅ Comprobante enviado. Tu membresía será activada una vez se verifique el pago.');
+            alert('✅ Comprobante enviado. Tu membresía Embajador será activada una vez se verifique el pago.');
         } catch (error) {
             alert('❌ Error: ' + (error.response?.data?.message || error.message));
         }
@@ -150,10 +154,10 @@ const MyReferralsPanel = ({ userData }) => {
                 </div>
                 <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700 md:col-span-2">
                     <div className="flex flex-col justify-center h-full gap-2">
-                        <label className="text-slate-400 text-xs font-bold uppercase tracking-wider block mb-1">Links de Invitación</label>
+                        <label className="text-slate-400 text-xs font-bold uppercase tracking-wider block mb-1">Link de Invitación para Jugadores</label>
 
                         {/* Link Jugador */}
-                        <div className="flex gap-2 mb-2">
+                        <div className="flex gap-2">
                             <input
                                 type="text"
                                 readOnly
@@ -165,26 +169,10 @@ const MyReferralsPanel = ({ userData }) => {
                                 className={`p-2 rounded-lg transition-all min-w-[140px] flex items-center justify-center gap-2 ${copied === 'player' ? 'bg-emerald-600 text-white' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20'}`}
                             >
                                 {copied === 'player' ? <CheckCircle size={16} /> : <Copy size={16} />}
-                                <span className="text-xs font-bold">COPIAR JUGADOR</span>
+                                <span className="text-xs font-bold">COPIAR LINK</span>
                             </button>
                         </div>
-
-                        {/* Link Agente */}
-                        <div className="flex gap-2">
-                            <input
-                                type="text"
-                                readOnly
-                                value={`${window.location.origin}/register-agent?ref=${referralCode}`}
-                                className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-300 w-full focus:outline-none focus:border-indigo-500"
-                            />
-                            <button
-                                onClick={() => copyToClipboard('agent')}
-                                className={`p-2 rounded-lg transition-all min-w-[140px] flex items-center justify-center gap-2 ${copied === 'agent' ? 'bg-emerald-600 text-white' : 'bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-500/20'}`}
-                            >
-                                {copied === 'agent' ? <CheckCircle size={16} /> : <Copy size={16} />}
-                                <span className="text-xs font-bold">COPIAR AGENTE</span>
-                            </button>
-                        </div>
+                        <p className="text-slate-500 text-[10px] mt-1">Los agentes se crean directamente desde el panel de administración.</p>
                     </div>
                 </div>
 
@@ -195,7 +183,16 @@ const MyReferralsPanel = ({ userData }) => {
                             <Trophy className="text-yellow-400" size={32} />
                         </div>
                         <div>
-                            <h3 className="text-lg font-bold text-white">Membresía Socio Embajador</h3>
+                            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                Membresía Socio Embajador
+                                <button 
+                                    onClick={() => setShowInfoModal(true)}
+                                    className="text-indigo-300 hover:text-yellow-400 transition-colors"
+                                    title="Ver beneficios"
+                                >
+                                    <HelpCircle size={18} />
+                                </button>
+                            </h3>
                             <p className="text-indigo-200 text-sm">Habilita el cobro de comisiones de red por referidos.</p>
                             {userData?.is_ambassador && (
                                 <p className="text-emerald-400 text-xs mt-1 flex items-center gap-1">
@@ -204,19 +201,29 @@ const MyReferralsPanel = ({ userData }) => {
                             )}
                         </div>
                     </div>
-                    {!userData?.is_ambassador ? (
-                        <button
-                            onClick={handleActivateAmbassador}
-                            className="bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 text-white font-bold py-2 px-6 rounded-lg shadow-lg shadow-amber-500/20 transition-all flex items-center gap-2"
-                        >
-                            <span>ACTIVAR ($5.000)</span>
-                        </button>
-                    ) : (
-                        <div className="bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 font-bold py-2 px-6 rounded-lg flex items-center gap-2">
-                            <CheckCircle size={18} />
-                            <span>ACTIVA</span>
-                        </div>
-                    )}
+                    <div className="flex items-center gap-2">
+                        {!userData?.is_ambassador ? (
+                            <>
+                                <button
+                                    onClick={() => setShowInfoModal(true)}
+                                    className="bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 px-4 rounded-lg transition-all"
+                                >
+                                    INFO
+                                </button>
+                                <button
+                                    onClick={handleActivateAmbassador}
+                                    className="bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 text-white font-bold py-2 px-6 rounded-lg shadow-lg shadow-amber-500/20 transition-all flex items-center gap-2"
+                                >
+                                    <span>ACTIVAR ($5.000)</span>
+                                </button>
+                            </>
+                        ) : (
+                            <div className="bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 font-bold py-2 px-6 rounded-lg flex items-center gap-2">
+                                <CheckCircle size={18} />
+                                <span>ACTIVA</span>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -391,25 +398,16 @@ const MyReferralsPanel = ({ userData }) => {
                             <input
                                 type="file"
                                 accept="image/*"
-                                onChange={async (e) => {
+                                onChange={(e) => {
                                     const file = e.target.files[0];
                                     if (!file) return;
 
-                                    const formData = new FormData();
-                                    formData.append('file', file);
-
-                                    try {
-                                        const token = localStorage.getItem('adminToken');
-                                        const { data } = await axios.post('/api/upload', formData, {
-                                            headers: {
-                                                'Authorization': `Bearer ${token}`,
-                                                'Content-Type': 'multipart/form-data'
-                                            }
-                                        });
-                                        handleAmbassadorPaymentSubmit(data.url);
-                                    } catch (error) {
-                                        alert('Error subiendo comprobante: ' + error.message);
-                                    }
+                                    const reader = new FileReader();
+                                    reader.onloadend = () => {
+                                        // Enviar como Base64, igual que el cliente-player
+                                        handleAmbassadorPaymentSubmit(reader.result);
+                                    };
+                                    reader.readAsDataURL(file);
                                 }}
                                 className="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-white file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-emerald-600 file:text-white hover:file:bg-emerald-500"
                             />
@@ -420,6 +418,17 @@ const MyReferralsPanel = ({ userData }) => {
                         </p>
                     </div>
                 </div>
+            )}
+
+            {/* Modal de Información de Membresía Embajador */}
+            {showInfoModal && (
+                <EmbajadorAgentInfoModal 
+                    onClose={() => setShowInfoModal(false)}
+                    onActivate={() => {
+                        setShowInfoModal(false);
+                        handleActivateAmbassador();
+                    }}
+                />
             )}
         </div>
     );

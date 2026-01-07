@@ -92,10 +92,10 @@ class GameEngineAuto {
 
     console.log(`[GameEngine] 🎮 Juego ${gameSessionId} iniciado (sala: ${session.room})`);
     
-    this.io.to(`room_${session.room}`).emit('game_started', {
+    this.io.to(`game_${session.room}`).emit('game_started', {
       gameSessionId,
       drawInterval,
-      totalBalls: 75
+      totalBalls: 90
     });
 
     return gameState;
@@ -103,7 +103,7 @@ class GameEngineAuto {
 
   generateBallPool() {
     const balls = [];
-    for (let i = 1; i <= 75; i++) {
+    for (let i = 1; i <= 90; i++) {
       balls.push(i);
     }
     return balls;
@@ -140,12 +140,13 @@ class GameEngineAuto {
     console.log(`[GameEngine] 🎱 ${ballLetter}-${ballNumber} (#${drawOrder})`);
 
     // Emitir a todos los jugadores
-    this.io.to(`room_${gameState.roomId}`).emit('ball_drawn', {
+    this.io.to(`game_${gameState.roomId}`).emit('ball_drawn', {
       gameSessionId,
       ballNumber,
       ballLetter,
       drawOrder,
-      totalDrawn: gameState.ballsDrawn.length
+      totalDrawn: gameState.ballsDrawn.length,
+      room: gameState.roomId  // Agregado para filtro en frontend
     });
 
     // VALIDAR AUTOMÁTICAMENTE TODOS LOS CARTONES
@@ -337,35 +338,38 @@ class GameEngineAuto {
 
   /**
    * Verifica si el cartón tiene alguna línea HORIZONTAL completa
-   * (Solo líneas horizontales según nuevas reglas)
+   * BINGO 90: Matriz 3x9, cada fila tiene 5 números y 4 espacios (null)
+   * Solo líneas horizontales según reglas del bingo europeo
    */
   checkHorizontalLines(cardNumbers, calledNumbers) {
+    // BINGO 90: Solo 3 filas horizontales
     const horizontalLines = [
       { type: 'horizontal_1', row: 0 },
       { type: 'horizontal_2', row: 1 },
-      { type: 'horizontal_3', row: 2 },
-      { type: 'horizontal_4', row: 3 },
-      { type: 'horizontal_5', row: 4 }
+      { type: 'horizontal_3', row: 2 }
     ];
 
     for (const line of horizontalLines) {
       const winningNumbers = [];
-      let isComplete = true;
+      let numbersInRow = 0;
+      let markedInRow = 0;
 
-      for (let col = 0; col < 5; col++) {
-        const number = cardNumbers[line.row][col];
+      // Recorrer las 9 columnas de la fila
+      for (let col = 0; col < 9; col++) {
+        const number = cardNumbers[line.row] ? cardNumbers[line.row][col] : null;
         
-        if (line.row === 2 && col === 2) {
-          winningNumbers.push('FREE');
-        } else if (calledNumbers.includes(number)) {
-          winningNumbers.push(number);
-        } else {
-          isComplete = false;
-          break;
+        // Solo procesar celdas con números (no null/undefined)
+        if (number !== null && number !== undefined) {
+          numbersInRow++;
+          if (calledNumbers.includes(number)) {
+            winningNumbers.push(number);
+            markedInRow++;
+          }
         }
       }
 
-      if (isComplete) {
+      // Una línea está completa si los 5 números de la fila fueron cantados
+      if (markedInRow === 5 && numbersInRow === 5) {
         return {
           hasLine: true,
           lineType: line.type,
@@ -505,20 +509,20 @@ class GameEngineAuto {
 
     // LIMPIEZA: Eliminar cartones no asignados a ninguna sesión de esta sala
     // Esto se ejecuta cuando finaliza cada sorteo
-    if (gameState.room) {
+    if (gameState.roomId) {
       const [cleanupResult] = await pool.query(`
         DELETE FROM bingo_cards_pool 
         WHERE room = ? 
         AND status = 'selected' 
         AND game_session_id IS NULL
-      `, [gameState.room]);
+      `, [gameState.roomId]);
       
-      console.log(`[GameEngine] 🧹 Limpieza post-sorteo sala ${gameState.room}: ${cleanupResult.affectedRows} cartones huérfanos eliminados`);
+      console.log(`[GameEngine] 🧹 Limpieza post-sorteo sala ${gameState.roomId}: ${cleanupResult.affectedRows} cartones huérfanos eliminados`);
     }
 
-    console.log(`[GameEngine] 🏁 Juego ${gameSessionId} terminado`);
+    console.log(`[GameEngine] 🏁 Juego ${gameSessionId} terminado (${gameState.ballsDrawn.length} bolas sorteadas)`);
 
-    this.io.to(`room_${gameState.roomId}`).emit('game_ended', {
+    this.io.to(`game_${gameState.roomId}`).emit('game_ended', {
       gameSessionId,
       status,
       totalBallsDrawn: gameState.ballsDrawn.length
@@ -532,7 +536,69 @@ class GameEngineAuto {
       }
     }, 5000);
 
+    // CREAR PRÓXIMA SESIÓN: 5 minutos después de terminar, crear sesión para próxima hora
+    const roomId = gameState.roomId;
+    setTimeout(async () => {
+      try {
+        await this.createNextHourlySession(roomId);
+        console.log(`[GameEngine] 🔄 Próxima sesión creada para ${roomId} - ventas reabiertas`);
+      } catch (error) {
+        console.error(`[GameEngine] Error creando próxima sesión para ${roomId}:`, error);
+      }
+    }, 5 * 60 * 1000); // 5 minutos después
+
     this.activeGames.delete(gameSessionId);
+  }
+
+  /**
+   * Crea la próxima sesión para la sala especificada (para reabrir ventas)
+   */
+  async createNextHourlySession(room) {
+    const now = new Date();
+    
+    // Calcular próxima hora de sorteo basado en la sala
+    const roomSchedule = {
+      'bronce': 0,       // :00 cada hora
+      'plata': 15,       // :15 cada hora
+      'oro': 30,         // :30 cada hora
+      'free_starter': 45 // :45 cada hora
+    };
+
+    const minuteOffset = roomSchedule[room];
+    if (minuteOffset === undefined) {
+      console.warn(`[GameEngine] Sala ${room} no tiene horario programado`);
+      return null;
+    }
+
+    // Próxima hora
+    const nextHour = new Date(now);
+    nextHour.setMinutes(minuteOffset, 0, 0);
+    
+    // Si ya pasó el horario de esta hora, programar para la siguiente
+    if (nextHour <= now) {
+      nextHour.setHours(nextHour.getHours() + 1);
+    }
+
+    // Configuración de premios por sala
+    const roomConfig = {
+      'bronce': { linePrize: 2500, bingoPrize: 10000 },
+      'plata': { linePrize: 5000, bingoPrize: 25000 },
+      'oro': { linePrize: 10000, bingoPrize: 50000 },
+      'free_starter': { linePrize: 500, bingoPrize: 2000 }
+    };
+
+    const config = roomConfig[room] || { linePrize: 2500, bingoPrize: 10000 };
+
+    // Crear sesión
+    const [result] = await pool.query(
+      `INSERT INTO game_sessions (room, start_time, status, line_prize, bingo_prize, current_pot_bingo, current_pot_linea, is_preventa)
+       VALUES (?, ?, 'pending', ?, ?, 0.00, 0.00, true)`,
+      [room, nextHour, config.linePrize, config.bingoPrize]
+    );
+
+    console.log(`[GameEngine] ✅ Sesión ${result.insertId} creada para ${room} - ${nextHour.toLocaleTimeString()}`);
+    
+    return result.insertId;
   }
 
   stopGame(gameSessionId) {
@@ -559,55 +625,34 @@ class GameEngineAuto {
 
   // ===== FUNCIONES DE VALIDACIÓN =====
 
+  // BINGO 90 europeo: las bolas se organizan por decenas (columnas del cartón)
   getBallLetter(number) {
-    if (number >= 1 && number <= 15) return 'B';
-    if (number >= 16 && number <= 30) return 'I';
-    if (number >= 31 && number <= 45) return 'N';
-    if (number >= 46 && number <= 60) return 'G';
-    if (number >= 61 && number <= 75) return 'O';
+    if (number >= 1 && number <= 9) return 'D1';   // Decena 1 (1-9)
+    if (number >= 10 && number <= 19) return 'D2'; // Decena 2 (10-19)
+    if (number >= 20 && number <= 29) return 'D3'; // Decena 3 (20-29)
+    if (number >= 30 && number <= 39) return 'D4'; // Decena 4 (30-39)
+    if (number >= 40 && number <= 49) return 'D5'; // Decena 5 (40-49)
+    if (number >= 50 && number <= 59) return 'D6'; // Decena 6 (50-59)
+    if (number >= 60 && number <= 69) return 'D7'; // Decena 7 (60-69)
+    if (number >= 70 && number <= 79) return 'D8'; // Decena 8 (70-79)
+    if (number >= 80 && number <= 90) return 'D9'; // Decena 9 (80-90)
     return '?';
   }
 
+  /**
+   * Valida una línea específica del cartón (BINGO 90)
+   * En bingo europeo no hay casilla FREE
+   */
   validateLine(cardNumbers, calledNumbers, lineType) {
     const positions = this.getLinePositions(lineType);
     const winningNumbers = [];
     const missingNumbers = [];
 
     for (const [row, col] of positions) {
-      const number = cardNumbers[row][col];
+      const number = cardNumbers[row] ? cardNumbers[row][col] : null;
 
-      if (row === 2 && col === 2) {
-        winningNumbers.push('FREE');
-        continue;
-      }
-
-      if (calledNumbers.includes(number)) {
-        winningNumbers.push(number);
-      } else {
-        missingNumbers.push(number);
-      }
-    }
-
-    return {
-      isValid: missingNumbers.length === 0,
-      winningNumbers,
-      missingNumbers
-    };
-  }
-
-  validateBingo(cardNumbers, calledNumbers) {
-    const winningNumbers = [];
-    const missingNumbers = [];
-
-    for (let row = 0; row < 5; row++) {
-      for (let col = 0; col < 5; col++) {
-        const number = cardNumbers[row][col];
-
-        if (row === 2 && col === 2) {
-          winningNumbers.push('FREE');
-          continue;
-        }
-
+      // Solo procesar celdas con números (no null/undefined)
+      if (number !== null && number !== undefined) {
         if (calledNumbers.includes(number)) {
           winningNumbers.push(number);
         } else {
@@ -617,61 +662,91 @@ class GameEngineAuto {
     }
 
     return {
-      isValid: missingNumbers.length === 0,
+      isValid: missingNumbers.length === 0 && winningNumbers.length === 5,
       winningNumbers,
-      missingNumbers,
-      totalMarked: winningNumbers.length,
-      totalNeeded: 24
+      missingNumbers
     };
   }
 
+  /**
+   * Valida si un cartón tiene BINGO completo
+   * BINGO 90: Matriz 3x9, 15 números totales (5 por fila, 3 filas)
+   * No hay casilla FREE en bingo europeo
+   */
+  validateBingo(cardNumbers, calledNumbers) {
+    const winningNumbers = [];
+    const missingNumbers = [];
+
+    // Recorrer matriz 3x9
+    for (let row = 0; row < 3; row++) {
+      for (let col = 0; col < 9; col++) {
+        const number = cardNumbers[row] ? cardNumbers[row][col] : null;
+
+        // Solo procesar celdas con números (no null/undefined)
+        if (number !== null && number !== undefined) {
+          if (calledNumbers.includes(number)) {
+            winningNumbers.push(number);
+          } else {
+            missingNumbers.push(number);
+          }
+        }
+      }
+    }
+
+    return {
+      isValid: missingNumbers.length === 0 && winningNumbers.length === 15,
+      winningNumbers,
+      missingNumbers,
+      totalMarked: winningNumbers.length,
+      totalNeeded: 15
+    };
+  }
+
+  /**
+   * Obtiene posiciones de una línea (BINGO 90: solo horizontales en matriz 3x9)
+   */
   getLinePositions(lineType) {
     switch (lineType) {
-      case 'horizontal_1': return [[0,0],[0,1],[0,2],[0,3],[0,4]];
-      case 'horizontal_2': return [[1,0],[1,1],[1,2],[1,3],[1,4]];
-      case 'horizontal_3': return [[2,0],[2,1],[2,2],[2,3],[2,4]];
-      case 'horizontal_4': return [[3,0],[3,1],[3,2],[3,3],[3,4]];
-      case 'horizontal_5': return [[4,0],[4,1],[4,2],[4,3],[4,4]];
-      case 'vertical_1': return [[0,0],[1,0],[2,0],[3,0],[4,0]];
-      case 'vertical_2': return [[0,1],[1,1],[2,1],[3,1],[4,1]];
-      case 'vertical_3': return [[0,2],[1,2],[2,2],[3,2],[4,2]];
-      case 'vertical_4': return [[0,3],[1,3],[2,3],[3,3],[4,3]];
-      case 'vertical_5': return [[0,4],[1,4],[2,4],[3,4],[4,4]];
-      case 'diagonal_1': return [[0,0],[1,1],[2,2],[3,3],[4,4]];
-      case 'diagonal_2': return [[0,4],[1,3],[2,2],[3,1],[4,0]];
-      case 'four_corners': return [[0,0],[0,4],[4,0],[4,4]];
+      // BINGO 90: Solo 3 líneas horizontales, cada una con 9 columnas (5 números + 4 nulls)
+      case 'horizontal_1': return [[0,0],[0,1],[0,2],[0,3],[0,4],[0,5],[0,6],[0,7],[0,8]];
+      case 'horizontal_2': return [[1,0],[1,1],[1,2],[1,3],[1,4],[1,5],[1,6],[1,7],[1,8]];
+      case 'horizontal_3': return [[2,0],[2,1],[2,2],[2,3],[2,4],[2,5],[2,6],[2,7],[2,8]];
       default: return [];
     }
   }
 
+  /**
+   * Convierte formatos de grid_data a matriz 3x9 para BINGO 90
+   */
   convertGridDataToMatrix(gridData) {
-    if (Array.isArray(gridData) && gridData.length === 5) {
+    // Si ya es matriz 3x9, devolverla directamente
+    if (Array.isArray(gridData) && gridData.length === 3 && Array.isArray(gridData[0]) && gridData[0].length === 9) {
       return gridData;
     }
 
-    if (typeof gridData === 'object' && gridData.B && gridData.I && gridData.N && gridData.G && gridData.O) {
+    // Si es array plano de 27 elementos, convertir a 3x9
+    if (Array.isArray(gridData) && gridData.length === 27) {
       const matrix = [];
-      for (let row = 0; row < 5; row++) {
-        matrix.push([
-          gridData.B[row],
-          gridData.I[row],
-          gridData.N[row],
-          gridData.G[row],
-          gridData.O[row]
-        ]);
+      for (let i = 0; i < 3; i++) {
+        matrix.push(gridData.slice(i * 9, (i + 1) * 9));
       }
       return matrix;
     }
 
-    if (Array.isArray(gridData) && gridData.length === 25) {
-      const matrix = [];
-      for (let i = 0; i < 5; i++) {
-        matrix.push(gridData.slice(i * 5, (i + 1) * 5));
+    // Si es objeto con columnas por decena (D1-D9)
+    if (typeof gridData === 'object' && (gridData.D1 || gridData.col_0)) {
+      const matrix = [[], [], []];
+      for (let col = 0; col < 9; col++) {
+        const colData = gridData[`D${col + 1}`] || gridData[`col_${col}`] || [null, null, null];
+        for (let row = 0; row < 3; row++) {
+          matrix[row].push(colData[row] || null);
+        }
       }
       return matrix;
     }
 
-    return [[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]];
+    console.warn('[GameEngine] Formato de grid_data no reconocido:', typeof gridData);
+    return [[null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null]];
   }
 
   async getGameWinners(gameSessionId) {
@@ -750,6 +825,66 @@ class GameEngineAuto {
     });
 
     return { success: true, message: 'Juego reanudado' };
+  }
+
+  /**
+   * Obtener el estado actual del sorteo para una sala
+   * Usado cuando un jugador entra a mitad del sorteo
+   */
+  getActiveGameForRoom(roomId) {
+    // Buscar en los juegos activos cuál corresponde a esta sala
+    for (const [sessionId, gameState] of this.activeGames) {
+      if (gameState.roomId === roomId) {
+        return {
+          sessionId: sessionId,
+          room: gameState.roomId,
+          isActive: true,
+          isPaused: gameState.isPaused,
+          ballsDrawn: gameState.ballsDrawn.map(num => ({
+            number: num,
+            letter: this.getBallLetter(num)
+          })),
+          totalBallsDrawn: gameState.ballsDrawn.length,
+          lineWinnersPaid: gameState.lineWinnersPaid,
+          bingoWinnersPaid: gameState.bingoWinnersPaid
+        };
+      }
+    }
+    return null; // No hay sorteo activo en esta sala
+  }
+
+  /**
+   * Obtener el estado de cualquier sesión activa (por sessionId)
+   */
+  getGameState(gameSessionId) {
+    const gameState = this.activeGames.get(gameSessionId);
+    if (!gameState) return null;
+    
+    return {
+      sessionId: gameSessionId,
+      room: gameState.roomId,
+      isActive: true,
+      isPaused: gameState.isPaused,
+      ballsDrawn: gameState.ballsDrawn.map(num => ({
+        number: num,
+        letter: this.getBallLetter(num)
+      })),
+      totalBallsDrawn: gameState.ballsDrawn.length,
+      lineWinnersPaid: gameState.lineWinnersPaid,
+      bingoWinnersPaid: gameState.bingoWinnersPaid
+    };
+  }
+
+  /**
+   * Verificar si hay un juego activo para una sala
+   */
+  hasActiveGame(roomId) {
+    for (const [sessionId, gameState] of this.activeGames) {
+      if (gameState.roomId === roomId) {
+        return true;
+      }
+    }
+    return false;
   }
 }
 

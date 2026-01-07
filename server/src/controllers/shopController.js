@@ -37,7 +37,7 @@ async function buyCard(req, res) {
     try {
       await client.beginTransaction();
 
-      // ====== PASO 1: Validar room ======
+      // ====== PASO 1: Validar room y verificar si ventas están abiertas ======
       const [roomRows] = await client.query(
         `SELECT * FROM game_sessions 
          WHERE room = ? AND status = 'pending'
@@ -53,6 +53,21 @@ async function buyCard(req, res) {
 
       const room = roomResult.rows[0];
       const cardCost = parseFloat(room.cost);
+
+      // ====== VERIFICACIÓN T-5: Ventas cerradas 5 minutos antes del sorteo ======
+      const startTime = new Date(room.start_time);
+      const now = new Date();
+      const minutesUntilStart = (startTime - now) / (1000 * 60);
+      
+      if (minutesUntilStart >= 0 && minutesUntilStart <= 5) {
+        await client.rollback();
+        const minutesLeft = Math.ceil(minutesUntilStart);
+        return res.status(400).json({
+          success: false,
+          message: `Ventas cerradas. El sorteo comienza en ${minutesLeft} minuto${minutesLeft !== 1 ? 's' : ''}. Espera al próximo sorteo.`,
+          code: 'SALES_CLOSED'
+        });
+      }
 
       // ====== PASO 2: Chequeo de Ticket (Solo si el usuario ELIGIÓ usar ticket) ======
       if (roomType === 'bronce' && paymentMethod === 'ticket') {

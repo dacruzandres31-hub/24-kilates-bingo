@@ -626,36 +626,46 @@ const CasinoLobby = ({ user, onLogout }) => {
             <span>CLUB VIP</span>
           </button>
 
+          {/* TEMPORALMENTE DESHABILITADO - Sistema de Referidos en desarrollo */}
           <button
             id="referrals-btn"
             className="btn-profile btn-referral"
             style={{
-              background: 'linear-gradient(45deg, #8b5cf6, #6366f1)',
-              color: 'white',
+              background: '#555',
+              color: '#999',
               fontWeight: 'bold',
-              border: '2px solid rgba(255,255,255,0.2)',
-              marginRight: '8px'
+              border: '2px solid rgba(255,255,255,0.1)',
+              marginRight: '8px',
+              cursor: 'not-allowed',
+              opacity: 0.6
             }}
-            onClick={() => setShowReferralDashboard(true)}
+            onClick={() => {}}
+            disabled
+            title="Próximamente"
           >
             <FaUsers />
             <span>REFERIDOS</span>
           </button>
 
+          {/* TEMPORALMENTE DESHABILITADO - Sistema de Referidos en desarrollo */}
           <button
             id="invite-btn"
-            className={`btn-profile btn-invite ${copiedLink ? 'bg-emerald-600' : ''}`}
+            className="btn-profile btn-invite"
             style={{
-              background: copiedLink ? '#10b981' : 'linear-gradient(45deg, #f59e0b, #d97706)',
-              color: 'white',
+              background: '#555',
+              color: '#999',
               fontWeight: 'bold',
-              border: '2px solid rgba(255,255,255,0.2)',
-              marginRight: '8px'
+              border: '2px solid rgba(255,255,255,0.1)',
+              marginRight: '8px',
+              cursor: 'not-allowed',
+              opacity: 0.6
             }}
-            onClick={copyReferralLink}
+            onClick={() => {}}
+            disabled
+            title="Próximamente"
           >
-            {copiedLink ? <FaCheck /> : <FaShareAlt />}
-            <span>{copiedLink ? 'COPIADO' : 'INVITAR'}</span>
+            <FaShareAlt />
+            <span>INVITAR</span>
           </button>
 
           <button

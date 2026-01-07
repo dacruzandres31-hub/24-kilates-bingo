@@ -58,7 +58,7 @@ const referralHelper = {
      * @returns {string} Link completo de referido
      */
     generateReferralLink: (referralCode, baseUrl = 'https://24kilates.xyz') => {
-        return `${baseUrl}/registro?ref=${referralCode}`;
+        return `${baseUrl}/register?ref=${referralCode}`;
     },
 
     /**

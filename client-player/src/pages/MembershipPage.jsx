@@ -274,6 +274,41 @@ const MembershipPage = ({ user, onLogout }) => {
                     const config = (typeof plan.benefits_config === 'string' ? JSON.parse(plan.benefits_config) : plan.benefits_config) || {};
                     const tierName = plan.name.toUpperCase().replace('SOCIO ', '').replace('PLAN ', '');
 
+                    // TEMPORALMENTE DESHABILITADO - Membresía Embajador
+                    const isEmbajadorPlan = plan.name.toLowerCase().includes('embajador');
+                    if (isEmbajadorPlan) {
+                        return (
+                            <div key={plan.id} className="plan-card tier-ambassador disabled-card" style={{ opacity: 0.5, pointerEvents: 'none' }}>
+                                <div className="ambassador-banner" style={{ background: '#666' }}>
+                                    <span>PRÓXIMAMENTE</span>
+                                </div>
+                                <div className="card-content-wrapper">
+                                    <div className="card-header">
+                                        <div className="tier-icon"><FaCrown className="tier-icon ambassador" style={{ color: '#888' }} /></div>
+                                        <h2 className="tier-name" style={{ color: '#888' }}>SOCIO EMBAJADOR</h2>
+                                        <div className="tier-price-container">
+                                            <span className="price" style={{ color: '#888' }}>${parseFloat(plan.price).toLocaleString()} ARS</span>
+                                            <span className="period">/mes</span>
+                                        </div>
+                                    </div>
+                                    <div className="separator-line"></div>
+                                    <div className="benefits-list">
+                                        <div className="benefit-row" style={{ color: '#666' }}>
+                                            <FaGift className="icon" />
+                                            <div>
+                                                <strong>Sistema de Referidos</strong>
+                                                <span className="subtext">En desarrollo - Próximamente disponible</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button className="subscribe-btn" disabled style={{ background: '#555', cursor: 'not-allowed' }}>
+                                        🚧 PRÓXIMAMENTE
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    }
+
                     const isActive = isPlanActive(plan.id, plan.name);
                     const isPending = isPlanPending(plan.id);
                     const isEmbajador = plan.name.toLowerCase().includes('embajador');

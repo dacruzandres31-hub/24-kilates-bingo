@@ -1,215 +1,384 @@
 import React, { useState, useEffect } from 'react';
-import { Copy, Users, Gift, ChevronRight, Share2, CheckCircle } from 'lucide-react';
+import { 
+    Copy, Users, Gift, Share2, CheckCircle, Crown, 
+    TrendingUp, Calendar, DollarSign, HelpCircle,
+    ChevronDown, ChevronUp, Wallet, Award
+} from 'lucide-react';
 import axios from 'axios';
+import ReferralTree from './ReferralTree';
+import EmbajadorInfoModal from './EmbajadorInfoModal';
 import './ReferralDashboard.css';
 
+// Referral Dashboard v2.0 - Red de Referidos con comisiones
+const API_BASE = import.meta.env.VITE_API_URL || '';
+
 const ReferralDashboard = ({ onClose }) => {
-    const [referralCode, setReferralCode] = useState('');
-    const [referredUsers, setReferredUsers] = useState([]);
-    const [rewardsHistory, setRewardsHistory] = useState([]);
-    const [activeTab, setActiveTab] = useState('network'); // 'network' or 'rewards'
-    const [stats, setStats] = useState({
-        totalEarned: 0,
-        pending: 0,
-        registered: 0,
-        levels: { l1: 0, l2: 0, l3: 0, l4: 0 }
-    });
+    const [referralData, setReferralData] = useState(null);
+    const [commissions, setCommissions] = useState(null);
+    const [claimStatus, setClaimStatus] = useState(null);
+    const [activeTab, setActiveTab] = useState('tree');
     const [copied, setCopied] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [claiming, setClaiming] = useState(false);
+    const [showInfoModal, setShowInfoModal] = useState(false);
+    const [expandedStats, setExpandedStats] = useState(false);
 
     useEffect(() => {
-        fetchReferralData();
+        fetchAllData();
     }, []);
 
-    const fetchReferralData = async () => {
-        try {
-            const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
-            // Step 1: Get profile for referral code
-            const profileRes = await axios.get('/api/users/profile', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            setReferralCode(profileRes.data.referral_code);
+    const fetchAllData = async () => {
+        const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
+        const headers = { 'Authorization': `Bearer ${token}` };
 
-            // Step 2: Get referral stats/list
-            const referralsRes = await axios.get('/api/referrals/my-referrals', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            setReferredUsers(referralsRes.data.referrals || []);
-            setRewardsHistory(referralsRes.data.rewards || []);
-            setStats(referralsRes.data.stats || {
-                totalEarned: 0,
-                pending: 0,
-                registered: 0,
-                levels: { l1: 0, l2: 0, l3: 0, l4: 0 }
-            });
+        // Fetch referrals data - principal
+        try {
+            const referralsRes = await axios.get(`${API_BASE}/api/referrals/my-referrals`, { headers });
+            setReferralData(referralsRes.data.data || referralsRes.data);
         } catch (error) {
-            console.error('Error fetching referral data:', error);
-        } finally {
-            setLoading(false);
+            console.error('Error fetching referrals:', error);
         }
+
+        // Fetch commissions - secundario
+        try {
+            const commissionsRes = await axios.get(`${API_BASE}/api/referrals/commissions`, { headers });
+            setCommissions(commissionsRes.data.data || commissionsRes.data);
+        } catch (error) {
+            console.error('Error fetching commissions:', error);
+        }
+
+        // Fetch claim status - secundario
+        try {
+            const claimRes = await axios.get(`${API_BASE}/api/referrals/claim-status`, { headers });
+            setClaimStatus(claimRes.data.data || claimRes.data);
+        } catch (error) {
+            console.error('Error fetching claim status:', error);
+        }
+
+        setLoading(false);
+    };
+
+    // Generar link de referido - usar API o fallback local
+    const getReferralLink = () => {
+        if (loading) {
+            return 'Cargando...';
+        }
+        if (referralData?.referral_link) {
+            return referralData.referral_link;
+        }
+        if (referralData?.referral_code) {
+            return `https://24kilates.xyz/register?ref=${referralData.referral_code}`;
+        }
+        // Si no hay código, mostrar mensaje
+        return 'Generando código...';
     };
 
     const copyToClipboard = () => {
-        const referralLink = `${window.location.origin}/register?ref=${referralCode}`;
-        navigator.clipboard.writeText(referralLink);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        const link = getReferralLink();
+        if (link) {
+            navigator.clipboard.writeText(link);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } else {
+            alert('No tienes un código de referido asignado aún. Contacta a soporte.');
+        }
     };
 
     const shareOnWhatsApp = () => {
-        const referralLink = `${window.location.origin}/register?ref=${referralCode}`;
-        const text = encodeURIComponent(`¡Únete a 24K Bingo y gana conmigo! Regístrate aquí: ${referralLink}`);
-        window.open(`https://wa.me/?text=${text}`, '_blank');
+        const link = getReferralLink();
+        if (link) {
+            const text = encodeURIComponent(
+                `🎰 ¡Únete a 24K Bingo Club VIP! \n\n` +
+                `💰 Juega y gana premios reales\n` +
+                `🎁 Bonus de bienvenida\n` +
+                `👑 Programa de referidos con comisiones\n\n` +
+                `Regístrate aquí: ${link}`
+            );
+            window.open(`https://wa.me/?text=${text}`, '_blank');
+        } else {
+            alert('No tienes un código de referido asignado aún. Contacta a soporte.');
+        }
     };
+
+    const handleClaimCommissions = async () => {
+        if (!claimStatus?.canClaim) return;
+        
+        setClaiming(true);
+        try {
+            const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
+            const res = await axios.post(
+                `${API_BASE}/api/referrals/commissions/claim`,
+                {},
+                { headers: { 'Authorization': `Bearer ${token}` } }
+            );
+            
+            alert(`✅ ${res.data.data?.message || '¡Comisiones cobradas!'}`);
+            fetchAllData();
+        } catch (error) {
+            alert(error.response?.data?.message || 'Error al cobrar comisiones');
+        } finally {
+            setClaiming(false);
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="referral-modal-overlay">
+                <div className="referral-dashboard loading-state">
+                    <div className="loading-spinner"></div>
+                    <p>Cargando tu red de referidos...</p>
+                </div>
+            </div>
+        );
+    }
+
+    const stats = referralData?.stats || {};
+    const commissionSummary = referralData?.commissions || commissions?.summary || {};
 
     return (
         <div className="referral-modal-overlay">
-            <div className="referral-dashboard">
+            <div className="referral-dashboard enhanced">
+                {/* Header */}
                 <div className="referral-header">
-                    <h2>🎁 Programa de Referidos</h2>
-                    <button className="btn-close" onClick={onClose}>&times;</button>
+                    <div className="header-title">
+                        <Crown className="crown-icon" />
+                        <h2>Red de Referidos</h2>
+                    </div>
+                    <div className="header-actions">
+                        <button 
+                            className="btn-info" 
+                            onClick={() => setShowInfoModal(true)}
+                            title="¿Cómo funciona?"
+                        >
+                            <HelpCircle size={20} />
+                        </button>
+                        <button className="btn-close" onClick={onClose}>&times;</button>
+                    </div>
                 </div>
 
-                <div className="referral-content">
-                    <div className="referral-promo-card">
-                        <div className="promo-text">
-                            <h3>¡Ganá 5 Cartones Plata!</h3>
-                            <p>Invita a tus amigos. Cuando realicen su primera compra, recibirás 5 cartones para Sala Plata ¡Gratis!</p>
+                {/* Hero Stats */}
+                <div className="hero-stats-section">
+                    <div className="hero-stat primary">
+                        <div className="stat-icon">
+                            <Users size={28} />
                         </div>
-                        <Gift className="promo-icon" size={48} />
-                    </div>
-
-                    <div className="stats-grid">
-                        <div className="stat-box">
-                            <span className="stat-val">{stats.registered}</span>
-                            <span className="stat-label">Red Total</span>
-                        </div>
-                        <div className="stat-box">
-                            <span className="stat-val">{stats.totalEarned}</span>
-                            <span className="stat-label">Cartones Ganados</span>
+                        <div className="stat-content">
+                            <span className="stat-value">{stats.total || 0}</span>
+                            <span className="stat-label">Referidos Totales</span>
                         </div>
                     </div>
-
-                    <div className="network-levels-summary">
-                        <div className="level-item">
-                            <span className="l-name">Nivel 1</span>
-                            <span className="l-val">{stats.levels?.l1 || 0}</span>
+                    <div className="hero-stat embajador">
+                        <div className="stat-icon">
+                            <Crown size={28} />
                         </div>
-                        <div className="level-item">
-                            <span className="l-name">Nivel 2</span>
-                            <span className="l-val">{stats.levels?.l2 || 0}</span>
-                        </div>
-                        <div className="level-item">
-                            <span className="l-name">Nivel 3</span>
-                            <span className="l-val">{stats.levels?.l3 || 0}</span>
-                        </div>
-                        <div className="level-item">
-                            <span className="l-name">Nivel 4</span>
-                            <span className="l-val">{stats.levels?.l4 || 0}</span>
+                        <div className="stat-content">
+                            <span className="stat-value">{stats.embajadores || 0}</span>
+                            <span className="stat-label">Embajadores Activos</span>
                         </div>
                     </div>
+                    <div className="hero-stat earnings">
+                        <div className="stat-icon">
+                            <DollarSign size={28} />
+                        </div>
+                        <div className="stat-content">
+                            <span className="stat-value">
+                                ${(commissionSummary.pending?.total || 0).toLocaleString()}
+                            </span>
+                            <span className="stat-label">Pendiente Cobrar</span>
+                        </div>
+                    </div>
+                </div>
 
-                    <div className="referral-link-section">
-                        <label>Tu enlace de invitación:</label>
-                        <div className="link-copy-group">
-                            <input
-                                type="text"
-                                readOnly
-                                value={`${window.location.origin}/register?ref=${referralCode}`}
-                            />
-                            <button
-                                className={`btn-copy ${copied ? 'copied' : ''}`}
-                                onClick={copyToClipboard}
+                {/* Claim Period Banner */}
+                {claimStatus && (
+                    <div className={`claim-period-banner ${claimStatus.isClaimPeriod ? 'active' : 'inactive'}`}>
+                        <Calendar size={18} />
+                        <span>{claimStatus.message}</span>
+                        {claimStatus.canClaim && (
+                            <button 
+                                className="btn-claim"
+                                onClick={handleClaimCommissions}
+                                disabled={claiming}
                             >
-                                {copied ? <CheckCircle size={18} /> : <Copy size={18} />}
+                                <Wallet size={16} />
+                                {claiming ? 'Cobrando...' : `Cobrar $${claimStatus.pendingAmount}`}
                             </button>
+                        )}
+                    </div>
+                )}
+
+                {/* Level Stats Collapsible */}
+                <div className="levels-stats-container">
+                    <button 
+                        className="levels-toggle"
+                        onClick={() => setExpandedStats(!expandedStats)}
+                    >
+                        <span>Referidos por Nivel</span>
+                        {expandedStats ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                    </button>
+                    {expandedStats && (
+                        <div className="levels-grid">
+                            <div className="level-stat level-1">
+                                <div className="level-badge">N1</div>
+                                <div className="level-info">
+                                    <span className="level-count">{stats.levels?.l1 || 0}</span>
+                                    <span className="level-percent">4% comisión</span>
+                                </div>
+                            </div>
+                            <div className="level-stat level-2">
+                                <div className="level-badge">N2</div>
+                                <div className="level-info">
+                                    <span className="level-count">{stats.levels?.l2 || 0}</span>
+                                    <span className="level-percent">3% comisión</span>
+                                </div>
+                            </div>
+                            <div className="level-stat level-3">
+                                <div className="level-badge">N3</div>
+                                <div className="level-info">
+                                    <span className="level-count">{stats.levels?.l3 || 0}</span>
+                                    <span className="level-percent">2% comisión</span>
+                                </div>
+                            </div>
+                            <div className="level-stat level-4">
+                                <div className="level-badge">N4</div>
+                                <div className="level-info">
+                                    <span className="level-count">{stats.levels?.l4 || 0}</span>
+                                    <span className="level-percent">1% comisión</span>
+                                </div>
+                            </div>
                         </div>
+                    )}
+                </div>
+
+                {/* Referral Link Section */}
+                <div className="referral-link-section enhanced">
+                    <div className="link-header">
+                        <Gift size={20} />
+                        <span>Tu enlace de invitación</span>
+                    </div>
+                    <div className="link-copy-group">
+                        <input
+                            type="text"
+                            readOnly
+                            value={getReferralLink()}
+                            className={loading ? 'loading' : ''}
+                        />
+                        <button
+                            className={`btn-copy ${copied ? 'copied' : ''}`}
+                            onClick={copyToClipboard}
+                        >
+                            {copied ? <CheckCircle size={18} /> : <Copy size={18} />}
+                        </button>
+                    </div>
+                    <div className="share-buttons">
                         <button className="btn-whatsapp" onClick={shareOnWhatsApp}>
                             <Share2 size={18} />
                             <span>Compartir por WhatsApp</span>
                         </button>
                     </div>
+                </div>
 
-                    <div className="referral-tabs">
-                        <button
-                            className={`tab-btn ${activeTab === 'network' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('network')}
-                        >
-                            Mi Red
-                        </button>
-                        <button
-                            className={`tab-btn ${activeTab === 'rewards' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('rewards')}
-                        >
-                            Historial Premios
-                        </button>
-                    </div>
+                {/* Tabs */}
+                <div className="referral-tabs">
+                    <button
+                        className={`tab-btn ${activeTab === 'tree' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('tree')}
+                    >
+                        <Users size={16} />
+                        Árbol de Red
+                    </button>
+                    <button
+                        className={`tab-btn ${activeTab === 'commissions' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('commissions')}
+                    >
+                        <TrendingUp size={16} />
+                        Historial Comisiones
+                    </button>
+                </div>
 
-                    <div className="tab-content-section">
-                        {activeTab === 'network' ? (
-                            <div className="referrals-list-section">
-                                <h4>Tus Referidos (4 Niveles)</h4>
-                                {loading ? (
-                                    <p className="loading-text">Cargando...</p>
-                                ) : referredUsers.length > 0 ? (
-                                    <div className="referrals-list">
-                                        {referredUsers.map((ref, idx) => (
-                                            <div key={idx} className="referral-item">
-                                                <div className="ref-info">
-                                                    <div className="name-level-row">
-                                                        <div className="name-with-indicator">
-                                                            <span className={`ambassador-indicator ${ref.is_ambassador ? 'active' : ''}`} title={ref.tier_name || 'Sin membresía'}></span>
-                                                            <span className="ref-name">{ref.username}</span>
-                                                        </div>
-                                                        <span className={`level-badge level-${ref.level}`}>N{ref.level}</span>
-                                                    </div>
-                                                    <span className="ref-date">Registrado: {new Date(ref.created_at).toLocaleDateString()}</span>
-                                                </div>
-                                            </div>
-                                        ))}
+                {/* Tab Content */}
+                <div className="tab-content-section">
+                    {activeTab === 'tree' ? (
+                        <ReferralTree referrals={referralData?.referrals || []} />
+                    ) : (
+                        <div className="commissions-history">
+                            <div className="commission-summary-cards">
+                                <div className="summary-card pending">
+                                    <Award size={24} />
+                                    <div className="summary-info">
+                                        <span className="amount">
+                                            ${(commissionSummary.pending?.total || 0).toLocaleString()}
+                                        </span>
+                                        <span className="label">
+                                            {commissionSummary.pending?.count || 0} pendientes
+                                        </span>
                                     </div>
-                                ) : (
-                                    <p className="empty-text">Aún no tienes referidos. ¡Empieza a invitar!</p>
-                                )}
+                                </div>
+                                <div className="summary-card claimed">
+                                    <CheckCircle size={24} />
+                                    <div className="summary-info">
+                                        <span className="amount">
+                                            ${(commissionSummary.claimed?.total || 0).toLocaleString()}
+                                        </span>
+                                        <span className="label">
+                                            {commissionSummary.claimed?.count || 0} cobradas
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
-                        ) : (
-                            <div className="rewards-history-section">
-                                <h4>Tus Recompensas (5 Cartones Plata c/u)</h4>
-                                {loading ? (
-                                    <p className="loading-text">Cargando...</p>
-                                ) : rewardsHistory.length > 0 ? (
-                                    <div className="rewards-list">
-                                        {rewardsHistory.map((reward, idx) => (
-                                            <div key={idx} className={`reward-item-row ${reward.status}`}>
-                                                <div className="reward-info">
-                                                    <div className="reward-source">
-                                                        <span className="source-label">De:</span>
-                                                        <span className="source-name">{reward.source_username}</span>
-                                                    </div>
-                                                    <span className="reward-date">
-                                                        {reward.status === 'credited'
-                                                            ? `Cobrado: ${new Date(reward.credited_at).toLocaleDateString()}`
-                                                            : `En cola desde: ${new Date(reward.created_at).toLocaleDateString()}`
-                                                        }
+
+                            {commissions?.commissions?.length > 0 ? (
+                                <div className="commissions-list">
+                                    {commissions.commissions.map((c, idx) => (
+                                        <div key={idx} className={`commission-item ${c.status}`}>
+                                            <div className="commission-left">
+                                                <div className="commission-source">
+                                                    <span className="source-name">{c.sourceUsername}</span>
+                                                    <span className={`level-badge small level-${c.level}`}>
+                                                        N{c.level}
                                                     </span>
                                                 </div>
-                                                <div className="reward-status-col">
-                                                    <span className={`status-badge ${reward.status}`}>
-                                                        {reward.status === 'credited' ? 'COBRADO' : 'PENDIENTE'}
-                                                    </span>
-                                                    <span className="reward-amount">+5 Cartones</span>
-                                                </div>
+                                                <span className="commission-date">
+                                                    {new Date(c.createdAt).toLocaleDateString('es-AR')}
+                                                </span>
                                             </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <p className="empty-text">Aún no has generado premios. Los verás aquí cuando tus amigos depositen.</p>
-                                )}
-                            </div>
-                        )}
+                                            <div className="commission-right">
+                                                <span className="commission-amount">
+                                                    +${c.amount.toLocaleString()}
+                                                </span>
+                                                <span className={`status-badge ${c.status}`}>
+                                                    {c.status === 'claimed' ? 'COBRADA' : 'PENDIENTE'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="empty-commissions">
+                                    <Gift size={48} />
+                                    <p>Aún no tienes comisiones</p>
+                                    <span>Las comisiones se generan cuando tus referidos compran la Membresía Embajador</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {/* CTA Banner */}
+                <div className="cta-banner" onClick={() => setShowInfoModal(true)}>
+                    <Crown size={24} />
+                    <div className="cta-text">
+                        <strong>¿Querés ganar comisiones por tu red?</strong>
+                        <span>Activá la Membresía Embajador y empezá a ganar</span>
                     </div>
+                    <ChevronDown size={20} className="cta-arrow" />
                 </div>
             </div>
+
+            {/* Info Modal */}
+            {showInfoModal && (
+                <EmbajadorInfoModal onClose={() => setShowInfoModal(false)} />
+            )}
         </div>
     );
 };

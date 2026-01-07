@@ -323,13 +323,17 @@ router.post('/memberships/subscriptions/:subscriptionId/renew', authenticateToke
 
 // Eliminar/Cancelar membresía
 router.delete('/memberships/subscriptions/:subscriptionId', authenticateToken, isAndy, async (req, res) => {
+  const db = require('../db');
+  const connection = await db.getConnection();
+  
   try {
     const { subscriptionId } = req.params;
-    const db = require('../db');
+    
+    await connection.beginTransaction();
     
     // Obtener suscripción actual para el log
-    const [subs] = await db.query(`
-      SELECT us.*, m.name as plan_name, u.username
+    const [subs] = await connection.query(`
+      SELECT us.*, m.name as plan_name, u.username, u.id as user_id
       FROM user_subscriptions us
       JOIN memberships m ON us.membership_id = m.id
       JOIN users u ON us.user_id = u.id
@@ -337,27 +341,77 @@ router.delete('/memberships/subscriptions/:subscriptionId', authenticateToken, i
     `, [subscriptionId]);
     
     if (!subs.length) {
+      await connection.rollback();
       return res.status(404).json({ error: 'Suscripción no encontrada' });
     }
     
     const sub = subs[0];
+    const isEmbajador = sub.plan_name.toLowerCase().includes('embajador');
     
-    // Marcar como cancelada (no eliminar para mantener historial)
-    await db.query(`
+    // 1. Marcar suscripción como cancelada
+    await connection.query(`
       UPDATE user_subscriptions 
       SET status = 'cancelled', auto_renew = 0
       WHERE id = ?
     `, [subscriptionId]);
     
-    console.log(`💎 [MEMBERSHIP] Andy eliminó membresía de ${sub.username} (${sub.plan_name})`);
+    // 2. Limpiar beneficios del usuario según el tipo de membresía
+    if (isEmbajador) {
+      // Membresía Embajador: quitar is_ambassador
+      await connection.query(`
+        UPDATE users 
+        SET is_ambassador = FALSE
+        WHERE id = ?
+      `, [sub.user_id]);
+      console.log(`💎 [MEMBERSHIP] Andy quitó membresía Embajador de ${sub.username}`);
+    } else {
+      // Membresía de tier (Bronce/Plata/Oro): verificar si tiene otras activas
+      const [otherActiveTiers] = await connection.query(`
+        SELECT us.id 
+        FROM user_subscriptions us
+        JOIN memberships m ON us.membership_id = m.id
+        WHERE us.user_id = ? 
+          AND us.status = 'active' 
+          AND us.id != ?
+          AND m.name NOT LIKE '%embajador%'
+        LIMIT 1
+      `, [sub.user_id, subscriptionId]);
+      
+      // Si no tiene otras membresías de tier activas, limpiar subscription_tier_id
+      if (otherActiveTiers.length === 0) {
+        await connection.query(`
+          UPDATE users 
+          SET subscription_tier_id = NULL,
+              monthly_free_cards_balance = 0,
+              daily_wheel_spins_balance = 0
+          WHERE id = ?
+        `, [sub.user_id]);
+      }
+      console.log(`💎 [MEMBERSHIP] Andy quitó membresía ${sub.plan_name} de ${sub.username}`);
+    }
+    
+    // 3. Registrar en audit_logs
+    await connection.query(`
+      INSERT INTO audit_logs (user_id, action, details, created_at)
+      VALUES (?, 'membership_removed_by_admin', ?, NOW())
+    `, [sub.user_id, JSON.stringify({
+      subscription_id: subscriptionId,
+      plan_name: sub.plan_name,
+      removed_by: req.user.username || 'Andy'
+    })]);
+    
+    await connection.commit();
     
     res.json({ 
       success: true, 
-      message: `Membresía de ${sub.username} eliminada correctamente`
+      message: `Membresía ${sub.plan_name} de ${sub.username} eliminada correctamente`
     });
   } catch (error) {
+    await connection.rollback();
     console.error('Error deleting membership:', error);
-    res.status(500).json({ error: 'Error al eliminar membresía' });
+    res.status(500).json({ error: 'Error al eliminar membresía: ' + error.message });
+  } finally {
+    connection.release();
   }
 });
 

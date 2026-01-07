@@ -9,26 +9,29 @@ import PlayerSidebar from './PlayerSidebar';
 import CardSelectionLobby from './CardSelectionLobby';
 import BingoCardPreview from './BingoCardPreview';
 import Countdown from './Countdown';
-import ModernBallMachine from './ModernBallMachine';
-import RecentBallsPanel from './RecentBallsPanel';
-import JackpotDisplay from './JackpotDisplay';
-import useSocket from '../hooks/useSocket';
-import useBingoTerminal from '../hooks/useBingoTerminal';
-import PendingPrizesModal from './PendingPrizesModal';
-import { checkPendingPrizes } from '../helpers/pendingPrizesHelper';
+import useLiveDraw from '../hooks/useLiveDraw';
 
 export default function BronzeRoom({ onLogout }) {
   const { sessionId } = useParams();
   const navigate = useNavigate();
-  const socket = useSocket();
-  const [ballsDrawn, setBallsDrawn] = useState([]);
+  
+  // Hook para sorteo en vivo - reemplaza la simulación local
+  const {
+    ballsDrawn,
+    currentBall,
+    gameStatus,
+    sessionId: liveSessionId,
+    prizes: livePrizes,
+    isLoading: liveDrawLoading,
+    setBallsDrawn,
+    setCurrentBall,
+    setGameStatus
+  } = useLiveDraw('bronce');
+  
   const [lastBall, setLastBall] = useState(null);
-  const [gameStatus, setGameStatus] = useState('waiting'); // waiting, active, ended
   const [previousGameStatus, setPreviousGameStatus] = useState('waiting'); // Para detectar cambios
-  const [currentBall, setCurrentBall] = useState(null);
   const [floatingBalls, setFloatingBalls] = useState([]);
   const [almostLineCards, setAlmostLineCards] = useState([]); // Cartones a 2 bolillas de línea
-  const [almostBingoCards, setAlmostBingoCards] = useState([]); // Cartones a 1-2 números de Bingo
   const [expandedCard, setExpandedCard] = useState(null); // Cartón expandido actualmente
   const [canCloseExpandedCard, setCanCloseExpandedCard] = useState(true); // Controla si se puede cerrar el cartón expandido
   const [lastHitCard, setLastHitCard] = useState(null); // Último cartón con acierto
@@ -37,33 +40,22 @@ export default function BronzeRoom({ onLogout }) {
   const [lineCelebrated, setLineCelebrated] = useState(false); // Flag de festejo activo
   const [bingoWinnerCard, setBingoWinnerCard] = useState(null); // Cartón ganador de BINGO
   const [bingoCelebrated, setBingoCelebrated] = useState(false); // Flag de festejo BINGO activo
+  // Estado de ventas (T-5 closure)
+  const [salesClosed, setSalesClosed] = useState(false);
+  const [salesMessage, setSalesMessage] = useState('');
+  const [nextSessionTime, setNextSessionTime] = useState(null);
   const [showVoiceSelector, setShowVoiceSelector] = useState(false); // Selector de voz
   const [availableVoices, setAvailableVoices] = useState([]); // Voces disponibles
   const [currentVoice, setCurrentVoice] = useState(null); // Voz actual
   const [audioStatus, setAudioStatus] = useState({ musicEnabled: true, efectosEnabled: true }); // Estado UI audio
-  const [pauseTimeout, setPauseTimeout] = useState(null); // Controlar pausa automática
-  const [highlightedLine, setHighlightedLine] = useState(null); // Línea a resaltar
-  const [cardWinningLines, setCardWinningLines] = useState({}); // líneas ganadoras por cartón
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
-
-  // --- STATE DECLARATIONS (MOVED UP FOR HOOK DEPENDENCIES) ---
+const [pauseTimeout, setPauseTimeout] = useState(null); // Controlar pausa automática
+const [highlightedLine, setHighlightedLine] = useState(null); // Línea a resaltar
+const [cardWinningLines, setCardWinningLines] = useState({}); // {cardId: [0,1,2]} líneas ganadoras por cartón
   const [sidebarOpen, setSidebarOpen] = useState(false); // Estado del sidebar
   const [showCardSelection, setShowCardSelection] = useState(false); // Mostrar lobby de selección de cartones
   const [selectedPlayerCards, setSelectedPlayerCards] = useState([]); // Cartones seleccionados por el jugador
-  const [pendingPrizes, setPendingPrizes] = useState(null); // Premios pendientes
-  const [showPrizesModal, setShowPrizesModal] = useState(false); // Modal de premios
   const [cardsRemaining, setCardsRemaining] = useState(20); // Cartones que faltan por seleccionar
   const [showReadyModal, setShowReadyModal] = useState(false); // Modal "¡¡Todo Listo!!"
-  const [timeRemaining, setTimeRemaining] = useState(null);
-  const [nextDrawTime, setNextDrawTime] = useState(null);
-
-  // --- TERMINAL AUTOMÁTICA ---
-  const { alreadyClaimedLine, alreadyClaimedBingo } = useBingoTerminal(
-    selectedPlayerCards,
-    ballsDrawn,
-    sessionId,
-    socket
-  );
 
   // Auto-cerrar modal "¡¡Todo Listo!!" después de 5 segundos
   useEffect(() => {
@@ -74,14 +66,14 @@ export default function BronzeRoom({ onLogout }) {
       return () => clearTimeout(timer);
     }
   }, [showReadyModal]);
-
+  
   // Estados para mejoras visuales
   const [toasts, setToasts] = useState([]); // Notificaciones toast
   const [showConfetti, setShowConfetti] = useState(false); // Confeti digital
   const [luckMeter, setLuckMeter] = useState(0); // Medidor de suerte (0-100)
   const [comboCount, setComboCount] = useState(0); // Contador de combo
   const [lastComboTime, setLastComboTime] = useState(Date.now()); // Último tiempo de combo
-
+  
   // Nuevos estados para mejoras visuales adicionales
   const [cardsDealing, setCardsDealing] = useState(false); // Animación de entrada de cartones
   const [markedNumbers, setMarkedNumbers] = useState([]); // Números marcados con efecto
@@ -89,109 +81,79 @@ export default function BronzeRoom({ onLogout }) {
   const [celebrationMode, setCelebrationMode] = useState(false); // Modo celebración full
   const [winAmount, setWinAmount] = useState(0); // Monto ganado para animación
   const [stateTransition, setStateTransition] = useState(''); // Transición entre estados
-  const [columnCounts, setColumnCounts] = useState([0, 0, 0, 0, 0, 0, 0, 0, 0]); // Contador por columna
-  const [pots, setPots] = useState({ bingo: 0, linea: 0, pre40: 0 }); // Pozos
+  const [columnCounts, setColumnCounts] = useState([0,0,0,0,0,0,0,0,0]); // Contador por columna
+  
+// Efectos de festejo (fuera del componente o arriba)
+const celebrationAudio = new Audio('/audio/celebration.mp3');
+celebrationAudio.volume = 0.7;
 
-  // Efectos de festejo (fuera del componente o arriba)
-  const celebrationAudio = new Audio('/audio/celebration.mp3');
-  celebrationAudio.volume = 0.7;
-
-  // Verificar cartones existentes del jugador al montar
-  const checkExistingCards = async () => {
-    try {
-      const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
-      const response = await fetch(`/api/cards/my-selected/bronze${sessionId ? `?sessionId=${sessionId}` : ''}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        // Filtrar solo cartones con status 'selected' (ignorando los 'used' de partidas anteriores)
-        const allCards = data.cards || [];
-
-        // Filtro de "Zombie Cards": Solo considerar cartones seleccionados en las últimas 12 horas
-        const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000);
-
-        const currentCards = allCards.filter(c => {
-          const isSelected = c.status === 'selected';
-          const isFresh = new Date(c.selectedAt) > twelveHoursAgo;
-          return isSelected && isFresh;
+  // Verificar estado de ventas (T-5 closure) cada 30 segundos
+  useEffect(() => {
+    const checkSalesStatus = async () => {
+      try {
+        const response = await fetch('/api/game/sales-status/bronce', {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         });
-
-        console.log('🔍 DEBUG - Cartones cargados (Activos):', currentCards);
-
-        setSelectedPlayerCards(currentCards);
-
-        // Integrar Terminal Automática (Cantar premios)
-        // (El hook ya se encarga de monitorear ballsDrawn)
-
-        // Calcular restantes excluyendo cartones de regalo (isGift=true)
-        const nonGiftCards = currentCards.filter(c => !c.isGift);
-        const remaining = 20 - nonGiftCards.length;
-        setCardsRemaining(remaining);
-
-        // Si tiene menos de 20 (pagos), mostrar botón
-        if (remaining > 0) {
-          console.log(`📋 Tiene ${nonGiftCards.length} cartones pagos y ${currentCards.length - nonGiftCards.length} de regalo. Faltan ${remaining} para el límite.`);
-        } else {
-          console.log('✅ Ya tiene 20 cartones completos');
+        
+        if (response.ok) {
+          const data = await response.json();
+          setSalesClosed(!data.salesOpen);
+          setSalesMessage(data.message || '');
+          setNextSessionTime(data.nextSession);
+          
+          if (!data.salesOpen) {
+            console.log(`🔒 Ventas cerradas: ${data.reason} - ${data.message}`);
+          }
         }
+      } catch (error) {
+        console.log('Error verificando estado de ventas:', error);
       }
-    } catch (error) {
-      console.log('Sin cartones previos');
-      setCardsRemaining(20);
-    }
-  };
-
-
-  // Cargar estado de la sala (siguiente sorteo)
-  const loadRoomStatus = async () => {
-    try {
-      const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
-      const response = await fetch(`/api/game/room-status/bronze`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        // Actualizar pozos desde la API
-        if (data.session) {
-          setPots({
-            bingo: parseFloat(data.session.current_pot_bingo || data.session.jackpot_bingo || 0),
-            linea: parseFloat(data.session.current_pot_linea || data.session.jackpot_linea || 0),
-            pre40: parseFloat(data.session.accumulated_pot || data.session.jackpot_pre40 || 0)
-          });
-        }
-
-        if (data.nextDraw) {
-          const drawDate = new Date(data.nextDraw);
-          setNextDrawTime(drawDate);
-          const seconds = Math.max(0, Math.floor((drawDate - new Date()) / 1000));
-          setTimeRemaining(seconds);
-        }
-      }
-    } catch (error) {
-      console.error('Error loading room status:', error);
-    }
-  };
-
-  // Efecto para actualizar el contador cada segundo
-  useEffect(() => {
-    let interval = null;
-    if (nextDrawTime) {
-      interval = setInterval(() => {
-        const seconds = Math.max(0, Math.floor((nextDrawTime - new Date()) / 1000));
-        setTimeRemaining(seconds);
-      }, 1000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
     };
-  }, [nextDrawTime]);
+    
+    // Verificar inmediatamente y luego cada 30 segundos
+    checkSalesStatus();
+    const interval = setInterval(checkSalesStatus, 30000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   // Verificar cartones existentes del jugador al montar
   useEffect(() => {
+    const checkExistingCards = async () => {
+      try {
+        const response = await fetch(`/api/game/starter/my-cards/${sessionId || 'starter_default'}`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          const currentCards = data.cards || [];
+          
+          console.log('🔍 DEBUG - Cartones cargados desde /my-cards:', currentCards.map(c => ({
+            id: c.id,
+            serial: c.serial,
+            hasSerial: !!c.serial,
+            hasNumbers: !!c.numbers
+          })));
+          
+          setSelectedPlayerCards(currentCards);
+          const remaining = 20 - currentCards.length;
+          setCardsRemaining(remaining);
+          
+          // Si tiene menos de 20, mostrar botón para seleccionar más
+          if (remaining > 0) {
+            console.log(`📋 Tiene ${currentCards.length} cartones, faltan ${remaining}`);
+          } else {
+            console.log('✅ Ya tiene 20 cartones completos');
+          }
+        }
+      } catch (error) {
+        console.log('Sin cartones previos');
+        setCardsRemaining(20);
+      }
+    };
+    
     checkExistingCards();
-    loadRoomStatus();
   }, [sessionId]);
 
   // Generar número de serie del cartón: DDMMYY-S0001
@@ -228,7 +190,7 @@ export default function BronzeRoom({ onLogout }) {
   const updateCombo = () => {
     const now = Date.now();
     const timeSinceLastBall = now - lastComboTime;
-
+    
     // Si pasó menos de 5 segundos, incrementar combo
     if (timeSinceLastBall < 5000) {
       setComboCount(prev => prev + 1);
@@ -246,7 +208,7 @@ export default function BronzeRoom({ onLogout }) {
     setShowConfetti(true);
     setTimeout(() => setShowConfetti(false), 5000);
   };
-
+  
   // Agregar emoji flotante
   const addFloatingEmoji = (emoji) => {
     const id = Date.now() + Math.random();
@@ -256,7 +218,7 @@ export default function BronzeRoom({ onLogout }) {
       setFloatingEmojis(prev => prev.filter(e => e.id !== id));
     }, 3000);
   };
-
+  
   // Marcar número con efecto
   const markNumberWithEffect = (number) => {
     setMarkedNumbers(prev => [...prev, { number, timestamp: Date.now() }]);
@@ -265,7 +227,7 @@ export default function BronzeRoom({ onLogout }) {
       setMarkedNumbers(prev => prev.filter(n => n.number !== number));
     }, 1500);
   };
-
+  
   // Activar modo celebración al ganar
   const activateCelebration = (amount) => {
     setCelebrationMode(true);
@@ -275,12 +237,12 @@ export default function BronzeRoom({ onLogout }) {
     addFloatingEmoji('🎉');
     addFloatingEmoji('🏆');
     addFloatingEmoji('�');
-
+    
     setTimeout(() => {
       setCelebrationMode(false);
     }, 8000);
   };
-
+  
   // Transición de estado con efecto
   const transitionToState = (newState) => {
     setStateTransition('fade-out');
@@ -290,10 +252,10 @@ export default function BronzeRoom({ onLogout }) {
       setTimeout(() => setStateTransition(''), 500);
     }, 500);
   };
-
+  
   // Actualizar contadores por columna
   const updateColumnCounts = () => {
-    const counts = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+    const counts = [0,0,0,0,0,0,0,0,0];
     ballsDrawn.forEach(ball => {
       const columnIndex = Math.floor((ball.number - 1) / 10);
       counts[columnIndex]++;
@@ -318,10 +280,10 @@ export default function BronzeRoom({ onLogout }) {
 
     // ACTIVACIÓN DE AUDIO - Estrategia múltiple
     let musicStarted = false;
-
+    
     const startMusic = async () => {
       if (musicStarted) return;
-
+      
       try {
         console.log('🎵 [BronzeRoom] Intentando iniciar música...');
         await audioService.playForRoom('bronze');
@@ -349,7 +311,7 @@ export default function BronzeRoom({ onLogout }) {
         }
       });
     };
-
+    
     // Agregar múltiples listeners
     document.addEventListener('click', handleUserInteraction, { once: false });
     document.addEventListener('touchstart', handleUserInteraction, { once: false });
@@ -363,7 +325,7 @@ export default function BronzeRoom({ onLogout }) {
       setAvailableVoices(voices);
       setCurrentVoice(voiceService.getCurrentVoice());
     }, 500);
-
+    
     return () => {
       document.removeEventListener('click', handleUserInteraction);
       document.removeEventListener('touchstart', handleUserInteraction);
@@ -374,149 +336,14 @@ export default function BronzeRoom({ onLogout }) {
     };
   }, []);
 
-  // Escuchar eventos del servidor (Sincronización v2.0 - Basada en SessionId)
-  useEffect(() => {
-    if (!socket || !sessionId) return;
-
-    // Unirse a la sesión específica (Sincronización v2.0)
-    socket.emit('join_session', { sessionId });
-    console.log(`[SOCKET] 🟢 Uniendo a sesión: session_${sessionId}`);
-
-    const handleBallDrawn = (data) => {
-      console.log('🎱 [SOCKET] Bola recibida:', data);
-      // Ignorar si el sessionId no coincide (doble seguridad)
-      if (data.gameSessionId && String(data.gameSessionId) !== String(sessionId)) {
-        console.warn(`[SOCKET] ⚠️ Bola ignorada: pertenece a sesión ${data.gameSessionId}, estamos en ${sessionId}`);
-        return;
-      }
-
-      // data = { number, ballLetter, drawOrder, ... }
-      const newBall = {
-        number: data.number,
-        color: getBallColor(data.number),
-        letter: data.ballLetter || getBallLetter(data.number),
-        id: data.drawOrder,
-        timestamp: Date.now()
-      };
-
-      setCurrentBall(newBall);
-
-      // Reproducir sonido cuando llega el evento
-      audioService.playBolaCayendoConPausa();
-
-      // Agregar a la lista con un pequeño delay para sincro visual
-      setTimeout(() => {
-        setBallsDrawn(prev => {
-          if (prev.some(b => b.number === newBall.number)) return prev;
-          return [...prev, newBall];
-        });
-        setCurrentBall(null);
-      }, 3000);
-    };
-
-    const handleGameStarted = (data) => {
-      console.log('🎮 [SOCKET] Juego iniciado:', data);
-      setGameStatus('active');
-      setBallsDrawn([]);
-      setWinnerCards([]);
-      addToast('🎮', 'JUEGO INICIADO', 'El sorteo ha comenzado');
-
-      if (data.pots) {
-        setPots({
-          bingo: parseFloat(data.pots.bingo || data.pots.jackpot_bingo || 0),
-          linea: parseFloat(data.pots.line || data.pots.jackpot_linea || 0),
-          pre40: parseFloat(data.pots.pre40 || data.pots.jackpot_pre40 || 0)
-        });
-      }
-    };
-
-    const handleGameEnded = (data) => {
-      console.log('🏁 [SOCKET] Juego terminado:', data);
-      setGameStatus('ended');
-      addToast('🏁', 'JUEGO FINALIZADO', 'El sorteo ha terminado');
-    };
-
-    const handlePotUpdate = (data) => {
-      console.log('💰 [SOCKET] Pot update (session specific):', data);
-      setPots({
-        bingo: parseFloat(data.potBingo || 0),
-        linea: parseFloat(data.potLinea || 0),
-        pre40: parseFloat(data.potJackpot || 0)
-      });
-    };
-
-    const handleCurrentGameState = (data) => {
-      console.log('🔄 [SOCKET] Sincronización de estado recibida:', data);
-
-      if (data.isPaused) {
-        setGameStatus('waiting');
-      } else if (data.ballsDrawn && data.ballsDrawn.length > 0) {
-        setGameStatus('active');
-        audioService.startBolilleroGirando();
-      }
-
-      const restoredBalls = (data.ballsDrawn || []).map((num, index) => ({
-        number: num,
-        color: getBallColor(num),
-        letter: getBallLetter(num),
-        id: index + 1
-      }));
-
-      setBallsDrawn(restoredBalls);
-
-      if (data.lastBall) {
-        const last = {
-          number: data.lastBall.number,
-          color: getBallColor(data.lastBall.number),
-          letter: data.lastBall.letter,
-          id: data.drawOrder || restoredBalls.length,
-          timestamp: Date.now()
-        };
-        setLastBall(last);
-        setCurrentBall(null);
-      }
-
-      if (data.lineWinnersPaid) {
-        setLineCelebrated(true);
-      }
-    };
-
-    socket.on('number_drawn', handleBallDrawn);
-    socket.on('game_started', handleGameStarted);
-    socket.on('game_ended', handleGameEnded);
-    socket.on('pot_update', handlePotUpdate);
-    socket.on('current_game_state', handleCurrentGameState);
-
-    // Escuchar actualizaciones globales de pozos (opcional como fallback)
-    socket.on('pots_updated', (data) => {
-      // Si la sesión actual está en los datos globales, actualizar
-      if (data.pots && Array.isArray(data.pots)) {
-        const myPot = data.pots.find(p => String(p.session_id) === String(sessionId));
-        if (myPot) {
-          setPots({
-            bingo: parseFloat(myPot.current_pot_bingo || 0),
-            linea: parseFloat(myPot.current_pot_linea || 0),
-            pre40: parseFloat(myPot.jackpot || 0)
-          });
-        }
-      }
-    });
-
-    return () => {
-      socket.off('number_drawn', handleBallDrawn);
-      socket.off('game_started', handleGameStarted);
-      socket.off('game_ended', handleGameEnded);
-      socket.off('pot_update', handlePotUpdate);
-      socket.off('pots_updated');
-      socket.off('current_game_state', handleCurrentGameState);
-    };
-  }, [socket, sessionId]);
-
+  // NOTA: El sorteo ahora viene del hook useLiveDraw via Socket.IO
+  // La simulación local fue eliminada - las bolas llegan en tiempo real del backend
+  
   // Actualizar contadores de columna cuando cambian las bolas
   useEffect(() => {
     updateColumnCounts();
   }, [ballsDrawn]);
-
+  
   // Reproducir sonido cuando la bola CAE (currentBall se establece)
   useEffect(() => {
     if (currentBall) {
@@ -524,7 +351,7 @@ export default function BronzeRoom({ onLogout }) {
       audioService.playBolaCayendoConPausa();
     }
   }, [currentBall]);
-
+  
   // Animación de entrada de cartones
   useEffect(() => {
     if (selectedPlayerCards.length > 0 && !cardsDealing) {
@@ -532,12 +359,12 @@ export default function BronzeRoom({ onLogout }) {
       setTimeout(() => setCardsDealing(false), selectedPlayerCards.length * 100 + 500);
     }
   }, [selectedPlayerCards.length]);
-
+  
   // Detectar transiciones de estado
   useEffect(() => {
     if (previousGameStatus !== gameStatus) {
       setPreviousGameStatus(gameStatus);
-
+      
       if (gameStatus === 'active') {
         addToast('🎮', 'JUEGO INICIADO', 'El sorteo ha comenzado');
         audioService.startBolilleroGirando();
@@ -562,121 +389,6 @@ export default function BronzeRoom({ onLogout }) {
     return '#A0826D'; // Marrón topo (81-90)
   };
 
-  const getBallLetter = (num) => {
-    if (num <= 18) return 'B';
-    if (num <= 36) return 'I';
-    if (num <= 54) return 'N';
-    if (num <= 72) return 'G';
-    return 'O';
-  };
-
-  // RESTAURAR ESTADO DEL JUEGO
-  const restoreGameState = async () => {
-    try {
-      console.log('🔄 [BronzeRoom] Restaurando estado del juego...');
-      const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
-      const response = await fetch(`/api/game/sessions/${sessionId}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const session = data.session;
-
-        // 1. Restaurar estado de sesión
-        // 'playing' es el estado interno del engine cuando está sorteando
-        // 'active' es cuando está abierta (pero quizás en pausa o previo)
-        if (session.status === 'active' || session.status === 'playing') {
-          console.log(`🔄 [BronzeRoom] Estado restaurado: ${session.status} -> active`);
-          setGameStatus('active');
-          // Forzar inicio de audio si ya está activo
-          audioService.startBolilleroGirando();
-          audioService.lowerMusicVolume();
-        } else if (session.status === 'ended' || session.status === 'completed') {
-          setGameStatus('ended');
-          audioService.stopBolilleroGirando();
-          audioService.restoreMusicVolume();
-        }
-
-        // 2. Restaurar bolas sorteadas
-        // Check both drawnNumbers (array) and ball_sequence (stringified JSON potentially)
-        // Adjust based on what API returns.
-        let nums = session.drawnNumbers || [];
-        // If API returns ball_sequence string, parse it
-        if (!nums.length && session.ball_sequence) {
-          try { nums = typeof session.ball_sequence === 'string' ? JSON.parse(session.ball_sequence) : session.ball_sequence; }
-          catch (e) { console.error('Error parsing ball_sequence', e); }
-        }
-
-        if (nums && nums.length > 0) {
-          const restoredBalls = nums.map((num, index) => ({
-            number: num,
-            color: getBallColor(num),
-            letter: getBallLetter(num),
-            id: index
-          }));
-
-          setBallsDrawn(restoredBalls);
-          console.log(`🎱 [BronzeRoom] ${restoredBalls.length} bolillas restauradas.`);
-
-          if (restoredBalls.length > 0) {
-            const last = restoredBalls[restoredBalls.length - 1];
-            setLastBall(last);
-            setCurrentBall(last);
-          }
-
-          // IMPORTANTE: Actualizar contadores de columnas para que se vean marcadas en el grid
-          const newColumnCounts = [0, 0, 0, 0, 0, 0, 0, 0, 0];
-          restoredBalls.forEach(ball => {
-            const columnIndex = Math.floor((ball.number - 1) / 10);
-            if (columnIndex >= 0 && columnIndex < 9) {
-              newColumnCounts[columnIndex]++;
-            }
-          });
-          setColumnCounts(newColumnCounts);
-          console.log(`📊 [BronzeRoom] Contadores de columnas actualizados:`, newColumnCounts);
-        }
-      }
-    } catch (error) {
-      console.error('❌ [BronzeRoom] Error restaurando estado:', error);
-    }
-  };
-
-  // Verificar cartones existentes y estado del juego al montar
-  useEffect(() => {
-    checkExistingCards();
-    loadRoomStatus();
-    restoreGameState(); // <--- Agregar llamada aquí (o en un effect separado)
-
-    // Cleanup: Detener TODOS los audios al desmontar el componente
-    return () => {
-      console.log('🧹 [BronzeRoom] Limpiando audio al salir de la sala...');
-      audioService.stopBolilleroGirando();
-      audioService.restoreMusicVolume();
-      audioService.stop(); // Detener música de fondo
-    };
-  }, [sessionId]);
-
-  // Verificar premios pendientes al conectarse
-  useEffect(() => {
-    const verifyPendingPrizes = async () => {
-      const result = await checkPendingPrizes();
-      if (result && result.prizes.length > 0) {
-        console.log(`🎁 [BronzeRoom] Encontrados ${result.prizes.length} premios pendientes`);
-        setPendingPrizes(result.prizes);
-        setShowPrizesModal(true);
-      }
-    };
-
-    verifyPendingPrizes();
-  }, []); // Solo se ejecuta al montar el componente
-
-  // Handler para cerrar modal de premios
-  const handleClosePrizesModal = () => {
-    setShowPrizesModal(false);
-    setPendingPrizes(null);
-  };
-
   // Organizar bolillas por decenas para el grid
   const organizedBalls = {};
   for (let i = 0; i < 9; i++) {
@@ -689,29 +401,33 @@ export default function BronzeRoom({ onLogout }) {
   const playerCards = selectedPlayerCards.length > 0 ? selectedPlayerCards : [];
 
   // Handlers para selección de cartones
-  // Handlers para selección de cartones
-  const handleCardsSelected = async (reservedCards, remainingTicketsFromBackend) => {
-    console.log('🔍 DEBUG - Cartones recibidos, actualizando estado local...');
-
-    // Combinar cartones existentes con nuevos inmediatamente para feedback visual
+  const handleCardsSelected = (reservedCards, remainingTicketsFromBackend) => {
+    console.log('🔍 DEBUG - Cartones recibidos del backend:', reservedCards.map(c => ({
+      id: c.id,
+      serial: c.serial,
+      hasSerial: !!c.serial
+    })));
+    
+    // Combinar cartones existentes con nuevos
     const allCards = [...selectedPlayerCards, ...reservedCards];
     setSelectedPlayerCards(allCards);
-
-    // Calcular restantes basado en el nuevo total
-    const nonGiftCards = allCards.filter(c => !c.isGift);
-    const remaining = Math.max(0, 20 - nonGiftCards.length);
+    
+    console.log('🔍 DEBUG - Todos los cartones después de combinar:', allCards.map(c => ({
+      id: c.id,
+      serial: c.serial,
+      hasSerial: !!c.serial
+    })));
+    
+    // Usar el valor que viene del backend (ya descontó solo los comprados, no PLUS)
+    const remaining = remainingTicketsFromBackend ?? (20 - allCards.length);
     setCardsRemaining(remaining);
-
     setShowCardSelection(false);
-
-    // Solo mostrar modal "Todo Listo" si ya tiene los 20 cartones (pagos)
-    if (remaining === 0) {
-      loadRoomStatus(); // Refrescar hora antes de mostrar
+    console.log(`✅ Total de cartones: ${allCards.length}, faltan: ${remaining}`);
+    
+    // Si se completaron los 20 cartones, mostrar modal
+    if (allCards.length === 20) {
       setShowReadyModal(true);
     }
-
-    // Sincronizar con el servidor en segundo plano
-    checkExistingCards();
   };
 
   const handleCancelSelection = () => {
@@ -748,11 +464,11 @@ export default function BronzeRoom({ onLogout }) {
   useEffect(() => {
     if (ballsDrawn.length > 0 && !lineCelebrated && winnerCards.length === 0) { // No expandir si hay festejo de línea
       const latestBall = ballsDrawn[ballsDrawn.length - 1];
-
+      
       // Buscar cartones que tienen este número
       playerCards.forEach(card => {
         const hasNumber = card.numbers.flat().includes(latestBall.number);
-        if (hasNumber && expandedCard !== card.id && !lineCelebrated) {
+        if (hasNumber && expandedCard !== card.id) {
           setLastHitCard(card.id);
           expandCard(card.id);
         }
@@ -763,14 +479,14 @@ export default function BronzeRoom({ onLogout }) {
   // Detectar líneas en BINGO 90 (solo horizontales - 3 filas)
   const checkLineStatus = (card) => {
     const lines = [];
-
+    
     // Revisar las 3 filas horizontales
     for (let row = 0; row < 3; row++) {
       const rowNumbers = card.numbers[row].filter(n => n !== null && n !== undefined);
-      lines.push({
-        type: 'horizontal',
-        row,
-        line: rowNumbers
+      lines.push({ 
+        type: 'horizontal', 
+        row, 
+        line: rowNumbers 
       });
     }
 
@@ -791,193 +507,172 @@ export default function BronzeRoom({ onLogout }) {
 
   // Detectar cartones a 1-2 números de línea y líneas completas
   useEffect(() => {
-    if (ballsDrawn.length === 0) {
-      setAlmostLineCards([]);
-      setWinnerCards([]);
-      setLineCelebrated(false);
-      setHighlightedLine(null);
-      setCardWinningLines({});
-      return;
-    }
+  if (ballsDrawn.length === 0) {
+    setAlmostLineCards([]);
+    setWinnerCards([]);
+    setLineCelebrated(false);
+    setHighlightedLine(null);
+    setCardWinningLines({});
+    return;
+  }
 
-    const cardsAlmostThere = [];
-    const cardsWithWinningLines = [];
-    const newCardWinningLines = {};
+  const cardsAlmostThere = [];
+  const cardsWithWinningLines = [];
+  const newCardWinningLines = {};
 
-    playerCards.forEach(card => {
-      const linesStatus = checkLineStatus(card);
-      const almostLines = linesStatus.filter(line => line.missing === 1 || line.missing === 2);
-      // Una línea está completa solo si missing === 0 Y tiene al menos 5 números marcados
-      const completedLines = linesStatus.filter(line => line.missing === 0 && line.markedCount >= 5);
+  playerCards.forEach(card => {
+    const linesStatus = checkLineStatus(card);
+    const almostLines = linesStatus.filter(line => line.missing === 1 || line.missing === 2);
+    // Una línea está completa solo si missing === 0 Y tiene al menos 5 números marcados
+    const completedLines = linesStatus.filter(line => line.missing === 0 && line.markedCount >= 5);
 
-      if (almostLines.length > 0) {
-        const minMissing = Math.min(...almostLines.map(line => line.missing));
-        cardsAlmostThere.push({
-          cardId: card.id,
-          almostLineCount: almostLines.length,
-          lines: almostLines,
-          minMissing: minMissing
-        });
-      }
-
-      if (completedLines.length > 0) {
-        // Guardar qué filas (índices 0, 1, 2) están completas
-        const winningRowIndices = completedLines.map(line => line.row);
-        newCardWinningLines[card.id] = winningRowIndices;
-
-        cardsWithWinningLines.push({
-          cardId: card.id,
-          cardSerial: card.serial || generateCardSerial(playerCards.indexOf(card)),
-          lineCount: completedLines.length,
-          lines: completedLines,
-          card // importante para renderizado
-        });
-      }
-    });
-
-    // Check Bingo Status
-    const cardsAlmostBingo = [];
-    playerCards.forEach(card => {
-      const markedCount = getCardProgress(card);
-      const missingForBingo = 15 - markedCount;
-      if (missingForBingo <= 2) {
-        cardsAlmostBingo.push({
-          cardId: card.id,
-          minMissing: missingForBingo
-        });
-      }
-    });
-    setAlmostBingoCards(cardsAlmostBingo);
-
-    // Only update Almost Line if Line hasn't been won yet
-    const hasLineBeenWonGlobal = celebratedCardIds.length > 0 || lineCelebrated;
-    if (!hasLineBeenWonGlobal) {
-      setAlmostLineCards(cardsAlmostThere);
-    } else {
-      setAlmostLineCards([]); // Clear Line alerts once Line is won
-    }
-
-    setCardWinningLines(newCardWinningLines); // Actualizar líneas ganadoras
-
-    // Mostrar celebración si hay NUEVOS ganadores que NO han sido festejados
-    // ANTI-LOOP: Verificar que el cartón NO esté en celebratedCardIds Y que no haya celebración activa
-    const newWinners = cardsWithWinningLines.filter(card =>
-      !celebratedCardIds.includes(card.cardId)
-    );
-
-    if (newWinners.length > 0 && !lineCelebrated && winnerCards.length === 0) {
-      // Tomar el primer cartón ganador nuevo
-      const winnerCard = newWinners[0];
-
-      setWinnerCards([winnerCard]); // Solo el nuevo ganador
-      setLineCelebrated(true);
-      setCelebratedCardIds([...celebratedCardIds, winnerCard.cardId]); // Marcar como festejado
-
-      // Limpiar alertas de "casi línea" porque ya se ganó
-      setAlmostLineCards([]);
-
-      // 1. PRIMERO: Anunciar línea ganadora INMEDIATAMENTE
-      setTimeout(() => {
-        console.log('[BronzeRoom] 🎶 Reproduciendo voz: Felicitaciones, Ganaste Línea');
-        voiceService.speak('Felicitaciones, Ganaste Línea', { volume: 1.0, rate: 0.9 });
-      }, 100);
-
-      // 2. Toast de celebración
-      addToast('🎉', '¡LÍNEA!', 'Has completado una línea', 8000);
-
-      // 3. Activar confeti
-      triggerConfetti();
-
-      // 4. DESPUÉS DE LA VOZ: Reproducir aplausos
-      setTimeout(() => {
-        celebrationAudio.currentTime = 0;
-        celebrationAudio.play();
-      }, 1500);
-
-      // 5. Pausar sorteo
-      if (gameStatus === 'active') {
-        setGameStatus('waiting');
-        const timeout = setTimeout(() => {
-          // Anunciar continuación a BINGO antes de reanudar
-          voiceService.speak('Continuamos hasta Bingo');
-          setTimeout(() => {
-            // ORDEN IMPORTANTE: Limpiar ganadores PRIMERO, luego resetear flag
-            setWinnerCards([]);
-            setHighlightedLine(null);
-            setLineCelebrated(false); // RESETEAR después de limpiar ganadores
-            setGameStatus('active');
-          }, 2000);
-        }, 18000);
-        setPauseTimeout(timeout);
-      }
-
-      // 6. Resaltar la línea ganadora
-      if (cardsWithWinningLines[0]?.lines?.length > 0) {
-        setHighlightedLine(cardsWithWinningLines[0].lines[0].numbers);
-      }
-    }
-
-    // DETECTAR BINGO (Cartón completo - 15 números marcados)
-    if (!bingoCelebrated && !lineCelebrated && winnerCards.length === 0) {
-      playerCards.forEach(card => {
-        const allNumbers = card.numbers.flat().filter(n => n !== null && n !== undefined);
-        const markedNumbers = allNumbers.filter(num => isNumberCalled(num));
-
-        if (markedNumbers.length === 15) {
-          console.log('[BronzeRoom] 🎊 BINGO DETECTADO');
-          setBingoWinnerCard({
-            cardId: card.id,
-            cardSerial: card.serial || generateCardSerial(playerCards.indexOf(card), 'B'),
-            card: card
-          });
-          setBingoCelebrated(true);
-          setGameStatus('ended');
-
-          setTimeout(() => voiceService.speak('BINGO', { volume: 1.0, rate: 0.9 }), 100);
-          setTimeout(() => voiceService.speak('Felicitaciones, Ganaste Bingo', { volume: 1.0, rate: 0.9 }), 1500);
-          addToast('🎊', '¡BINGO!', 'Has completado el cartón', 8000);
-          triggerConfetti();
-          setTimeout(() => { celebrationAudio.currentTime = 0; celebrationAudio.play(); }, 2000);
-
-          setTimeout(() => {
-            voiceService.speak('El Bingo ha finalizado');
-            setTimeout(() => {
-              setBallsDrawn([]); setSelectedPlayerCards([]); setPlayerCards([]);
-              setBingoWinnerCard(null); setBingoCelebrated(false); setGameStatus('waiting');
-              setShowCardSelection(false); setCardsRemaining(6); setCelebratedCardIds([]);
-              setWinnerCards([]); setLineCelebrated(false); audioService.stopBolilleroGirando();
-              addToast('✅', 'Juego Finalizado', 'Puedes comprar nuevos cartones', 5000);
-            }, 2000);
-          }, 18000);
-          return;
-        }
+    if (almostLines.length > 0) {
+      const minMissing = Math.min(...almostLines.map(line => line.missing));
+      cardsAlmostThere.push({
+        cardId: card.id,
+        almostLineCount: almostLines.length,
+        lines: almostLines,
+        minMissing: minMissing
       });
     }
-  }, [ballsDrawn.length, playerCards.length, lineCelebrated, gameStatus, winnerCards.length, bingoCelebrated]);
 
-  useEffect(() => {
-    return () => {
-      if (pauseTimeout) clearTimeout(pauseTimeout);
-    };
-  }, [pauseTimeout]);
+    if (completedLines.length > 0) {
+      // Guardar qué filas (índices 0, 1, 2) están completas
+      const winningRowIndices = completedLines.map(line => line.row);
+      newCardWinningLines[card.id] = winningRowIndices;
+      
+      cardsWithWinningLines.push({
+        cardId: card.id,
+        cardSerial: card.serial || generateCardSerial(playerCards.indexOf(card)),
+        lineCount: completedLines.length,
+        lines: completedLines,
+        card // importante para renderizado
+      });
+    }
+  });
+
+  setAlmostLineCards(cardsAlmostThere);
+  setCardWinningLines(newCardWinningLines); // Actualizar líneas ganadoras
+
+  // Mostrar celebración si hay NUEVOS ganadores que NO han sido festejados
+  // ANTI-LOOP: Verificar que el cartón NO esté en celebratedCardIds Y que no haya celebración activa
+  const newWinners = cardsWithWinningLines.filter(card => 
+    !celebratedCardIds.includes(card.cardId)
+  );
+  
+  if (newWinners.length > 0 && !lineCelebrated && winnerCards.length === 0) {
+    // Tomar el primer cartón ganador nuevo
+    const winnerCard = newWinners[0];
+    
+    setWinnerCards([winnerCard]); // Solo el nuevo ganador
+    setLineCelebrated(true);
+    setCelebratedCardIds([...celebratedCardIds, winnerCard.cardId]); // Marcar como festejado
+    
+    // Limpiar alertas de "casi línea" porque ya se ganó
+    setAlmostLineCards([]);
+    
+    // 1. PRIMERO: Anunciar línea ganadora INMEDIATAMENTE (100ms para dar tiempo a que se active el audio)
+    setTimeout(() => {
+      console.log('[BronzeRoom] 🎶 Reproduciendo voz: Felicitaciones, Ganaste Línea');
+      voiceService.speak('Felicitaciones, Ganaste Línea', { volume: 1.0, rate: 0.9 });
+    }, 100);
+    
+    // 2. Toast de celebración (sin sonido)
+    addToast('🎉', '¡LÍNEA!', 'Has completado una línea', 8000);
+    
+    // 3. Activar confeti
+    triggerConfetti();
+    
+    // 4. DESPUÉS DE LA VOZ: Reproducir aplausos (1.5 segundos después para no interferir)
+    setTimeout(() => {
+      celebrationAudio.currentTime = 0;
+      celebrationAudio.play();
+    }, 1500);
+    
+    // 5. Pausar sorteo (pero NO anunciar "Sorteo Pausado" - se anunciará al reanudar)
+    if (gameStatus === 'active') {
+      setGameStatus('waiting');
+      const timeout = setTimeout(() => {
+        // Anunciar continuación a BINGO antes de reanudar
+        voiceService.speak('Continuamos hasta Bingo');
+        setTimeout(() => {
+          // ORDEN IMPORTANTE: Limpiar ganadores PRIMERO, luego resetear flag
+          setWinnerCards([]);
+          setHighlightedLine(null);
+          setLineCelebrated(false); // RESETEAR después de limpiar ganadores
+          setGameStatus('active');
+        }, 2000); // Esperar 2 segundos para que termine el anuncio
+      }, 18000); // 18 segundos + 2 del anuncio = 20 segundos total
+      setPauseTimeout(timeout);
+    }
+    
+    // 6. Resaltar la línea ganadora (primera del primer cartón)
+    if (cardsWithWinningLines[0]?.lines?.length > 0) {
+      setHighlightedLine(cardsWithWinningLines[0].lines[0].numbers);
+    }
+  }
+
+  // DETECTAR BINGO (Cartón completo - 15 números marcados)
+  if (!bingoCelebrated && !lineCelebrated && winnerCards.length === 0) {
+    playerCards.forEach(card => {
+      const allNumbers = card.numbers.flat().filter(n => n !== null && n !== undefined);
+      const markedNumbers = allNumbers.filter(num => isNumberCalled(num));
+      
+      if (markedNumbers.length === 15) {
+        console.log('[BronzeRoom] 🎊 BINGO DETECTADO');
+        setBingoWinnerCard({
+          cardId: card.id,
+          cardSerial: card.serial || generateCardSerial(playerCards.indexOf(card), 'B'),
+          card: card
+        });
+        setBingoCelebrated(true);
+        setGameStatus('ended');
+        
+        setTimeout(() => voiceService.speak('BINGO', { volume: 1.0, rate: 0.9 }), 100);
+        setTimeout(() => voiceService.speak('Felicitaciones, Ganaste Bingo', { volume: 1.0, rate: 0.9 }), 1500);
+        addToast('🎊', '¡BINGO!', 'Has completado el cartón', 8000);
+        triggerConfetti();
+        setTimeout(() => { celebrationAudio.currentTime = 0; celebrationAudio.play(); }, 2000);
+        
+        setTimeout(() => {
+          voiceService.speak('El Bingo ha finalizado');
+          setTimeout(() => {
+            setBallsDrawn([]); setSelectedPlayerCards([]); setPlayerCards([]);
+            setBingoWinnerCard(null); setBingoCelebrated(false); setGameStatus('waiting');
+            setShowCardSelection(false); setCardsRemaining(6); setCelebratedCardIds([]);
+            setWinnerCards([]); setLineCelebrated(false); audioService.stopBolilleroGirando();
+            addToast('✅', 'Juego Finalizado', 'Puedes comprar nuevos cartones', 5000);
+          }, 2000);
+        }, 18000);
+        return;
+      }
+    });
+  }
+}, [ballsDrawn.length, playerCards.length, lineCelebrated, gameStatus, winnerCards.length, bingoCelebrated]);
+
+useEffect(() => {
+  return () => {
+    if (pauseTimeout) clearTimeout(pauseTimeout);
+  };
+}, [pauseTimeout]);
 
   // Detectar cambios en el estado del juego y anunciar
   useEffect(() => {
     if (gameStatus === 'active' && previousGameStatus !== 'active') {
       console.log('🎬 INICIANDO SORTEO - Activando bolillero INMEDIATAMENTE');
-
+      
       // Iniciar bolillero INMEDIATAMENTE sin delay
       audioService.startBolilleroGirando();
-
+      
       audioService.lowerMusicVolume();
-
+      
       if (previousGameStatus === 'waiting') {
         voiceService.announceSorteoIniciado();
         addToast('🎲', '¡Sorteo iniciado!', 'Buena suerte');
       } else if (previousGameStatus === 'paused') {
         voiceService.announceSorteoReiniciado();
       }
-
+      
     } else if (gameStatus === 'waiting' && previousGameStatus === 'active') {
       // NO anunciar "Sorteo Pausado" si hay línea celebrada (ya se anunció "Felicitaciones")
       if (!lineCelebrated) {
@@ -989,7 +684,7 @@ export default function BronzeRoom({ onLogout }) {
         addToast('⏸️', 'Sorteo pausado', 'Esperando...');
       }
     }
-
+    
     setPreviousGameStatus(gameStatus);
   }, [gameStatus]);
 
@@ -997,22 +692,22 @@ export default function BronzeRoom({ onLogout }) {
   useEffect(() => {
     if (ballsDrawn.length > 0 && !lineCelebrated) { // No anunciar si hay festejo de línea
       const lastDrawnBall = ballsDrawn[ballsDrawn.length - 1];
-
+      
       // Anunciar el número con voz (delay mínimo de 200ms para que suene natural)
       setTimeout(() => {
         voiceService.announceNumber(lastDrawnBall.number);
       }, 200);
-
+      
       // Actualizar combo y suerte
       updateCombo();
       const luck = calculateLuck();
       setLuckMeter(luck);
-
+      
       // Detectar si el jugador acertó un número
-      const hasMatch = playerCards.some(card =>
+      const hasMatch = playerCards.some(card => 
         card.numbers.flat().includes(lastDrawnBall.number)
       );
-
+      
       if (hasMatch) {
         addToast('✨', '¡Acierto!', `Número ${lastDrawnBall.number}`);
       }
@@ -1115,8 +810,8 @@ export default function BronzeRoom({ onLogout }) {
       {!showCardSelection && (
         <>
           {/* Sidebar con información del jugador */}
-          <PlayerSidebar
-            isOpen={sidebarOpen}
+          <PlayerSidebar 
+            isOpen={sidebarOpen} 
             onToggle={() => setSidebarOpen(!sidebarOpen)}
             themeColor="#b87333"
             accentColor="#d4a574"
@@ -1125,693 +820,779 @@ export default function BronzeRoom({ onLogout }) {
 
           {/* CELEBRACIÓN DE BINGO GANADOR */}
           {bingoWinnerCard && (
-            <div className="winner-celebration-overlay">
-              <div className="celebration-content">
-                <h1 className="felicitaciones-pulse">¡BINGO!</h1>
-                <div className="celebration-subtitle">Felicitaciones Ganaste Bingo con el cartón {bingoWinnerCard.cardSerial}</div>
-                <div className="celebration-card-display">
-                  <BingoCardPreview
-                    card={{ card_serial: bingoWinnerCard.cardSerial, numbers: bingoWinnerCard.card.numbers }}
-                    room="bronce" selected={false} onClick={null} showSerial={true}
-                    drawnNumbers={ballsDrawn.map(b => b.number)} winningLines={[0, 1, 2]}
-                  />
-                </div>
-              </div>
-              <div className="confetti-container">
-                {Array.from({ length: 50 }).map((_, i) => (
-                  <div key={i} className="confetti" style={{
-                    left: `${Math.random() * 100}%`, animationDelay: `${Math.random() * 3}s`,
-                    backgroundColor: getBallColor(Math.floor(Math.random() * 90) + 1)
-                  }} />
-                ))}
-              </div>
-            </div>
-          )}
+<div className="winner-celebration-overlay">
+  <div className="celebration-content">
+    <h1 className="felicitaciones-pulse">¡BINGO!</h1>
+    <div className="celebration-subtitle">Felicitaciones Ganaste Bingo con el cartón {bingoWinnerCard.cardSerial}</div>
+    <div className="celebration-card-display">
+      <BingoCardPreview
+        card={{ card_serial: bingoWinnerCard.cardSerial, numbers: bingoWinnerCard.card.numbers }}
+        room="bronce" selected={false} onClick={null} showSerial={true}
+        drawnNumbers={ballsDrawn.map(b => b.number)} winningLines={[0, 1, 2]}
+      />
+    </div>
+  </div>
+  <div className="confetti-container">
+    {Array.from({ length: 50 }).map((_, i) => (
+      <div key={i} className="confetti" style={{
+        left: `${Math.random() * 100}%`, animationDelay: `${Math.random() * 3}s`,
+        backgroundColor: getBallColor(Math.floor(Math.random() * 90) + 1)
+      }} />
+    ))}
+  </div>
+</div>
+)}
 
           {/* CELEBRACIÓN DE LÍNEA GANADORA - Usa el cartón de la grilla con números marcados */}
           {winnerCards.length > 0 && !bingoWinnerCard && (
-            <div className="winner-celebration-overlay">
-              <div className="celebration-content">
-                <h1 className="felicitaciones-pulse">¡Felicitaciones!</h1>
-                <div className="celebration-subtitle">Ganaste Línea con el cartón {winnerCards[0].cardSerial}</div>
+  <div className="winner-celebration-overlay">
+    <div className="celebration-content">
+      {/* Título pulsante */}
+      <h1 className="felicitaciones-pulse">¡Felicitaciones!</h1>
+      <div className="celebration-subtitle">Ganaste Línea con el cartón {winnerCards[0].cardSerial}</div>
+      
+      {/* Cartón usando BingoCardPreview IGUAL que el expandido */}
+      {winnerCards[0] && (
+        <div className="celebration-card-display">
+          <BingoCardPreview
+            card={{
+              card_serial: winnerCards[0].cardSerial,
+              numbers: winnerCards[0].card.numbers
+            }}
+            room="bronce"
+            selected={false}
+            onClick={null}
+            showSerial={true}
+            drawnNumbers={ballsDrawn.map(b => b.number)}
+            winningLines={cardWinningLines[winnerCards[0].cardId] || []}
+          />
+        </div>
+      )}
+    </div>
+    
+    {/* Confetti animado */}
+    <div className="confetti-container">
+      {Array.from({ length: 50 }).map((_, i) => (
+        <div 
+          key={i} 
+          className="confetti"
+          style={{
+            left: `${Math.random() * 100}%`,
+            animationDelay: `${Math.random() * 3}s`,
+            backgroundColor: getBallColor(Math.floor(Math.random() * 90) + 1)
+          }}
+        />
+      ))}
+    </div>
+  </div>
+)}
 
-                {winnerCards[0] && (
-                  <div className="celebration-card-display">
-                    <BingoCardPreview
-                      card={{
-                        card_serial: winnerCards[0].cardSerial,
-                        numbers: winnerCards[0].card.numbers
-                      }}
-                      room="bronce"
-                      selected={false}
-                      onClick={null}
-                      showSerial={true}
-                      drawnNumbers={ballsDrawn.map(b => b.number)}
-                      winningLines={cardWinningLines[winnerCards[0].cardId] || []}
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="confetti-container">
-                {Array.from({ length: 50 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="confetti"
-                    style={{
-                      left: `${Math.random() * 100}%`,
-                      animationDelay: `${Math.random() * 3}s`,
-                      backgroundColor: getBallColor(Math.floor(Math.random() * 90) + 1)
+      {/* LAYOUT REORGANIZADO */}
+      <div className="game-table">
+        {/* Cuadrícula Digital - IZQUIERDA COMPLETA - 3 FILAS */}
+        <div className="digital-grid-full">
+          <div className="grid-header">
+            <div className="grid-title" style={{
+              fontSize: '1rem',
+              fontWeight: 900,
+              letterSpacing: '2px',
+              color: '#b87333',
+              textShadow: '0 0 8px rgba(184, 115, 51, 0.5)',
+              background: 'linear-gradient(180deg, rgba(62, 39, 35, 0.9), rgba(42, 24, 16, 0.9))',
+              borderRadius: '6px',
+              border: '2px solid #5a2d0c',
+              fontFamily: "'Roboto Condensed', 'Arial Narrow', sans-serif",
+              padding: '8px 16px',
+              textAlign: 'center',
+              textTransform: 'uppercase'
+            }}>NÚMEROS CANTADOS</div>
+            <div className="grid-glow"></div>
+          </div>
+          
+          {/* FILA 1: 1-10, 11-20, 21-30 */}
+          <div className="grid-row">
+            {[0, 1, 2].map(columnIndex => {
+              const start = columnIndex * 10 + 1;
+              const end = (columnIndex + 1) * 10;
+              const columnLabel = `${start}-${end}`;
+              const columnCount = columnCounts[columnIndex] || 0;
+              
+              return (
+                <div key={columnIndex} className="grid-column">
+                  <div 
+                    className="column-letter" 
+                    style={{ 
+                      color: '#b87333',
+                      textShadow: '0 0 8px rgba(184, 115, 51, 0.5)',
+                      background: 'linear-gradient(180deg, rgba(62, 39, 35, 0.9), rgba(42, 24, 16, 0.9))',
+                      borderRadius: '6px',
+                      border: '2px solid #5a2d0c',
+                      fontFamily: "'Roboto Condensed', 'Arial Narrow', sans-serif",
+                      padding: '4px 0',
+                      fontWeight: 900,
+                      textAlign: 'center',
+                      fontSize: '1rem',
+                      letterSpacing: '2px'
                     }}
-                  />
+                  >
+                    {columnLabel}
+                    {columnCount > 0 && (
+                      <div className="column-counter">{columnCount}</div>
+                    )}
+                  </div>
+                  <div className="column-numbers">
+                    {Array.from({ length: 10 }, (_, i) => {
+                      const number = start + i;
+                      const isCalled = ballsDrawn.some(b => b.number === number);
+                      const isRecent = ballsDrawn.length > 0 && 
+                                       ballsDrawn[ballsDrawn.length - 1]?.number === number;
+                      
+                      return (
+                        <div 
+                          key={number} 
+                          className={`grid-number ${isCalled ? 'called' : ''} ${isRecent ? 'recent' : ''}`}
+                          style={isCalled ? {
+                            background: 'linear-gradient(135deg, #b87333, #d4a574)',
+                            color: '#1a1310',
+                            fontWeight: 900,
+                            border: '2px solid #8b4513',
+                            boxShadow: '0 0 15px rgba(184, 115, 51, 0.8), inset 0 0 10px rgba(255, 255, 255, 0.2)',
+                            fontFamily: "'Roboto Condensed', 'Arial Narrow', sans-serif",
+                            borderRadius: '4px',
+                            padding: '6px 3px',
+                            textAlign: 'center',
+                            fontSize: '1.2rem',
+                            textShadow: '1px 1px 2px rgba(255, 255, 255, 0.3), -1px -1px 2px rgba(0, 0, 0, 0.5)'
+                          } : {
+                            background: 'rgba(26, 19, 16, 0.7)',
+                            border: '1px solid rgba(90, 45, 12, 0.3)',
+                            borderRadius: '4px',
+                            color: '#6b4423',
+                            fontFamily: "'Roboto Condensed', 'Arial Narrow', sans-serif",
+                            padding: '6px 3px',
+                            textAlign: 'center',
+                            fontSize: '1.2rem',
+                            fontWeight: 600,
+                            textShadow: '1px 1px 2px rgba(212, 165, 116, 0.2)'
+                          }}
+                        >
+                          {number}
+                          {isCalled && (
+                            <div className="number-glow-ring" style={{ borderColor: '#b87333' }}></div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* FILA 2: 31-40, 41-50, 51-60 */}
+          <div className="grid-row">
+            {[3, 4, 5].map(columnIndex => {
+              const start = columnIndex * 10 + 1;
+              const end = (columnIndex + 1) * 10;
+              const columnLabel = `${start}-${end}`;
+              const columnCount = columnCounts[columnIndex] || 0;
+              
+              return (
+                <div key={columnIndex} className="grid-column">
+                  <div 
+                    className="column-letter" 
+                    style={{ 
+                      color: '#b87333',
+                      textShadow: '0 0 8px rgba(184, 115, 51, 0.5)',
+                      background: 'linear-gradient(180deg, rgba(62, 39, 35, 0.9), rgba(42, 24, 16, 0.9))',
+                      borderRadius: '6px',
+                      border: '2px solid #5a2d0c',
+                      fontFamily: "'Roboto Condensed', 'Arial Narrow', sans-serif",
+                      padding: '4px 0',
+                      fontWeight: 900,
+                      textAlign: 'center',
+                      fontSize: '1rem',
+                      letterSpacing: '2px'
+                    }}
+                  >
+                    {columnLabel}
+                    {columnCount > 0 && (
+                      <div className="column-counter">{columnCount}</div>
+                    )}
+                  </div>
+                  <div className="column-numbers">
+                    {Array.from({ length: 10 }, (_, i) => {
+                      const number = start + i;
+                      const isCalled = ballsDrawn.some(b => b.number === number);
+                      const isRecent = ballsDrawn.length > 0 && 
+                                       ballsDrawn[ballsDrawn.length - 1]?.number === number;
+                      
+                      return (
+                        <div 
+                          key={number} 
+                          className={`grid-number ${isCalled ? 'called' : ''} ${isRecent ? 'recent' : ''}`}
+                          style={isCalled ? {
+                            background: 'linear-gradient(135deg, #b87333, #d4a574)',
+                            color: '#1a1310',
+                            fontWeight: 900,
+                            border: '2px solid #8b4513',
+                            boxShadow: '0 0 15px rgba(184, 115, 51, 0.8), inset 0 0 10px rgba(255, 255, 255, 0.2)',
+                            fontFamily: "'Roboto Condensed', 'Arial Narrow', sans-serif",
+                            borderRadius: '4px',
+                            padding: '6px 3px',
+                            textAlign: 'center',
+                            fontSize: '1.2rem',
+                            textShadow: '1px 1px 2px rgba(255, 255, 255, 0.3), -1px -1px 2px rgba(0, 0, 0, 0.5)'
+                          } : {
+                            background: 'rgba(26, 19, 16, 0.7)',
+                            border: '1px solid rgba(90, 45, 12, 0.3)',
+                            borderRadius: '4px',
+                            color: '#6b4423',
+                            fontFamily: "'Roboto Condensed', 'Arial Narrow', sans-serif",
+                            padding: '6px 3px',
+                            textAlign: 'center',
+                            fontSize: '1.2rem',
+                            fontWeight: 600,
+                            textShadow: '1px 1px 2px rgba(212, 165, 116, 0.2)'
+                          }}
+                        >
+                          {number}
+                          {isCalled && (
+                            <div className="number-glow-ring" style={{ borderColor: '#b87333' }}></div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* FILA 3: 61-70, 71-80, 81-90 */}
+          <div className="grid-row">
+            {[6, 7, 8].map(columnIndex => {
+              const start = columnIndex * 10 + 1;
+              const end = columnIndex === 8 ? 90 : (columnIndex + 1) * 10;
+              const columnLabel = `${start}-${end}`;
+              const columnCount = columnCounts[columnIndex] || 0;
+              
+              return (
+                <div key={columnIndex} className="grid-column">
+                  <div 
+                    className="column-letter" 
+                    style={{ 
+                      color: '#b87333',
+                      textShadow: '0 0 8px rgba(184, 115, 51, 0.5)',
+                      background: 'linear-gradient(180deg, rgba(62, 39, 35, 0.9), rgba(42, 24, 16, 0.9))',
+                      borderRadius: '6px',
+                      border: '2px solid #5a2d0c',
+                      fontFamily: "'Roboto Condensed', 'Arial Narrow', sans-serif",
+                      padding: '4px 0',
+                      fontWeight: 900,
+                      textAlign: 'center',
+                      fontSize: '1rem',
+                      letterSpacing: '2px'
+                    }}
+                  >
+                    {columnLabel}
+                    {columnCount > 0 && (
+                      <div className="column-counter">{columnCount}</div>
+                    )}
+                  </div>
+                  <div className="column-numbers">
+                    {Array.from({ length: end - start + 1 }, (_, i) => {
+                      const number = start + i;
+                      const isCalled = ballsDrawn.some(b => b.number === number);
+                      const isRecent = ballsDrawn.length > 0 && 
+                                       ballsDrawn[ballsDrawn.length - 1]?.number === number;
+                      
+                      return (
+                        <div 
+                          key={number} 
+                          className={`grid-number ${isCalled ? 'called' : ''} ${isRecent ? 'recent' : ''}`}
+                          style={isCalled ? {
+                            background: 'linear-gradient(135deg, #b87333, #d4a574)',
+                            color: '#1a1310',
+                            fontWeight: 900,
+                            border: '2px solid #8b4513',
+                            boxShadow: '0 0 15px rgba(184, 115, 51, 0.8), inset 0 0 10px rgba(255, 255, 255, 0.2)',
+                            fontFamily: "'Roboto Condensed', 'Arial Narrow', sans-serif",
+                            borderRadius: '4px',
+                            padding: '6px 3px',
+                            textAlign: 'center',
+                            fontSize: '1.2rem',
+                            textShadow: '1px 1px 2px rgba(255, 255, 255, 0.3), -1px -1px 2px rgba(0, 0, 0, 0.5)'
+                          } : {
+                            background: 'rgba(26, 19, 16, 0.7)',
+                            border: '1px solid rgba(90, 45, 12, 0.3)',
+                            borderRadius: '4px',
+                            color: '#6b4423',
+                            fontFamily: "'Roboto Condensed', 'Arial Narrow', sans-serif",
+                            padding: '6px 3px',
+                            textAlign: 'center',
+                            fontSize: '1.2rem',
+                            fontWeight: 600,
+                            textShadow: '1px 1px 2px rgba(212, 165, 116, 0.2)'
+                          }}
+                        >
+                          {number}
+                          {isCalled && (
+                            <div className="number-glow-ring" style={{ borderColor: '#b87333' }}></div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Sección derecha: Título/Info arriba, Bolillero abajo */}
+        <div className="right-section">
+          {/* Info superior */}
+          <div className="side-info">
+            <div className="room-title">
+              <img src={GiftIcon} alt="Gift" className="title-icon" />
+              <span className="title-text" style={{ 
+                color: '#b87333',
+                textShadow: '0 0 10px rgba(184, 115, 51, 0.6), 0 0 20px rgba(139, 69, 19, 0.4)',
+                WebkitTextFillColor: '#b87333'
+              }}>SALA BRONCE</span>
+              <div className="card-price-tag">
+                <span className="price-label">Valor Cartón</span>
+                <span className="price-amount">$500</span>
+              </div>
+              <button 
+                className="lobby-btn"
+                onClick={() => navigate('/')}
+                title="Volver al lobby"
+              >
+                LOBBY
+              </button>
+              <div className="ball-counter-display">
+                🎱 Bola {ballsDrawn.length} de 90
+              </div>
+              <div className={`status-badge ${gameStatus}`}>
+                {gameStatus === 'waiting' && '⏸️ ESPERA'}
+                {gameStatus === 'active' && '🔴 EN VIVO'}
+                {gameStatus === 'ended' && '✅ FINALIZADO'}
+              </div>
+            </div>
+          </div>
+
+          {/* Bolillero Moderno */}
+          <div className="modern-bingo-machine">
+          <div className="machine-top-led"></div>
+          
+          <div className="acrylic-sphere">
+            {/* Borde LED azul */}
+            <div className="led-ring"></div>
+            
+            {/* Bolillas flotantes */}
+            {gameStatus === 'active' && !currentBall && (
+              <div className="floating-balls-container">
+                {floatingBalls.map(ball => (
+                  <div
+                    key={ball.id}
+                    className="floating-ball"
+                    style={{
+                      backgroundColor: ball.color,
+                      boxShadow: `0 0 20px ${ball.color}`,
+                      animationDelay: `${ball.delay}s`,
+                      animationDuration: `${ball.duration}s`
+                    }}
+                  >
+                    {ball.number}
+                  </div>
                 ))}
               </div>
-            </div>
-          )}
+            )}
 
-          {/* LAYOUT REORGANIZADO */}
-          <div className="game-table">
-            {/* Cuadrícula Digital - IZQUIERDA COMPLETA - 3 FILAS */}
-            <div className="digital-grid-full">
-              <div className="grid-header">
-                <div className="grid-title">NÚMEROS CANTADOS</div>
-                <div className="grid-glow"></div>
-              </div>
-
-              {/* FILA 1: 1-10, 11-20, 21-30 */}
-              <div className="grid-row">
-                {[0, 1, 2].map(columnIndex => {
-                  const start = columnIndex * 10 + 1;
-                  const end = (columnIndex + 1) * 10;
-                  const columnLabel = `${start}-${end}`;
-                  const columnCount = columnCounts[columnIndex] || 0;
-
-                  return (
-                    <div key={columnIndex} className="grid-column">
-                      <div
-                        className="column-letter"
-                        style={{
-                          color: '#d4a574',
-                          textShadow: '0 0 8px rgba(184, 115, 51, 0.7)',
-                          background: 'linear-gradient(180deg, rgba(139, 69, 13, 0.3), rgba(62, 39, 35, 0.3))',
-                          borderRadius: '6px',
-                          border: '2px solid #8b4513',
-                          fontFamily: "Georgia, 'Times New Roman', serif",
-                          padding: '4px 0',
-                          fontWeight: 700,
-                          textAlign: 'center',
-                          fontSize: '1rem',
-                          letterSpacing: '2px'
-                        }}
-                      >
-                        {columnLabel}
-                        {columnCount > 0 && (
-                          <div className="column-counter">{columnCount}</div>
-                        )}
-                      </div>
-                      <div className="column-numbers">
-                        {Array.from({ length: 10 }, (_, i) => {
-                          const number = start + i;
-                          const isCalled = ballsDrawn.some(b => b.number === number);
-                          const isRecent = ballsDrawn.length > 0 &&
-                            ballsDrawn[ballsDrawn.length - 1]?.number === number;
-
-                          return (
-                            <div
-                              key={number}
-                              className={`grid-number ${isCalled ? 'called' : ''} ${isRecent ? 'recent' : ''}`}
-                              style={isCalled ? {
-                                background: 'linear-gradient(135deg, #d4a574, #b87333)',
-                                color: '#1a1310',
-                                fontWeight: 900,
-                                border: '2px solid #8b4513',
-                                boxShadow: '0 0 15px rgba(184, 115, 51, 0.9), inset 0 0 10px rgba(255, 255, 255, 0.3)',
-                                fontFamily: "Georgia, 'Times New Roman', serif",
-                                borderRadius: '4px',
-                                padding: '6px 3px',
-                                textAlign: 'center',
-                                fontSize: '1.2rem',
-                                textShadow: '1px 1px 2px rgba(255, 255, 255, 0.5), -1px -1px 2px rgba(0, 0, 0, 0.3)'
-                              } : {
-                                background: 'rgba(40, 20, 10, 0.7)',
-                                border: '1px solid rgba(139, 69, 13, 0.3)',
-                                borderRadius: '4px',
-                                color: '#6b4423',
-                                fontFamily: "Georgia, 'Times New Roman', serif",
-                                padding: '6px 3px',
-                                textAlign: 'center',
-                                fontSize: '1.2rem',
-                                fontWeight: 600
-                              }}
-                            >
-                              {number}
-                              {isCalled && (
-                                <div className="number-glow-ring" style={{ borderColor: '#d4a574' }}></div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* FILA 2: 31-40, 41-50, 51-60 */}
-              <div className="grid-row">
-                {[3, 4, 5].map(columnIndex => {
-                  const start = columnIndex * 10 + 1;
-                  const end = (columnIndex + 1) * 10;
-                  const columnLabel = `${start}-${end}`;
-                  const columnCount = columnCounts[columnIndex] || 0;
-
-                  return (
-                    <div key={columnIndex} className="grid-column">
-                      <div
-                        className="column-letter"
-                        style={{
-                          color: '#d4a574',
-                          textShadow: '0 0 8px rgba(184, 115, 51, 0.7)',
-                          background: 'linear-gradient(180deg, rgba(139, 69, 13, 0.3), rgba(62, 39, 35, 0.3))',
-                          borderRadius: '6px',
-                          border: '2px solid #8b4513',
-                          fontFamily: "Georgia, 'Times New Roman', serif",
-                          padding: '4px 0',
-                          fontWeight: 700,
-                          textAlign: 'center',
-                          fontSize: '1rem',
-                          letterSpacing: '2px'
-                        }}
-                      >
-                        {columnLabel}
-                        {columnCount > 0 && (
-                          <div className="column-counter">{columnCount}</div>
-                        )}
-                      </div>
-                      <div className="column-numbers">
-                        {Array.from({ length: 10 }, (_, i) => {
-                          const number = start + i;
-                          const isCalled = ballsDrawn.some(b => b.number === number);
-                          const isRecent = ballsDrawn.length > 0 &&
-                            ballsDrawn[ballsDrawn.length - 1]?.number === number;
-
-                          return (
-                            <div
-                              key={number}
-                              className={`grid-number ${isCalled ? 'called' : ''} ${isRecent ? 'recent' : ''}`}
-                              style={isCalled ? {
-                                background: 'linear-gradient(135deg, #d4a574, #b87333)',
-                                color: '#1a1310',
-                                fontWeight: 900,
-                                border: '2px solid #8b4513',
-                                boxShadow: '0 0 15px rgba(184, 115, 51, 0.9), inset 0 0 10px rgba(255, 255, 255, 0.3)',
-                                fontFamily: "Georgia, 'Times New Roman', serif",
-                                borderRadius: '4px',
-                                padding: '6px 3px',
-                                textAlign: 'center',
-                                fontSize: '1.2rem',
-                                textShadow: '1px 1px 2px rgba(255, 255, 255, 0.5), -1px -1px 2px rgba(0, 0, 0, 0.3)'
-                              } : {
-                                background: 'rgba(40, 20, 10, 0.7)',
-                                border: '1px solid rgba(139, 69, 13, 0.3)',
-                                borderRadius: '4px',
-                                color: '#6b4423',
-                                fontFamily: "Georgia, 'Times New Roman', serif",
-                                padding: '6px 3px',
-                                textAlign: 'center',
-                                fontSize: '1.2rem',
-                                fontWeight: 600
-                              }}
-                            >
-                              {number}
-                              {isCalled && (
-                                <div className="number-glow-ring" style={{ borderColor: '#d4a574' }}></div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* FILA 3: 61-70, 71-80, 81-90 */}
-              <div className="grid-row">
-                {[6, 7, 8].map(columnIndex => {
-                  const start = columnIndex * 10 + 1;
-                  const end = columnIndex === 8 ? 90 : (columnIndex + 1) * 10;
-                  const columnLabel = `${start}-${end}`;
-                  const columnCount = columnCounts[columnIndex] || 0;
-
-                  return (
-                    <div key={columnIndex} className="grid-column">
-                      <div
-                        className="column-letter"
-                        style={{
-                          color: '#d4a574',
-                          textShadow: '0 0 8px rgba(184, 115, 51, 0.7)',
-                          background: 'linear-gradient(180deg, rgba(139, 69, 13, 0.3), rgba(62, 39, 35, 0.3))',
-                          borderRadius: '6px',
-                          border: '2px solid #8b4513',
-                          fontFamily: "Georgia, 'Times New Roman', serif",
-                          padding: '4px 0',
-                          fontWeight: 700,
-                          textAlign: 'center',
-                          fontSize: '1rem',
-                          letterSpacing: '2px'
-                        }}
-                      >
-                        {columnLabel}
-                        {columnCount > 0 && (
-                          <div className="column-counter">{columnCount}</div>
-                        )}
-                      </div>
-                      <div className="column-numbers">
-                        {Array.from({ length: end - start + 1 }, (_, i) => {
-                          const number = start + i;
-                          const isCalled = ballsDrawn.some(b => b.number === number);
-                          const isRecent = ballsDrawn.length > 0 &&
-                            ballsDrawn[ballsDrawn.length - 1]?.number === number;
-
-                          return (
-                            <div
-                              key={number}
-                              className={`grid-number ${isCalled ? 'called' : ''} ${isRecent ? 'recent' : ''}`}
-                              style={isCalled ? {
-                                background: 'linear-gradient(135deg, #d4a574, #b87333)',
-                                color: '#1a1310',
-                                fontWeight: 900,
-                                border: '2px solid #8b4513',
-                                boxShadow: '0 0 15px rgba(184, 115, 51, 0.9), inset 0 0 10px rgba(255, 255, 255, 0.3)',
-                                fontFamily: "Georgia, 'Times New Roman', serif",
-                                borderRadius: '4px',
-                                padding: '6px 3px',
-                                textAlign: 'center',
-                                fontSize: '1.2rem',
-                                textShadow: '1px 1px 2px rgba(255, 255, 255, 0.5), -1px -1px 2px rgba(0, 0, 0, 0.3)'
-                              } : {
-                                background: 'rgba(40, 20, 10, 0.7)',
-                                border: '1px solid rgba(139, 69, 13, 0.3)',
-                                borderRadius: '4px',
-                                color: '#6b4423',
-                                fontFamily: "Georgia, 'Times New Roman', serif",
-                                padding: '6px 3px',
-                                textAlign: 'center',
-                                fontSize: '1.2rem',
-                                fontWeight: 600
-                              }}
-                            >
-                              {number}
-                              {isCalled && (
-                                <div className="number-glow-ring" style={{ borderColor: '#d4a574' }}></div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Sección derecha: Título/Info arriba, Bolillero abajo */}
-            <div className="right-section">
-              {/* Info superior */}
-              <div className="side-info">
-                <div className="room-title">
-                  <img src={GiftIcon} alt="Gift" className="title-icon" />
-                  <span className="title-text" style={{
-                    color: '#b87333',
-                    textShadow: '0 0 10px rgba(184, 115, 51, 0.6), 0 0 20px rgba(139, 69, 19, 0.4)',
-                    WebkitTextFillColor: '#b87333'
-                  }}>SALA BRONCE</span>
-                  <div className="card-price-tag">
-                    <span className="price-label">Valor Cartón</span>
-                    <span className="price-amount">$500</span>
-                  </div>
-                  <button
-                    className="lobby-btn"
-                    onClick={() => navigate('/')}
-                    title="Volver al lobby"
-                  >
-                    LOBBY
-                  </button>
-                  <div className="ball-counter-display">
-                    🎱 Bola {ballsDrawn.length} de 90
-                  </div>
-                  <div className={`status-badge ${gameStatus}`}>
-                    {gameStatus === 'waiting' && '⏸️ ESPERA'}
-                    {gameStatus === 'active' && '🔴 EN VIVO'}
-                    {gameStatus === 'ended' && '✅ FINALIZADO'}
+            {/* Bola actual en sorteo */}
+            {currentBall && (
+              <div className="current-ball-showcase">
+                <div 
+                  className="showcase-ball"
+                  style={{
+                    backgroundColor: getBallColor(currentBall.number),
+                    boxShadow: `0 0 40px ${getBallColor(currentBall.number)}`
+                  }}
+                >
+                  <div className="ball-shine"></div>
+                  <div className="ball-content">
+                    <div className="ball-number-large">{currentBall.number}</div>
                   </div>
                 </div>
-              </div>
-
-              {/* Display de Pozos (Jackpots) - ELIMINADO POR PETICIÓN DEL USUARIO */}
-              {/* <JackpotDisplay pots={pots} /> */}
-
-              {/* Bolillero Moderno */}
-
-              {/* Bolillero Moderno */}
-              <ModernBallMachine
-                theme="bronze"
-                currentBall={currentBall}
-                isActive={gameStatus === 'active'}
-                cardsRemaining={cardsRemaining}
-                onSelectCards={() => setShowCardSelection(true)}
-                waitingButtonImage={selectCardsButton}
-              />
-
-              {/* Últimas 5 bolas - COMPONENTE NUEVO (75px) */}
-              <RecentBallsPanel balls={ballsDrawn} getBallColor={getBallColor} />
-            </div>
-          </div>
-
-
-          {/* MITAD INFERIOR - LOS CARTONES */}
-          <div className="player-cards-section">
-            <div className="cards-header">
-              <div className="cards-title" style={{
-                fontSize: '1rem',
-                fontWeight: 900,
-                letterSpacing: '2px',
-                color: '#b87333',
-                textShadow: '0 0 8px rgba(184, 115, 51, 0.5)',
-                background: 'linear-gradient(180deg, rgba(62, 39, 35, 0.9), rgba(42, 24, 16, 0.9))',
-                borderRadius: '6px',
-                border: '2px solid #5a2d0c',
-                fontFamily: "'Roboto Condensed', 'Arial Narrow', sans-serif",
-                padding: '8px 16px',
-                textAlign: 'center',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px'
-              }}>
-                <span className="cards-icon">🎴</span>
-                <span>MIS CARTONES</span>
-              </div>
-
-              {/* Modal de Alerta de Casi Línea - Al lado del título */}
-              {/* Modal de Alerta de Casi Línea / Casi Bingo - Al lado del título */}
-              {/* Notificaciones de Estado (Casi Línea / Casi Bingo) */}
-              {(() => {
-                const hasLineBeenWon = celebratedCardIds.length > 0 || lineCelebrated;
-
-                // PRIORIDAD 0: ALERTA DE POZO (Solo antes de la bola 40 y si no hay línea)
-                // "Posibilidades de Pozo Pre-40"
-                if (!hasLineBeenWon && ballsDrawn.length < 40 && ballsDrawn.length > 5) {
-                  return (
-                    <div className="almost-line-modal pozo-alert" style={{
-                      top: '15%',
-                      opacity: 0.9,
-                      transform: 'scale(0.8)',
-                      pointerEvents: 'none'
-                    }}>
-                      <div className="almost-line-content" style={{
-                        background: 'linear-gradient(135deg, #CD7F32, #A0522D)',
-                        color: '#fff',
-                        borderColor: '#8B4513',
-                        boxShadow: '0 0 15px rgba(205, 127, 50, 0.6)'
-                      }}>
-                        <span className="alert-icon-modal">🏆</span>
-                        <span className="alert-text-modal">
-                          ¡POZO DISPONIBLE! (Pre-40)
-                        </span>
-                      </div>
-                    </div>
-                  );
-                }
-
-                // PRIORIDAD 1: ALERTA DE BINGO (Solo si ya se ganó la línea)
-                if (hasLineBeenWon && almostBingoCards.length > 0 && ballsDrawn.length < 90) {
-                  const minMissing = Math.min(...almostBingoCards.map(c => c.minMissing));
-                  return (
-                    <div className="almost-line-modal almost-bingo-modal">
-                      <div className="almost-line-content" style={{ borderColor: '#ff00ff', background: 'linear-gradient(135deg, rgba(255, 0, 255, 0.95), rgba(75, 0, 130, 0.95))' }}>
-                        <span className="alert-icon-modal">💎</span>
-                        <span className="alert-text-modal">
-                          ¡A {minMissing} NÚMERO{minMissing > 1 ? 'S' : ''} DE BINGO!
-                        </span>
-                      </div>
-                    </div>
-                  );
-                }
-
-                // PRIORIDAD 2: ALERTA DE LÍNEA (Restaurada y Mejorada)
-                // Solo si NO se ha ganado línea aún. Y SE QUEDA hasta que se gane.
-                if (!hasLineBeenWon && !lineCelebrated && almostLineCards.length > 0) {
-                  const minMissing = Math.min(...almostLineCards.map(card => card.minMissing));
-                  const count = almostLineCards.length;
-                  return (
-                    <div className="almost-line-modal">
-                      <div className="almost-line-content">
-                        <span className="alert-icon-modal">⚡</span>
-                        <span className="alert-text-modal">
-                          {count > 1 ? `¡${count} CARTONES A ` : '¡A '}
-                          {minMissing} NÚMERO{minMissing > 1 ? 'S' : ''} DE LÍNEA!
-                        </span>
-                      </div>
-                    </div>
-                  );
-                }
-                return null;
-              })()}
-
-              <div className="cards-count">{playerCards.length} cartones</div>
-            </div>
-
-            <div className="cards-grid-container">
-              {/* Grid compacto 6x5 = 30 cartones */}
-              <div className="cards-compact-grid">
-                {playerCards.map((card, index) => {
-                  const cardSerial = card.serial || generateCardSerial(index);
-
-                  // DEBUG: Log solo la primera vez o cuando cambia
-                  if (index === 0 && card.serial) {
-                    console.log(`🔍 RENDER - Cartón ${index}: serial=${card.serial}, usando=${cardSerial}`);
-                  }
-
-                  const progress = getCardProgress(card);
-                  const isExpanded = expandedCard === card.id;
-                  const isAlmostLine = almostLineCards.some(c => c.cardId === card.id);
-
-                  return (
-                    <div
-                      key={card.id}
-                      className={`compact-card ${isExpanded ? 'expanded' : ''} ${isAlmostLine ? 'almost-line' : ''}`}
-                      onClick={() => !isExpanded && expandCard(card.id)}
-                      style={{
-                        cursor: 'pointer',
-                        '--progress': Math.round((progress / 15) * 100)
-                      }}
-                    >
-                      {!isExpanded && (
-                        <>
-                          <div className="compact-card-serial" style={{ fontSize: '1.5rem', letterSpacing: '-0.1px', fontWeight: 700 }}>{cardSerial}</div>
-                          <div className="compact-card-progress">
-                            {Array.from({ length: 15 }).map((_, i) => (
-                              <div
-                                key={i}
-                                className={`progress-segment ${i < progress ? 'filled' : ''}`}
-                                style={{
-                                  color: i < progress ? getBallColor((i + 1) * 6) : 'rgba(255,0,255,0.3)'
-                                }}
-                              />
-                            ))}
-                          </div>
-                          <div className="compact-card-count">{progress}/15</div>
-                        </>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Cartón expandido en el centro */}
-              {expandedCard && (
-                <div className="expanded-card-overlay" onClick={() => canCloseExpandedCard && setExpandedCard(null)}>
-                  <div className="expanded-card-container" onClick={(e) => e.stopPropagation()}>
-                    {playerCards
-                      .filter(card => card.id === expandedCard)
-                      .map(card => (
-                        <BingoCardPreview
-                          key={card.id}
-                          card={{
-                            card_serial: card.serial || generateCardSerial(playerCards.indexOf(card)),
-                            numbers: card.numbers
-                          }}
-                          room="bronze"
-                          selected={false}
-                          onClick={null}
-                          showSerial={true}
-                          drawnNumbers={ballsDrawn.map(b => b.number)}
-                          winningLines={cardWinningLines[card.id] || []}
-                        />
-                      ))}
-                    <button
-                      className="close-expanded-btn"
-                      onClick={() => canCloseExpandedCard && setExpandedCard(null)}
-                      style={{ opacity: canCloseExpandedCard ? 1 : 0.3, cursor: canCloseExpandedCard ? 'pointer' : 'not-allowed' }}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Selector de Voz */}
-          {
-            showVoiceSelector && (
-              <div className="voice-selector-overlay" onClick={() => setShowVoiceSelector(false)}>
-                <div className="voice-selector-modal" onClick={(e) => e.stopPropagation()}>
-                  <h3>🎤 Seleccionar Voz</h3>
-                  <div className="voice-list">
-                    {availableVoices.map((voice, index) => (
-                      <button
-                        key={index}
-                        className={`voice-option ${currentVoice?.name === voice.name ? 'active' : ''}`}
-                        onClick={() => {
-                          voiceService.setVoice(voice);
-                          setCurrentVoice(voice);
-                          voiceService.speak('Hola, esta es mi voz');
-                        }}
-                      >
-                        <span className="voice-name">{voice.name}</span>
-                        <span className="voice-lang">{voice.lang}</span>
-                      </button>
-                    ))}
-                  </div>
-                  <button className="close-voice-selector" onClick={() => setShowVoiceSelector(false)}>
-                    Cerrar
-                  </button>
-                </div>
-              </div>
-            )
-          }
-
-          {/* Botón de control (solo para testing) */}
-          {/* Botón de control (solo para testing - VOZ MANTENIDO) */}
-          <div className="test-controls" style={{ justifyContent: 'center' }}>
-            <button
-              className="control-btn voice-btn"
-              onClick={() => setShowVoiceSelector(true)}
-              title="Cambiar voz del anunciador"
-            >
-              🎤 Voz
-            </button>
-          </div>
-
-          {/* Sistema de Reacciones */}
-          <div className="reactions-panel" style={{
-            boxShadow: '0 0 30px rgba(184, 115, 51, 0.6), inset 0 0 20px rgba(139, 69, 19, 0.2)'
-          }}>
-            <div className="reactions-title">Reacciones</div>
-            <div className="reactions-buttons">
-              <button className="reaction-btn" onClick={() => addFloatingEmoji('👍')} title="Me gusta">👍</button>
-              <button className="reaction-btn" onClick={() => addFloatingEmoji('😮')} title="Sorprendido">😮</button>
-              <button className="reaction-btn" onClick={() => addFloatingEmoji('🎉')} title="Celebrar">🎉</button>
-              <button className="reaction-btn" onClick={() => addFloatingEmoji('😢')} title="Triste">😢</button>
-              <button className="reaction-btn" onClick={() => addFloatingEmoji('🔥')} title="Fuego">🔥</button>
-              <button className="reaction-btn" onClick={() => addFloatingEmoji('💎')} title="Diamante">💎</button>
-            </div>
-          </div>
-
-          {/* Emojis Flotantes */}
-          {
-            floatingEmojis.map(emoji => (
-              <div
-                key={emoji.id}
-                className="floating-emoji"
-                style={{ left: `${emoji.x}px` }}
-              >
-                {emoji.emoji}
-              </div>
-            ))
-          }
-
-          {/* Modo Celebración Full Screen */}
-          {
-            celebrationMode && (
-              <div className="celebration-overlay">
-                <div className="celebration-content">
-                  <div className="celebration-trophy">🏆</div>
-                  <div className="celebration-text">¡FELICITACIONES!</div>
-                  <div className="celebration-subtitle">Has ganado</div>
-                  <div className="celebration-amount">${winAmount.toLocaleString()}</div>
-                  <div className="celebration-stars">
-                    {'⭐'.repeat(5)}
-                  </div>
-                </div>
-                <div className="celebration-confetti">
-                  {Array.from({ length: 100 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="celebration-confetti-piece"
-                      style={{
-                        left: `${Math.random() * 100}%`,
-                        animationDelay: `${Math.random() * 3}s`,
-                        backgroundColor: getBallColor(Math.floor(Math.random() * 90) + 1)
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-            )
-          }
-
-          {/* Números Marcados con Efecto */}
-          {
-            markedNumbers.map(mark => (
-              <div
-                key={`mark-${mark.number}-${mark.timestamp}`}
-                className="marked-number-effect"
-              >
-                <div className="marked-stamp">✓</div>
-                <div className="marked-number">{mark.number}</div>
-                <div className="marked-particles">
-                  {Array.from({ length: 8 }).map((_, i) => (
-                    <div key={i} className="marked-particle" />
-                  ))}
-                </div>
-              </div>
-            ))
-          }
-
-          {/* Modal "¡¡Todo Listo!!" cuando se completan 20 cartones */}
-          {
-            showReadyModal && (
-              <div className="ready-modal-overlay">
-                <div className="ready-modal-content bronze-modal">
-                  <div className="ready-modal-icon">🎉</div>
-                  <h2 className="ready-modal-title">¡¡Todo Listo!!</h2>
-                  <p className="ready-modal-subtitle">Tienes {selectedPlayerCards.length} cartones listos para jugar</p>
-                  <div className="ready-modal-countdown">
-                    <p className="ready-modal-countdown-label">Próximo Sorteo en:</p>
-                    {nextDrawTime ? (
-                      <Countdown targetDate={nextDrawTime} />
-                    ) : (
-                      <p className="loading-countdown">Calculando...</p>
-                    )}
+                <div className="ball-announcement">
+                  <div className="announcement-number-large" style={{ color: getBallColor(currentBall.number) }}>
+                    {currentBall.number}
                   </div>
                 </div>
               </div>
             )}
 
-          {showPrizesModal && pendingPrizes && (
-            <PendingPrizesModal
-              prizes={pendingPrizes}
-              onClose={handleClosePrizesModal}
-            />
+            {/* Estado de espera - Botón de Selección de Cartones */}
+            {gameStatus === 'waiting' && cardsRemaining > 0 && !salesClosed && (
+              <div className="card-selection-sphere">
+                <button 
+                  className="select-cards-sphere-btn"
+                  onClick={() => setShowCardSelection(true)}
+                  title={`Seleccionar cartones (${cardsRemaining} restantes)`}
+                >
+                  <img 
+                    src={selectCardsButton} 
+                    alt="Seleccionar Cartones" 
+                    className="sphere-btn-image"
+                  />
+                </button>
+              </div>
+            )}
+
+            {/* VENTAS CERRADAS - Mostrar mensaje T-5 */}
+            {gameStatus === 'waiting' && salesClosed && (
+              <div className="card-selection-sphere sales-closed">
+                <div className="sales-closed-message">
+                  <div className="sales-closed-icon">🔒</div>
+                  <div className="sales-closed-text">VENTAS CERRADAS</div>
+                  <div className="sales-closed-subtext">{salesMessage}</div>
+                  {nextSessionTime && (
+                    <div className="sales-closed-countdown">
+                      Sorteo: {new Date(nextSessionTime).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Mensaje de espera cuando no hay cartones disponibles */}
+            {gameStatus === 'waiting' && cardsRemaining === 0 && !salesClosed && (
+              <div className="waiting-message">
+                <div className="waiting-icon">⏳</div>
+                <div className="waiting-text">Esperando inicio...</div>
+              </div>
+            )}
+          </div>
+
+          {/* Contador de Cartones - Fuera del círculo */}
+          {gameStatus === 'waiting' && cardsRemaining > 0 && (
+            <div className="external-counter">
+              <div className="counter-line top-line"></div>
+              <div className="counter-number" style={{
+                color: '#b87333',
+                textShadow: '0 0 15px rgba(184, 115, 51, 0.8), 2px 2px 4px rgba(0, 0, 0, 0.8)'
+              }}>{cardsRemaining}</div>
+              <div className="counter-line bottom-line"></div>
+              <div className="counter-label">Cartones Disponibles</div>
+            </div>
           )}
+
+          <div className="machine-base">
+            <div className="base-panel"></div>
+            <div className="base-lights">
+              <div className="light-strip"></div>
+            </div>
+          </div>
+
+          {/* Últimas 5 bolas */}
+          {ballsDrawn.length > 0 && (
+            <div className="recent-balls-bar">
+              <span className="recent-label">ÚLTIMAS:</span>
+              <div className="recent-balls-list">
+                {ballsDrawn.slice(-5).reverse().map((ball, index) => (
+                  <div 
+                    key={`${ball.number}-${index}`}
+                    className="recent-ball-chip"
+                    style={{
+                      backgroundColor: getBallColor(ball.number),
+                      boxShadow: `0 0 15px ${getBallColor(ball.number)}`
+                    }}
+                  >
+                    <span className="ball-number">{ball.number}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        </div>
+      </div>
+
+      {/* MITAD INFERIOR - LOS CARTONES */}
+      <div className="player-cards-section">
+        <div className="cards-header">
+          <div className="cards-title" style={{
+            fontSize: '1rem',
+            fontWeight: 900,
+            letterSpacing: '2px',
+            color: '#b87333',
+            textShadow: '0 0 8px rgba(184, 115, 51, 0.5)',
+            background: 'linear-gradient(180deg, rgba(62, 39, 35, 0.9), rgba(42, 24, 16, 0.9))',
+            borderRadius: '6px',
+            border: '2px solid #5a2d0c',
+            fontFamily: "'Roboto Condensed', 'Arial Narrow', sans-serif",
+            padding: '8px 16px',
+            textAlign: 'center',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px'
+          }}>
+            <span className="cards-icon">🎴</span>
+            <span>MIS CARTONES</span>
+          </div>
+          
+          {/* Modal de Alerta de Casi Línea - Al lado del título */}
+          {almostLineCards.length > 0 && ballsDrawn.length < 40 && (() => {
+            const minMissing = Math.min(...almostLineCards.map(card => card.minMissing));
+            return (
+              <div className="almost-line-modal">
+                <div className="almost-line-content">
+                  <span className="alert-icon-modal">⚡</span>
+                  <span className="alert-text-modal">
+                    ¡A {minMissing} NÚMERO{minMissing > 1 ? 'S' : ''} DE LÍNEA!
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
+          
+          <div className="cards-count">{playerCards.length} cartones</div>
+        </div>
+
+        <div className="cards-grid-container">
+          {/* Grid compacto 6x5 = 30 cartones */}
+          <div className="cards-compact-grid">
+            {playerCards.map((card, index) => {
+              const cardSerial = card.serial || generateCardSerial(index);
+              
+              // DEBUG: Log solo la primera vez o cuando cambia
+              if (index === 0 && card.serial) {
+                console.log(`🔍 RENDER - Cartón ${index}: serial=${card.serial}, usando=${cardSerial}`);
+              }
+              
+              const progress = getCardProgress(card);
+              const isExpanded = expandedCard === card.id;
+              const isAlmostLine = almostLineCards.some(c => c.cardId === card.id);
+              
+              return (
+                <div 
+                  key={card.id} 
+                  className={`compact-card ${isExpanded ? 'expanded' : ''} ${isAlmostLine ? 'almost-line' : ''}`}
+                  onClick={() => !isExpanded && expandCard(card.id)}
+                  style={{
+                    cursor: 'pointer',
+                    '--progress': Math.round((progress / 15) * 100)
+                  }}
+                >
+                  {!isExpanded && (
+                    <>
+                      <div className="compact-card-serial" style={{ fontSize: '1.5rem', letterSpacing: '-0.1px', fontWeight: 700 }}>{cardSerial}</div>
+                      <div className="compact-card-progress">
+                        {Array.from({ length: 15 }).map((_, i) => (
+                          <div 
+                            key={i} 
+                            className={`progress-segment ${i < progress ? 'filled' : ''}`}
+                            style={{
+                              color: i < progress ? getBallColor((i + 1) * 6) : 'rgba(255,0,255,0.3)'
+                            }}
+                          />
+                        ))}
+                      </div>
+                      <div className="compact-card-count">{progress}/15</div>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Cartón expandido en el centro */}
+          {expandedCard && (
+            <div className="expanded-card-overlay" onClick={() => canCloseExpandedCard && setExpandedCard(null)}>
+              <div className="expanded-card-container" onClick={(e) => e.stopPropagation()}>
+                {playerCards
+                  .filter(card => card.id === expandedCard)
+                  .map(card => (
+                    <BingoCardPreview
+                      key={card.id}
+                      card={{
+                        card_serial: card.serial || generateCardSerial(playerCards.indexOf(card)),
+                        numbers: card.numbers
+                      }}
+                      room="bronze"
+                      selected={false}
+                      onClick={null}
+                      showSerial={true}
+                      drawnNumbers={ballsDrawn.map(b => b.number)}
+                      winningLines={cardWinningLines[card.id] || []}
+                    />
+                  ))}
+                <button 
+                  className="close-expanded-btn"
+                  onClick={() => canCloseExpandedCard && setExpandedCard(null)}
+                  style={{ opacity: canCloseExpandedCard ? 1 : 0.3, cursor: canCloseExpandedCard ? 'pointer' : 'not-allowed' }}
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Selector de Voz */}
+      {showVoiceSelector && (
+        <div className="voice-selector-overlay" onClick={() => setShowVoiceSelector(false)}>
+          <div className="voice-selector-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>🎤 Seleccionar Voz</h3>
+            <div className="voice-list">
+              {availableVoices.map((voice, index) => (
+                <button
+                  key={index}
+                  className={`voice-option ${currentVoice?.name === voice.name ? 'active' : ''}`}
+                  onClick={() => {
+                    voiceService.setVoice(voice);
+                    setCurrentVoice(voice);
+                    voiceService.speak('Hola, esta es mi voz');
+                  }}
+                >
+                  <span className="voice-name">{voice.name}</span>
+                  <span className="voice-lang">{voice.lang}</span>
+                </button>
+              ))}
+            </div>
+            <button className="close-voice-selector" onClick={() => setShowVoiceSelector(false)}>
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Botón de control (solo para testing) */}
+      <div className="test-controls">
+        <button 
+          className="control-btn voice-btn"
+          onClick={() => setShowVoiceSelector(true)}
+          title="Cambiar voz del anunciador"
+        >
+          🎤 Voz
+        </button>
+        <button 
+          className="control-btn"
+          onClick={() => setGameStatus(gameStatus === 'active' ? 'waiting' : 'active')}
+        >
+          {gameStatus === 'active' ? '⏸️ Pausar' : '▶️ Iniciar'}
+        </button>
+        <button 
+          className="control-btn"
+          onClick={() => activateCelebration(50000)}
+          title="Probar modo celebración"
+          style={{ background: 'linear-gradient(135deg, #ffd700, #ffaa00)' }}
+        >
+          🏆 Ganar
+        </button>
+      </div>
+      
+      {/* Sistema de Reacciones */}
+      <div className="reactions-panel" style={{
+        boxShadow: '0 0 30px rgba(184, 115, 51, 0.6), inset 0 0 20px rgba(139, 69, 19, 0.2)'
+      }}>
+        <div className="reactions-title">Reacciones</div>
+        <div className="reactions-buttons">
+          <button className="reaction-btn" onClick={() => addFloatingEmoji('👍')} title="Me gusta">👍</button>
+          <button className="reaction-btn" onClick={() => addFloatingEmoji('😮')} title="Sorprendido">😮</button>
+          <button className="reaction-btn" onClick={() => addFloatingEmoji('🎉')} title="Celebrar">🎉</button>
+          <button className="reaction-btn" onClick={() => addFloatingEmoji('😢')} title="Triste">😢</button>
+          <button className="reaction-btn" onClick={() => addFloatingEmoji('🔥')} title="Fuego">🔥</button>
+          <button className="reaction-btn" onClick={() => addFloatingEmoji('💎')} title="Diamante">💎</button>
+        </div>
+      </div>
+      
+      {/* Emojis Flotantes */}
+      {floatingEmojis.map(emoji => (
+        <div 
+          key={emoji.id} 
+          className="floating-emoji"
+          style={{ left: `${emoji.x}px` }}
+        >
+          {emoji.emoji}
+        </div>
+      ))}
+      
+      {/* Modo Celebración Full Screen */}
+      {celebrationMode && (
+        <div className="celebration-overlay">
+          <div className="celebration-content">
+            <div className="celebration-trophy">🏆</div>
+            <div className="celebration-text">¡FELICITACIONES!</div>
+            <div className="celebration-subtitle">Has ganado</div>
+            <div className="celebration-amount">${winAmount.toLocaleString()}</div>
+            <div className="celebration-stars">
+              {'⭐'.repeat(5)}
+            </div>
+          </div>
+          <div className="celebration-confetti">
+            {Array.from({ length: 100 }).map((_, i) => (
+              <div 
+                key={i} 
+                className="celebration-confetti-piece"
+                style={{
+                  left: `${Math.random() * 100}%`,
+                  animationDelay: `${Math.random() * 3}s`,
+                  backgroundColor: getBallColor(Math.floor(Math.random() * 90) + 1)
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {/* Números Marcados con Efecto */}
+      {markedNumbers.map(mark => (
+        <div 
+          key={`mark-${mark.number}-${mark.timestamp}`} 
+          className="marked-number-effect"
+        >
+          <div className="marked-stamp">✓</div>
+          <div className="marked-number">{mark.number}</div>
+          <div className="marked-particles">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="marked-particle" />
+            ))}
+          </div>
+        </div>
+      ))}
+
+      {/* Modal "¡¡Todo Listo!!" cuando se completan 20 cartones */}
+      {showReadyModal && (
+        <div className="ready-modal-overlay">
+          <div className="ready-modal-content bronze-modal">
+            <div className="ready-modal-icon">🎉</div>
+            <h2 className="ready-modal-title">¡¡Todo Listo!!</h2>
+            <p className="ready-modal-subtitle">Tienes {selectedPlayerCards.length} cartones listos para jugar</p>
+            <div className="ready-modal-countdown">
+              <p className="ready-modal-countdown-label">Próximo Sorteo en:</p>
+              <Countdown targetDate={(() => {
+                const today = new Date();
+                const drawTime = new Date(today);
+                drawTime.setHours(20, 0, 0, 0);
+                
+                // Si ya pasó las 20:00 hoy, programar para mañana
+                if (today > drawTime) {
+                  drawTime.setDate(drawTime.getDate() + 1);
+                }
+                
+                return drawTime;
+              })()} />
+            </div>
+          </div>
+        </div>
+      )}
         </>
-      )
-      }
-    </div >
+      )}
+    </div>
   );
 }
-

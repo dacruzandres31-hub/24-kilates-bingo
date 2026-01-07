@@ -357,6 +357,38 @@ class DepositService {
                     }
                 };
             }
+            // --- CASO 4: ACTIVACIÓN EMBAJADOR PARA AGENTES ---
+            else if (deposit.request_type === 'ambassador_activation') {
+                // Verificar que el usuario sea agente
+                if (users[0].role !== 'agente') {
+                    throw new Error('Solo los agentes pueden activar la membresía Embajador');
+                }
+
+                // Verificar que no sea ya ambassador
+                if (users[0].is_ambassador) {
+                    throw new Error('Ya tienes la membresía Socio Embajador activa');
+                }
+
+                // Activar is_ambassador
+                await connection.query(
+                    `UPDATE users SET is_ambassador = TRUE WHERE id = ?`,
+                    [deposit.user_id]
+                );
+
+                // Registrar en audit_logs
+                await connection.query(`
+                    INSERT INTO audit_logs (user_id, action, details, created_at)
+                    VALUES (?, 'ambassador_activated', ?, NOW())
+                `, [deposit.user_id, JSON.stringify({ 
+                    method: 'payment_proof', 
+                    amount: MoneyMath.toNumber(amount),
+                    deposit_id: depositId 
+                })]);
+
+                balanceAfter = balanceBefore; // El dinero fue para la membresía, no al saldo
+
+                console.log(`[DepositService] ✅ Membresía Embajador activada para agente #${deposit.user_id}`);
+            }
             else {
                 // --- CASO NORMAL: Acreditar balance de dinero ---
                 balanceAfter = balanceBefore.plus(amount);

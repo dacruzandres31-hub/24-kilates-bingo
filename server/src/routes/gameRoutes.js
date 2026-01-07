@@ -18,8 +18,12 @@ const router = express.Router();
  * GET    /game/session-status/:sessionId - Estado detallado de sesión (para jugadores)
  */
 
-// ENDPOINT PÚBLICO (sin autenticación)
+// ENDPOINTS PÚBLICOS (sin autenticación)
 router.get('/lobby-data', roomSettingsController.getLobbyData);
+
+// Sorteo en vivo - estado actual para jugadores que entran a mitad del sorteo
+// PÚBLICO para que cualquiera pueda ver el sorteo en curso
+router.get('/live-draw/:room', gameController.getLiveDraw);
 
 // Todos los siguientes requieren autenticación
 router.use(authMiddleware.authenticateToken);
@@ -52,8 +56,8 @@ router.get('/session-status/:sessionId', diagnosticsController.getSessionStatus)
 // Sesiones activas
 router.get('/sessions', gameController.getActiveSessions);
 
-// Estado de la sala (siguiente sorteo, sorteando)
-router.get('/room-status/:room', gameController.getRoomStatus);
+// Estado de ventas de una sala (para habilitar/deshabilitar botón de compra)
+router.get('/sales-status/:room', gameController.getSalesStatus);
 
 // NUEVO: Cantar línea en salas monetizadas
 router.post('/claim-line', gameController.claimLine);
@@ -71,11 +75,5 @@ router.get('/my-cards-analysis/:gameSessionId', gameController.getMyCardsAnalysi
 router.post('/validate-cards', gameController.validateCardsForSession);
 router.get('/my-validated-cards/:sessionId', gameController.getMyValidatedCards);
 router.get('/my-inventory', gameController.getMyCardInventory);
-
-// TEST: Gatillar notificación de ganador
-router.post('/test-winner-notification', gameController.testWinnerNotification);
-
-// NUEVO: Obtener premios pendientes (ganados mientras estaba offline)
-router.get('/pending-prizes', gameController.getPendingPrizes);
 
 module.exports = router;

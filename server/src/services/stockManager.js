@@ -20,81 +20,34 @@ class StockManager {
    * @returns {object} Resultado de limpieza
    */
   static async cleanUnsoldStock(playDate, roomType = null) {
-    try {
-      let query = `UPDATE daily_stock_cards 
-                   SET status = 'discarded', updated_at = NOW()
-                   WHERE play_date = ? AND status = 'available'`;
-      const params = [playDate];
-
-      if (roomType) {
-        query += ` AND room = ?`;
-        params.push(roomType);
-      }
-
-      const [result] = await pool.query(query, params);
-      const discardedCount = result.affectedRows;
-
-      // Auditoría
-      await pool.query(
-        `INSERT INTO audit_revenue (amount, transaction_type)
-         VALUES (?, ?)`,
-        [discardedCount, `stock_cleanup_${playDate}`]
-      );
-
-      console.log(`[StockManager] Limpieza: ${discardedCount} cartones descartados para ${playDate}`);
-
-      return {
-        success: true,
-        discardedCount,
-        playDate,
-        roomType: roomType || 'todas'
-      };
-    } catch (error) {
-      console.error('Clean unsold stock error:', error);
-      throw error;
-    }
+    // NOTA: El sistema actual usa bingo_cards_pool que es un pool permanente,
+    // no daily_stock_cards. La limpieza la hace CardPoolManager al iniciar el sorteo.
+    // Esta función es un no-op silencioso para evitar errores.
+    console.log(`[StockManager] cleanUnsoldStock: Delegado a CardPoolManager`);
+    return {
+      success: true,
+      discardedCount: 0,
+      playDate,
+      roomType: roomType || 'todas',
+      note: 'CardPoolManager handles cleanup'
+    };
   }
 
   /**
    * Bloquea ventas de cartones (T-5 minutes antes de partida)
-   * @param {Date} playDate - Fecha de la partida
-   * @param {string} roomType - (opcional) solo sala específica
-   * @returns {object} Resultado del bloqueo
+   * NOTA: El sistema actual cierra ventas via frontend (salesOpen endpoint).
+   * Esta función es un no-op silencioso.
    */
   static async blockSales(playDate, roomType = null) {
-    try {
-      let query = `UPDATE daily_stock_cards 
-                   SET status = 'discarded', updated_at = NOW()
-                   WHERE play_date = ? AND status = 'available'`;
-      const params = [playDate];
-
-      if (roomType) {
-        query += ` AND room = ?`;
-        params.push(roomType);
-      }
-
-      const [result] = await pool.query(query, params);
-      const blockedCount = result.affectedRows;
-
-      // Auditoría
-      await pool.query(
-        `INSERT INTO audit_revenue (amount, transaction_type)
-         VALUES (?, ?)`,
-        [blockedCount, `sales_blocked_${playDate}`]
-      );
-
-      console.log(`[StockManager] Bloqueo de ventas: ${blockedCount} cartones para ${playDate}`);
-
-      return {
-        success: true,
-        blockedCount,
-        playDate,
-        reason: 'T-5 minutes to game start'
-      };
-    } catch (error) {
-      console.error('Block sales error:', error);
-      throw error;
-    }
+    // El bloqueo de ventas se maneja en el frontend verificando si hay sesión active
+    // y si faltan menos de 5 minutos. Esta función es legacy.
+    console.log(`[StockManager] blockSales: Ventas controladas via frontend`);
+    return {
+      success: true,
+      blockedCount: 0,
+      playDate,
+      reason: 'T-5 closure handled by frontend salesOpen check'
+    };
   }
 
   /**

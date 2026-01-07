@@ -570,10 +570,25 @@ export default function Dashboard() {
             </section>
           )}
 
-          {/* Mis Referidos */}
+          {/* Mis Referidos - TEMPORALMENTE DESHABILITADO */}
           {activeSections['my-referrals'] && (
             <section className="mb-8">
-              <MyReferralsPanel />
+              <div className="bg-slate-900/50 border border-slate-700/50 rounded-2xl p-6 opacity-60">
+                <div className="bg-gradient-to-r from-gray-600 to-gray-700 rounded-xl p-6 mb-4 flex items-center justify-between">
+                  <div className="text-white">
+                    <h2 className="text-2xl font-bold flex items-center gap-2">
+                      🎁 Mis Referidos e Invitaciones
+                    </h2>
+                    <p className="text-gray-300 mt-2">
+                      Sistema de referidos en desarrollo. Próximamente disponible.
+                    </p>
+                  </div>
+                </div>
+                <div className="text-center py-12 text-gray-500">
+                  <p className="text-lg">🚧 Esta función estará disponible próximamente</p>
+                  <p className="text-sm mt-2">Estamos trabajando para traerte la mejor experiencia de referidos.</p>
+                </div>
+              </div>
             </section>
           )}
 
