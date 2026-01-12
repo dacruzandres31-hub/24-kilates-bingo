@@ -1,33 +1,55 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import '../styles/Countdown.css';
 
-const Countdown = ({ targetDate }) => {
-  const calculateTimeLeft = () => {
+const Countdown = ({ targetDate, isPlaying = false }) => {
+  // Función memoizada para calcular tiempo restante
+  const calculateTimeLeft = useCallback(() => {
+    if (isPlaying) return { H: 0, M: 0, S: 0 };
+    if (!targetDate) return null;
+    
     const difference = +new Date(targetDate) - +new Date();
-    let timeLeft = {};
-
+    
     if (difference > 0) {
-      timeLeft = {
+      return {
         H: Math.floor((difference / (1000 * 60 * 60)) % 24),
         M: Math.floor((difference / 1000 / 60) % 60),
         S: Math.floor((difference / 1000) % 60),
       };
     }
-    return timeLeft;
-  };
+    return { H: 0, M: 0, S: 0 };
+  }, [targetDate, isPlaying]);
 
-  const [timeLeft, setTimeLeft] = useState(calculateTimeLeft());
+  const [timeLeft, setTimeLeft] = useState(() => calculateTimeLeft());
+
+  // Recalcular inmediatamente cuando cambie targetDate o isPlaying
+  useEffect(() => {
+    setTimeLeft(calculateTimeLeft());
+  }, [calculateTimeLeft]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
+    // Actualizar cada segundo
+    const interval = setInterval(() => {
       setTimeLeft(calculateTimeLeft());
     }, 1000);
 
-    // Clear the timer if the component is unmounted
-    return () => clearTimeout(timer);
-  });
+    return () => clearInterval(interval);
+  }, [calculateTimeLeft]);
 
-  const hasTimeLeft = Object.values(timeLeft).some(val => val > 0);
+  // Si no hay targetDate, mostrar estado de carga
+  if (timeLeft === null) {
+    return (
+      <div className="countdown-container">
+        <div className="countdown-label-text">Próximo sorteo en...</div>
+        <div className="countdown-timer">
+          <div className="countdown-segment full-width">
+            <span className="countdown-number text-medium">Calculando...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const hasTimeLeft = timeLeft.H > 0 || timeLeft.M > 0 || timeLeft.S > 0;
 
   return (
     <div className="countdown-container">
@@ -54,7 +76,7 @@ const Countdown = ({ targetDate }) => {
       ) : (
         <div className="countdown-timer drawing-pulse">
           <div className="countdown-segment full-width">
-            <span className="countdown-number text-large">INICIANDO</span>
+            <span className="countdown-number text-large">EN CURSO</span>
           </div>
         </div>
       )}

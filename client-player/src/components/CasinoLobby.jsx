@@ -7,6 +7,7 @@ import '../styles/Countdown.css';
 import '../styles/LiveDrawBadge.css';
 import '../styles/LobbyCompact.css';
 import Countdown from './Countdown';
+import RoomStatusBadge from './RoomStatusBadge';
 import PlayerActivityHistory from './PlayerActivityHistory';
 import { FaClock, FaUsers, FaMoneyBillWave, FaTrophy, FaStar, FaGlassCheers, FaGift, FaHeadset, FaTicketAlt, FaEye, FaEyeSlash, FaMusic, FaVolumeUp, FaVolumeMute, FaUser, FaKey, FaSignOutAlt, FaMapMarkedAlt, FaShoppingCart, FaCrown, FaGem } from 'react-icons/fa';
 
@@ -43,12 +44,6 @@ const getTargetTime = (hour) => {
 };
 
 const RoomCard = ({ room, style }) => {
-  const statusText = {
-    active: 'Habilitada',
-    playing: 'Sorteando',
-    closed: 'Cerrada',
-  };
-
   const renderParticles = () => {
     return Array.from({ length: 10 }).map((_, i) => (
       <div
@@ -64,6 +59,8 @@ const RoomCard = ({ room, style }) => {
     ));
   };
 
+  const isPlaying = room.status === 'playing';
+
   return (
     <Link to={room.path} className={`room-link ${room.className} ${room.featured ? 'featured' : ''}`} id={room.id === 'starter' ? 'btn-room-starter' : undefined} style={style}>
       <div className="room-card">
@@ -73,7 +70,7 @@ const RoomCard = ({ room, style }) => {
           </div>
         )}
 
-        {room.isLive && (
+        {isPlaying && (
           <div className="live-draw-badge">
             <span className="live-dot"></span>
             EN VIVO
@@ -84,11 +81,12 @@ const RoomCard = ({ room, style }) => {
         <div className="room-texture"></div>
         <div className="room-shine"></div>
 
-        {room.status && (
-          <div className={`room-status-badge ${room.status}`}>
-            {statusText[room.status]}
-          </div>
-        )}
+        {/* Badge futurista de estado - usando datos centralizados del backend */}
+        <RoomStatusBadge 
+          status={room.status} 
+          statusText={room.statusText}
+          salesOpen={room.salesOpen}
+        />
 
         <div className="room-icon">
           <img
@@ -103,7 +101,7 @@ const RoomCard = ({ room, style }) => {
         </div>
         <h3 className="room-name">{room.name}</h3>
         <div className="room-time">
-          <Countdown targetDate={room.targetTime} />
+          <Countdown targetDate={room.targetTime} isPlaying={room.status === 'playing'} />
         </div>
         <p className="room-description">{room.description}</p>
 
@@ -283,18 +281,13 @@ const CasinoLobby = ({ user, onLogout }) => {
     };
   }, [socket]);
 
-  // Load Lobby Data
-  useEffect(() => {
-    loadLobbyData();
-    const interval = setInterval(loadLobbyData, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
+  // Load Lobby Data - Optimizado para carga inmediata
   const loadLobbyData = async () => {
     try {
       const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
       const response = await axios.get('/api/game/lobby-data', {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 5000 // 5 segundos máximo
       });
       if (response.data.success) setLobbyData(response.data.data);
     } catch (error) {
@@ -303,6 +296,14 @@ const CasinoLobby = ({ user, onLogout }) => {
       setLoadingLobby(false);
     }
   };
+
+  useEffect(() => {
+    // Cargar inmediatamente al montar
+    loadLobbyData();
+    // Refrescar cada 5 segundos para mantener estados sincronizados con schedule_settings
+    const interval = setInterval(loadLobbyData, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Wheel Status
   const checkWheelStatus = async () => {
@@ -371,8 +372,11 @@ const CasinoLobby = ({ user, onLogout }) => {
       },
     ];
 
+    // OPTIMIZACIÓN: Usar targetTime local como placeholder mientras carga
+    // Esto permite que los countdowns se muestren inmediatamente (máximo 1-2s de diferencia con servidor)
     if (!lobbyData) return baseRooms.map(room => ({
       ...room,
+      // Mantener targetTime local para countdown inmediato (se actualizará cuando llegue lobbyData)
       price: room.id === 'starter' ? 'Tickets' : '$...',
       pots: room.id !== 'starter' ? { bingo: '$...', line: '$...', pre40: '$...' } : undefined
     }));
@@ -385,11 +389,17 @@ const CasinoLobby = ({ user, onLogout }) => {
         pots: room.id !== 'starter' ? { bingo: '$...', line: '$...', pre40: '$...' } : undefined
       };
 
+      // Si está sorteando (playing), no mostrar countdown - mostrar SORTEANDO
+      const isPlaying = roomData.status === 'playing';
+
       return {
         ...room,
         path: roomData.sessionId ? `${room.path}/${roomData.sessionId}` : room.path,
-        targetTime: roomData.nextSession ? new Date(roomData.nextSession) : room.targetTime,
-        status: roomData.status || 'no_session',
+        targetTime: isPlaying ? null : (roomData.nextSession ? new Date(roomData.nextSession) : room.targetTime),
+        status: roomData.status || 'closed',
+        statusText: roomData.statusText || null,
+        salesOpen: roomData.salesOpen !== undefined ? roomData.salesOpen : true,
+        minutesToStart: isPlaying ? 0 : (roomData.minutesToStart || null),
         price: room.id === 'starter' ? 'Tickets' : uiHelper.formatCurrency(roomData.price),
         prizes: room.id === 'starter' ? roomData.prizes : undefined,
         pots: room.id !== 'starter' ? {
