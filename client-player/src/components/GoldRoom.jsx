@@ -1,8 +1,9 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import '../styles/GoldRoom.css';
 import GoldIcon from '../assets/gold_icon.png';
 import comprarBotonOro from '../assets/comprar_boton_oro.png';
+import bolilleroVideo from '../assets/bolillero_loop.mp4';
 import voiceService from '../services/voiceService';
 import audioService from '../services/audioService';
 import PlayerSidebar from './PlayerSidebar';
@@ -10,6 +11,7 @@ import CardSelectionLobby from './CardSelectionLobby';
 import BingoCardPreview from './BingoCardPreview';
 import Countdown from './Countdown';
 import useLiveDraw from '../hooks/useLiveDraw';
+import SessionHistory from './SessionHistory';
 
 export default function GoldRoom({ onLogout }) {
   const { sessionId } = useParams();
@@ -22,6 +24,8 @@ export default function GoldRoom({ onLogout }) {
     gameStatus,
     sessionId: liveSessionId,
     prizes: livePrizes,
+    lineWinnersPaid,
+    bingoWinnersPaid,
     isLoading: liveDrawLoading,
     setBallsDrawn,
     setCurrentBall,
@@ -56,6 +60,21 @@ const [cardWinningLines, setCardWinningLines] = useState({}); // {cardId: [0,1,2
   const [selectedPlayerCards, setSelectedPlayerCards] = useState([]); // Cartones seleccionados por el jugador
   const [cardsRemaining, setCardsRemaining] = useState(20); // Cartones que faltan por seleccionar
   const [showReadyModal, setShowReadyModal] = useState(false); // Modal "¡¡Todo Listo!!"
+  const [showHistoryModal, setShowHistoryModal] = useState(false); // Modal de historial de sorteos
+
+  // Calcular targetDate una sola vez (optimización)
+  const nextDrawTime = useMemo(() => {
+    const today = new Date();
+    const drawTime = new Date(today);
+    drawTime.setHours(22, 0, 0, 0); // Oro a las 22:00
+    
+    // Si ya pasó las 22:00 hoy, programar para mañana
+    if (today > drawTime) {
+      drawTime.setDate(drawTime.getDate() + 1);
+    }
+    
+    return drawTime;
+  }, []);
 
   // Auto-cerrar modal "¡¡Todo Listo!!" después de 5 segundos
   useEffect(() => {
@@ -87,7 +106,7 @@ const [cardWinningLines, setCardWinningLines] = useState({}); // {cardId: [0,1,2
 const celebrationAudio = new Audio('/audio/celebration.mp3');
 celebrationAudio.volume = 0.7;
 
-  // Verificar estado de ventas (T-5 closure) cada 30 segundos
+  // Verificar estado de ventas (T-5 closure) cada 5 segundos - Centralizado con schedule_settings
   useEffect(() => {
     const checkSalesStatus = async () => {
       try {
@@ -111,22 +130,50 @@ celebrationAudio.volume = 0.7;
     };
     
     checkSalesStatus();
-    const interval = setInterval(checkSalesStatus, 30000);
+    const interval = setInterval(checkSalesStatus, 5000);
     
     return () => clearInterval(interval);
   }, []);
 
   // Verificar cartones existentes del jugador al montar
+  // PERSISTENCIA: Los cartones se guardan en localStorage para no perderlos al salir de la sala
   useEffect(() => {
+    // Usar liveSessionId (sesión real del servidor) si está disponible, sino sessionId de URL
+    const activeSessionId = liveSessionId || sessionId;
+    const STORAGE_KEY = `bingo_cards_oro_${activeSessionId}`;
+    
     const checkExistingCards = async () => {
+      if (!activeSessionId) return;
+      
+      // 1. Primero intentar cargar desde localStorage (para cuando vuelve a la sala)
+      const cached = localStorage.getItem(STORAGE_KEY);
+      if (cached) {
+        try {
+          const cachedCards = JSON.parse(cached);
+          if (cachedCards && cachedCards.length > 0) {
+            console.log('📦 Cartones recuperados de localStorage:', cachedCards.length);
+            setSelectedPlayerCards(cachedCards);
+            setCardsRemaining(20 - cachedCards.length);
+          }
+        } catch (e) {
+          console.log('Error parseando cache, ignorando');
+        }
+      }
+      
+      // 2. Luego verificar con el servidor (fuente de verdad)
       try {
-        const response = await fetch(`/api/game/starter/my-cards/${sessionId || 'starter_default'}`, {
+        const response = await fetch(`/api/game/my-cards?roomType=oro`, {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         });
         
         if (response.ok) {
           const data = await response.json();
-          const currentCards = data.cards || [];
+          const currentCards = (data.cards || []).map(card => ({
+            id: card.id,
+            serial: card.serial_number,
+            numbers: JSON.parse(card.grid_numbers || '[]'),
+            room: card.room
+          }));
           
           console.log('🔍 DEBUG - Cartones cargados desde /my-cards:', currentCards.map(c => ({
             id: c.id,
@@ -139,7 +186,12 @@ celebrationAudio.volume = 0.7;
           const remaining = 20 - currentCards.length;
           setCardsRemaining(remaining);
           
-          // Si tiene menos de 20, mostrar botón para seleccionar más
+          // Guardar en localStorage para persistencia
+          if (currentCards.length > 0) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(currentCards));
+            console.log('💾 Cartones guardados en localStorage');
+          }
+          
           if (remaining > 0) {
             console.log(`📋 Tiene ${currentCards.length} cartones, faltan ${remaining}`);
           } else {
@@ -147,13 +199,14 @@ celebrationAudio.volume = 0.7;
           }
         }
       } catch (error) {
-        console.log('Sin cartones previos');
-        setCardsRemaining(20);
+        console.log('Sin cartones previos o error de red');
+        // Si hay cache, mantenerlo; sino resetear
+        if (!cached) setCardsRemaining(20);
       }
     };
     
     checkExistingCards();
-  }, [sessionId]);
+  }, [sessionId, liveSessionId]);
 
   // Generar número de serie del cartón: DDMMYY-S0001
   const generateCardSerial = (cardIndex, roomLetter = 'S') => {
@@ -388,6 +441,15 @@ celebrationAudio.volume = 0.7;
     setShowCardSelection(false);
     console.log(`✅ Total de cartones: ${allCards.length}, faltan: ${remaining}`);
     
+    // 💾 PERSISTENCIA: Guardar cartones en localStorage
+    // Usar liveSessionId (sesión real del servidor) si está disponible, sino sessionId de URL
+    const activeSessionId = liveSessionId || sessionId;
+    const STORAGE_KEY = `bingo_cards_oro_${activeSessionId}`;
+    if (allCards.length > 0 && activeSessionId) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(allCards));
+      console.log('💾 Cartones guardados en localStorage después de selección');
+    }
+    
     // Si se completaron los 20 cartones, mostrar modal
     if (allCards.length === 20) {
       setShowReadyModal(true);
@@ -480,6 +542,28 @@ celebrationAudio.volume = 0.7;
     return;
   }
 
+  // PREMIO ÚNICO: Si ya se celebró línea O el servidor marcó lineWinnersPaid, NO detectar más
+  // Esto evita que se marquen múltiples líneas como ganadoras después de la primera
+  if (lineCelebrated || lineWinnersPaid || celebratedCardIds.length > 0) {
+    // Solo detectar cartones "casi línea" para alertas, pero NO nuevas líneas ganadoras
+    const cardsAlmostThere = [];
+    playerCards.forEach(card => {
+      const linesStatus = checkLineStatus(card);
+      const almostLines = linesStatus.filter(line => line.missing === 1 || line.missing === 2);
+      if (almostLines.length > 0) {
+        const minMissing = Math.min(...almostLines.map(line => line.missing));
+        cardsAlmostThere.push({
+          cardId: card.id,
+          almostLineCount: almostLines.length,
+          lines: almostLines,
+          minMissing: minMissing
+        });
+      }
+    });
+    setAlmostLineCards(cardsAlmostThere);
+    return; // Salir temprano - no detectar más líneas ganadoras
+  }
+
   const cardsAlmostThere = [];
   const cardsWithWinningLines = [];
   const newCardWinningLines = {};
@@ -487,7 +571,7 @@ celebrationAudio.volume = 0.7;
   playerCards.forEach(card => {
     const linesStatus = checkLineStatus(card);
     const almostLines = linesStatus.filter(line => line.missing === 1 || line.missing === 2);
-    // Una línea está completa solo si missing === 0 Y tiene al menos 5 números marcados
+    // PREMIO ÚNICO: Detectar línea completa solo si aún no hay ganador
     const completedLines = linesStatus.filter(line => line.missing === 0 && line.markedCount >= 5);
 
     if (almostLines.length > 0) {
@@ -524,7 +608,8 @@ celebrationAudio.volume = 0.7;
     !celebratedCardIds.includes(card.cardId)
   );
   
-  if (newWinners.length > 0 && !lineCelebrated && winnerCards.length === 0) {
+  // PREMIO ÚNICO: Solo celebrar si lineWinnersPaid === false (primer ganador solamente)
+  if (newWinners.length > 0 && !lineCelebrated && winnerCards.length === 0 && !lineWinnersPaid) {
     // Tomar el primer cartón ganador nuevo
     const winnerCard = newWinners[0];
     
@@ -560,10 +645,12 @@ celebrationAudio.volume = 0.7;
         // Anunciar continuación a BINGO antes de reanudar
         voiceService.speak('Continuamos hasta Bingo');
         setTimeout(() => {
-          // ORDEN IMPORTANTE: Limpiar ganadores PRIMERO, luego resetear flag
+          // ORDEN IMPORTANTE: Limpiar ganadores PRIMERO pero NO resetear lineCelebrated
+          // lineCelebrated debe mantenerse TRUE para que no detecte más líneas ganadoras
+          // El premio de línea ya se pagó, ahora solo se puede ganar BINGO
           setWinnerCards([]);
           setHighlightedLine(null);
-          setLineCelebrated(false); // RESETEAR después de limpiar ganadores
+          // NO RESETEAR: setLineCelebrated(false); -- mantener TRUE para evitar detectar más líneas
           setGameStatus('active');
         }, 2000); // Esperar 2 segundos para que termine el anuncio
       }, 18000); // 18 segundos + 2 del anuncio = 20 segundos total
@@ -1125,52 +1212,35 @@ useEffect(() => {
             </div>
           </div>
 
-          {/* Bolillero Moderno */}
+          {/* Bolillero Moderno con Video */}
           <div className="modern-bingo-machine">
           <div className="machine-top-led"></div>
           
           <div className="acrylic-sphere">
-            {/* Borde LED azul */}
-            <div className="led-ring"></div>
-            
-            {/* Bolillas flotantes */}
-            {gameStatus === 'active' && !currentBall && (
-              <div className="floating-balls-container">
-                {floatingBalls.map(ball => (
-                  <div
-                    key={ball.id}
-                    className="floating-ball"
-                    style={{
-                      backgroundColor: ball.color,
-                      boxShadow: `0 0 20px ${ball.color}`,
-                      animationDelay: `${ball.delay}s`,
-                      animationDuration: `${ball.duration}s`
-                    }}
-                  >
-                    {ball.number}
-                  </div>
-                ))}
-              </div>
+            {/* Video del bolillero girando - SOLO cuando hay sorteo activo */}
+            {gameStatus === 'active' && (
+              <video 
+                className="bolillero-video"
+                src={bolilleroVideo}
+                autoPlay
+                loop
+                muted
+                playsInline
+              />
             )}
 
-            {/* Bola actual en sorteo */}
+            {/* Bola actual en sorteo - superpuesta sobre el video */}
             {currentBall && (
               <div className="current-ball-showcase">
                 <div 
-                  className="showcase-ball"
+                  className="showcase-ball bingo-ball-style"
                   style={{
                     backgroundColor: getBallColor(currentBall.number),
-                    boxShadow: `0 0 40px ${getBallColor(currentBall.number)}`
+                    boxShadow: `0 4px 15px rgba(0,0,0,0.4)`
                   }}
                 >
-                  <div className="ball-shine"></div>
-                  <div className="ball-content">
-                    <div className="ball-number-large">{currentBall.number}</div>
-                  </div>
-                </div>
-                <div className="ball-announcement">
-                  <div className="announcement-number-large" style={{ color: getBallColor(currentBall.number) }}>
-                    {currentBall.number}
+                  <div className="ball-white-center">
+                    <span className="ball-number-large">{currentBall.number}</span>
                   </div>
                 </div>
               </div>
@@ -1189,6 +1259,7 @@ useEffect(() => {
                     alt="Comprar Cartones" 
                     className="sphere-btn-image"
                   />
+                  <span className="available-badge">{cardsRemaining} Disponibles</span>
                 </button>
               </div>
             )}
@@ -1218,15 +1289,7 @@ useEffect(() => {
             )}
           </div>
 
-          {/* Contador de Cartones - Fuera del círculo */}
-          {gameStatus === 'waiting' && cardsRemaining > 0 && (
-            <div className="external-counter">
-              <div className="counter-line top-line"></div>
-              <div className="counter-number">{cardsRemaining}</div>
-              <div className="counter-line bottom-line"></div>
-              <div className="counter-label">Cartones Disponibles</div>
-            </div>
-          )}
+          {/* Contador de Cartones eliminado - ahora está dentro del botón */}
 
           <div className="machine-base">
             <div className="base-panel"></div>
@@ -1243,13 +1306,15 @@ useEffect(() => {
                 {ballsDrawn.slice(-5).reverse().map((ball, index) => (
                   <div 
                     key={`${ball.number}-${index}`}
-                    className="recent-ball-chip"
+                    className="recent-ball-chip bingo-ball-mini"
                     style={{
                       backgroundColor: getBallColor(ball.number),
-                      boxShadow: `0 0 15px ${getBallColor(ball.number)}`
+                      boxShadow: `0 2px 8px rgba(0,0,0,0.3)`
                     }}
                   >
-                    <span className="ball-number">{ball.number}</span>
+                    <div className="ball-white-center-mini">
+                      <span className="ball-number">{ball.number}</span>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1394,7 +1459,7 @@ useEffect(() => {
         </div>
       )}
 
-      {/* Botón de control (solo para testing) */}
+      {/* Controles de audio e historial */}
       <div className="test-controls">
         <button 
           className="control-btn voice-btn"
@@ -1405,17 +1470,11 @@ useEffect(() => {
         </button>
         <button 
           className="control-btn"
-          onClick={() => setGameStatus(gameStatus === 'active' ? 'waiting' : 'active')}
+          onClick={() => setShowHistoryModal(true)}
+          title="Ver historial de sorteos"
+          style={{ background: 'linear-gradient(135deg, #fbbf24, #d97706)' }}
         >
-          {gameStatus === 'active' ? '⏸️ Pausar' : '▶️ Iniciar'}
-        </button>
-        <button 
-          className="control-btn"
-          onClick={() => activateCelebration(50000)}
-          title="Probar modo celebración"
-          style={{ background: 'linear-gradient(135deg, #ffd700, #ffaa00)' }}
-        >
-          🏆 Ganar
+          📜 Historial
         </button>
       </div>
       
@@ -1496,22 +1555,18 @@ useEffect(() => {
             <p className="ready-modal-subtitle">Tienes {selectedPlayerCards.length} cartones listos para jugar</p>
             <div className="ready-modal-countdown">
               <p className="ready-modal-countdown-label">Próximo Sorteo en:</p>
-              <Countdown targetDate={(() => {
-                const today = new Date();
-                const drawTime = new Date(today);
-                drawTime.setHours(22, 0, 0, 0);
-                
-                // Si ya pasó las 22:00 hoy, programar para mañana
-                if (today > drawTime) {
-                  drawTime.setDate(drawTime.getDate() + 1);
-                }
-                
-                return drawTime;
-              })()} />
+              <Countdown targetDate={nextDrawTime} />
             </div>
           </div>
         </div>
       )}
+
+      {/* Modal de Historial de Sesiones */}
+      <SessionHistory
+        room="oro"
+        isOpen={showHistoryModal}
+        onClose={() => setShowHistoryModal(false)}
+      />
         </>
       )}
     </div>
