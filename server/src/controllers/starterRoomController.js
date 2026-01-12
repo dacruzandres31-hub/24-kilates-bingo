@@ -8,6 +8,7 @@
  */
 
 const cardPoolService = require('../services/cardPoolService');
+const pool = require('../db');
 
 class StarterRoomController {
   /**
@@ -174,6 +175,7 @@ class StarterRoomController {
   /**
    * GET /api/game/starter/my-cards/:sessionId
    * Obtiene cartones ya reservados por el jugador actual
+   * Busca primero en BD (fuente de verdad), luego complementa con memoria
    */
   async getMyCards(req, res) {
     try {
@@ -187,32 +189,60 @@ class StarterRoomController {
         return res.json({ success: true, cards: [] });
       }
 
-      let pool = cardPoolService.pools.get(sessionId);
+      // 1. FUENTE DE VERDAD: Buscar en base de datos
+      const [dbCards] = await pool.query(
+        `SELECT id, card_serial as serial, numbers, selected_at
+         FROM bingo_cards_pool
+         WHERE selected_by = ? 
+         AND status = 'selected'
+         AND room = 'starter'
+         AND game_session_id = ?`,
+        [userId, sessionId]
+      );
+
+      if (dbCards.length > 0) {
+        // Formatear cartones desde BD
+        const formattedCards = dbCards.map(card => ({
+          id: card.id,
+          serial: card.serial,
+          numbers: typeof card.numbers === 'string' ? JSON.parse(card.numbers) : card.numbers,
+          selectedAt: card.selected_at
+        }));
+
+        console.log(`📋 [Starter/MyCards] Retornando ${formattedCards.length} cartones desde BD para usuario ${userId} en sesión ${sessionId}`);
+        return res.json({
+          success: true,
+          cards: formattedCards
+        });
+      }
+
+      // 2. FALLBACK: Buscar en pool de memoria (para reservas temporales aún no confirmadas)
+      let memPool = cardPoolService.pools.get(sessionId);
 
       // Si no está en memoria, intentar cargar desde BD
-      if (!pool) {
+      if (!memPool) {
         console.log(`🔄 [Starter/MyCards] Pool no encontrado en memoria para sesión ${sessionId}, intentando cargar...`);
         try {
           await cardPoolService.loadPoolFromDB(sessionId);
-          pool = cardPoolService.pools.get(sessionId);
+          memPool = cardPoolService.pools.get(sessionId);
         } catch (loadError) {
           console.error(`❌ Error cargando pool en getMyCards:`, loadError.message);
         }
       }
 
-      if (!pool) {
+      if (!memPool) {
         return res.json({
           success: true,
           cards: []
         });
       }
 
-      // Filtrar cartones reservados por este usuario
-      const myCards = Array.from(pool.cards.values()).filter(card =>
+      // Filtrar cartones reservados por este usuario en memoria
+      const myCards = Array.from(memPool.cards.values()).filter(card =>
         card.status === 'reserved' && card.reserved_by === userId
       );
 
-      console.log(`📋 [Starter/MyCards] Retornando ${myCards.length} cartones para usuario ${userId} en sesión ${sessionId}`);
+      console.log(`📋 [Starter/MyCards] Retornando ${myCards.length} cartones desde MEMORIA para usuario ${userId} en sesión ${sessionId}`);
 
       res.json({
         success: true,

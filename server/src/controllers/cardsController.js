@@ -1,7 +1,5 @@
 const pool = require('../db');
 const websocketService = require('../services/websocketService');
-const cardPoolService = require('../services/cardPoolService');
-const sessionService = require('../services/sessionService');
 
 /**
  * Mapeo de nombres de salas (inglés → español para BD)
@@ -12,23 +10,6 @@ const ROOM_MAP = {
   'gold': 'oro',
   'starter': 'starter'
 };
-
-/**
- * Safely parse card numbers from database
- * MySQL2 driver auto-parses JSON columns, but we handle both cases
- */
-const safeParseNumbers = (numbers) => {
-  if (typeof numbers === 'string') {
-    try {
-      return JSON.parse(numbers);
-    } catch (e) {
-      console.error('[Cards] Error parsing numbers:', e);
-      return [];
-    }
-  }
-  return numbers || [];
-};
-
 
 /**
  * GET /api/cards/available/:room
@@ -63,7 +44,7 @@ exports.getAvailableCards = async (req, res) => {
 
       if (!inventory || inventory.length === 0 || inventory[0].quantity === 0) {
         console.log(`[Cards] ❌ No se encontraron tickets para sala ${room}`);
-        return res.status(400).json({
+        return res.status(400).json({ 
           error: 'No tienes tickets disponibles para esta sala',
           availableTickets: 0
         });
@@ -97,12 +78,28 @@ exports.getAvailableCards = async (req, res) => {
     );
 
     // Parsear JSON de números
-    const formattedCards = cards.map(card => ({
-      id: card.id,
-      card_serial: card.card_serial || card.serial,
-      numbers: safeParseNumbers(card.numbers),
-      createdAt: card.created_at
-    }));
+    const formattedCards = cards.map(card => {
+      let parsedNumbers;
+      
+      // El campo numbers puede venir como JSON string o como ya parseado
+      if (typeof card.numbers === 'string') {
+        try {
+          parsedNumbers = JSON.parse(card.numbers);
+        } catch (e) {
+          console.log(`[Cards] ⚠️ Error parseando JSON del cartón ${card.id}, intentando parsearlo como está`);
+          parsedNumbers = card.numbers;
+        }
+      } else {
+        parsedNumbers = card.numbers;
+      }
+
+      return {
+        id: card.id,
+        serial: card.card_serial,
+        numbers: parsedNumbers,
+        createdAt: card.created_at
+      };
+    });
 
     console.log(`[Cards] ✅ ${formattedCards.length} cartones disponibles de ${totalAvailable} totales`);
 
@@ -126,7 +123,7 @@ exports.getAvailableCards = async (req, res) => {
  */
 exports.reserveCard = async (req, res) => {
   const connection = await pool.getConnection();
-
+  
   try {
     const { cardId, room } = req.body;
     const userId = req.user.id;
@@ -155,7 +152,7 @@ exports.reserveCard = async (req, res) => {
     // Si ya está reservado/seleccionado por otro usuario
     if ((card.status === 'reserved' || card.status === 'selected') && card.selected_by !== userId) {
       await connection.rollback();
-      return res.status(409).json({
+      return res.status(409).json({ 
         error: 'Este cartón ya fue tomado por otro jugador',
         status: card.status
       });
@@ -164,8 +161,8 @@ exports.reserveCard = async (req, res) => {
     // Si ya está reservado por este usuario, no hacer nada
     if (card.status === 'reserved' && card.selected_by === userId) {
       await connection.commit();
-      return res.json({
-        success: true,
+      return res.json({ 
+        success: true, 
         message: 'Cartón ya reservado',
         cardId,
         alreadyReserved: true
@@ -186,8 +183,8 @@ exports.reserveCard = async (req, res) => {
 
     console.log(`[Cards] ✅ Cartón ${cardId} reservado temporalmente para usuario ${userId}`);
 
-    res.json({
-      success: true,
+    res.json({ 
+      success: true, 
       message: 'Cartón reservado',
       cardId,
       expiresIn: 300 // 5 minutos
@@ -208,7 +205,7 @@ exports.reserveCard = async (req, res) => {
  */
 exports.unreserveCard = async (req, res) => {
   const connection = await pool.getConnection();
-
+  
   try {
     const { cardId, room } = req.body;
     const userId = req.user.id;
@@ -254,15 +251,12 @@ exports.unreserveCard = async (req, res) => {
  */
 exports.selectCards = async (req, res) => {
   const connection = await pool.getConnection();
-
+  
   try {
     await connection.beginTransaction();
-
+    
     const { cardIds, room, packageInfo } = req.body;
     const userId = req.user.id;
-
-    // Mapear nombre de sala a español para BD
-    const roomDB = ROOM_MAP[room] || room;
 
     if (!Array.isArray(cardIds) || cardIds.length === 0) {
       await connection.rollback();
@@ -277,11 +271,11 @@ exports.selectCards = async (req, res) => {
     // Extraer cantidad de gift cards del paquete
     const giftCount = packageInfo?.bonus || 0;
     const purchasedCount = cardIds.length - giftCount;
-
-    console.log(`[Cards] 🎯 Usuario ${userId} seleccionando ${cardIds.length} cartones (${purchasedCount} comprados + ${giftCount} PLUS) para sala ${room} (BD: ${roomDB})`);
+    
+    console.log(`[Cards] 🎯 Usuario ${userId} seleccionando ${cardIds.length} cartones (${purchasedCount} comprados + ${giftCount} PLUS) para sala ${room}`);
 
     // Solo validar tickets/balance si NO es sala starter
-    if (roomDB !== 'starter') {
+    if (room !== 'starter') {
       // Verificar tickets disponibles por tipo (pagos vs gratis)
       const [inventory] = await connection.query(
         `SELECT 
@@ -289,29 +283,29 @@ exports.selectCards = async (req, res) => {
            COALESCE(SUM(CASE WHEN is_gift = 1 THEN quantity ELSE 0 END), 0) as free_quantity
          FROM user_card_inventory 
          WHERE user_id = ? AND room = ?`,
-        [userId, roomDB]
+        [userId, room]
       );
 
       const availablePaid = inventory[0]?.paid_quantity || 0;
       const availableFree = inventory[0]?.free_quantity || 0;
       const totalAvailable = availablePaid + availableFree;
-
+      
       console.log(`[Cards] 📊 Tickets disponibles - Pagos: ${availablePaid}, Gratis: ${availableFree}, Total: ${totalAvailable}, Necesarios: ${purchasedCount} (${giftCount} PLUS no cuentan)`);
 
       // Si no tiene suficientes tickets para los COMPRADOS (gift cards no cuentan), intentar usar balance
       if (totalAvailable < purchasedCount) {
         console.log(`[Cards] ⚠️ Tickets insuficientes - verificando balance del usuario`);
-
+        
         // Obtener costo del cartón según la sala desde room_settings
         const [roomSettings] = await connection.query(
           `SELECT card_price FROM room_settings WHERE room = ? LIMIT 1`,
-          [roomDB]
+          [room]
         );
 
         if (!roomSettings || roomSettings.length === 0) {
           await connection.rollback();
           connection.release();
-          return res.status(400).json({
+          return res.status(400).json({ 
             error: 'No se encontró configuración de precio para esta sala'
           });
         }
@@ -328,7 +322,7 @@ exports.selectCards = async (req, res) => {
         if (!userData || userData.length === 0) {
           await connection.rollback();
           connection.release();
-          return res.status(400).json({
+          return res.status(400).json({ 
             error: 'Usuario no encontrado'
           });
         }
@@ -341,7 +335,7 @@ exports.selectCards = async (req, res) => {
           await connection.rollback();
           connection.release();
           console.log(`[Cards] ❌ Balance insuficiente - Necesita: $${totalCost}, Tiene: $${userBalance}`);
-          return res.status(402).json({
+          return res.status(402).json({ 
             error: 'insufficient_funds',
             message: 'No tienes suficientes tickets ni balance. Por favor contacta a tu agente para recargar.',
             required: totalCost,
@@ -353,7 +347,7 @@ exports.selectCards = async (req, res) => {
 
         // Tiene balance suficiente - cobrar y crear inventario
         console.log(`[Cards] ✅ Cobrando $${totalCost} del balance del usuario`);
-
+        
         await connection.query(
           `UPDATE users SET balance = balance - ? WHERE id = ?`,
           [totalCost, userId]
@@ -364,7 +358,7 @@ exports.selectCards = async (req, res) => {
           `INSERT INTO chips_movements 
            (user_id, movement_type, amount, balance_after, description, created_at)
            VALUES (?, 'purchase', ?, ?, ?, NOW())`,
-          [userId, totalCost, userBalance - totalCost, `Compra de ${purchasedCount} cartones para sala ${roomDB} (${giftCount} PLUS gratis)`]
+          [userId, totalCost, userBalance - totalCost, `Compra de ${purchasedCount} cartones para sala ${room} (${giftCount} PLUS gratis)`]
         );
 
         // Crear inventario de cartones pagos
@@ -373,7 +367,7 @@ exports.selectCards = async (req, res) => {
            VALUES (?, ?, ?, 0, ?, NOW())
            ON DUPLICATE KEY UPDATE 
            quantity = quantity + VALUES(quantity)`,
-          [userId, roomDB, cardIds.length, cardCost]
+          [userId, room, cardIds.length, cardCost]
         );
 
         console.log(`[Cards] ✅ Balance cobrado y ${cardIds.length} cartones agregados al inventario como PAGOS`);
@@ -386,6 +380,11 @@ exports.selectCards = async (req, res) => {
         };
       } else {
         // Tiene suficientes tickets - aplicar regla del 10% SOLO sobre cartones comprados
+        // ========================================
+        // REGLA DEL 10%: Máximo 10% de cartones COMPRADOS pueden ser gratis
+        // MODO FLEXIBLE: Si no hay suficientes pagos, usar todos los disponibles
+        // IMPORTANTE: Gift cards (PLUS) NO cuentan en esta distribución
+        // ========================================
         const maxFree = Math.ceil(purchasedCount * 0.10); // Máximo 10% gratis sobre COMPRADOS (no sobre gifts)
         let actualFree = Math.min(maxFree, availableFree);
         let needPaid = purchasedCount - actualFree;
@@ -396,16 +395,16 @@ exports.selectCards = async (req, res) => {
         // MODO FLEXIBLE: Si no hay suficientes pagos, usar todos los disponibles
         if (needPaid > availablePaid) {
           console.log(`[Cards] ⚠️ MODO FLEXIBLE activado - Pagos insuficientes (${availablePaid}/${needPaid})`);
-
+          
           // Usar TODOS los pagos disponibles
           needPaid = availablePaid;
           actualFree = purchasedCount - needPaid;
-
+          
           // Verificar que haya suficientes gratis para completar
           if (actualFree > availableFree) {
             await connection.rollback();
             console.log(`[Cards] ❌ Tickets insuficientes TOTALES - Necesita ${actualFree} gratis pero solo tiene ${availableFree}`);
-            return res.status(400).json({
+            return res.status(400).json({ 
               error: 'No tienes suficientes tickets disponibles',
               required: purchasedCount,
               available: {
@@ -415,9 +414,9 @@ exports.selectCards = async (req, res) => {
               }
             });
           }
-
+          
           flexibleMode = true;
-          const actualPercentage = Math.round(actualFree / purchasedCount * 100);
+          const actualPercentage = Math.round(actualFree/purchasedCount*100);
           console.log(`[Cards] 🔄 FLEXIBLE: Usará ${needPaid} pagos + ${actualFree} gratis (${actualPercentage}% gratis - EXCEDE regla 10%)`);
         }
 
@@ -427,9 +426,9 @@ exports.selectCards = async (req, res) => {
           free: actualFree,
           flexibleMode
         };
-
+        
         if (!flexibleMode) {
-          console.log(`[Cards] ✅ Distribución validada - Usará ${needPaid} pagos + ${actualFree} gratis (${Math.round(actualFree / purchasedCount * 100)}% gratis sobre ${purchasedCount} comprados)`);
+          console.log(`[Cards] ✅ Distribución validada - Usará ${needPaid} pagos + ${actualFree} gratis (${Math.round(actualFree/purchasedCount*100)}% gratis sobre ${purchasedCount} comprados)`);
         }
       }
     } else {
@@ -437,8 +436,8 @@ exports.selectCards = async (req, res) => {
     }
 
     // Verificar que los cartones estén disponibles, reservados O ya seleccionados por este usuario
-    console.log(`[Cards] 🔍 Verificando disponibilidad de cartones para userId=${userId}, room=${roomDB}, cardIds=`, cardIds);
-
+    console.log(`[Cards] 🔍 Verificando disponibilidad de cartones para userId=${userId}, room=${room}, cardIds=`, cardIds);
+    
     const [cardsCheck] = await connection.query(
       `SELECT id, card_serial, status, selected_by FROM bingo_cards_pool
        WHERE id IN (?) AND room = ? 
@@ -446,16 +445,20 @@ exports.selectCards = async (req, res) => {
             OR (status = 'reserved' AND selected_by = ?)
             OR (status = 'selected' AND selected_by = ?))
        FOR UPDATE`,
-      [cardIds, roomDB, userId, userId]
+      [cardIds, room, userId, userId]
+    );
+
+    console.log(`[Cards] 📋 Cartones encontrados: ${cardsCheck.length}/${cardIds.length}`, 
+      cardsCheck.map(c => ({ id: c.id, status: c.status, selected_by: c.selected_by }))
     );
 
     if (cardsCheck.length !== cardIds.length) {
       // Mostrar cuáles están ocupados
       const [allCards] = await connection.query(
         `SELECT id, card_serial, status, selected_by FROM bingo_cards_pool WHERE id IN (?) AND room = ?`,
-        [cardIds, roomDB]
+        [cardIds, room]
       );
-
+      
       await connection.rollback();
       console.log('[Cards] ❌ Cartones no disponibles:', {
         requested: cardIds.length,
@@ -463,7 +466,7 @@ exports.selectCards = async (req, res) => {
         cardIds,
         allCardsStatus: allCards
       });
-      return res.status(409).json({
+      return res.status(409).json({ 
         error: 'Algunos cartones ya fueron seleccionados por otros jugadores',
         available: cardsCheck.length,
         requested: cardIds.length,
@@ -471,14 +474,40 @@ exports.selectCards = async (req, res) => {
       });
     }
 
-    // Marcar cartones como seleccionados
+    // Marcar cartones como seleccionados y gift según packageInfo
+    // giftCount ya está definido al inicio de la función
+    
+    // ========================================
+    // BUSCAR SESIÓN PENDIENTE PARA LA SALA
+    // Los cartones se asignan a la sesión cuando se seleccionan
+    // ========================================
+    let pendingSessionId = null;
+    
+    // Para sala starter, el room en la BD es 'starter'
+    const dbRoom = room === 'starter' ? 'starter' : room;
+    
+    const [pendingSession] = await connection.query(
+      `SELECT id FROM game_sessions 
+       WHERE room = ? AND status IN ('pending', 'preventa') 
+       ORDER BY start_time ASC LIMIT 1`,
+      [dbRoom]
+    );
+    
+    if (pendingSession.length > 0) {
+      pendingSessionId = pendingSession[0].id;
+      console.log(`[Cards] 🎯 Sesión pendiente encontrada: ${pendingSessionId} para sala ${dbRoom}`);
+    } else {
+      console.log(`[Cards] ⚠️ No hay sesión pendiente para sala ${dbRoom} - cartones quedarán sin asignar`);
+    }
+    
+    // Marcar todos los cartones como seleccionados con el game_session_id
     await connection.query(
       `UPDATE bingo_cards_pool
-       SET status = 'selected', selected_by = ?, selected_at = NOW()
+       SET status = 'selected', selected_by = ?, selected_at = NOW(), game_session_id = ?
        WHERE id IN (?)`,
-      [userId, cardIds]
+      [userId, pendingSessionId, cardIds]
     );
-
+    
     // Si hay gifts, marcar los últimos N cartones como gifts
     if (giftCount > 0) {
       const giftIds = cardIds.slice(-giftCount); // Últimos N IDs son gifts
@@ -492,182 +521,228 @@ exports.selectCards = async (req, res) => {
     }
 
     // Descontar tickets del inventario solo si NO es sala starter
-    if (roomDB !== 'starter') {
+    if (room !== 'starter') {
       const distribution = req.ticketDistribution;
+      
+      if (distribution.flexibleMode) {
+        console.log(`[Cards] 🔄 Iniciando descuento MODO FLEXIBLE - ${distribution.paid} pagos + ${distribution.free} gratis (${Math.round(distribution.free/(distribution.paid+distribution.free)*100)}% gratis)`);
+      } else {
+        console.log(`[Cards] 🔄 Iniciando descuento según distribución - ${distribution.paid} pagos + ${distribution.free} gratis`);
+      }
 
-      // Descontar tickets PAGOS (is_gift = 0)
+      // ========================================
+      // PASO 1: Descontar tickets PAGOS (is_gift = 0)
+      // ========================================
       let paidToDeduct = distribution.paid;
+      
       const [paidRecords] = await connection.query(
         `SELECT id, quantity FROM user_card_inventory
          WHERE user_id = ? AND room = ? AND is_gift = 0 AND quantity > 0
          ORDER BY created_at ASC FOR UPDATE`,
-        [userId, roomDB]
+        [userId, room]
       );
+
+      console.log(`[Cards] 💰 Descontando ${paidToDeduct} tickets PAGOS de ${paidRecords.length} registros`);
 
       for (const record of paidRecords) {
         if (paidToDeduct <= 0) break;
+
         const deductFromThis = Math.min(record.quantity, paidToDeduct);
-        await connection.query(`UPDATE user_card_inventory SET quantity = quantity - ? WHERE id = ?`, [deductFromThis, record.id]);
+        
+        await connection.query(
+          `UPDATE user_card_inventory
+           SET quantity = quantity - ?
+           WHERE id = ?`,
+          [deductFromThis, record.id]
+        );
+
         paidToDeduct -= deductFromThis;
+        console.log(`[Cards] ✂️ PAGOS: Descontados ${deductFromThis} del registro ${record.id}. Quedan: ${paidToDeduct}`);
       }
 
-      // Descontar tickets GRATIS (is_gift = 1)
+      // ========================================
+      // PASO 2: Descontar tickets GRATIS (is_gift = 1)
+      // ========================================
       let freeToDeduct = distribution.free;
+      
       if (freeToDeduct > 0) {
         const [freeRecords] = await connection.query(
           `SELECT id, quantity FROM user_card_inventory
            WHERE user_id = ? AND room = ? AND is_gift = 1 AND quantity > 0
            ORDER BY created_at ASC FOR UPDATE`,
-          [userId, roomDB]
+          [userId, room]
         );
+
+        console.log(`[Cards] 🎁 Descontando ${freeToDeduct} tickets GRATIS de ${freeRecords.length} registros`);
+
         for (const record of freeRecords) {
           if (freeToDeduct <= 0) break;
+
           const deductFromThis = Math.min(record.quantity, freeToDeduct);
-          await connection.query(`UPDATE user_card_inventory SET quantity = quantity - ? WHERE id = ?`, [deductFromThis, record.id]);
+          
+          await connection.query(
+            `UPDATE user_card_inventory
+             SET quantity = quantity - ?
+             WHERE id = ?`,
+            [deductFromThis, record.id]
+          );
+
           freeToDeduct -= deductFromThis;
+          console.log(`[Cards] ✂️ GRATIS: Descontados ${deductFromThis} del registro ${record.id}. Quedan: ${freeToDeduct}`);
         }
       }
 
-      // Eliminar registros vacíos
-      await connection.query(`DELETE FROM user_card_inventory WHERE user_id = ? AND room = ? AND quantity = 0`, [userId, roomDB]);
-
-      const [roomSettings] = await connection.query(`SELECT card_price FROM room_settings WHERE room = ? LIMIT 1`, [roomDB]);
-      if (roomSettings && roomSettings.length > 0) {
-        // [MOD] Asegurar que existe una sesión activa/pendiente para esta sala
-        // Pero NO actualizamos los pozos aquí manualmente para evitar duplicación.
-        // Lo haremos al final usando el potAccumulationService.
-        const activeSession = await sessionService.getOrCreateActiveSession(roomDB);
-
-        if (!activeSession) {
-          console.warn(`[Cards] ⚠️ No se pudo obtener/crear sesión para sala ${roomDB}.`);
-        } else {
-          req.activeSessionId = activeSession.id;
-          console.log(`[Cards] 🎯 Sesión objetivo: ${req.activeSessionId}`);
-        }
-      }
-    }
-
-    // Finalizar transacción
-    const [selectedCards] = await connection.query(`SELECT id, card_serial, numbers, is_gift, selected_at FROM bingo_cards_pool WHERE id IN (?)`, [cardIds]);
-
-    // [MOD] PERSISTENCIA: Insertar en validated_cards para que aparezcan después de refresh y en el juego
-    if (roomDB !== 'starter' && req.activeSessionId) {
-      const sessionId = req.activeSessionId;
-      const [roomSettings] = await connection.query(`SELECT card_price FROM room_settings WHERE room = ? LIMIT 1`, [roomDB]);
-      const cardPrice = parseFloat(roomSettings[0]?.card_price || 0);
-
-      const validatedInsertValues = selectedCards.map(c => [
-        userId,
-        sessionId,
-        roomDB,
-        c.card_serial,
-        typeof c.numbers === 'object' ? JSON.stringify(c.numbers) : c.numbers,
-        c.is_gift,
-        c.is_gift ? 0 : (cardPrice * 0.70),
-        new Date() // validated_at
-      ]);
-
+      // Eliminar registros con cantidad = 0
       await connection.query(
-        `INSERT INTO validated_cards (player_id, game_session_id, room, serial_number, grid_numbers, is_gift, contributed_amount, validated_at)
-         VALUES ?`,
-        [validatedInsertValues]
+        `DELETE FROM user_card_inventory
+         WHERE user_id = ? AND room = ? AND quantity = 0`,
+        [userId, room]
       );
-      console.log(`[Cards] 💾 ${validatedInsertValues.length} cartones persistidos en validated_cards para sesión ${sessionId}`);
+      
+      console.log(`[Cards] 🧹 Registros vacíos eliminados`);
+
+      // ========================================
+      // ACTUALIZAR POZOS DE LA SESIÓN
+      // Solo cartones COMPRADOS contribuyen (gift cards NO)
+      // ========================================
+      
+      // Obtener precio del cartón según la sala
+      const [roomSettings] = await connection.query(
+        `SELECT card_price FROM room_settings WHERE room = ? LIMIT 1`,
+        [room]
+      );
+
+      if (roomSettings && roomSettings.length > 0) {
+        const cardCost = parseFloat(roomSettings[0].card_price);
+        const totalRevenue = cardCost * purchasedCount; // Solo cartones comprados
+
+        // Distribuir según porcentajes: 50% Bingo, 15% Línea, 5% Jackpot
+        const bigoAmount = totalRevenue * 0.50;
+        const lineaAmount = totalRevenue * 0.15;
+        const jackpotAmount = totalRevenue * 0.05;
+        // 30% se queda en house (no entra aquí)
+
+        console.log(`[Cards] 💰 Contribución a pozos: ${purchasedCount} cartones × $${cardCost} = $${totalRevenue} → Bingo: $${bigoAmount}, Línea: $${lineaAmount}, Jackpot: $${jackpotAmount}`);
+
+        // Encontrar sesión pendiente de hoy
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const todayEnd = new Date();
+        todayEnd.setHours(23, 59, 59, 999);
+        
+        const [sessionResult] = await connection.query(
+          `SELECT id FROM game_sessions 
+           WHERE room = ? AND status = 'pending' 
+           AND start_time >= ? AND start_time <= ?
+           ORDER BY created_at DESC LIMIT 1`,
+          [room, todayStart, todayEnd]
+        );
+
+        if (sessionResult.length > 0) {
+          const sessionId = sessionResult[0].id;
+          await connection.query(
+            `UPDATE game_sessions 
+             SET current_pot_bingo = current_pot_bingo + ?,
+                 current_pot_linea = current_pot_linea + ?,
+                 current_pot_jackpot = current_pot_jackpot + ?,
+                 jackpot_bingo = jackpot_bingo + ?,
+                 jackpot_linea = jackpot_linea + ?,
+                 jackpot_pre40 = jackpot_pre40 + ?,
+                 updated_at = NOW()
+             WHERE id = ?`,
+            [bigoAmount, lineaAmount, jackpotAmount, bigoAmount, lineaAmount, jackpotAmount, sessionId]
+          );
+          console.log(`[Cards] ✅ Pozos actualizados en sesión ${sessionId} (current_pot + jackpot)`);
+          
+          // Emitir actualización de pozos en vivo
+          websocketService.emitPotsUpdate();
+        } else {
+          console.log(`[Cards] ⚠️ No se encontró sesión pendiente para hoy en sala ${room}`);
+        }
+      }
+    } else {
+      console.log('[Cards] 🎁 Sala Starter - No se descontarán tickets');
     }
+
+    // Obtener cartones seleccionados con detalles
+    const [selectedCards] = await connection.query(
+      `SELECT id, card_serial, numbers, selected_at
+       FROM bingo_cards_pool
+       WHERE id IN (?)`,
+      [cardIds]
+    );
 
     await connection.commit();
 
-    // ... (Sincronización Starter se mantiene igual)
-    if (roomDB === 'starter') {
-      try {
-        console.log(`[Cards] 🔄 Sincronizando selección Starter en cardPoolService para usuario ${userId}`);
-
-        // 1. Buscar sesión activa de starter
-        const [activeSession] = await pool.query(
-          "SELECT id FROM game_sessions WHERE room = 'starter' AND status IN ('pending', 'active') ORDER BY created_at DESC LIMIT 1"
-        );
-
-        if (activeSession.length > 0) {
-          const sessionId = activeSession[0].id;
-
-          // 2. Formatear cartones para cardPoolService
-          const cardsForPool = selectedCards.map(c => ({
-            id: c.id,
-            card_serial: c.card_serial,
-            numbers: typeof c.numbers === 'string' ? JSON.parse(c.numbers) : c.numbers
-          }));
-
-          // Primero borramos si tenía algo previo en esta sesión para evitar duplicados
-          await pool.query("DELETE FROM card_pool WHERE session_id = ? AND reserved_by = ?", [sessionId, userId]);
-
-          const values = cardsForPool.map(c => [
-            c.id,
-            sessionId,
-            c.card_serial,
-            JSON.stringify(c.numbers),
-            'reserved',
-            userId
-          ]);
-
-          if (values.length > 0) {
-            await pool.query(
-              "INSERT INTO card_pool (id, session_id, serial, numbers, status, reserved_by, reserved_at) VALUES ?",
-              [values]
-            );
-
-            // 4. Forzar recarga del pool de memoria para esta sesión
-            await cardPoolService.loadPoolFromDB(sessionId);
-            console.log(`[Cards] ✅ Sincronización Starter exitosa para sesión ${sessionId}`);
-          }
+    // Determinar cuáles son gifts según packageInfo (ya declarado arriba)
+    
+    const formattedCards = selectedCards.map((card, index) => {
+      // Parsear números - puede venir como JSON string o como objeto
+      let numbers = card.numbers;
+      if (typeof numbers === 'string') {
+        try {
+          numbers = JSON.parse(numbers);
+        } catch (err) {
+          console.error(`[Cards] ⚠️ Error parseando números del cartón ${card.id}:`, err.message);
+          // Si falla el parse, usar un array vacío o intentar parsear manualmente
+          numbers = [];
         }
-      } catch (syncError) {
-        console.error('[Cards] ❌ Error en sincronización Starter:', syncError);
-        // No bloqueamos la respuesta al usuario ya que bingo_cards_pool ya se guardó
       }
-    }
-
-    // ============================================
-    // PREPARAR RESPUESTA Y FORMATEAR CARTONES
-    // ============================================
-    const formattedCards = selectedCards.map((card) => {
+      
+      // Los últimos N cartones son gifts (donde N = giftCount)
+      const isGift = index >= (selectedCards.length - giftCount);
+      
       return {
         id: card.id,
-        card_serial: card.card_serial,
-        serial: card.card_serial, // Mantener ambos por compatibilidad
-        numbers: safeParseNumbers(card.numbers),
+        serial: card.card_serial,
+        numbers: numbers,
         selectedAt: card.selected_at,
-        isGift: card.is_gift === 1 || card.is_gift === true
+        isGift: isGift
       };
     });
 
-    // Calcular tickets restantes para el usuario en esta sala
-    const [purchasedCardsCount] = await pool.query(
+    console.log(`[Cards] ✅ ${formattedCards.length} cartones seleccionados correctamente`);
+
+    // Calcular tickets restantes según si es starter o no
+    // IMPORTANTE: Solo contar cartones comprados, NO PLUS/gifts
+    let remainingTickets = 0;
+    let totalCardsInRoom = 0;
+    
+    // Contar cuántos cartones COMPRADOS (no gifts) tiene el usuario en esta sala
+    // Ahora cuenta cartones de la sesión pendiente actual O sin sesión asignada
+    const [purchasedCards] = await connection.query(
       `SELECT COUNT(*) as total
        FROM bingo_cards_pool
        WHERE selected_by = ? 
        AND status = 'selected' 
        AND is_gift = 0
-       AND room = ?`,
-      [userId, roomDB]
+       AND room = ?
+       AND (game_session_id IS NULL OR game_session_id = ?)`,
+      [userId, room, pendingSessionId]
     );
+    
+    totalCardsInRoom = purchasedCards[0]?.total || 0;
+    remainingTickets = Math.max(0, 20 - totalCardsInRoom); // Nunca negativo
+    
+    console.log(`[Cards] 📊 Sala ${room} - Total comprado: ${totalCardsInRoom}, Puede comprar: ${remainingTickets} más (sessionId: ${pendingSessionId})`);
 
-    const totalInRoom = purchasedCardsCount[0]?.total || 0;
-    const remainingTickets = Math.max(0, 20 - totalInRoom);
+    // REGENERACIÓN AUTOMÁTICA: Verificar si se necesita generar más cartones
+    // Se ejecuta en background sin bloquear la respuesta al usuario
+    const cardPoolManager = require('../services/cardPoolManager');
+    cardPoolManager.checkAndRegenerate(room).catch(err => {
+      console.error('[Cards] Error en regeneración automática:', err);
+    });
 
-    // ============================================
-    // ACTUALIZAR POZOS Y CONTEO DE CARTONES
-    // ============================================
-    // Notificar via Socket.IO AL USUARIO INMEDIATAMENTE
+    // Notificar via Socket.IO
     const io = req.app.get('io');
     if (io) {
       io.to(`user_${userId}`).emit('cards_selected', {
-        room: roomDB,
+        room,
         cards: formattedCards,
         remainingTickets
       });
     }
 
-    // Responder al cliente para que pueda navegar SIN ESPERAR a las regeneraciones de fondo
     res.json({
       success: true,
       cards: formattedCards,
@@ -675,76 +750,17 @@ exports.selectCards = async (req, res) => {
       message: `${formattedCards.length} cartón${formattedCards.length > 1 ? 'es' : ''} seleccionado${formattedCards.length > 1 ? 's' : ''} exitosamente`
     });
 
-    // ============================================
-    // TAREAS EN BACKGROUND (No bloquean respuesta)
-    // ============================================
-
-    // 1. REGENERACIÓN AUTOMÁTICA
-    const cardPoolManager = require('../services/cardPoolManager');
-    cardPoolManager.checkAndRegenerate(roomDB).catch(err => {
-      console.error('[Cards] Error en regeneración automática:', err);
-    });
-
-    // 2. ACTUALIZAR POZOS (Solo si no es starter)
-    if (roomDB !== 'starter') {
-      try {
-        const sessionId = req.activeSessionId;
-        if (sessionId) {
-          const [roomSettings] = await pool.query("SELECT card_price FROM room_settings WHERE room = ?", [roomDB]);
-          const cardPriceValue = parseFloat(roomSettings[0]?.card_price || 0);
-          const potContribution = cardPriceValue * purchasedCount;
-
-          await pool.query(
-            `UPDATE game_sessions 
-             SET total_cards_validated = total_cards_validated + ?, 
-                 total_paid_cards = total_paid_cards + ?,
-                 total_gift_cards = total_gift_cards + ?
-             WHERE id = ?`,
-            [cardIds.length, purchasedCount, giftCount, sessionId]
-          );
-
-          if (potContribution > 0) {
-            const potAccumulationService = require('../services/potAccumulationService');
-            await potAccumulationService.updateSessionPots(sessionId, potContribution);
-          } else {
-            websocketService.emitPotsUpdate();
-          }
-        }
-      } catch (potError) {
-        console.error('[Cards] ❌ Error background pots:', potError);
-      }
-    } else {
-      // Starter background update
-      try {
-        const [activeSession] = await pool.query(
-          "SELECT id FROM game_sessions WHERE room = 'starter' AND status IN ('pending', 'active') ORDER BY created_at DESC LIMIT 1"
-        );
-        if (activeSession.length > 0) {
-          await pool.query(
-            "UPDATE game_sessions SET total_cards_validated = total_cards_validated + ? WHERE id = ?",
-            [cardIds.length, activeSession[0].id]
-          );
-        }
-        websocketService.emitPotsUpdate();
-      } catch (err) {
-        console.error('[Cards] ❌ Error background starter:', err);
-      }
-    }
-
   } catch (error) {
     if (connection) {
       await connection.rollback();
+      connection.release();
     }
     console.error('[Cards] ❌ Error seleccionando cartones:', error);
     console.error('[Cards] ❌ Stack:', error.stack);
-    res.status(500).json({
+    res.status(500).json({ 
       error: 'Error al seleccionar cartones',
       details: error.message
     });
-  } finally {
-    if (connection) {
-      connection.release();
-    }
   }
 };
 
@@ -755,72 +771,26 @@ exports.selectCards = async (req, res) => {
 exports.getMySelectedCards = async (req, res) => {
   try {
     const { room } = req.params;
-    const { sessionId: querySessionId } = req.query;
     const userId = req.user.id;
 
-    // Mapear nombre de sala
-    const roomDB = ROOM_MAP[room] || room;
-
-    // 1. Intentar obtener cartones VALIDADOS de la sesión ACTIVA o una específica
-    let sessionId = querySessionId;
-
-    if (!sessionId) {
-      const [activeSession] = await pool.query(
-        'SELECT id FROM game_sessions WHERE room = ? AND status IN ("active", "playing", "pending") ORDER BY id DESC LIMIT 1',
-        [roomDB]
-      );
-      if (activeSession.length > 0) {
-        sessionId = activeSession[0].id;
-      }
-    }
-
-    let cards = [];
-    let source = '';
-
-    if (sessionId) {
-      // Obtener cartones de la tabla de juego (validated_cards)
-      // Nota: validated_cards usa serial_number, grid_numbers y validated_at
-      const [validated] = await pool.query(
-        `SELECT id, serial_number as card_serial, grid_numbers as numbers, validated_at as selected_at, game_session_id, is_gift
-         FROM validated_cards
-         WHERE player_id = ? AND game_session_id = ?`,
-        [userId, sessionId]
-      );
-
-      if (validated.length > 0) {
-        cards = validated;
-        source = 'validated';
-      }
-    }
-
-    // 2. Si no hay validados, buscar en el pool (fallback para Lobby o Pending)
-    if (cards.length === 0) {
-      // Buscar cartones 'selected' recientes (últimas 24h)
-      // Nota: bingo_cards_pool usa serial y numbers
-      const [poolCards] = await pool.query(
-        `SELECT id, card_serial, numbers, selected_at, game_session_id, is_gift
-         FROM bingo_cards_pool
-         WHERE selected_by = ? AND room = ? AND status = 'selected'
-         AND selected_at > NOW() - INTERVAL 24 HOUR
-         ORDER BY selected_at DESC`,
-        [userId, roomDB]
-      );
-      cards = poolCards;
-      source = 'pool';
-    }
+    const [cards] = await pool.query(
+      `SELECT id, card_serial, numbers, selected_at, game_session_id
+       FROM bingo_cards_pool
+       WHERE selected_by = ? AND room = ? AND status IN ('selected', 'used')
+       ORDER BY selected_at DESC`,
+      [userId, room]
+    );
 
     const formattedCards = cards.map(card => ({
       id: card.id,
       serial: card.card_serial,
-      card_serial: card.card_serial,
-      numbers: typeof card.numbers === 'string' ? safeParseNumbers(card.numbers) : card.numbers, // Handle JSON vs String
+      numbers: JSON.parse(card.numbers),
       selectedAt: card.selected_at,
       sessionId: card.game_session_id,
-      status: source === 'validated' ? 'selected' : 'selected', // Always return selected so frontend renders them
-      isGift: !!card.is_gift
+      status: card.game_session_id ? 'used' : 'selected'
     }));
 
-    res.json({ cards: formattedCards, source });
+    res.json({ cards: formattedCards });
   } catch (error) {
     console.error('[Cards] ❌ Error obteniendo cartones seleccionados:', error);
     res.status(500).json({ error: 'Error al obtener cartones seleccionados' });
@@ -883,9 +853,9 @@ exports.getCardStats = async (req, res) => {
     });
   } catch (error) {
     console.error('[Cards Stats] ❌ Error:', error);
-    res.status(500).json({
+    res.status(500).json({ 
       error: 'Error al obtener estadísticas de cartones',
-      details: error.message
+      details: error.message 
     });
   }
 };
@@ -970,12 +940,27 @@ exports.getGiftCards = async (req, res) => {
     );
 
     // Parsear números
-    const formattedGiftCards = giftCardsFromInventory.map(card => ({
-      id: card.id,
-      serial: card.card_serial,
-      numbers: safeParseNumbers(card.numbers),
-      isGift: true
-    }));
+    const formattedGiftCards = giftCardsFromInventory.map(card => {
+      let parsedNumbers;
+      
+      if (typeof card.numbers === 'string') {
+        try {
+          parsedNumbers = JSON.parse(card.numbers);
+        } catch (e) {
+          console.error(`[Cards] Error parseando gift card ${card.id}:`, e);
+          parsedNumbers = card.numbers;
+        }
+      } else {
+        parsedNumbers = card.numbers;
+      }
+
+      return {
+        id: card.id,
+        serial: card.card_serial,
+        numbers: parsedNumbers,
+        isGift: true
+      };
+    });
 
     console.log(`[Cards] ✅ ${formattedGiftCards.length} gift cards obtenidas`);
 
