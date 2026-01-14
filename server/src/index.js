@@ -7,6 +7,7 @@ const socketIo = require('socket.io');
 require('dotenv').config();
 
 const scheduler = require('./services/scheduler');
+const sessionWatchdog = require('./services/sessionWatchdog'); // 🛡️ WATCHDOG
 const notificationService = require('./services/notificationService');
 const websocketService = require('./services/websocketService');
 const authRoutes = require('./routes/authRoutes');
@@ -75,6 +76,10 @@ const io = socketIo(server, {
 // INICIALIZAR NOTIFICATION SERVICE
 notificationService.initialize(io);
 
+// INICIALIZAR PERSISTENT NOTIFICATIONS SERVICE (Campana tipo WhatsApp)
+const persistentNotifications = require('./services/persistentNotifications');
+persistentNotifications.initialize(io);
+
 // INICIALIZAR WEBSOCKET SERVICE (para pozos en vivo)
 websocketService.initialize(io);
 
@@ -99,8 +104,11 @@ io.on('connection', (socket) => {
 
   // Eventos del juego
   socket.on('join_game', (data) => {
-    console.log(`[Socket.IO] Join game: ${data.userId} en sala ${data.room}`);
-    socket.join(`game_${data.room}`);
+    const roomName = `game_${data.room}`;
+    socket.join(roomName);
+    const roomSockets = io.sockets.adapter.rooms.get(roomName);
+    const clientsCount = roomSockets ? roomSockets.size : 0;
+    console.log(`[Socket.IO] 🎮 Join game: socket ${socket.id} unido a ${roomName} (${clientsCount} clientes en sala)`);
   });
 
   socket.on('number_drawn', (data) => {
@@ -154,6 +162,7 @@ app.use('/api/admin/gift-cards', giftCardsRoutes);
 app.use('/api/superadmin', superAdminRoutes);
 app.use('/api/game-admin', gameAdminRoutes);
 app.use('/api/whatsapp', require('./routes/whatsapp24KRoutes')); // WhatsApp 24K Premium
+app.use('/api/notifications', require('./routes/notifications')); // Notificaciones persistentes
 app.use('/api/memberships', membershipRoutes); // Sistema de membresías Club VIP
 app.use('/api/referrals', referralRoutes); // Sistema de referidos
 
@@ -161,12 +170,35 @@ app.use('/api/referrals', referralRoutes); // Sistema de referidos
 app.post('/api/webhook/whatsapp', (req, res) => res.sendStatus(200));
 
 // HEALTH CHECK
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
+  try {
+    // Obtener reporte del watchdog
+    const watchdogReport = await sessionWatchdog.getHealthReport();
+    
+    res.json({
+      status: 'ok',
+      timestamp: new Date(),
+      scheduler: scheduler.getStatus(),
+      watchdog: watchdogReport,
+      environment: NODE_ENV
+    });
+  } catch (error) {
+    res.json({
+      status: 'degraded',
+      timestamp: new Date(),
+      scheduler: scheduler.getStatus(),
+      watchdog: { error: error.message },
+      environment: NODE_ENV
+    });
+  }
+});
+
+// WATCHDOG INCIDENTS - Ver incidentes recientes (para debugging)
+app.get('/health/incidents', (req, res) => {
+  const limit = parseInt(req.query.limit) || 20;
   res.json({
-    status: 'ok',
-    timestamp: new Date(),
-    scheduler: scheduler.getStatus(),
-    environment: NODE_ENV
+    incidents: sessionWatchdog.getRecentIncidents(limit),
+    total: sessionWatchdog.incidents?.length || 0
   });
 });
 
@@ -239,8 +271,15 @@ const startServer = async () => {
     // Inyectar gameEngine al scheduler para auto-start de sorteos
     if (gameAdminController.gameEngine) {
       scheduler.setGameEngine(gameAdminController.gameEngine);
+      
+      // 🛡️ INICIAR SESSION WATCHDOG - Sistema de vigilancia y auto-recuperación
+      console.log('🛡️ Inicializando Session Watchdog...');
+      sessionWatchdog.initialize(io, gameAdminController.gameEngine);
+      sessionWatchdog.start();
+      console.log('✅ Session Watchdog activo - Monitoreo continuo habilitado');
+      console.log('');
     } else {
-      console.warn('[Index] ⚠️ GameEngine no disponible para scheduler');
+      console.warn('[Index] ⚠️ GameEngine no disponible para scheduler/watchdog');
     }
 
     // Iniciar servidor HTTP
@@ -274,6 +313,7 @@ process.on('SIGTERM', async () => {
   console.log('\n📛 SIGTERM recibido, apagando servidor...');
   
   try {
+    sessionWatchdog.stop(); // 🛡️ Detener watchdog
     await scheduler.stop();
     server.close(() => {
       console.log('✅ Servidor apagado correctamente');
@@ -298,6 +338,7 @@ process.on('SIGINT', async () => {
   console.log('\n📛 SIGINT recibido (Ctrl+C), apagando servidor...');
   
   try {
+    sessionWatchdog.stop(); // 🛡️ Detener watchdog
     await scheduler.stop();
     server.close(() => {
       console.log('✅ Servidor apagado correctamente');

@@ -17,6 +17,9 @@ const {
   showPaymentForms 
 } = require('../socket/winnerEvents');
 const whatsapp24KService = require('./whatsapp24KService');
+const ChipsService = require('./chipsService');
+const MoneyMath = require('../utils/moneyMath');
+const persistentNotifications = require('./persistentNotifications');
 
 class GameEngineAuto {
   constructor(io) {
@@ -26,30 +29,52 @@ class GameEngineAuto {
 
   /**
    * Inicia un sorteo automático
+   * Puede iniciar uno nuevo (status active/pending) o retomar uno existente (status playing)
    */
   async startGame(gameSessionId, options = {}) {
     const {
-      drawInterval = 5000,      // 5 segundos entre números
+      drawInterval = 8000,      // 8 segundos entre números
       pauseOnWinner = 2000      // 2 segundos de pausa al cantar línea
     } = options;
 
+    // Verificar si ya hay un intervalo activo para esta sesión
+    if (this.activeGames.has(gameSessionId)) {
+      const existingGame = this.activeGames.get(gameSessionId);
+      if (existingGame.interval && !existingGame.isEnded) {
+        console.log(`[GameEngine] ⚠️ Sesión ${gameSessionId} ya tiene sorteo activo, ignorando`);
+        return existingGame;
+      }
+    }
+
+    // Buscar sesión: puede ser nueva (active/pending) o retomada (playing)
     const [sessions] = await pool.query(
-      'SELECT * FROM game_sessions WHERE id = ? AND status = ?',
-      [gameSessionId, 'active']
+      'SELECT * FROM game_sessions WHERE id = ? AND status IN (?, ?, ?)',
+      [gameSessionId, 'active', 'pending', 'playing']
     );
 
     if (sessions.length === 0) {
-      throw new Error('Sesión no encontrada o no está activa');
+      throw new Error('Sesión no encontrada o no está en estado válido para sorteo');
     }
 
     const session = sessions[0];
+    const isResume = session.status === 'playing';
 
-    // LIMPIEZA Y REGENERACIÓN: Al iniciar sorteo
-    // Eliminar cartones no usados y generar 1000 nuevos para próxima sesión
-    const cardPoolManager = require('./cardPoolManager');
-    cardPoolManager.cleanAndRegenerateForSession(session.room).catch(err => {
-      console.error('[GameEngine] Error en limpieza/regeneración al iniciar:', err);
-    });
+    // Solo cambiar status si no es retomar
+    if (!isResume) {
+      await pool.query(
+        'UPDATE game_sessions SET status = ? WHERE id = ?',
+        ['playing', gameSessionId]
+      );
+      console.log(`[GameEngine] 🎰 Sesión ${gameSessionId} cambiada a status 'playing'`);
+
+      // LIMPIEZA Y REGENERACIÓN: Solo al iniciar nuevo sorteo (no al retomar)
+      const cardPoolManager = require('./cardPoolManager');
+      cardPoolManager.cleanAndRegenerateForSession(session.room).catch(err => {
+        console.error('[GameEngine] Error en limpieza/regeneración al iniciar:', err);
+      });
+    } else {
+      console.log(`[GameEngine] 🔄 Retomando sesión ${gameSessionId} desde bola ${session.bingo_ball_index || 0}`);
+    }
 
     // Estado del juego
     const gameState = {
@@ -62,7 +87,10 @@ class GameEngineAuto {
       lineWinnersPaid: false,           // Solo se paga UNA VEZ la primera línea
       lineWinnersThisBall: [],          // Ganadores de línea en esta bolilla
       bingoWinnersPaid: false,          // Control de BINGO pagado
-      bingoWinnersThisBall: []          // Ganadores de BINGO en esta bolilla
+      bingoWinnersThisBall: [],         // Ganadores de BINGO en esta bolilla
+      isEnded: false,                   // NUEVA: Bandera para evitar cierre duplicado
+      startedAt: Date.now(),            // NUEVA: Timestamp de inicio para timeout
+      safetyTimeout: null               // NUEVA: Timeout de seguridad (15 min máximo)
     };
 
     this.activeGames.set(gameSessionId, gameState);
@@ -81,6 +109,11 @@ class GameEngineAuto {
     // Iniciar sorteo automático
     gameState.interval = setInterval(async () => {
       if (gameState.isPaused) return;
+      if (gameState.isEnded) {
+        console.log(`[GameEngine] ⚠️ Sorteo ${gameSessionId} ya terminado, limpiando intervalo residual`);
+        clearInterval(gameState.interval);
+        return;
+      }
 
       try {
         await this.drawNextBall(gameSessionId, pauseOnWinner);
@@ -90,7 +123,17 @@ class GameEngineAuto {
       }
     }, drawInterval);
 
+    // TIMEOUT DE SEGURIDAD: Si pasan 15 minutos sin terminar, forzar cierre
+    // (90 bolas × 8seg = 12min, damos 3min extra de margen)
+    gameState.safetyTimeout = setTimeout(async () => {
+      if (!gameState.isEnded && this.activeGames.has(gameSessionId)) {
+        console.error(`[GameEngine] ⏰ TIMEOUT DE SEGURIDAD - Forzando cierre de sesión ${gameSessionId} después de 15 minutos`);
+        await this.endGame(gameSessionId, 'completed');
+      }
+    }, 15 * 60 * 1000); // 15 minutos
+
     console.log(`[GameEngine] 🎮 Juego ${gameSessionId} iniciado (sala: ${session.room})`);
+    console.log(`[GameEngine] 📊 Control de sorteo: ${gameState.availableBalls.length} bolas disponibles, timeout de seguridad: 15min`);
     
     this.io.to(`game_${session.room}`).emit('game_started', {
       gameSessionId,
@@ -116,8 +159,15 @@ class GameEngineAuto {
     const gameState = this.activeGames.get(gameSessionId);
     if (!gameState) throw new Error('Juego no encontrado');
 
-    if (gameState.availableBalls.length === 0) {
-      console.log(`[GameEngine] Juego ${gameSessionId} terminado - no hay más bolas`);
+    // CONTROL: Si ya terminó, no hacer nada
+    if (gameState.isEnded) {
+      console.log(`[GameEngine] ⚠️ Sesión ${gameSessionId} ya terminada, ignorando drawNextBall`);
+      return;
+    }
+
+    // CONTROL: 90 bolas sorteadas = FIN DEL SORTEO
+    if (gameState.availableBalls.length === 0 || gameState.ballsDrawn.length >= 90) {
+      console.log(`[GameEngine] 🏁 Juego ${gameSessionId} terminado - ${gameState.ballsDrawn.length} bolas sorteadas (COMPLETO)`);
       await this.endGame(gameSessionId, 'completed');
       return;
     }
@@ -137,10 +187,23 @@ class GameEngineAuto {
       [gameSessionId, ballNumber, ballLetter, drawOrder]
     );
 
-    console.log(`[GameEngine] 🎱 ${ballLetter}-${ballNumber} (#${drawOrder})`);
+    // ACTUALIZAR índice de bola en la sesión para seguimiento
+    await pool.query(
+      `UPDATE game_sessions SET bingo_ball_index = ? WHERE id = ?`,
+      [drawOrder, gameSessionId]
+    );
 
+    // Log con progreso del sorteo
+    const progress = ((drawOrder / 90) * 100).toFixed(1);
+    console.log(`[GameEngine] 🎱 ${ballLetter}-${ballNumber} (#${drawOrder}/90 - ${progress}%)`);
+
+    // Verificar cuántos clientes hay en la sala
+    const roomName = `game_${gameState.roomId}`;
+    const roomSockets = this.io.sockets.adapter.rooms.get(roomName);
+    const clientsCount = roomSockets ? roomSockets.size : 0;
+    
     // Emitir a todos los jugadores
-    this.io.to(`game_${gameState.roomId}`).emit('ball_drawn', {
+    this.io.to(roomName).emit('ball_drawn', {
       gameSessionId,
       ballNumber,
       ballLetter,
@@ -148,6 +211,8 @@ class GameEngineAuto {
       totalDrawn: gameState.ballsDrawn.length,
       room: gameState.roomId  // Agregado para filtro en frontend
     });
+    
+    console.log(`[GameEngine] 📡 ball_drawn emitido a ${roomName} (${clientsCount} clientes)`);
 
     // VALIDAR AUTOMÁTICAMENTE TODOS LOS CARTONES
     await this.validateAllCards(gameSessionId, pauseOnWinner);
@@ -158,24 +223,31 @@ class GameEngineAuto {
 
   /**
    * Emite evento de reordenamiento de cartones a cada usuario
+   * NOTA: Deshabilitado temporalmente porque CardAnalyzer espera formato 5x5 
+   * pero los cartones son 3x9 (bingo europeo 90 bolas)
    */
   async emitCardsReordering(gameSessionId) {
+    // TODO: Actualizar CardAnalyzer para soportar formato 3x9
+    // Por ahora deshabilitado para evitar errores
+    return;
+    
     try {
       const CardAnalyzer = require('./cardAnalyzer');
 
-      // Obtener todos los usuarios con cartones activos en esta sesión
+      // CORREGIDO: Obtener todos los usuarios con cartones seleccionados en esta sesión
       const [users] = await pool.query(
-        `SELECT DISTINCT user_id FROM bingo_cards 
-         WHERE session_id = ? AND status = 'active'`,
+        `SELECT DISTINCT selected_by as user_id FROM bingo_cards_pool 
+         WHERE game_session_id = ? AND status = 'selected'`,
         [gameSessionId]
       );
 
       // Para cada usuario, analizar sus cartones y emitir evento personal
       for (const { user_id } of users) {
-        // Obtener cartones del usuario
+        // CORREGIDO: Obtener cartones del usuario desde bingo_cards_pool
         const [userCards] = await pool.query(
-          `SELECT * FROM bingo_cards 
-           WHERE user_id = ? AND session_id = ? AND status = 'active'
+          `SELECT id, card_serial, numbers, grid_data, selected_by as user_id 
+           FROM bingo_cards_pool 
+           WHERE selected_by = ? AND game_session_id = ? AND status = 'selected'
            ORDER BY id ASC`,
           [user_id, gameSessionId]
         );
@@ -240,11 +312,13 @@ class GameEngineAuto {
   async validateAllCards(gameSessionId, pauseOnWinner) {
     const gameState = this.activeGames.get(gameSessionId);
 
+    // CORREGIDO: Buscar en bingo_cards_pool donde realmente están los cartones seleccionados
     const [cards] = await pool.query(
-      `SELECT bc.*, u.username 
-       FROM bingo_cards bc
-       JOIN users u ON bc.user_id = u.id
-       WHERE bc.session_id = ? AND bc.status = 'active'`,
+      `SELECT bcp.id, bcp.card_serial, bcp.numbers, bcp.grid_data, bcp.selected_by as user_id, 
+              bcp.status, u.username 
+       FROM bingo_cards_pool bcp
+       JOIN users u ON bcp.selected_by = u.id
+       WHERE bcp.game_session_id = ? AND bcp.status = 'selected'`,
       [gameSessionId]
     );
 
@@ -383,23 +457,65 @@ class GameEngineAuto {
 
   /**
    * Paga a los ganadores de línea (puede haber múltiples)
+   * ✅ ACREDITACIÓN INMEDIATA: El premio se suma al balance del jugador al instante
+   * ✅ VACIADO DE POZO: El pozo de línea se vacía después del pago
+   * 
+   * Para sala STARTER: Se acreditan tickets en lugar de dinero
    */
   async payLineWinners(gameSessionId, winners) {
     const [session] = await pool.query('SELECT * FROM game_sessions WHERE id = ?', [gameSessionId]);
-    const totalPrize = session[0].line_prize || 2500;
+    const sessionData = session[0];
+    const totalPrize = sessionData.line_prize || sessionData.current_pot_linea || 2500;
     const prizePerWinner = totalPrize / winners.length;
+    const isStarterRoom = sessionData.room === 'starter';
 
     const gameState = this.activeGames.get(gameSessionId);
 
-    console.log(`[GameEngine] 🎉 LÍNEA COMPLETADA - ${winners.length} ganador(es)`);
+    console.log(`[GameEngine] 🎉 LÍNEA COMPLETADA - ${winners.length} ganador(es) en sala ${sessionData.room}`);
     
     for (const winner of winners) {
-      await pool.query(
-        `INSERT INTO game_winners 
-         (game_session_id, user_id, card_id, prize_type, prize_amount, line_type, winning_numbers, verified)
-         VALUES (?, ?, ?, 'linea', ?, ?, ?, TRUE)`,
-        [gameSessionId, winner.userId, winner.cardId, prizePerWinner, winner.lineType, JSON.stringify(winner.winningNumbers)]
-      );
+      // Registrar en tabla de ganadores (IGNORE para evitar duplicados)
+      try {
+        await pool.query(
+          `INSERT IGNORE INTO game_winners 
+           (game_session_id, user_id, card_id, prize_type, prize_amount, line_type, winning_numbers, verified)
+           VALUES (?, ?, ?, 'linea', ?, ?, ?, TRUE)`,
+          [gameSessionId, winner.userId, winner.cardId, prizePerWinner, winner.lineType, JSON.stringify(winner.winningNumbers)]
+        );
+      } catch (insertError) {
+        console.log(`   ⚠️ Ganador ya registrado: ${winner.username}`);
+      }
+
+      // ✅ ACREDITACIÓN INMEDIATA AL BALANCE
+      if (!isStarterRoom) {
+        // Salas monetizadas: Acreditar dinero al balance
+        try {
+          await ChipsService.recordGameMovement(
+            winner.userId,
+            prizePerWinner,
+            gameSessionId,
+            'prize',
+            `Premio LÍNEA - Sala ${sessionData.room.toUpperCase()}`
+          );
+          console.log(`   💰 ${winner.username}: $${prizePerWinner.toFixed(2)} ACREDITADO al balance`);
+        } catch (err) {
+          console.error(`   ❌ Error acreditando premio a ${winner.username}:`, err.message);
+        }
+      } else {
+        // Sala Starter: Acreditar tickets
+        try {
+          const ticketReward = sessionData.line_prize || 2; // 2 tickets por línea por defecto
+          await pool.query(
+            `INSERT INTO user_inventory (user_id, item_id, quantity, obtained_at)
+             VALUES (?, (SELECT id FROM cosmetic_items WHERE ticket_room = 'bronce' LIMIT 1), ?, NOW())
+             ON DUPLICATE KEY UPDATE quantity = quantity + ?`,
+            [winner.userId, ticketReward, ticketReward]
+          );
+          console.log(`   🎫 ${winner.username}: ${ticketReward} tickets Bronce ACREDITADOS`);
+        } catch (err) {
+          console.error(`   ❌ Error acreditando tickets a ${winner.username}:`, err.message);
+        }
+      }
 
       console.log(`   → ${winner.username}: $${prizePerWinner.toFixed(2)} (${winner.lineType})`);
 
@@ -441,6 +557,20 @@ class GameEngineAuto {
       }).catch(err => console.error('[WhatsApp] Error notificando línea:', err));
     }
 
+    // ✅ VACIAR POZO DE LÍNEA
+    await pool.query(
+      'UPDATE game_sessions SET current_pot_linea = 0 WHERE id = ?',
+      [gameSessionId]
+    );
+    console.log(`[GameEngine] 🔄 Pozo de LÍNEA vaciado (sesión ${gameSessionId})`);
+
+    // Notificar actualización de pozos via Socket
+    this.io.to(`game_${gameState.roomId}`).emit('pots_updated', {
+      room: gameState.roomId,
+      line: 0,
+      lineWinnersPaid: true
+    });
+
     if (winners.length > 1) {
       console.log(`   💰 Pozo dividido: $${totalPrize} / ${winners.length} = $${prizePerWinner.toFixed(2)} c/u`);
     }
@@ -448,42 +578,150 @@ class GameEngineAuto {
 
   /**
    * Paga a los ganadores de BINGO (puede haber múltiples)
+   * ✅ ACREDITACIÓN INMEDIATA: El premio se suma al balance del jugador al instante
+   * ✅ VACIADO DE POZOS: Los pozos de bingo y pre-40 se vacían después del pago
+   * ✅ FIN DEL SORTEO: El sorteo termina inmediatamente después de BINGO
+   * 
+   * REGLA PRE-40: Si BINGO antes de bola 40, ganador recibe jackpot_pre40
+   *               Si BINGO después de bola 40, pre-40 se acumula a próxima sesión
+   * 
+   * Para sala STARTER: Se acreditan tickets en lugar de dinero
    */
   async payBingoWinners(gameSessionId, winners) {
     const [session] = await pool.query('SELECT * FROM game_sessions WHERE id = ?', [gameSessionId]);
-    const totalPrize = session[0].bingo_prize || 25000;
+    const sessionData = session[0];
+    const totalPrize = sessionData.bingo_prize || sessionData.current_pot_bingo || 25000;
     const prizePerWinner = totalPrize / winners.length;
+    const isStarterRoom = sessionData.room === 'starter';
 
     const gameState = this.activeGames.get(gameSessionId);
+    const currentBallIndex = gameState ? gameState.ballsDrawn.length : 0;
+    const isBeforeBall40 = currentBallIndex <= 40;
 
-    console.log(`[GameEngine] 🎊 BINGO COMPLETADO - ${winners.length} ganador(es)`);
+    console.log(`[GameEngine] 🎊 BINGO COMPLETADO - ${winners.length} ganador(es) en bola #${currentBallIndex} (sala ${sessionData.room})`);
+    
+    // Verificar si hay jackpot pre-40 para pagar
+    const pre40Amount = parseFloat(sessionData.jackpot_pre40) || 0;
+    let pre40Paid = false;
+
+    if (isBeforeBall40 && pre40Amount > 0) {
+      console.log(`[GameEngine] 🎰 ¡BINGO ANTES DE BOLA 40! Jackpot Pre-40: $${pre40Amount.toFixed(2)}`);
+      pre40Paid = true;
+    } else if (!isBeforeBall40 && pre40Amount > 0) {
+      console.log(`[GameEngine] 📤 BINGO después de bola 40 - Pre-40 ($${pre40Amount.toFixed(2)}) se acumula a próxima sesión`);
+      // Transferir pre-40 a próxima sesión
+      await this.transferPre40ToNextSession(gameSessionId, gameState.roomId, pre40Amount);
+    }
     
     for (const winner of winners) {
-      await pool.query(
-        `INSERT INTO game_winners 
-         (game_session_id, user_id, card_id, prize_type, prize_amount, winning_numbers, verified)
-         VALUES (?, ?, ?, 'bingo', ?, ?, TRUE)`,
-        [gameSessionId, winner.userId, winner.cardId, prizePerWinner, JSON.stringify(winner.winningNumbers)]
-      );
+      // Premio base de bingo
+      let totalWinnerPrize = prizePerWinner;
+      
+      // Si ganó antes de bola 40, agregar el pre-40
+      if (pre40Paid) {
+        const pre40PerWinner = pre40Amount / winners.length;
+        totalWinnerPrize += pre40PerWinner;
+        
+        // Registrar premio pre-40 separado (IGNORE para evitar duplicados)
+        try {
+          await pool.query(
+            `INSERT IGNORE INTO game_winners 
+             (game_session_id, user_id, card_id, prize_type, prize_amount, winning_numbers, verified)
+             VALUES (?, ?, ?, 'pre40', ?, ?, TRUE)`,
+            [gameSessionId, winner.userId, winner.cardId, pre40PerWinner, JSON.stringify(winner.winningNumbers)]
+          );
+          console.log(`   🎰 ${winner.username}: +$${pre40PerWinner.toFixed(2)} (PRE-40)`);
+        } catch (insertError) {
+          console.log(`   ⚠️ PRE-40 ya registrado: ${winner.username}`);
+        }
+      }
 
-      console.log(`   → ${winner.username}: $${prizePerWinner.toFixed(2)}`);
+      // Registrar ganador de BINGO (IGNORE para evitar duplicados)
+      try {
+        await pool.query(
+          `INSERT IGNORE INTO game_winners 
+           (game_session_id, user_id, card_id, prize_type, prize_amount, winning_numbers, verified)
+           VALUES (?, ?, ?, 'bingo', ?, ?, TRUE)`,
+          [gameSessionId, winner.userId, winner.cardId, prizePerWinner, JSON.stringify(winner.winningNumbers)]
+        );
+      } catch (insertError) {
+        console.log(`   ⚠️ BINGO ya registrado: ${winner.username}`);
+      }
+
+      // ✅ ACREDITACIÓN INMEDIATA AL BALANCE
+      if (!isStarterRoom) {
+        // Salas monetizadas: Acreditar dinero al balance
+        try {
+          await ChipsService.recordGameMovement(
+            winner.userId,
+            totalWinnerPrize,
+            gameSessionId,
+            'prize',
+            `Premio BINGO${pre40Paid ? ' + PRE-40' : ''} - Sala ${sessionData.room.toUpperCase()}`
+          );
+          console.log(`   💰 ${winner.username}: $${totalWinnerPrize.toFixed(2)} ACREDITADO al balance`);
+        } catch (err) {
+          console.error(`   ❌ Error acreditando premio a ${winner.username}:`, err.message);
+        }
+      } else {
+        // Sala Starter: Acreditar tickets
+        try {
+          const ticketReward = sessionData.bingo_prize || 5; // 5 tickets por bingo por defecto
+          await pool.query(
+            `INSERT INTO user_inventory (user_id, item_id, quantity, obtained_at)
+             VALUES (?, (SELECT id FROM cosmetic_items WHERE ticket_room = 'bronce' LIMIT 1), ?, NOW())
+             ON DUPLICATE KEY UPDATE quantity = quantity + ?`,
+            [winner.userId, ticketReward, ticketReward]
+          );
+          console.log(`   🎫 ${winner.username}: ${ticketReward} tickets Bronce ACREDITADOS`);
+        } catch (err) {
+          console.error(`   ❌ Error acreditando tickets a ${winner.username}:`, err.message);
+        }
+      }
+
+      console.log(`   → ${winner.username}: $${prizePerWinner.toFixed(2)} (BINGO) = Total: $${totalWinnerPrize.toFixed(2)}`);
 
       notifyBingoWinner(
         this.io,
         gameState.roomId,
         { id: winner.userId, username: winner.username },
-        prizePerWinner,
+        totalWinnerPrize,
         gameSessionId
       );
 
       // 🔔 Notificación WhatsApp de premio BINGO
       whatsapp24KService.notifyPrizeWon(winner.userId, {
-        type: 'bingo',
-        amount: prizePerWinner,
+        type: pre40Paid ? 'bingo_pre40' : 'bingo',
+        amount: totalWinnerPrize,
         cardSerial: winner.cardSerial || `#${winner.cardId}`,
         room: gameState.roomId
       }).catch(err => console.error('[WhatsApp] Error notificando bingo:', err));
     }
+
+    // ✅ VACIAR POZOS DE BINGO
+    await pool.query(
+      'UPDATE game_sessions SET current_pot_bingo = 0 WHERE id = ?',
+      [gameSessionId]
+    );
+    console.log(`[GameEngine] 🔄 Pozo de BINGO vaciado (sesión ${gameSessionId})`);
+
+    // Si se pagó el pre-40, resetear en la sesión actual
+    if (pre40Paid) {
+      await pool.query(
+        'UPDATE game_sessions SET jackpot_pre40 = 0, current_pot_jackpot = 0 WHERE id = ?',
+        [gameSessionId]
+      );
+      console.log(`[GameEngine] 🔄 Jackpot Pre-40 reseteado después de pago`);
+    }
+
+    // Notificar actualización de pozos via Socket
+    this.io.to(`game_${gameState.roomId}`).emit('pots_updated', {
+      room: gameState.roomId,
+      bingo: 0,
+      pre40: pre40Paid ? 0 : pre40Amount,
+      bingoWinnersPaid: true,
+      gameEnded: true
+    });
 
     if (winners.length > 1) {
       console.log(`   💰 Pozo dividido: $${totalPrize} / ${winners.length} = $${prizePerWinner.toFixed(2)} c/u`);
@@ -491,34 +729,105 @@ class GameEngineAuto {
   }
 
   /**
+   * Transfiere el jackpot pre-40 a la próxima sesión (cuando BINGO es después de bola 40)
+   */
+  async transferPre40ToNextSession(currentSessionId, roomType, amount) {
+    try {
+      // Buscar próxima sesión de la misma sala
+      const [nextSessions] = await pool.query(`
+        SELECT id FROM game_sessions 
+        WHERE room = ? AND id > ? AND status IN ('pending', 'active')
+        ORDER BY id ASC LIMIT 1
+      `, [roomType, currentSessionId]);
+
+      if (nextSessions.length > 0) {
+        const nextSessionId = nextSessions[0].id;
+        await pool.query(`
+          UPDATE game_sessions 
+          SET jackpot_pre40 = jackpot_pre40 + ?,
+              current_pot_jackpot = current_pot_jackpot + ?,
+              jackpot_source_id = ?
+          WHERE id = ?
+        `, [amount, amount, currentSessionId, nextSessionId]);
+        
+        console.log(`[GameEngine] 📤 Pre-40 ($${amount.toFixed(2)}) transferido a sesión #${nextSessionId}`);
+      } else {
+        console.log(`[GameEngine] ⚠️ No hay próxima sesión para transferir pre-40, se mantiene en room_settings`);
+        // Guardar en room_settings como respaldo
+        await pool.query(`
+          UPDATE room_settings 
+          SET accumulated_pot_pre40 = accumulated_pot_pre40 + ?
+          WHERE room = ?
+        `, [amount, roomType]);
+      }
+
+      // Resetear pre-40 de sesión actual (ya transferido)
+      await pool.query(`
+        UPDATE game_sessions 
+        SET jackpot_pre40 = 0, current_pot_jackpot = 0
+        WHERE id = ?
+      `, [currentSessionId]);
+
+    } catch (error) {
+      console.error('[GameEngine] Error transfiriendo pre-40:', error);
+    }
+  }
+
+  /**
    * Termina el juego y muestra formularios de pago
+   * GARANTIZA cierre correcto del sorteo
    */
   async endGame(gameSessionId, status = 'completed') {
     const gameState = this.activeGames.get(gameSessionId);
-    if (!gameState) return;
+    if (!gameState) {
+      console.log(`[GameEngine] ⚠️ endGame llamado pero no hay gameState para sesión ${gameSessionId}`);
+      // Igual actualizar BD por seguridad
+      await pool.query('UPDATE game_sessions SET status = ? WHERE id = ? AND status = ?', [status, gameSessionId, 'playing']);
+      return;
+    }
 
+    // BANDERA: Evitar cierre duplicado
+    if (gameState.isEnded) {
+      console.log(`[GameEngine] ⚠️ Sesión ${gameSessionId} ya fue terminada previamente, ignorando`);
+      return;
+    }
+    gameState.isEnded = true;
+
+    // Limpiar intervalo de sorteo
     if (gameState.interval) {
       clearInterval(gameState.interval);
       gameState.interval = null;
     }
 
-    await pool.query(
-      'UPDATE game_sessions SET status = ? WHERE id = ?',
-      [status, gameSessionId]
-    );
-
-    // LIMPIEZA: Eliminar cartones no asignados a ninguna sesión de esta sala
-    // Esto se ejecuta cuando finaliza cada sorteo
-    if (gameState.roomId) {
-      const [cleanupResult] = await pool.query(`
-        DELETE FROM bingo_cards_pool 
-        WHERE room = ? 
-        AND status = 'selected' 
-        AND game_session_id IS NULL
-      `, [gameState.roomId]);
-      
-      console.log(`[GameEngine] 🧹 Limpieza post-sorteo sala ${gameState.roomId}: ${cleanupResult.affectedRows} cartones huérfanos eliminados`);
+    // Limpiar timeout de seguridad
+    if (gameState.safetyTimeout) {
+      clearTimeout(gameState.safetyTimeout);
+      gameState.safetyTimeout = null;
     }
+
+    console.log(`[GameEngine] 🔒 Cerrando sesión ${gameSessionId} con status '${status}'`);
+
+    // ACTUALIZACIÓN ATÓMICA: status + bingo_ball_index final
+    const finalBallCount = gameState.ballsDrawn.length;
+    await pool.query(
+      'UPDATE game_sessions SET status = ?, bingo_ball_index = ? WHERE id = ?',
+      [status, finalBallCount, gameSessionId]
+    );
+    console.log(`[GameEngine] ✅ BD actualizada: status='${status}', bingo_ball_index=${finalBallCount}`);
+
+    // ====== ARCHIVADO DE CARTONES ======
+    // Los cartones vendidos de esta sesión pasan a 'used' (participaron en el sorteo)
+    const [usedResult] = await pool.query(`
+      UPDATE bingo_cards_pool 
+      SET status = 'used'
+      WHERE game_session_id = ? 
+      AND status = 'sold'
+    `, [gameSessionId]);
+    
+    console.log(`[GameEngine] 📦 ${usedResult.affectedRows} cartones archivados como 'used' (sesión #${gameSessionId})`);
+
+    // NOTA: Los cartones 'selected' NO se eliminan - se migran a la próxima sesión
+    // via scheduler.assignCardsToSession() para que el usuario no los pierda
 
     console.log(`[GameEngine] 🏁 Juego ${gameSessionId} terminado (${gameState.ballsDrawn.length} bolas sorteadas)`);
 
@@ -528,24 +837,64 @@ class GameEngineAuto {
       totalBallsDrawn: gameState.ballsDrawn.length
     });
 
-    // Formularios de pago después de 5 segundos
-    setTimeout(async () => {
-      const winners = await this.getGameWinners(gameSessionId);
-      if (winners.length > 0) {
-        showPaymentForms(this.io, gameSessionId, winners);
-      }
-    }, 5000);
-
-    // CREAR PRÓXIMA SESIÓN: 5 minutos después de terminar, crear sesión para próxima hora
-    const roomId = gameState.roomId;
+    // ====== NOTIFICACIÓN PERSISTENTE DEL SORTEO ======
+    // Obtener datos de ganadores y premios para la notificación
     setTimeout(async () => {
       try {
-        await this.createNextHourlySession(roomId);
-        console.log(`[GameEngine] 🔄 Próxima sesión creada para ${roomId} - ventas reabiertas`);
-      } catch (error) {
-        console.error(`[GameEngine] Error creando próxima sesión para ${roomId}:`, error);
+        const winners = await this.getGameWinners(gameSessionId);
+        
+        // Obtener pozos finales de la sesión
+        const [sessionData] = await pool.query(
+          `SELECT jackpot_linea, jackpot_bingo, current_pot_linea, current_pot_bingo 
+           FROM game_sessions WHERE id = ?`,
+          [gameSessionId]
+        );
+        
+        const session = sessionData[0] || {};
+        
+        // Separar ganadores por tipo
+        const lineWinners = [];
+        const bingoWinners = [];
+        let totalLinePrize = 0;
+        let totalBingoPrize = 0;
+        
+        winners.forEach(w => {
+          w.prizes.forEach(p => {
+            if (p.type === 'line' || p.type === 'linea') {
+              lineWinners.push({ userId: w.userId, username: w.username, amount: p.amount });
+              totalLinePrize += p.amount;
+            } else if (p.type === 'bingo') {
+              bingoWinners.push({ userId: w.userId, username: w.username, amount: p.amount });
+              totalBingoPrize += p.amount;
+            }
+          });
+        });
+        
+        // Enviar notificación global del resultado del sorteo
+        await persistentNotifications.notifySorteoResult({
+          sessionId: gameSessionId,
+          room: gameState.roomId,
+          lineWinners,
+          bingoWinners,
+          linePrize: totalLinePrize || session.current_pot_linea || 0,
+          bingoPrize: totalBingoPrize || session.current_pot_bingo || 0,
+          totalBalls: gameState.ballsDrawn.length
+        });
+        
+        console.log(`[GameEngine] 📢 Notificación de sorteo #${gameSessionId} enviada`);
+        
+        // Mostrar formularios de pago si hay ganadores
+        if (winners.length > 0) {
+          showPaymentForms(this.io, gameSessionId, winners);
+        }
+      } catch (notifError) {
+        console.error('[GameEngine] Error enviando notificación de sorteo:', notifError);
       }
-    }, 5 * 60 * 1000); // 5 minutos después
+    }, 3000);
+
+    // NOTA: La creación de próxima sesión ahora la maneja el Scheduler (SessionCreator)
+    // Ya no usamos timeout aquí porque el SessionCreator crea la próxima sesión
+    // mientras esta está sorteando, y ya tiene los cartones asignados
 
     this.activeGames.delete(gameSessionId);
   }
@@ -561,7 +910,7 @@ class GameEngineAuto {
       'bronce': 0,       // :00 cada hora
       'plata': 15,       // :15 cada hora
       'oro': 30,         // :30 cada hora
-      'free_starter': 45 // :45 cada hora
+      'starter': 45      // :45 cada hora
     };
 
     const minuteOffset = roomSchedule[room];
@@ -579,19 +928,19 @@ class GameEngineAuto {
       nextHour.setHours(nextHour.getHours() + 1);
     }
 
-    // Configuración de premios por sala
+    // Configuración de premios por sala (jackpots iniciales)
     const roomConfig = {
       'bronce': { linePrize: 2500, bingoPrize: 10000 },
       'plata': { linePrize: 5000, bingoPrize: 25000 },
       'oro': { linePrize: 10000, bingoPrize: 50000 },
-      'free_starter': { linePrize: 500, bingoPrize: 2000 }
+      'starter': { linePrize: 500, bingoPrize: 2000 }
     };
 
     const config = roomConfig[room] || { linePrize: 2500, bingoPrize: 10000 };
 
-    // Crear sesión
+    // Crear sesión - usar columnas correctas (jackpot_linea, jackpot_bingo)
     const [result] = await pool.query(
-      `INSERT INTO game_sessions (room, start_time, status, line_prize, bingo_prize, current_pot_bingo, current_pot_linea, is_preventa)
+      `INSERT INTO game_sessions (room, start_time, status, jackpot_linea, jackpot_bingo, current_pot_bingo, current_pot_linea, is_preventa)
        VALUES (?, ?, 'pending', ?, ?, 0.00, 0.00, true)`,
       [room, nextHour, config.linePrize, config.bingoPrize]
     );
@@ -601,13 +950,24 @@ class GameEngineAuto {
     return result.insertId;
   }
 
-  stopGame(gameSessionId) {
+  async stopGame(gameSessionId) {
     const gameState = this.activeGames.get(gameSessionId);
     if (!gameState) return;
 
     if (gameState.interval) {
       clearInterval(gameState.interval);
       gameState.interval = null;
+    }
+
+    // Cambiar status a 'finished' para indicar que el sorteo terminó
+    try {
+      await pool.query(
+        'UPDATE game_sessions SET status = ? WHERE id = ?',
+        ['finished', gameSessionId]
+      );
+      console.log(`[GameEngine] 🏁 Sesión ${gameSessionId} cambiada a status 'finished'`);
+    } catch (error) {
+      console.error(`[GameEngine] Error actualizando status a finished:`, error);
     }
 
     console.log(`[GameEngine] 🛑 Juego ${gameSessionId} detenido`);
@@ -885,6 +1245,35 @@ class GameEngineAuto {
       }
     }
     return false;
+  }
+
+  /**
+   * Verificar si una sesión específica está activa en el motor
+   * Usado por el Watchdog para detectar sesiones huérfanas
+   */
+  isSessionActive(gameSessionId) {
+    const gameState = this.activeGames.get(gameSessionId);
+    return gameState && gameState.interval && !gameState.isEnded;
+  }
+
+  /**
+   * Obtener lista de todas las sesiones activas
+   * Usado para debugging y monitoreo
+   */
+  getActiveSessions() {
+    const sessions = [];
+    for (const [sessionId, gameState] of this.activeGames) {
+      sessions.push({
+        sessionId,
+        room: gameState.roomId,
+        ballsDrawn: gameState.ballsDrawn?.length || 0,
+        isEnded: gameState.isEnded,
+        isPaused: gameState.isPaused,
+        lineWinnersPaid: gameState.lineWinnersPaid,
+        bingoWinnersPaid: gameState.bingoWinnersPaid
+      });
+    }
+    return sessions;
   }
 }
 
