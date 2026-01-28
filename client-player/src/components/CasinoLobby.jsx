@@ -30,7 +30,6 @@ import FortuneWheel from './Gamification/FortuneWheel';
 import useSocket from '../hooks/useSocket';
 import uiHelper from '../helpers/uiHelper';
 import HotPotNotification from './Notifications/HotPotNotification';
-import NotificationBell from './NotificationBell';
 import CardPurchaseCalculator from './CardPurchaseCalculator';
 import ReferralDashboard from './Referral/ReferralDashboard';
 import { FaShareAlt, FaCheck } from 'react-icons/fa';
@@ -102,7 +101,7 @@ const RoomCard = ({ room, style }) => {
         </div>
         <h3 className="room-name">{room.name}</h3>
         <div className="room-time">
-          <Countdown targetDate={room.targetTime} isPlaying={room.status === 'playing'} />
+          <Countdown targetDate={room.targetTime} />
         </div>
         <p className="room-description">{room.description}</p>
 
@@ -301,8 +300,8 @@ const CasinoLobby = ({ user, onLogout }) => {
   useEffect(() => {
     // Cargar inmediatamente al montar
     loadLobbyData();
-    // Refrescar cada 5 segundos para mantener estados sincronizados con schedule_settings
-    const interval = setInterval(loadLobbyData, 5000);
+    // Refrescar cada 10 segundos para mantener estados sincronizados con schedule_settings
+    const interval = setInterval(loadLobbyData, 10000);
     return () => clearInterval(interval);
   }, []);
 
@@ -373,11 +372,9 @@ const CasinoLobby = ({ user, onLogout }) => {
       },
     ];
 
-    // OPTIMIZACIÓN: Usar targetTime local como placeholder mientras carga
-    // Esto permite que los countdowns se muestren inmediatamente (máximo 1-2s de diferencia con servidor)
     if (!lobbyData) return baseRooms.map(room => ({
       ...room,
-      // Mantener targetTime local para countdown inmediato (se actualizará cuando llegue lobbyData)
+      targetTime: null, // No mostrar countdown hasta tener datos del servidor
       price: room.id === 'starter' ? 'Tickets' : '$...',
       pots: room.id !== 'starter' ? { bingo: '$...', line: '$...', pre40: '$...' } : undefined
     }));
@@ -390,17 +387,14 @@ const CasinoLobby = ({ user, onLogout }) => {
         pots: room.id !== 'starter' ? { bingo: '$...', line: '$...', pre40: '$...' } : undefined
       };
 
-      // Si está sorteando (playing), no mostrar countdown - mostrar SORTEANDO
-      const isPlaying = roomData.status === 'playing';
-
       return {
         ...room,
         path: roomData.sessionId ? `${room.path}/${roomData.sessionId}` : room.path,
-        targetTime: isPlaying ? null : (roomData.nextSession ? new Date(roomData.nextSession) : room.targetTime),
+        targetTime: roomData.nextSession ? new Date(roomData.nextSession) : room.targetTime,
         status: roomData.status || 'closed',
         statusText: roomData.statusText || null,
         salesOpen: roomData.salesOpen !== undefined ? roomData.salesOpen : true,
-        minutesToStart: isPlaying ? 0 : (roomData.minutesToStart || null),
+        minutesToStart: roomData.minutesToStart || null,
         price: room.id === 'starter' ? 'Tickets' : uiHelper.formatCurrency(roomData.price),
         prizes: room.id === 'starter' ? roomData.prizes : undefined,
         pots: room.id !== 'starter' ? {
@@ -569,9 +563,6 @@ const CasinoLobby = ({ user, onLogout }) => {
           </div>
         </div>
         <div className="user-actions">
-          {/* 🔔 Campanita de Notificaciones */}
-          <NotificationBell />
-
           <button
             id="btn-history"
             className="btn-profile btn-history"

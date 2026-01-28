@@ -204,14 +204,9 @@ const FortuneWheel = ({ isOpen, onClose, onPrizeClaimed, onSpinComplete, initial
                 >
                     <button className="close-btn" onClick={onClose}><FaTimes /></button>
 
-                    <div className="wheel-layout">
-                        <div className="wheel-title-side">
-                            <span>RUEDA</span>
-                            <span>DE LA</span>
-                            <span>FORTUNA</span>
-                        </div>
+                    <h2 className="wheel-title">Rueda de la Fortuna</h2>
 
-                        <div className="wheel-container">
+                    <div className="wheel-container">
                         <div className="pointer"></div>
                         <div className="wheel-shadow"></div>
                         <div
@@ -245,36 +240,35 @@ const FortuneWheel = ({ isOpen, onClose, onPrizeClaimed, onSpinComplete, initial
                                 </div>
                             </div>
                         </div>
+                    </div>
 
-                        {/* Cooldown Overlay - Centrado con la rueda */}
-                        {!prize && !canSpin && (
-                            <div className="cooldown-overlay">
-                                <FaLock className="cooldown-icon" />
-                                <p>Próximo giro habilitado en:</p>
-                                <h3>{timeLeft || 'Calculando...'}</h3>
+                    {/* Cooldown Overlay - Positioned Relative to Modal (Centered) */}
+                    {!prize && !canSpin && (
+                        <div className="cooldown-overlay">
+                            <FaLock className="cooldown-icon" />
+                            <p>Próximo giro habilitado en:</p>
+                            <h3>{timeLeft || 'Calculando...'}</h3>
 
-                                <div className="wheel-attributes">
-                                    <div className="attribute-item">
-                                        <span className="attribute-icon">💵</span>
-                                        <span>Hasta $100k</span>
-                                    </div>
-                                    <div className="attribute-item">
-                                        <span className="attribute-icon">🎫</span>
-                                        <span>Cartones Gratis</span>
-                                    </div>
-                                    <div className="attribute-item">
-                                        <span className="attribute-icon">🎁</span>
-                                        <span>Premios Sorpresa</span>
-                                    </div>
+                            <div className="wheel-attributes">
+                                <div className="attribute-item">
+                                    <span className="attribute-icon">💵</span>
+                                    <span>Hasta $100k</span>
                                 </div>
-
-                                <button className="back-lobby-btn" onClick={onClose} style={{ marginTop: '10px' }}>
-                                    VOLVER AL LOBBY
-                                </button>
+                                <div className="attribute-item">
+                                    <span className="attribute-icon">🎫</span>
+                                    <span>Cartones Gratis</span>
+                                </div>
+                                <div className="attribute-item">
+                                    <span className="attribute-icon">🎁</span>
+                                    <span>Premios Sorpresa</span>
+                                </div>
                             </div>
-                        )}
-                    </div>
-                    </div>
+
+                            <button className="back-lobby-btn" onClick={onClose} style={{ marginTop: '10px' }}>
+                                VOLVER AL LOBBY
+                            </button>
+                        </div>
+                    )}
 
                     <div className="wheel-controls">
                         {!prize && canSpin && (

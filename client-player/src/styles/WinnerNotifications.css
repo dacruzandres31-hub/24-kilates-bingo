@@ -473,7 +473,7 @@
 .line-winner-icon {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-center;
   width: 96px;
   height: 96px;
   border-radius: 50%;

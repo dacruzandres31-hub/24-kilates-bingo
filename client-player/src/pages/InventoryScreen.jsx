@@ -28,7 +28,7 @@ export default function InventoryScreen() {
   const loadInventory = async () => {
     try {
       const response = await fetch('/api/inventory', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('playerToken') || localStorage.getItem('token')}` }
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
       if (!response.ok) throw new Error('No se cargó inventario');
       const data = await response.json();
@@ -42,7 +42,7 @@ export default function InventoryScreen() {
   const loadEquipped = async () => {
     try {
       const response = await fetch('/api/inventory/equipped', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('playerToken') || localStorage.getItem('token')}` }
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
       if (!response.ok) throw new Error('No se cargó equipado');
       const data = await response.json();
@@ -59,7 +59,7 @@ export default function InventoryScreen() {
       const response = await fetch(`/api/inventory/equip/${itemId}`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('playerToken') || localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json'
         }
       });
@@ -86,7 +86,7 @@ export default function InventoryScreen() {
       const response = await fetch(`/api/inventory/unequip/${type}`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('playerToken') || localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json'
         }
       });
@@ -128,7 +128,7 @@ export default function InventoryScreen() {
   return (
     <div className="inventory-container">
       <div className="inventory-header">
-        <button className="back-btn" onClick={() => navigate('/')}>
+        <button className="back-btn" onClick={() => navigate('/lobby')}>
           ← Volver
         </button>
         <h1>🎁 Mi Inventario</h1>

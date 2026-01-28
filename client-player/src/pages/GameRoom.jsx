@@ -17,7 +17,6 @@ import ChatWidget from '../components/ChatWidget';
 import EmojiReactions from '../components/EmojiReactions';
 import SoundToggle from '../components/SoundToggle';
 import VIPBadge from '../components/VIPBadge';
-import ConnectionIndicator from '../components/ConnectionIndicator';
 import AchievementManager, { useAchievements } from '../components/AchievementManager';
 import soundManager from '../utils/soundManager';
 import hapticManager from '../utils/hapticManager';
@@ -80,7 +79,7 @@ export default function GameRoom() {
     if (!socket) return;
 
     // Obtener usuario actual
-    const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
+    const token = localStorage.getItem('token');
     if (token) {
       const userData = JSON.parse(atob(token.split('.')[1]));
       setCurrentUser(userData);
@@ -234,7 +233,7 @@ export default function GameRoom() {
       if (!roomType) return;
 
       try {
-        const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
+        const token = localStorage.getItem('token');
         const headers = { 'Authorization': `Bearer ${token}` };
 
         // 1. Obtener estado de la sala (ID de sesión activa)
@@ -289,7 +288,7 @@ export default function GameRoom() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('playerToken') || localStorage.getItem('token')}`
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
         body: JSON.stringify({
           amount: winnerData.amount,
@@ -311,7 +310,7 @@ export default function GameRoom() {
   const fetchUserTier = async () => {
     try {
       const response = await fetch('/api/memberships/my-subscription', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('playerToken') || localStorage.getItem('token')}` }
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await response.json();
       if (data.success && data.subscription) {
@@ -329,7 +328,7 @@ export default function GameRoom() {
   const loadEquippedSkin = async () => {
     try {
       const response = await fetch('/api/inventory/equipped', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('playerToken') || localStorage.getItem('token')}` }
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
       if (!response.ok) return;
 
@@ -388,14 +387,13 @@ export default function GameRoom() {
             <h1 className="text-3xl font-black text-white flex items-center gap-2">
               🎰 SALA {roomType?.toUpperCase()}
               {currentUser?.tier && <VIPBadge tier={currentUser.tier} size="medium" />}
-              <ConnectionIndicator showLabel={false} className="ml-2" />
             </h1>
             <p className="text-cyan-100 text-sm mt-1">Sesión activa - {gameState.drawnNumbers.length} bolillas sorteadas</p>
           </div>
 
           <div className="flex gap-3">
             <button
-              onClick={() => navigate('/')}
+              onClick={() => navigate('/lobby')}
               className="flex items-center gap-2 px-4 py-2 bg-white text-slate-900 font-bold rounded-lg hover:bg-cyan-100 transition-colors"
             >
               <Home size={20} />
@@ -511,7 +509,7 @@ export default function GameRoom() {
               <div className="bg-slate-800 rounded-lg p-6 text-center">
                 <p className="text-slate-400">No tienes cartones en esta sala</p>
                 <button
-                  onClick={() => navigate('/')}
+                  onClick={() => navigate('/lobby')}
                   className="mt-3 px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors"
                 >
                   Comprar Cartón

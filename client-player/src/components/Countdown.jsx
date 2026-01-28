@@ -1,39 +1,34 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import '../styles/Countdown.css';
 
-const Countdown = ({ targetDate, isPlaying = false }) => {
-  // Función memoizada para calcular tiempo restante
-  const calculateTimeLeft = useCallback(() => {
-    if (isPlaying) return { H: 0, M: 0, S: 0 };
+const Countdown = ({ targetDate }) => {
+  const calculateTimeLeft = () => {
+    // Si no hay fecha, retornar null para mostrar "Cargando..."
     if (!targetDate) return null;
     
     const difference = +new Date(targetDate) - +new Date();
-    
+    let timeLeft = {};
+
     if (difference > 0) {
-      return {
+      timeLeft = {
         H: Math.floor((difference / (1000 * 60 * 60)) % 24),
         M: Math.floor((difference / 1000 / 60) % 60),
         S: Math.floor((difference / 1000) % 60),
       };
     }
-    return { H: 0, M: 0, S: 0 };
-  }, [targetDate, isPlaying]);
+    return timeLeft;
+  };
 
-  const [timeLeft, setTimeLeft] = useState(() => calculateTimeLeft());
-
-  // Recalcular inmediatamente cuando cambie targetDate o isPlaying
-  useEffect(() => {
-    setTimeLeft(calculateTimeLeft());
-  }, [calculateTimeLeft]);
+  const [timeLeft, setTimeLeft] = useState(calculateTimeLeft());
 
   useEffect(() => {
-    // Actualizar cada segundo
-    const interval = setInterval(() => {
+    const timer = setTimeout(() => {
       setTimeLeft(calculateTimeLeft());
     }, 1000);
 
-    return () => clearInterval(interval);
-  }, [calculateTimeLeft]);
+    // Clear the timer if the component is unmounted
+    return () => clearTimeout(timer);
+  });
 
   // Si no hay targetDate, mostrar estado de carga
   if (timeLeft === null) {
@@ -49,7 +44,7 @@ const Countdown = ({ targetDate, isPlaying = false }) => {
     );
   }
 
-  const hasTimeLeft = timeLeft.H > 0 || timeLeft.M > 0 || timeLeft.S > 0;
+  const hasTimeLeft = Object.values(timeLeft).some(val => val > 0);
 
   return (
     <div className="countdown-container">

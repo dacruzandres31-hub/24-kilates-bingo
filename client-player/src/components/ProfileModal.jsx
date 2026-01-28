@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { FaTimes, FaEye, FaEyeSlash, FaKey, FaSignOutAlt, FaUser, FaTrophy, FaLock, FaScroll, FaWhatsapp } from 'react-icons/fa';
+import { FaTimes, FaEye, FaEyeSlash, FaKey, FaSignOutAlt, FaUser, FaTrophy, FaLock, FaScroll } from 'react-icons/fa';
 import axios from 'axios';
 import MissionsPanel from './MissionsPanel';
-import WhatsAppSettings from './WhatsAppSettings';
 
 const ProfileModal = ({ isOpen, onClose, user, onLogout }) => {
   const [showChangePassword, setShowChangePassword] = useState(false);
@@ -18,7 +17,7 @@ const ProfileModal = ({ isOpen, onClose, user, onLogout }) => {
   });
   const [message, setMessage] = useState({ type: '', text: '' });
   const [isProcessing, setIsProcessing] = useState(false);
-  const [activeTab, setActiveTab] = useState('profile'); // 'profile' | 'achievements' | 'whatsapp'
+  const [activeTab, setActiveTab] = useState('profile'); // 'profile' | 'achievements'
   const [achievements, setAchievements] = useState([]);
 
   useEffect(() => {
@@ -65,7 +64,7 @@ const ProfileModal = ({ isOpen, onClose, user, onLogout }) => {
     setIsProcessing(true);
 
     try {
-      const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
+      const token = localStorage.getItem('token');
       const response = await axios.post('/api/auth/change-password', {
         currentPassword: passwordData.currentPassword,
         newPassword: passwordData.newPassword
@@ -164,7 +163,7 @@ const ProfileModal = ({ isOpen, onClose, user, onLogout }) => {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
         <button
           onClick={() => setActiveTab('profile')}
           style={{
@@ -216,34 +215,10 @@ const ProfileModal = ({ isOpen, onClose, user, onLogout }) => {
       >
         <FaScroll /> Misiones
       </button>
-
-      <button
-        onClick={() => setActiveTab('whatsapp')}
-        style={{
-          flex: 1,
-          padding: '10px',
-          borderRadius: '8px',
-          background: activeTab === 'whatsapp' ? 'rgba(37, 211, 102, 0.3)' : 'rgba(255, 255, 255, 0.05)',
-          border: activeTab === 'whatsapp' ? '1px solid #25d366' : 'none',
-          color: activeTab === 'whatsapp' ? '#25d366' : '#aaa',
-          fontWeight: 'bold',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '5px'
-        }}
-      >
-        <FaWhatsapp /> WhatsApp
-      </button>
     </div>
 
         {
-    activeTab === 'whatsapp' ? (
-      <div style={{ maxHeight: '450px', overflowY: 'auto' }}>
-        <WhatsAppSettings userRole={user?.role || 'jugador'} />
-      </div>
-    ) : activeTab === 'missions' ? (
+    activeTab === 'missions' ? (
       <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
         <MissionsPanel />
       </div>

@@ -3,22 +3,6 @@ import axios from 'axios';
 import { FaHeadset, FaTimes, FaInbox, FaPaperPlane, FaSpinner, FaCommentAlt, FaCheckCircle, FaExclamationCircle } from 'react-icons/fa';
 import './SupportModal.css';
 
-// Traducción de estados
-const statusLabels = {
-    'open': 'Abierto',
-    'in_progress': 'En Progreso',
-    'resolved': 'Resuelto',
-    'closed': 'Cerrado'
-};
-
-// Traducción de categorías
-const categoryLabels = {
-    'payment': 'Problema de Pago / Depósito',
-    'game_bug': 'Error en el Juego',
-    'account': 'Cuenta y Acceso',
-    'other': 'Otro'
-};
-
 export default function SupportModal({ isOpen, onClose }) {
     const [activeTab, setActiveTab] = useState('new'); // 'new', 'list', 'detail'
     const [tickets, setTickets] = useState([]);
@@ -238,12 +222,12 @@ export default function SupportModal({ isOpen, onClose }) {
                                         <div className="ticket-subject">{ticket.subject}</div>
                                         <div className="ticket-meta">
                                             <span className="ticket-id">#{ticket.id}</span>
-                                            <span className="ticket-category">{categoryLabels[ticket.category] || ticket.category}</span>
+                                            <span className="ticket-category">{ticket.category}</span>
                                             <span className="ticket-date">{new Date(ticket.created_at).toLocaleDateString()}</span>
                                         </div>
                                     </div>
                                     <div className={`ticket-badge status-${ticket.status}`}>
-                                        {statusLabels[ticket.status] || ticket.status}
+                                        {ticket.status}
                                     </div>
                                 </div>
                             ))}
@@ -262,15 +246,15 @@ export default function SupportModal({ isOpen, onClose }) {
                                     <span className="detail-subject">{selectedTicket.subject}</span>
                                 </div>
                                 <div className={`status-badge status-${selectedTicket.status}`}>
-                                    {statusLabels[selectedTicket.status] || selectedTicket.status}
+                                    {selectedTicket.status}
                                 </div>
                             </div>
 
                             <div className="messages-container">
                                 {ticketMessages.map((msg, idx) => (
-                                    <div key={idx} className={`message-bubble ${msg.is_admin ? 'message-admin' : 'message-user'}`}>
+                                    <div key={idx} className={`message-bubble ${msg.sender_role === 'admin' ? 'message-admin' : 'message-user'}`}>
                                         <div className="message-sender">
-                                            {msg.is_admin ? 'Soporte 24K' : 'Tú'}
+                                            {msg.sender_role === 'admin' ? 'Soporte 24K' : 'Tú'}
                                         </div>
                                         <div className="message-text">{msg.message}</div>
                                         <div className="message-time">

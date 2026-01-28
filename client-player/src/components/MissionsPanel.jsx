@@ -25,7 +25,7 @@ export default function MissionsPanel() {
   const fetchQuests = async () => {
     try {
       const response = await axios.get('/api/gamification/quests', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('playerToken') || localStorage.getItem('token')}` }
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
       setQuests(response.data.quests);
       // Marcar completadas
@@ -42,7 +42,7 @@ export default function MissionsPanel() {
   const fetchStats = async () => {
     try {
       const response = await axios.get('/api/gamification/quest-stats', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('playerToken') || localStorage.getItem('token')}` }
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
       setStats(response.data.stats);
       setLoading(false);

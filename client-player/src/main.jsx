@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client'
 import axios from 'axios'
 import App from './App.jsx'
 
-// Configurar axios baseURL - vacío para usar rutas relativas en producción
+// Configurar axios baseURL
 axios.defaults.baseURL = '';
 
 import ErrorBoundary from './helpers/ErrorBoundary.jsx'

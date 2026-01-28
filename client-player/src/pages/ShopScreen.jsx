@@ -30,7 +30,7 @@ export default function ShopScreen() {
   const loadTickets = async () => {
     try {
       const response = await fetch('/api/shop/my-tickets', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('playerToken') || localStorage.getItem('token')}` }
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await response.json();
       if (data.success) {
@@ -44,7 +44,7 @@ export default function ShopScreen() {
   const loadUserBalance = async () => {
     try {
       const response = await fetch('/api/users/profile', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('playerToken') || localStorage.getItem('token')}` }
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await response.json();
       if (data.success) {
@@ -58,7 +58,7 @@ export default function ShopScreen() {
   const loadRooms = async () => {
     try {
       const response = await fetch('/api/game/sessions', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('playerToken') || localStorage.getItem('token')}` }
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await response.json();
       if (data.success) {
@@ -122,7 +122,7 @@ export default function ShopScreen() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('playerToken') || localStorage.getItem('token')}`
+          Authorization: `Bearer ${localStorage.getItem('token')}`
         },
         body: JSON.stringify({
           roomType,

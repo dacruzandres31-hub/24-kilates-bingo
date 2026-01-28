@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import '../styles/BronzeRoomIndustrial.css?v=2';
 import GiftIcon from '../assets/bronze_icon.png';
@@ -24,8 +24,6 @@ export default function BronzeRoom({ onLogout }) {
     gameStatus,
     sessionId: liveSessionId,
     prizes: livePrizes,
-    lineWinnersPaid,
-    bingoWinnersPaid,
     isLoading: liveDrawLoading,
     setBallsDrawn,
     setCurrentBall,
@@ -61,20 +59,6 @@ const [cardWinningLines, setCardWinningLines] = useState({}); // {cardId: [0,1,2
   const [cardsRemaining, setCardsRemaining] = useState(20); // Cartones que faltan por seleccionar
   const [showReadyModal, setShowReadyModal] = useState(false); // Modal "¡¡Todo Listo!!"
   const [showHistoryModal, setShowHistoryModal] = useState(false); // Modal de historial de sorteos
-
-  // Calcular targetDate una sola vez (optimización)
-  const nextDrawTime = useMemo(() => {
-    const today = new Date();
-    const drawTime = new Date(today);
-    drawTime.setHours(20, 0, 0, 0); // Bronce a las 20:00
-    
-    // Si ya pasó las 20:00 hoy, programar para mañana
-    if (today > drawTime) {
-      drawTime.setDate(drawTime.getDate() + 1);
-    }
-    
-    return drawTime;
-  }, []);
 
   // Auto-cerrar modal "¡¡Todo Listo!!" después de 5 segundos
   useEffect(() => {
@@ -139,13 +123,9 @@ celebrationAudio.volume = 0.7;
   // Verificar cartones existentes del jugador al montar
   // PERSISTENCIA: Los cartones se guardan en localStorage para no perderlos al salir de la sala
   useEffect(() => {
-    // Usar liveSessionId (sesión real del servidor) si está disponible, sino sessionId de URL
-    const activeSessionId = liveSessionId || sessionId;
-    const STORAGE_KEY = `bingo_cards_bronce_${activeSessionId}`;
+    const STORAGE_KEY = `bingo_cards_bronce_${sessionId}`;
     
     const checkExistingCards = async () => {
-      if (!activeSessionId) return;
-      
       // 1. Primero intentar cargar desde localStorage (para cuando vuelve a la sala)
       const cached = localStorage.getItem(STORAGE_KEY);
       if (cached) {
@@ -207,7 +187,7 @@ celebrationAudio.volume = 0.7;
     };
     
     checkExistingCards();
-  }, [sessionId, liveSessionId]);
+  }, [sessionId]);
 
   // Generar número de serie del cartón: DDMMYY-S0001
   const generateCardSerial = (cardIndex, roomLetter = 'S') => {
@@ -477,15 +457,6 @@ celebrationAudio.volume = 0.7;
     setShowCardSelection(false);
     console.log(`✅ Total de cartones: ${allCards.length}, faltan: ${remaining}`);
     
-    // 💾 PERSISTENCIA: Guardar cartones en localStorage
-    // Usar liveSessionId (sesión real del servidor) si está disponible, sino sessionId de URL
-    const activeSessionId = liveSessionId || sessionId;
-    const STORAGE_KEY = `bingo_cards_bronce_${activeSessionId}`;
-    if (allCards.length > 0 && activeSessionId) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(allCards));
-      console.log('💾 Cartones guardados en localStorage después de selección');
-    }
-    
     // Si se completaron los 20 cartones, mostrar modal
     if (allCards.length === 20) {
       setShowReadyModal(true);
@@ -578,28 +549,6 @@ celebrationAudio.volume = 0.7;
     return;
   }
 
-  // PREMIO ÚNICO: Si ya se celebró línea O el servidor marcó lineWinnersPaid, NO detectar más
-  // Esto evita que se marquen múltiples líneas como ganadoras después de la primera
-  if (lineCelebrated || lineWinnersPaid || celebratedCardIds.length > 0) {
-    // Solo detectar cartones "casi línea" para alertas, pero NO nuevas líneas ganadoras
-    const cardsAlmostThere = [];
-    playerCards.forEach(card => {
-      const linesStatus = checkLineStatus(card);
-      const almostLines = linesStatus.filter(line => line.missing === 1 || line.missing === 2);
-      if (almostLines.length > 0) {
-        const minMissing = Math.min(...almostLines.map(line => line.missing));
-        cardsAlmostThere.push({
-          cardId: card.id,
-          almostLineCount: almostLines.length,
-          lines: almostLines,
-          minMissing: minMissing
-        });
-      }
-    });
-    setAlmostLineCards(cardsAlmostThere);
-    return; // Salir temprano - no detectar más líneas ganadoras
-  }
-
   const cardsAlmostThere = [];
   const cardsWithWinningLines = [];
   const newCardWinningLines = {};
@@ -607,7 +556,7 @@ celebrationAudio.volume = 0.7;
   playerCards.forEach(card => {
     const linesStatus = checkLineStatus(card);
     const almostLines = linesStatus.filter(line => line.missing === 1 || line.missing === 2);
-    // PREMIO ÚNICO: Detectar línea completa solo si aún no hay ganador
+    // Una línea está completa solo si missing === 0 Y tiene al menos 5 números marcados
     const completedLines = linesStatus.filter(line => line.missing === 0 && line.markedCount >= 5);
 
     if (almostLines.length > 0) {
@@ -644,8 +593,7 @@ celebrationAudio.volume = 0.7;
     !celebratedCardIds.includes(card.cardId)
   );
   
-  // PREMIO ÚNICO: Solo celebrar si lineWinnersPaid === false (primer ganador solamente)
-  if (newWinners.length > 0 && !lineCelebrated && winnerCards.length === 0 && !lineWinnersPaid) {
+  if (newWinners.length > 0 && !lineCelebrated && winnerCards.length === 0) {
     // Tomar el primer cartón ganador nuevo
     const winnerCard = newWinners[0];
     
@@ -681,12 +629,10 @@ celebrationAudio.volume = 0.7;
         // Anunciar continuación a BINGO antes de reanudar
         voiceService.speak('Continuamos hasta Bingo');
         setTimeout(() => {
-          // ORDEN IMPORTANTE: Limpiar ganadores PRIMERO pero NO resetear lineCelebrated
-          // lineCelebrated debe mantenerse TRUE para que no detecte más líneas ganadoras
-          // El premio de línea ya se pagó, ahora solo se puede ganar BINGO
+          // ORDEN IMPORTANTE: Limpiar ganadores PRIMERO, luego resetear flag
           setWinnerCards([]);
           setHighlightedLine(null);
-          // NO RESETEAR: setLineCelebrated(false); -- mantener TRUE para evitar detectar más líneas
+          setLineCelebrated(false); // RESETEAR después de limpiar ganadores
           setGameStatus('active');
         }, 2000); // Esperar 2 segundos para que termine el anuncio
       }, 18000); // 18 segundos + 2 del anuncio = 20 segundos total
@@ -1501,7 +1447,18 @@ useEffect(() => {
             <p className="ready-modal-subtitle">Tienes {selectedPlayerCards.length} cartones listos para jugar</p>
             <div className="ready-modal-countdown">
               <p className="ready-modal-countdown-label">Próximo Sorteo en:</p>
-              <Countdown targetDate={nextDrawTime} />
+              <Countdown targetDate={(() => {
+                const today = new Date();
+                const drawTime = new Date(today);
+                drawTime.setHours(20, 0, 0, 0);
+                
+                // Si ya pasó las 20:00 hoy, programar para mañana
+                if (today > drawTime) {
+                  drawTime.setDate(drawTime.getDate() + 1);
+                }
+                
+                return drawTime;
+              })()} />
             </div>
           </div>
         </div>
