@@ -28,7 +28,7 @@ class CommissionService {
           u.role as seller_role
         FROM bingo_cards bc
         LEFT JOIN users u ON bc.seller_id = u.id
-        WHERE bc.session_id = ?`,
+        WHERE bc.game_session_id = ?`,
         [sessionId]
       );
 

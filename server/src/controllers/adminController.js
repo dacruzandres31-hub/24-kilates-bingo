@@ -1605,6 +1605,19 @@ async function transferCardsToUser(req, res) {
       req.user.id
     );
 
+    // Emitir evento WebSocket para que el jugador vea los cartones al instante
+    const io = req.app.get('io');
+    if (io && result.success) {
+      io.to(`user_${to_user_id}`).emit('resources_updated', {
+        type: 'cards_received',
+        room,
+        quantity,
+        message: `Recibiste ${quantity} cartones de ${room}`,
+        timestamp: new Date().toISOString()
+      });
+      console.log(`📡 WebSocket: Notificado user_${to_user_id} de ${quantity} cartones ${room}`);
+    }
+
     res.json(result);
 
   } catch (error) {

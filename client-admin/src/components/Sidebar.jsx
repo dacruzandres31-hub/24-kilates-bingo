@@ -65,6 +65,7 @@ export default function Sidebar({ isOpen, onClose, activeSections, onToggleSecti
       sections: [
         { id: 'pozos', name: 'Estado de Pozos' },
         { id: 'sesiones-stats', name: 'Estado de Sesiones' },
+        { id: 'session-history', name: '📜 Historial de Sorteos' },
         { id: 'sesiones-control', name: 'Control de Sesiones', superAdminOnly: true },
         { id: 'sesiones-live', name: 'Monitoreo en Vivo' },
         { id: 'room-config', name: 'Configuración de Salas', superAdminOnly: true },
@@ -76,6 +77,7 @@ export default function Sidebar({ isOpen, onClose, activeSections, onToggleSecti
       title: '⚙️ Sistema',
       icon: '⚙️',
       sections: [
+        { id: 'global-notifications', name: '📢 Notificaciones Globales', andyOnly: true },
         { id: 'whatsapp-config', name: '📱 Configuración WhatsApp' },
         { id: 'system-health', name: '🏥 Salud del Sistema', superAdminOnly: true },
         { id: 'audit-logs', name: '📜 Log de Auditoría' },
@@ -144,7 +146,8 @@ export default function Sidebar({ isOpen, onClose, activeSections, onToggleSecti
                         'room-config',            // Configuración de Salas
                         'horarios-config',        // Configuración de Horarios
                         'audit-logs',             // Log de Auditoría
-                        'support'                 // Soporte Técnico
+                        'support',                // Soporte Técnico
+                        'global-notifications'    // Notificaciones Globales
                       ];
 
                       if (andyOnlySections.includes(section.id) && !isAndy) return false;
@@ -183,7 +186,7 @@ export default function Sidebar({ isOpen, onClose, activeSections, onToggleSecti
           <span>🎓</span> Iniciar Tour
         </button>
         <p className="text-xs text-slate-500 text-center">
-          Panel Admin v1.0
+          Panel Admin v1.1
         </p>
       </div>
     </aside>

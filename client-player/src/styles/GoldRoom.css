@@ -1,8 +1,6 @@
-﻿/* ============================================
+/* ============================================
    SALA ORO - LUJO Y EXCLUSIVIDAD
    Paleta: Dorado Puro (#ffd700), Amarillo Brillante (#ffea00), Negro Premium
-   ============================================ */
-   Paleta: Cian ElÃ©ctrico, Violeta NeÃ³n, Negro Profundo
    ============================================ */
 
 .gold-room {
@@ -32,7 +30,7 @@
   }
 }
 
-/* Cortinilla de transiciÃ³n waiting â†’ active */
+/* Cortinilla de transición waiting → active */
 .transition-curtain {
   position: fixed;
   inset: 0;
@@ -97,7 +95,7 @@
 }
 
 /* ============================================
-   CELEBRACIÃ“N DE LÃNEA GANADORA
+   CELEBRACIÓN DE LÍNEA GANADORA
    ============================================ */
 
 .winner-celebration-overlay {
@@ -261,7 +259,7 @@
   }
 }
 
-/* Estilos para el cartÃ³n en el modal de celebraciÃ³n */
+/* Estilos para el cartón en el modal de celebración */
 .celebration-card-expanded {
   margin: 30px auto;
   max-width: 700px;
@@ -320,7 +318,7 @@
   text-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
 }
 
-/* LÃ­nea resaltada en dorado */
+/* Línea resaltada en dorado */
 .celebration-card-expanded .card-cell.highlighted-line {
   background: linear-gradient(135deg, #ffd700 0%, #ffd700 100%);
   border: 3px solid #ffd700;
@@ -348,11 +346,11 @@
 }
 
 /* ============================================
-   ALERTA DE CASI LÃNEA
+   ALERTA DE CASI LÍNEA
    ============================================ */
 
 /* ============================================
-   ALERTA DE CASI LÃNEA - COMPACTA
+   ALERTA DE CASI LÍNEA - COMPACTA
    ============================================ */
 
 .compact-line-alert {
@@ -392,7 +390,7 @@
 }
 
 /* ============================================
-   MODAL DE CASI LÍNEA - AL LADO DEL TÍTULO
+   MODAL DE CASI L�NEA - AL LADO DEL T�TULO
    ============================================ */
 
 .almost-line-modal {
@@ -935,7 +933,7 @@
 }
 
 /* ============================================
-   CUADRÃCULA DIGITAL (IZQUIERDA) - 3x3 LAYOUT
+   CUADRÍCULA DIGITAL (IZQUIERDA) - 3x3 LAYOUT
    ============================================ */
 
 .digital-grid-full {
@@ -1047,9 +1045,9 @@
   }
 }
 
-/* PartÃ­culas doradas flotantes */
+/* Partículas doradas flotantes */
 .grid-row .grid-number.recent::after {
-  content: 'âœ¨';
+  content: '✨';
   position: absolute;
   top: -20px;
   left: 50%;
@@ -1070,7 +1068,7 @@
   }
 }
 
-/* Barra de Ãºltimas bolas */
+/* Barra de últimas bolas */
 .recent-balls-bar {
   margin-top: 12px;
   padding: 10px;
@@ -1096,16 +1094,7 @@
 }
 
 .recent-ball-chip {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 0.8rem;
-  color: #000;
-  border: 2px solid rgba(255, 215, 0, 0.9);
+  /* Base - los estilos espec�ficos vienen de .bingo-ball-mini */
   animation: recentBallPop 0.4s ease-out;
 }
 
@@ -1121,8 +1110,64 @@
 }
 
 /* ============================================
-   CUADRÃCULA DIGITAL ANTIGUA (BACKUP)
+   CUADRÍCULA DIGITAL ANTIGUA (BACKUP)
    ============================================ */
+
+/* Estilos para mini bolillas de últimas bolas */
+.bingo-ball-mini {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+/* Centro blanco para bola grande del bolillero */
+.ball-white-center {
+  width: 70%;
+  height: 70%;
+  background: radial-gradient(circle at 40% 40%, #ffffff, #f0f0f0);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.ball-white-center .ball-number-large {
+  font-size: 3.5rem;
+  font-weight: 900;
+  color: #000000;
+  text-shadow: none;
+  line-height: 1;
+}
+
+.ball-white-center-mini {
+  width: 65%;
+  height: 65%;
+  background: radial-gradient(circle at 40% 40%, #ffffff, #f0f0f0);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 1px 5px rgba(0,0,0,0.1);
+}
+
+.ball-white-center-mini .ball-number {
+  font-size: 1rem !important;
+  font-weight: 900 !important;
+  color: #000000 !important;
+  text-shadow: none !important;
+  line-height: 1 !important;
+  width: auto !important;
+  height: auto !important;
+  background: none !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+}
 
 .digital-grid {
   background: rgba(0, 0, 0, 0.6);
@@ -1139,6 +1184,7 @@
   text-align: center;
   margin-bottom: 8px;
   position: relative;
+  padding-left: 50px; /* Espacio para el menú hamburguesa */
 }
 
 .grid-title {
@@ -1268,67 +1314,8 @@
   }
 }
 
-/* Barra de Ãºltimas bolas */
-.recent-balls-bar {
-  margin-top: 4px;
-  padding: 6px 10px;
-  background: rgba(0, 0, 0, 0.8);
-  border: 2px solid rgba(255, 215, 0, 0.3);
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.recent-label {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: #ffd700;
-  letter-spacing: 2px;
-  text-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
-}
-
-.recent-balls-list {
-  display: flex;
-  gap: 8px;
-  flex: 1;
-}
-
-.recent-ball-chip {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 12px;
-  border-radius: 20px;
-  font-weight: 900;
-  color: #000;
-  font-size: 0.85rem;
-  animation: chip-slide-in 0.4s ease-out;
-}
-
-@keyframes chip-slide-in {
-  0% {
-    transform: translateX(-20px);
-    opacity: 0;
-  }
-  100% {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-.ball-letter {
-  font-size: 0.9rem;
-  font-weight: 700;
-}
-
-.ball-number {
-  font-size: 1rem;
-  font-weight: 900;
-}
-
 /* ============================================
-   SECCIÃ“N DERECHA - TÃTULO + INFO + BOLILLERO
+   SECCIÓN DERECHA - TÍTULO + INFO + BOLILLERO
    ============================================ */
 
 .right-section {
@@ -1478,7 +1465,7 @@
   50% { opacity: 1; }
 }
 
-/* Esfera de AcrÃ­lico Transparente */
+/* Esfera de Acrílico Transparente */
 .acrylic-sphere {
   width: 240px;
   height: 240px;
@@ -1639,7 +1626,7 @@
   }
 }
 
-/* PartÃ­culas de explosiÃ³n al aparecer bola */
+/* Partículas de explosión al aparecer bola */
 @keyframes particle-burst {
   0% {
     transform: translate(0, 0) scale(1);
@@ -1729,7 +1716,7 @@
   letter-spacing: 2px;
 }
 
-/* BotÃ³n de SelecciÃ³n de Cartones en el Bolillero */
+/* Botón de Selección de Cartones en el Bolillero */
 .card-selection-sphere {
   width: 100%;
   height: 100%;
@@ -1803,7 +1790,7 @@
   50% { transform: translateY(-5px); }
 }
 
-/* Contador VIEJO dentro del cÃ­rculo - mantener por compatibilidad */
+/* Contador VIEJO dentro del círculo - mantener por compatibilidad */
 .sphere-btn-counter {
   display: flex;
   flex-direction: column;
@@ -1876,7 +1863,7 @@
   margin-top: 3px;
 }
 
-/* Base de la MÃ¡quina */
+/* Base de la Máquina */
 .machine-base {
   width: 80%;
   display: flex;
@@ -1914,7 +1901,7 @@
 }
 
 /* ============================================
-   SISTEMA DE TOASTS Y ALERTAS CINEMATOGRÃFICAS
+   SISTEMA DE TOASTS Y ALERTAS CINEMATOGRÁFICAS
    ============================================ */
 
 .toast-container {
@@ -1984,7 +1971,7 @@
   color: #4a2800;
 }
 
-/* Alerta de lÃ­nea tipo marquesina */
+/* Alerta de línea tipo marquesina */
 .marquee-alert {
   position: fixed;
   top: 50%;
@@ -2141,7 +2128,7 @@
 }
 
 /* ============================================
-   DIVIDER NEÃ“N
+   DIVIDER NEÓN
    ============================================ */
 
 .neon-divider {
@@ -2195,7 +2182,7 @@
    ============================================ */
 
 /* ============================================
-   ELEMENTOS DE GAMIFICACIÃ“N
+   ELEMENTOS DE GAMIFICACIÓN
    ============================================ */
 
 .gamification-panel {
@@ -2392,7 +2379,7 @@
   border: 1px solid rgba(255, 234, 0, 0.3);
 }
 
-/* Scroll Container - Con superposiciÃ³n vertical */
+/* Scroll Container - Con superposición vertical */
 .cards-scroll-container {
   flex: 1;
   position: relative;
@@ -2452,7 +2439,7 @@
   z-index: 10;
 }
 
-/* CartÃ³n a 1 de lÃ­nea - borde dorado pulsante intenso */
+/* Cartón a 1 de línea - borde dorado pulsante intenso */
 .compact-card.almost-line {
   border-color: #ffd700;
   animation: cyan-pulse-intense 0.8s ease-in-out infinite;
@@ -2478,7 +2465,7 @@
   }
 }
 
-/* Barra de progreso circular alrededor del cartÃ³n */
+/* Barra de progreso circular alrededor del cartón */
 .compact-card::before {
   content: '';
   position: absolute;
@@ -2604,7 +2591,7 @@
 }
 
 /* ============================================
-   CARTÃ“N EXPANDIDO - OVERLAY CENTRAL
+   CARTÓN EXPANDIDO - OVERLAY CENTRAL
    ============================================ */
 
 .expanded-card-overlay {
@@ -2762,7 +2749,7 @@
 }
 
 /* ============================================
-   CARTÃ“N DE BINGO - ESTILO CARTAS SUPERPUESTAS VERTICAL (BACKUP)
+   CARTÓN DE BINGO - ESTILO CARTAS SUPERPUESTAS VERTICAL (BACKUP)
    ============================================ */
 
 .bingo-card-starter {
@@ -2785,41 +2772,41 @@
   margin-bottom: -210px;
 }
 
-/* Primer cartÃ³n - totalmente visible con mayor z-index */
+/* Primer cartón - totalmente visible con mayor z-index */
 .bingo-card-starter:first-child {
   margin-top: 0;
   z-index: 10;
 }
 
-/* Segundo cartÃ³n - desplazado 50px hacia abajo */
+/* Segundo cartón - desplazado 50px hacia abajo */
 .bingo-card-starter:nth-child(2) {
   margin-top: 50px;
   z-index: 9;
 }
 
-/* Tercer cartÃ³n - desplazado 100px hacia abajo */
+/* Tercer cartón - desplazado 100px hacia abajo */
 .bingo-card-starter:nth-child(3) {
   margin-top: 100px;
   z-index: 8;
 }
 
-/* Cuarto cartÃ³n - desplazado 150px hacia abajo */
+/* Cuarto cartón - desplazado 150px hacia abajo */
 .bingo-card-starter:nth-child(4) {
   margin-top: 150px;
   z-index: 7;
 }
 
-/* Quinto cartÃ³n y siguientes */
+/* Quinto cartón y siguientes */
 .bingo-card-starter:nth-child(n+5) {
   z-index: 6;
 }
 
-/* Ãšltimo cartÃ³n - debe tener margen normal para no cortar */
+/* Último cartón - debe tener margen normal para no cortar */
 .bingo-card-starter:last-child {
   margin-bottom: 0;
 }
 
-/* Hover - expandir cartÃ³n */
+/* Hover - expandir cartón */
 .bingo-card-starter:hover {
   transform: scale(1.03);
   z-index: 20 !important;
@@ -3109,13 +3096,13 @@
     font-size: 1rem;
   }
 
-  /* Cartones en stack vertical en mÃ³vil */
+  /* Cartones en stack vertical en móvil */
   .cards-compact-grid {
     grid-template-columns: repeat(2, 1fr);
     grid-template-rows: repeat(15, 1fr);
   }
 
-  /* BotÃ³n de selecciÃ³n mÃ¡s grande en touch */
+  /* Botón de selección más grande en touch */
   .select-cards-sphere-btn {
     transform: scale(1.2);
   }
@@ -3124,7 +3111,7 @@
     width: 180px;
   }
 
-  /* Toasts mÃ¡s pequeÃ±os */
+  /* Toasts más pequeños */
   .toast-notification {
     padding: 15px 20px;
   }
@@ -3137,7 +3124,7 @@
     font-size: 0.9rem;
   }
 
-  /* Medidores de gamificaciÃ³n mÃ¡s compactos */
+  /* Medidores de gamificación más compactos */
   .gamification-panel {
     bottom: 10px;
     left: 10px;
@@ -3153,7 +3140,7 @@
 /* ===== BINGO 90 STYLES (3x9 Grid) ===== */
 
 .bingo-card-starter-90 {
-  max-width: 400px; /* MÃ¡s ancho para acomodar 9 columnas */
+  max-width: 400px; /* Más ancho para acomodar 9 columnas */
 }
 
 .card-grid-90 {
@@ -3197,8 +3184,8 @@
 .ball-number-large {
   font-size: 3.5rem;
   font-weight: 900;
-  color: white;
-  text-shadow: 0 0 30px rgba(255, 255, 255, 0.8);
+  color: #000000;
+  text-shadow: none;
 }
 
 .announcement-number-large {
@@ -3494,7 +3481,7 @@
   }
 }
 
-/* Modo CelebraciÃ³n Full Screen */
+/* Modo Celebración Full Screen */
 .celebration-overlay {
   position: fixed;
   inset: 0;
@@ -3603,7 +3590,7 @@
   }
 }
 
-/* Confetti para CelebraciÃ³n */
+/* Confetti para Celebración */
 .celebration-confetti {
   position: absolute;
   inset: 0;
@@ -3630,7 +3617,7 @@
   }
 }
 
-/* NÃºmeros Marcados con Efecto */
+/* Números Marcados con Efecto */
 .marked-number-effect {
   position: fixed;
   top: 50%;
@@ -3725,7 +3712,7 @@
 .marked-particle:nth-child(7) { --i: 0; --j: -1; }
 .marked-particle:nth-child(8) { --i: 1; --j: -1; }
 
-/* AnimaciÃ³n de Entrada de Cartones (Deal) */
+/* Animación de Entrada de Cartones (Deal) */
 .compact-card {
   animation: card-deal 0.5s ease-out backwards;
 }
@@ -3756,7 +3743,7 @@
   }
 }
 
-/* Efecto 3D en nÃºmeros del grid cuando son cantados */
+/* Efecto 3D en números del grid cuando son cantados */
 .grid-number.called {
   animation: number-3d-pop 0.6s ease-out;
 }
@@ -3853,10 +3840,10 @@
 
 /* ============================================
    SALA ORO - ESTILOS EXCLUSIVOS (NO AFECTAN STARTER, BRONCE NI PLATA)
-   Tema Elegante: Dorado con Tipografía Georgia
+   Tema Elegante: Dorado con Tipograf�a Georgia
    ============================================ */
 
-/* Etiqueta de Precio Cartón $2.000 */
+/* Etiqueta de Precio Cart�n $2.000 */
 .gold-room .card-price-tag {
   display: flex;
   flex-direction: column;
@@ -3895,7 +3882,7 @@
   box-shadow: 0 0 15px rgba(255, 215, 0, 0.6), inset 0 1px 2px rgba(255, 255, 255, 0.3);
 }
 
-/* Grid de Números - Fondo Dorado Elegante */
+/* Grid de N�meros - Fondo Dorado Elegante */
 .gold-room .grid-number {
   background: linear-gradient(135deg, #FFEB3B 0%, #FFC107 100%) !important;
   color: #1a1a00 !important;
@@ -3932,7 +3919,7 @@
     inset 0 2px 5px rgba(255, 255, 255, 0.5) !important;
 }
 
-/* Título del Grid */
+/* T�tulo del Grid */
 .gold-room .grid-title {
   color: #FFD700 !important;
   text-shadow: 
@@ -3952,7 +3939,7 @@
     inset 0 0 30px rgba(255, 255, 255, 0.2) !important;
 }
 
-/* Anillo de Glow en Números Llamados */
+/* Anillo de Glow en N�meros Llamados */
 .gold-room .number-glow-ring {
   border: 2px solid #FFD700 !important;
   box-shadow: 
@@ -3968,19 +3955,19 @@
     inset 0 0 20px rgba(255, 215, 0, 0.1) !important;
 }
 
-/* Título de las columnas (1-10, 11-20, etc) - DORADO */
+/* T�tulo de las columnas (1-10, 11-20, etc) - DORADO */
 .gold-room .grid-row .column-letter {
   border: 1px solid rgba(255, 215, 0, 0.6) !important;
   color: #FFD700 !important;
 }
 
-/* Números del grid general */
+/* N�meros del grid general */
 .gold-room .grid-row .grid-number {
   border: 1px solid rgba(255, 215, 0, 0.4) !important;
   box-shadow: 0 0 10px rgba(255, 215, 0, 0.2) !important;
 }
 
-/* Números cantados */
+/* N�meros cantados */
 .gold-room .grid-row .grid-number.called {
   border: 2px solid rgba(255, 215, 0, 0.8) !important;
 }
@@ -4027,7 +4014,7 @@
   font-family: Georgia, 'Times New Roman', serif !important;
 }
 
-/* Sección de cartones - Fondo dorado */
+/* Secci�n de cartones - Fondo dorado */
 .gold-room .player-cards-section {
   background: rgba(20, 15, 0, 0.8) !important;
   border: 2px solid rgba(255, 215, 0, 0.5) !important;
@@ -4099,7 +4086,7 @@
    SIDEBAR DORADO - SALA ORO
    ============================================ */
 
-/* Botón toggle del sidebar */
+/* Bot�n toggle del sidebar */
 .gold-room .sidebar-toggle-btn {
   background: rgba(255, 215, 0, 0.2) !important;
   border: 2px solid rgba(255, 215, 0, 0.6) !important;
@@ -4172,7 +4159,7 @@
   color: #ffffff !important;
 }
 
-/* Botones de acción */
+/* Botones de acci�n */
 .gold-room .sidebar-actions button {
   background: linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(255, 160, 0, 0.2)) !important;
   border: 2px solid rgba(255, 215, 0, 0.4) !important;
@@ -4185,7 +4172,7 @@
   box-shadow: 0 0 20px rgba(255, 215, 0, 0.5) !important;
 }
 
-/* Sección derecha - Fondo negro con resplandor dorado */
+/* Secci�n derecha - Fondo negro con resplandor dorado */
 .gold-room .right-section {
   background: rgba(0, 0, 0, 0.95) !important;
   border: 2px solid rgba(255, 215, 0, 0.4) !important;
@@ -4222,7 +4209,7 @@
 
 
 /* ============================
-   Modal Ready - ¡¡Todo Listo!!
+   Modal Ready - ��Todo Listo!!
    ============================ */
 
 .ready-modal-overlay {
@@ -4419,7 +4406,7 @@
 }
 
 /* ============================================
-   FESTEJO DE LÍNEA - Usando cartón de grilla 6x5
+   FESTEJO DE L�NEA - Usando cart�n de grilla 6x5
    ============================================ */
 
 .winner-celebration-overlay {
@@ -4612,7 +4599,7 @@
 }
 
 /* ============================================
-   FESTEJO DE LÍNEA - Usando cartón de grilla 6x5
+   FESTEJO DE L�NEA - Usando cart�n de grilla 6x5
    ============================================ */
 
 .winner-celebration-overlay {

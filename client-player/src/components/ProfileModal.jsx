@@ -65,7 +65,7 @@ const ProfileModal = ({ isOpen, onClose, user, onLogout }) => {
     setIsProcessing(true);
 
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
       const response = await axios.post('/api/auth/change-password', {
         currentPassword: passwordData.currentPassword,
         newPassword: passwordData.newPassword

@@ -174,11 +174,9 @@ class DailyGenerator {
            room,
            COUNT(*) as total_cards,
            COUNT(CASE WHEN status = 'available' THEN 1 END) as available,
-           COUNT(CASE WHEN status = 'sold' THEN 1 END) as sold,
-           COUNT(CASE WHEN status = 'discarded' THEN 1 END) as discarded,
-           DATE(MAX(play_date)) as max_play_date,
-           COALESCE(AVG(CASE WHEN status = 'sold' THEN price END), 0) as avg_price
-         FROM daily_stock_cards
+           COUNT(CASE WHEN status IN ('sold', 'selected', 'used') THEN 1 END) as sold,
+           COUNT(CASE WHEN status = 'discarded' THEN 1 END) as discarded
+         FROM bingo_cards_pool
          GROUP BY room`
       );
 

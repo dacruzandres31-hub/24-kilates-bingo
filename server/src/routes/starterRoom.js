@@ -14,11 +14,14 @@ const optionalAuth = (req, res, next) => {
   const authHeader = req.headers.authorization;
   const token = authHeader?.split(' ')[1];
   
+  console.log(`[StarterRoom] 🔐 Auth header: ${authHeader ? 'presente' : 'ausente'}, token: ${token ? token.substring(0, 20) + '...' : 'null'}`);
+  
   // Si hay token válido (no null, no undefined, no vacío)
   if (token && token !== 'null' && token !== 'undefined') {
     // Si hay token, usar auth normal
     return authenticateToken(req, res, next);
   } else {
+    console.log(`[StarterRoom] ⚠️ Usando usuario mock (999) porque no hay token válido`);
     // Si no hay token válido, crear usuario mock para testing
     req.user = {
       id: 999,

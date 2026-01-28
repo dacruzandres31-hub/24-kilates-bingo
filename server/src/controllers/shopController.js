@@ -113,15 +113,25 @@ async function buyCard(req, res) {
             console.log(`[ShopController] Tickets restantes: ${newQuantity}`);
           }
 
-          // Asignar cartones gratis
+          // Asignar cartones gratis - INSERTAR EN bingo_cards para que el motor de juego los valide
           for (let i = 0; i < quantity; i++) {
             const gridNumbers = generateBingoGrid();
+            const numbersJson = JSON.stringify(gridNumbers);
 
+            // Insertar en bingo_cards (tabla que usa el motor de juego para validar)
+            await client.query(
+              `INSERT INTO bingo_cards 
+               (user_id, game_session_id, grid_data, numbers, status, price)
+               VALUES (?, ?, ?, ?, 'active', 0.00)`,
+              [userId, room.id, numbersJson, numbersJson]
+            );
+
+            // También insertar en daily_stock_cards para compatibilidad
             await client.query(
               `INSERT INTO daily_stock_cards 
-               (room, serial_number, grid_numbers, play_date, play_time, status, price)
-               VALUES (?, ?, ?, ?, '10:00:00', 'available', 0.00)`,
-              [roomType, `TICKET_${Date.now()}_${i}`, JSON.stringify(gridNumbers), new Date().toISOString().split('T')[0]]
+               (room, serial_number, grid_numbers, play_date, play_time, status, price, buyer_id)
+               VALUES (?, ?, ?, ?, '10:00:00', 'sold', 0.00, ?)`,
+              [roomType, `TICKET_${Date.now()}_${i}`, numbersJson, new Date().toISOString().split('T')[0], userId]
             );
           }
 
@@ -184,15 +194,25 @@ async function buyCard(req, res) {
         [totalCost, userId]
       );
 
-      // Asignar cartones
+      // Asignar cartones - INSERTAR EN bingo_cards para que el motor de juego los valide
       for (let i = 0; i < quantity; i++) {
         const gridNumbers = generateBingoGrid();
+        const numbersJson = JSON.stringify(gridNumbers);
 
+        // Insertar en bingo_cards (tabla que usa el motor de juego para validar)
+        await client.query(
+          `INSERT INTO bingo_cards 
+           (user_id, game_session_id, grid_data, numbers, status, price)
+           VALUES (?, ?, ?, ?, 'active', ?)`,
+          [userId, room.id, numbersJson, numbersJson, cardCost]
+        );
+
+        // También insertar en daily_stock_cards para compatibilidad con otros sistemas
         await client.query(
           `INSERT INTO daily_stock_cards 
-           (room, serial_number, grid_numbers, play_date, play_time, status, price)
-           VALUES (?, ?, ?, ?, '10:00:00', 'available', ?)`,
-          [roomType, `PAID_${Date.now()}_${i}`, JSON.stringify(gridNumbers), new Date().toISOString().split('T')[0], cardCost]
+           (room, serial_number, grid_numbers, play_date, play_time, status, price, buyer_id)
+           VALUES (?, ?, ?, ?, '10:00:00', 'sold', ?, ?)`,
+          [roomType, `PAID_${Date.now()}_${i}`, numbersJson, new Date().toISOString().split('T')[0], cardCost, userId]
         );
       }
 
@@ -215,14 +235,20 @@ async function buyCard(req, res) {
       console.log(`  Línea: +$${lineaIncrease}`);
       console.log(`  Pre-40: +$${pre40Increase}`);
 
+      // Actualizar AMBOS sets de columnas:
+      // - jackpot_* = acumulado histórico (persiste entre sesiones si no hay ganador)
+      // - current_pot_* = pozo de la sesión actual (para mostrar en frontend)
       await client.query(`
         UPDATE game_sessions
         SET 
           jackpot_bingo = jackpot_bingo + ?,
           jackpot_linea = jackpot_linea + ?,
-          jackpot_pre40 = jackpot_pre40 + ?
+          jackpot_pre40 = jackpot_pre40 + ?,
+          current_pot_bingo = current_pot_bingo + ?,
+          current_pot_linea = current_pot_linea + ?,
+          current_pot_jackpot = current_pot_jackpot + ?
         WHERE id = ?
-      `, [bingoIncrease, lineaIncrease, pre40Increase, room.id]);
+      `, [bingoIncrease, lineaIncrease, pre40Increase, bingoIncrease, lineaIncrease, pre40Increase, room.id]);
 
       // AGREGAR XP Y VERIFICAR LEVEL UP
       const xpResult = await gamificationEngine.addXPToPlayer(userId, totalCost);

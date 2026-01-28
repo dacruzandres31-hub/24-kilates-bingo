@@ -30,6 +30,7 @@ import FortuneWheel from './Gamification/FortuneWheel';
 import useSocket from '../hooks/useSocket';
 import uiHelper from '../helpers/uiHelper';
 import HotPotNotification from './Notifications/HotPotNotification';
+import NotificationBell from './NotificationBell';
 import CardPurchaseCalculator from './CardPurchaseCalculator';
 import ReferralDashboard from './Referral/ReferralDashboard';
 import { FaShareAlt, FaCheck } from 'react-icons/fa';
@@ -568,6 +569,9 @@ const CasinoLobby = ({ user, onLogout }) => {
           </div>
         </div>
         <div className="user-actions">
+          {/* 🔔 Campanita de Notificaciones */}
+          <NotificationBell />
+
           <button
             id="btn-history"
             className="btn-profile btn-history"

@@ -1230,6 +1230,7 @@
   text-align: center;
   margin-bottom: 8px;
   position: relative;
+  padding-left: 50px; /* Espacio para el menú hamburguesa */
 }
 
 .grid-title {

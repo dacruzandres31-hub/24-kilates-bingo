@@ -73,7 +73,7 @@ export default function GameRoom() {
         `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/game/sessions/${sessionId}`,
         {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+            'Authorization': `Bearer ${localStorage.getItem('playerToken') || localStorage.getItem('token')}`
           }
         }
       );
@@ -114,7 +114,7 @@ export default function GameRoom() {
         `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/users/me`,
         {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+            'Authorization': `Bearer ${localStorage.getItem('playerToken') || localStorage.getItem('token')}`
           }
         }
       );

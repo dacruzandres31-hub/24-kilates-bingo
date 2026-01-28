@@ -34,7 +34,7 @@ export default function PlayerCardInventory({
     }
   }, [sessionId]);
 
-  const getToken = () => localStorage.getItem('token');
+  const getToken = () => localStorage.getItem('playerToken') || localStorage.getItem('token');
 
   // ==================== INVENTARIO ====================
   const fetchMyInventory = async () => {

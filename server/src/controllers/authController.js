@@ -52,20 +52,24 @@ exports.login = async (req, res) => {
     // Generar token
     const token = generateToken(user.id, user.role, user.username);
 
-    // Obtener datos de gamificación (streak, nivel, etc.)
+    // Obtener datos de gamificación (streak, nivel, etc.) - datos en tabla user_streaks
     let gamification = { streak: null };
     try {
       const [streakResult] = await pool.query(
-        `SELECT current_streak, longest_streak, last_login_date, 
-                DATEDIFF(CURRENT_DATE, last_login_date) as days_since_login
-         FROM users WHERE id = ?`,
+        `SELECT us.current_streak, us.highest_streak as longest_streak, us.last_login_date, 
+                DATEDIFF(CURRENT_DATE, us.last_login_date) as days_since_login
+         FROM user_streaks us WHERE us.user_id = ?`,
         [user.id]
       );
       if (streakResult.length > 0) {
         gamification.streak = streakResult[0];
       }
-      // Actualizar last_login_date
-      await pool.query('UPDATE users SET last_login_date = CURRENT_DATE WHERE id = ?', [user.id]);
+      // Actualizar o crear registro de streak
+      await pool.query(
+        `INSERT INTO user_streaks (user_id, last_login_date) VALUES (?, CURRENT_DATE)
+         ON DUPLICATE KEY UPDATE last_login_date = CURRENT_DATE`,
+        [user.id]
+      );
     } catch (gamErr) {
       console.error('Error obteniendo gamification:', gamErr);
     }

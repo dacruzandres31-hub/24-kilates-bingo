@@ -232,7 +232,7 @@ exports.getCurrentPots = async (req, res) => {
         total_cards_validated AS cards_sold,
         status
       FROM game_sessions
-      WHERE room = 'free_starter' 
+      WHERE room = 'starter' 
         AND status IN ('active', 'playing', 'pending')
       ORDER BY created_at DESC
       LIMIT 1
@@ -272,27 +272,44 @@ exports.getCurrentPots = async (req, res) => {
  * ENDPOINT PÚBLICO (sin autenticación)
  * Obtener datos para el lobby del jugador: precios + pozos actuales
  * Formato optimizado para CasinoLobby.jsx
+ * 
+ * CENTRALIZADO: Todo se basa en schedule_settings
+ * Estados:
+ * - active: Habilitada (más de 5 min antes del sorteo)
+ * - sales_closed: Ventas cerradas (5-1 min antes)
+ * - starting: Iniciando (1 min antes)
+ * - playing: Sorteando (sesión activa)
+ * - finishing: Finalizando (0-2 min después)
+ * - closed: Cerrada (sin horarios programados)
  */
 exports.getLobbyData = async (req, res) => {
   try {
     // Obtener datos de salas monetizadas (Bronce, Plata, Oro)
+    // Prioridad: 'playing' > otros estados (para detectar sorteos en curso)
     const [moneyRooms] = await pool.query(`
       SELECT 
         rs.room,
         rs.card_price,
-        rs.accumulated_pot_pre40 AS current_pot_jackpot,
+        COALESCE(latest.jackpot_pre40, 0) AS jackpot_pre40_accumulated,
         COALESCE(latest.current_pot_linea, 0) AS current_pot_linea,
         COALESCE(latest.current_pot_bingo, 0) AS current_pot_bingo,
-        latest.status
+        latest.status,
+        latest.id as session_id
       FROM room_settings rs
       LEFT JOIN (
         SELECT 
           gs1.*
         FROM game_sessions gs1
         INNER JOIN (
-          SELECT room, MAX(id) AS max_id
+          SELECT room, 
+            -- Priorizar sesiones 'playing' sobre otras
+            CASE 
+              WHEN MAX(CASE WHEN status = 'playing' THEN id END) IS NOT NULL 
+              THEN MAX(CASE WHEN status = 'playing' THEN id END)
+              ELSE MAX(id) 
+            END AS max_id
           FROM game_sessions
-          WHERE status IN ('active', 'playing', 'pending')
+          WHERE status IN ('active', 'playing', 'pending', 'waiting')
           GROUP BY room
         ) gs2 ON gs1.id = gs2.max_id
       ) latest ON latest.room COLLATE utf8mb4_0900_ai_ci = rs.room COLLATE utf8mb4_0900_ai_ci
@@ -347,7 +364,67 @@ exports.getLobbyData = async (req, res) => {
         }
       });
 
-      return nextTime;
+      return { nextTime, secondsToStart: minDiff === Infinity ? null : minDiff };
+    };
+
+    // Función para calcular estado y si ventas están abiertas basándose en schedule_settings
+    const calculateRoomState = (roomSchedules, sessionStatus) => {
+      // Si hay sesión activa en estado 'playing', está sorteando
+      if (sessionStatus === 'playing') {
+        return {
+          status: 'playing',
+          salesOpen: false,
+          statusText: 'SORTEANDO',
+          minutesToStart: 0
+        };
+      }
+
+      const { nextTime, secondsToStart } = getNextScheduledTime(roomSchedules || []);
+      
+      if (!nextTime) {
+        return {
+          status: 'closed',
+          salesOpen: false,
+          statusText: 'CERRADA',
+          minutesToStart: null,
+          nextSession: null
+        };
+      }
+
+      const minutesToStart = Math.floor(secondsToStart / 60);
+
+      // Determinar estado según tiempo restante
+      let status, salesOpen, statusText;
+      
+      if (minutesToStart > 5) {
+        // Más de 5 minutos: Habilitada
+        status = 'active';
+        salesOpen = true;
+        statusText = 'HABILITADA';
+      } else if (minutesToStart > 1) {
+        // 5-1 minutos: Ventas cerradas
+        status = 'sales_closed';
+        salesOpen = false;
+        statusText = 'VENTAS CERRADAS';
+      } else if (minutesToStart > 0) {
+        // 1 minuto o menos: Iniciando
+        status = 'starting';
+        salesOpen = false;
+        statusText = 'INICIANDO';
+      } else {
+        // 0 o negativo: debería estar sorteando o finalizando
+        status = 'starting';
+        salesOpen = false;
+        statusText = 'INICIANDO';
+      }
+
+      return {
+        status,
+        salesOpen,
+        statusText,
+        minutesToStart,
+        nextSession: nextTime.toISOString()
+      };
     };
 
     // Agrupar horarios por sala
@@ -359,15 +436,6 @@ exports.getLobbyData = async (req, res) => {
       schedulesByRoom[schedule.room].push(schedule);
     });
 
-    // Calcular próximos sorteos para cada sala
-    const nextSessionMap = {};
-    Object.keys(schedulesByRoom).forEach(room => {
-      const nextTime = getNextScheduledTime(schedulesByRoom[room]);
-      if (nextTime) {
-        nextSessionMap[room] = nextTime.toISOString();
-      }
-    });
-
     // Obtener configuración de premios de Starter (usar tabla directamente)
     const [starterConfig] = await pool.query(`
       SELECT prizes_linea, ticket_room_linea, prizes_bingo, ticket_room_bingo
@@ -376,23 +444,17 @@ exports.getLobbyData = async (req, res) => {
       LIMIT 1
     `);
 
-    // Obtener status actual de la sala Starter
+    // Obtener status actual de la sala Starter (priorizar 'playing')
     const [starterStatus] = await pool.query(`
-      SELECT status
+      SELECT status, id
       FROM game_sessions
-      WHERE room = 'free_starter'
+      WHERE room = 'starter'
         AND status IN ('active', 'playing', 'pending', 'waiting')
-      ORDER BY id DESC
+      ORDER BY 
+        CASE WHEN status = 'playing' THEN 0 ELSE 1 END,
+        id DESC
       LIMIT 1
     `);
-
-    // Determinar estado de Starter según lógica de negocio
-    let starterComputedStatus = 'closed';
-    if (starterStatus.length > 0 && starterStatus[0].status === 'playing') {
-      starterComputedStatus = 'playing'; // Sorteando
-    } else if (nextSessionMap['starter']) {
-      starterComputedStatus = 'active'; // Habilitada (hay próximo sorteo programado)
-    }
 
     // Usar premios de la configuración o valores por defecto
     const starterPrizes = starterConfig.length > 0 ? starterConfig[0] : {
@@ -401,6 +463,10 @@ exports.getLobbyData = async (req, res) => {
       prizes_bingo: 5,
       ticket_room_bingo: 'oro'
     };
+
+    // Calcular estado de Starter
+    const starterSessionStatus = starterStatus.length > 0 ? starterStatus[0].status : null;
+    const starterState = calculateRoomState(schedulesByRoom['starter'], starterSessionStatus);
 
     // Formatear respuesta para cada sala
     const lobbyData = {
@@ -416,34 +482,24 @@ exports.getLobbyData = async (req, res) => {
             room: starterPrizes.ticket_room_bingo
           }
         },
-        status: starterComputedStatus,
-        nextSession: nextSessionMap['starter'] || null
+        ...starterState,
+        sessionId: starterStatus.length > 0 ? starterStatus[0].id : null
       }
     };
 
     // Agregar datos de salas monetizadas
     moneyRooms.forEach(room => {
-      // Determinar estado correcto según lógica de negocio:
-      // - Si está 'playing' → Sorteando
-      // - Si tiene próxima sesión (pending/active) → Habilitada (se pueden comprar cartones)
-      // - Si no hay sesión → Cerrada
-      let computedStatus = 'closed';
-      
-      if (room.status === 'playing') {
-        computedStatus = 'playing'; // Sorteando
-      } else if (nextSessionMap[room.room]) {
-        computedStatus = 'active'; // Habilitada (hay próximo sorteo)
-      }
+      const roomState = calculateRoomState(schedulesByRoom[room.room], room.status);
 
       lobbyData[room.room] = {
         price: parseFloat(room.card_price),
         pots: {
           bingo: parseFloat(room.current_pot_bingo) || 0,
           line: parseFloat(room.current_pot_linea) || 0,
-          pre40: parseFloat(room.current_pot_jackpot) || 0
+          pre40: parseFloat(room.jackpot_pre40_accumulated) || 0
         },
-        status: computedStatus,
-        nextSession: nextSessionMap[room.room] || null
+        ...roomState,
+        sessionId: room.session_id || null
       };
     });
 

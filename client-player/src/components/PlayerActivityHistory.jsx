@@ -86,6 +86,7 @@ const PlayerActivityHistory = ({ onClose }) => {
 
   const getRoomName = (room) => {
     const names = {
+      'starter': 'Starter Gratis',
       'free_starter': 'Starter Gratis',
       'bronce': 'Bronce',
       'plata': 'Plata',

@@ -1,44 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { FaGift, FaTimes, FaCrown } from 'react-icons/fa';
-import axios from 'axios';
+import React from 'react';
+import { FaGift, FaTimes } from 'react-icons/fa';
 import uiSoundService from '../services/uiSoundService';
 import '../styles/PackageSelectionModal.css';
 
 const PackageSelectionModal = ({ onSelectPackage, onClose, roomTheme, currentCards = 0 }) => {
   const MAX_CARDS_TOTAL = 30; // Límite máximo de cartones totales (pagos + PLUS)
   const MAX_CARDS_PAID = 20;  // Límite máximo de cartones PAGOS (sin contar PLUS)
-
-  const [userMembership, setUserMembership] = useState(null);
-
-  useEffect(() => {
-    fetchUserMembership();
-  }, []);
-
-  const fetchUserMembership = async () => {
-    try {
-      const res = await axios.get('/api/memberships/my-subscription');
-      if (res.data.subscription && res.data.subscription.status === 'active') {
-        setUserMembership(res.data.subscription);
-      }
-    } catch (error) {
-      console.error('Error fetching membership:', error);
-    }
-  };
-
-  // Calculate VIP discount based on membership tier
-  const calculateVIPDiscount = (buyQuantity) => {
-    if (!userMembership?.benefits_config?.pack_bingo_bonus) return 0;
-
-    const { threshold, free_cards } = userMembership.benefits_config.pack_bingo_bonus;
-
-    // Only apply if quantity matches threshold exactly
-    if (buyQuantity === threshold) {
-      return free_cards;
-    }
-
-    return 0;
-  };
-
+  
   const packages = [
     {
       id: 'no-bonus',
@@ -84,7 +52,7 @@ const PackageSelectionModal = ({ onSelectPackage, onClose, roomTheme, currentCar
         <button className="close-btn" onClick={onClose}>
           <FaTimes />
         </button>
-
+        
         <h2 className="modal-title">PACK BINGO PLUS</h2>
         <p className="modal-subtitle">Elige cuántos cartones quieres y obtén gift cards PLUS gratis</p>
 
@@ -92,88 +60,66 @@ const PackageSelectionModal = ({ onSelectPackage, onClose, roomTheme, currentCar
           {packages.map((pkg) => {
             // Validar límite TOTAL (pagos + PLUS)
             const wouldExceedTotalLimit = (currentCards + pkg.total) > MAX_CARDS_TOTAL;
-
+            
             // Validar límite de COMPRA (solo cartones pagos, sin contar PLUS)
             // Asumimos que currentCards son los cartones que ya tiene (pueden incluir PLUS de compras anteriores)
             // pkg.buy es cuántos cartones PAGOS va a comprar ahora
             // El límite de compra es cuántos cartones PAGOS puede tener en total (20)
             const wouldExceedPaidLimit = (currentCards + pkg.buy) > MAX_CARDS_PAID;
-
+            
             const isDisabled = wouldExceedTotalLimit || wouldExceedPaidLimit;
             const remainingTotal = MAX_CARDS_TOTAL - currentCards;
             const remainingPaid = MAX_CARDS_PAID - currentCards;
-
+            
             let disabledReason = '';
             if (wouldExceedTotalLimit) {
               disabledReason = `Excede límite total de ${MAX_CARDS_TOTAL} cartones (${remainingTotal} espacios)`;
             } else if (wouldExceedPaidLimit) {
               disabledReason = `Excede límite de compra de ${MAX_CARDS_PAID} cartones (solo puedes comprar ${remainingPaid} más)`;
             }
-
+            
             return (
               <button
                 key={pkg.id}
                 className={`package-option animation-level-${pkg.animationLevel} ${isDisabled ? 'disabled' : ''}`}
-                id={pkg.id === 'no-bonus' ? 'btn-package-no-bonus' : undefined}
                 onClick={() => {
                   uiSoundService.playClick();
-                  if (!isDisabled) {
-                    const vipDiscount = calculateVIPDiscount(pkg.buy);
-                    onSelectPackage({
-                      ...pkg,
-                      vipDiscount: vipDiscount,
-                      actualCost: pkg.buy - vipDiscount // Lo que realmente paga
-                    });
-                  }
+                  !isDisabled && onSelectPackage(pkg);
                 }}
                 disabled={isDisabled}
                 title={isDisabled ? disabledReason : ''}
               >
-                <div className="package-content">
-                  <div className="package-header">
-                    <h3 className="package-title">{pkg.title}</h3>
-                    {pkg.bonus > 0 && (
-                      <div className="bonus-badge">
-                        <FaGift /> +{pkg.bonus}
-                      </div>
-                    )}
-                  </div>
-
-                  <p className="package-description">{pkg.description}</p>
-
+              <div className="package-content">
+                <div className="package-header">
+                  <h3 className="package-title">{pkg.title}</h3>
                   {pkg.bonus > 0 && (
-                    <div className="package-breakdown">
-                      <span className="buy-amount">{pkg.buy} para comprar</span>
-                      <span className="plus-sign">+</span>
-                      <span className="bonus-amount">{pkg.bonus} Gift Cards</span>
-                      <span className="equals-sign">=</span>
-                      <span className="total-amount">{pkg.total} total</span>
+                    <div className="bonus-badge">
+                      <FaGift /> +{pkg.bonus}
                     </div>
                   )}
-
-                  {(() => {
-                    const vipDiscount = calculateVIPDiscount(pkg.buy);
-                    if (vipDiscount > 0) {
-                      const chargedAmount = pkg.buy - vipDiscount;
-                      return (
-                        <div className="vip-bonus-badge">
-                          <FaCrown className="vip-icon" />
-                          <span>¡Bonificación VIP! Pagas {chargedAmount}, recibes {pkg.buy}</span>
-                        </div>
-                      );
-                    }
-                    return null;
-                  })()}
                 </div>
-
-                <div className="package-glow"></div>
-
-                {isDisabled && (
-                  <div className="package-disabled-overlay">
-                    <span>⚠️ {wouldExceedPaidLimit ? `Solo puedes comprar ${remainingPaid} más` : `Excede límite (${remainingTotal} espacios)`}</span>
+                
+                <p className="package-description">{pkg.description}</p>
+                
+                {pkg.bonus > 0 && (
+                  <div className="package-breakdown">
+                    <span className="buy-amount">{pkg.buy} para comprar</span>
+                    <span className="plus-sign">+</span>
+                    <span className="bonus-amount">{pkg.bonus} Gift Cards</span>
+                    <span className="equals-sign">=</span>
+                    <span className="total-amount">{pkg.total} total</span>
                   </div>
                 )}
-              </button>
+              </div>
+              
+              <div className="package-glow"></div>
+              
+              {isDisabled && (
+                <div className="package-disabled-overlay">
+                  <span>⚠️ {wouldExceedPaidLimit ? `Solo puedes comprar ${remainingPaid} más` : `Excede límite (${remainingTotal} espacios)`}</span>
+                </div>
+              )}
+            </button>
             );
           })}
         </div>

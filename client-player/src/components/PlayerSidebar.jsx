@@ -159,7 +159,7 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
   };
 
   const handleGoToLobby = () => {
-    navigate('/lobby');
+    navigate('/');
   };
 
   const handleSupport = () => {

@@ -200,24 +200,85 @@ exports.buyCard = async (req, res) => {
 exports.getPlayerCards = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { roomType, playDate } = req.query;
+    const { roomType, sessionId, includeArchived } = req.query;
 
-    let query = `SELECT id, serial_number, grid_numbers, room, price 
-                 FROM daily_stock_cards 
-                 WHERE buyer_id = ? AND status = 'sold'`;
+    // Obtener cartones del jugador - SOLO de sesiones activas (no completadas/canceladas)
+    // Los cartones de sesiones completadas van al historial
+    // Incluye is_gift para distinguir cartones pagos vs yapa/regalo
+    let query = `SELECT bcp.id, bcp.card_serial as serial_number, bcp.numbers as grid_numbers, 
+                        bcp.room, bcp.game_session_id, gs.status as session_status,
+                        bcp.is_gift
+                 FROM bingo_cards_pool bcp
+                 INNER JOIN game_sessions gs ON bcp.game_session_id = gs.id
+                 WHERE bcp.selected_by = ? AND bcp.status IN ('selected', 'sold')`;
     const params = [userId];
 
     if (roomType) {
-      query += ` AND room = ?`;
+      query += ` AND bcp.room = ?`;
       params.push(roomType);
     }
 
-    if (playDate) {
-      query += ` AND play_date = ?`;
-      params.push(playDate);
+    // Si se proporciona sessionId específico, filtrar por esa sesión
+    if (sessionId) {
+      query += ` AND bcp.game_session_id = ?`;
+      params.push(sessionId);
+    }
+    
+    // Por defecto, solo mostrar cartones de sesiones ACTIVAS (no archivadas)
+    // A menos que se solicite incluir archivados explícitamente
+    // Incluir 'closing' y 'starting' para que no desaparezcan en T-5 y T-1
+    // TAMBIÉN incluir 'completed' para sesiones que terminaron recientemente (período de gracia)
+    if (includeArchived !== 'true') {
+      // Incluir 'completed' para que los cartones no desaparezcan inmediatamente al terminar
+      // Usar updated_at en lugar de end_time (que no existe en la tabla)
+      query += ` AND (gs.status IN ('pending', 'open', 'active', 'playing', 'closing', 'starting')
+                 OR (gs.status = 'completed' AND gs.updated_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)))`;
     }
 
-    query += ` ORDER BY created_at DESC`;
+    query += ` ORDER BY bcp.selected_at DESC`;
+
+    const [result] = await pool.query(query, params);
+
+    // Contar cartones pagos (no yapa/regalo) para el límite de compra
+    const paidCards = result.filter(c => !c.is_gift).length;
+    const giftCards = result.filter(c => c.is_gift).length;
+
+    res.json({
+      cards: result,
+      total: result.length,
+      paidCards: paidCards,     // Cartones que cuentan para el límite
+      giftCards: giftCards      // Cartones de yapa/regalo (no cuentan)
+    });
+  } catch (error) {
+    console.error('Get player cards error:', error);
+    res.status(500).json({ error: 'Error obteniendo cartones' });
+  }
+};
+
+// HISTORIAL DE CARTONES - Cartones de sesiones completadas
+exports.getPlayerCardsHistory = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { roomType, limit = 50 } = req.query;
+
+    // Obtener cartones de sesiones COMPLETADAS (archivados)
+    let query = `SELECT bcp.id, bcp.card_serial as serial_number, bcp.numbers as grid_numbers, 
+                        bcp.room, bcp.game_session_id, gs.status as session_status,
+                        gs.start_time as session_date, gs.end_time
+                 FROM bingo_cards_pool bcp
+                 INNER JOIN game_sessions gs ON bcp.game_session_id = gs.id
+                 WHERE bcp.selected_by = ? 
+                   AND bcp.status IN ('selected', 'sold', 'used')
+                   AND gs.status IN ('completed', 'cancelled')`;
+    const params = [userId];
+
+    if (roomType) {
+      query += ` AND bcp.room = ?`;
+      params.push(roomType);
+    }
+
+    query += ` ORDER BY gs.end_time DESC LIMIT ?`;
+    params.push(parseInt(limit));
 
     const [result] = await pool.query(query, params);
 
@@ -226,8 +287,8 @@ exports.getPlayerCards = async (req, res) => {
       total: result.length
     });
   } catch (error) {
-    console.error('Get player cards error:', error);
-    res.status(500).json({ error: 'Error obteniendo cartones' });
+    console.error('Get player cards history error:', error);
+    res.status(500).json({ error: 'Error obteniendo historial de cartones' });
   }
 };
 
@@ -415,14 +476,14 @@ exports.buyCardFree = async (req, res) => {
 
     const card = cardResult[0];
 
-    if (card.room !== 'free_starter') {
+    if (card.room !== 'starter') {
       return res.status(400).json({ error: 'Este cartón no es de sala gratis' });
     }
 
     // Verificar límite de 20 cartones
     const [countResult] = await pool.query(
       `SELECT COUNT(*) as count FROM daily_stock_cards 
-       WHERE buyer_id = ? AND play_date = ? AND room = 'free_starter'`,
+       WHERE buyer_id = ? AND play_date = ? AND room = 'starter'`,
       [userId, playDate]
     );
 
@@ -447,7 +508,7 @@ exports.buyCardFree = async (req, res) => {
       await connection.query(
         `INSERT INTO audit_revenue (player_id, amount, transaction_type)
          VALUES (?, ?, ?)`,
-        [userId, 0, 'free_starter_card']
+        [userId, 0, 'starter_card']
       );
 
       await connection.query('COMMIT');
@@ -493,7 +554,7 @@ exports.claimFreePrize = async (req, res) => {
       return res.status(404).json({ error: 'Sesión no encontrada' });
     }
 
-    if (sessionResult[0].room !== 'free_starter') {
+    if (sessionResult[0].room !== 'starter') {
       return res.status(400).json({ error: 'Esta sesión no es Sala Starter' });
     }
 
@@ -568,7 +629,7 @@ exports.end_free_game = async (req, res) => {
       // ====== Validar que sea Sala Starter (19:00) ======
       const [sessionResult] = await connection.query(
         `SELECT id, room, status FROM game_sessions 
-         WHERE id = ? AND room = 'free_starter'`,
+         WHERE id = ? AND room = 'starter'`,
         [gameSessionId]
       );
 
@@ -1283,7 +1344,7 @@ exports.getMyCardsAnalysis = async (req, res) => {
     // Obtener cartones del usuario en esta sesión
     const [cards] = await pool.query(
       `SELECT * FROM bingo_cards 
-       WHERE user_id = ? AND session_id = ? AND status = 'active'
+       WHERE user_id = ? AND game_session_id = ? AND status = 'active'
        ORDER BY id ASC`,
       [userId, gameSessionId]
     );
@@ -1486,6 +1547,7 @@ exports.getMyCardInventory = async (req, res) => {
 
 /**
  * VERIFICAR ESTADO DE VENTAS PARA UNA SALA
+ * Centralizado usando schedule_settings como fuente de verdad
  * Retorna si las ventas están abiertas o cerradas (5 min antes del sorteo)
  */
 exports.getSalesStatus = async (req, res) => {
@@ -1496,66 +1558,212 @@ exports.getSalesStatus = async (req, res) => {
       return res.status(400).json({ error: 'Parámetro room requerido' });
     }
 
-    // Buscar próxima sesión pendiente para esta sala
-    const [sessions] = await pool.query(
-      `SELECT id, start_time, status FROM game_sessions 
-       WHERE room = ? AND status IN ('pending', 'active')
-       ORDER BY start_time ASC LIMIT 1`,
-      [room]
+    // Normalizar nombre de sala
+    const roomMap = {
+      'starter': 'starter',
+      'free_starter': 'starter',
+      'bronze': 'bronce',
+      'bronce': 'bronce',
+      'silver': 'plata',
+      'plata': 'plata',
+      'gold': 'oro',
+      'oro': 'oro'
+    };
+    const normalizedRoom = roomMap[room.toLowerCase()] || room;
+
+    // Verificar si hay sesión activa en playing
+    const [activeSessions] = await pool.query(
+      `SELECT id, status FROM game_sessions 
+       WHERE room = ? AND status = 'playing'
+       LIMIT 1`,
+      [normalizedRoom]
     );
 
-    if (sessions.length === 0) {
-      // No hay sesión programada - ventas cerradas
-      return res.json({
-        salesOpen: false,
-        reason: 'NO_SESSION',
-        message: 'No hay sorteo programado',
-        nextSession: null
-      });
-    }
-
-    const session = sessions[0];
-    const startTime = new Date(session.start_time);
-    const now = new Date();
-    const minutesUntilStart = (startTime - now) / (1000 * 60);
-
-    // Si el sorteo ya está activo - ventas cerradas
-    if (session.status === 'active') {
+    if (activeSessions.length > 0) {
       return res.json({
         salesOpen: false,
         reason: 'GAME_IN_PROGRESS',
         message: 'Sorteo en curso',
-        nextSession: startTime.toISOString(),
-        sessionId: session.id
+        status: 'playing',
+        sessionId: activeSessions[0].id
       });
     }
 
-    // Si faltan 5 minutos o menos - ventas cerradas
-    if (minutesUntilStart >= 0 && minutesUntilStart <= 5) {
-      const minutesLeft = Math.ceil(minutesUntilStart);
+    // Obtener horarios programados desde schedule_settings
+    const [schedules] = await pool.query(`
+      SELECT day_of_week, hour
+      FROM schedule_settings
+      WHERE room = ? AND is_active = 1
+      ORDER BY day_of_week, hour
+    `, [normalizedRoom]);
+
+    if (schedules.length === 0) {
+      return res.json({
+        salesOpen: false,
+        reason: 'NO_SCHEDULE',
+        message: 'No hay sorteos programados',
+        status: 'closed',
+        nextSession: null
+      });
+    }
+
+    // Calcular próximo sorteo basado en schedule_settings
+    const now = new Date();
+    const currentDay = now.getDay();
+    const currentTime = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+
+    let nextTime = null;
+    let minDiff = Infinity;
+
+    schedules.forEach(schedule => {
+      const [hour, minute, second] = schedule.hour.split(':').map(Number);
+      const scheduleTime = hour * 3600 + minute * 60 + (second || 0);
+      
+      let dayDiff = schedule.day_of_week - currentDay;
+      let timeDiff = scheduleTime - currentTime;
+
+      if (dayDiff === 0 && timeDiff <= 0) {
+        dayDiff = 7;
+      }
+      
+      if (dayDiff < 0) {
+        dayDiff += 7;
+      }
+
+      const totalDiff = dayDiff * 86400 + timeDiff;
+
+      if (totalDiff > 0 && totalDiff < minDiff) {
+        minDiff = totalDiff;
+        const nextDate = new Date(now);
+        nextDate.setDate(nextDate.getDate() + dayDiff);
+        nextDate.setHours(hour, minute, second || 0, 0);
+        nextTime = nextDate;
+      }
+    });
+
+    if (!nextTime) {
+      return res.json({
+        salesOpen: false,
+        reason: 'NO_NEXT_SESSION',
+        message: 'No hay próximo sorteo',
+        status: 'closed',
+        nextSession: null
+      });
+    }
+
+    const minutesToStart = Math.floor(minDiff / 60);
+
+    // Determinar estado según tiempo restante
+    if (minutesToStart > 5) {
+      // Más de 5 minutos: Ventas abiertas
+      return res.json({
+        salesOpen: true,
+        reason: 'OPEN',
+        message: 'Ventas abiertas',
+        status: 'active',
+        minutesToStart,
+        minutesUntilClose: minutesToStart - 5,
+        nextSession: nextTime.toISOString()
+      });
+    } else if (minutesToStart > 1) {
+      // 5-1 minutos: Ventas cerradas
       return res.json({
         salesOpen: false,
         reason: 'CLOSING_SOON',
-        message: `Ventas cerradas - El sorteo comienza en ${minutesLeft} min`,
-        minutesLeft,
-        nextSession: startTime.toISOString(),
-        sessionId: session.id
+        message: `Ventas cerradas - El sorteo comienza en ${minutesToStart} min`,
+        status: 'sales_closed',
+        minutesToStart,
+        minutesLeft: minutesToStart,
+        nextSession: nextTime.toISOString()
+      });
+    } else {
+      // 1 minuto o menos: Iniciando
+      return res.json({
+        salesOpen: false,
+        reason: 'STARTING',
+        message: 'El sorteo está por comenzar',
+        status: 'starting',
+        minutesToStart,
+        nextSession: nextTime.toISOString()
       });
     }
-
-    // Ventas abiertas
-    return res.json({
-      salesOpen: true,
-      reason: 'OPEN',
-      message: 'Ventas abiertas',
-      minutesUntilClose: Math.floor(minutesUntilStart - 5),
-      nextSession: startTime.toISOString(),
-      sessionId: session.id
-    });
 
   } catch (error) {
     console.error('[GameController] Error obteniendo estado de ventas:', error);
     res.status(500).json({ error: 'Error obteniendo estado de ventas' });
+  }
+};
+
+/**
+ * GET /game/room-status/:room
+ * Obtiene el ID de la sesión activa para una sala (closing, starting, playing, o pending)
+ * Usado por GameRoom.jsx para obtener cartones del usuario
+ */
+exports.getRoomStatus = async (req, res) => {
+  try {
+    const { room } = req.params;
+    
+    // Mapear room del frontend al room de la BD
+    const roomMap = {
+      'starter': 'starter',
+      'free_starter': 'starter',
+      'bronze': 'bronce',
+      'bronce': 'bronce',
+      'silver': 'plata',
+      'plata': 'plata',
+      'gold': 'oro',
+      'oro': 'oro'
+    };
+    
+    const dbRoom = roomMap[room] || room;
+    
+    // Buscar sesión activa (priorizar playing > starting > closing > pending)
+    const [sessions] = await pool.query(`
+      SELECT id, room, status, start_time, 
+             current_pot_bingo, current_pot_linea, current_pot_jackpot
+      FROM game_sessions 
+      WHERE room = ? AND status IN ('playing', 'starting', 'closing', 'pending', 'active')
+      ORDER BY 
+        CASE status 
+          WHEN 'playing' THEN 1 
+          WHEN 'active' THEN 2
+          WHEN 'starting' THEN 3 
+          WHEN 'closing' THEN 4 
+          WHEN 'pending' THEN 5 
+        END,
+        start_time ASC
+      LIMIT 1
+    `, [dbRoom]);
+    
+    if (sessions.length === 0) {
+      return res.json({
+        success: false,
+        message: 'No hay sesión activa para esta sala',
+        sessionId: null
+      });
+    }
+    
+    const session = sessions[0];
+    
+    res.json({
+      success: true,
+      sessionId: session.id,
+      room: session.room,
+      status: session.status,
+      startTime: session.start_time,
+      pots: {
+        bingo: parseFloat(session.current_pot_bingo || 0),
+        linea: parseFloat(session.current_pot_linea || 0),
+        jackpot: parseFloat(session.current_pot_jackpot || 0)
+      }
+    });
+    
+  } catch (error) {
+    console.error('[GameController] Error obteniendo estado de sala:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Error obteniendo estado de sala' 
+    });
   }
 };
 
@@ -1570,8 +1778,8 @@ exports.getLiveDraw = async (req, res) => {
     
     // Mapear room del frontend al room de la BD
     const roomMap = {
-      'starter': 'free_starter',
-      'free_starter': 'free_starter',
+      'starter': 'starter',
+      'free_starter': 'starter',
       'bronze': 'bronce',
       'bronce': 'bronce',
       'silver': 'plata',
@@ -1649,11 +1857,11 @@ exports.getLiveDraw = async (req, res) => {
       );
       
       if (activeSession.length === 0) {
-        // Buscar próxima sesión pendiente
+        // Buscar próxima sesión pendiente (incluir closing y starting)
         const [pendingSession] = await pool.query(
-          `SELECT id, room, start_time, current_pot_linea, current_pot_bingo, current_pot_jackpot
+          `SELECT id, room, status, start_time, current_pot_linea, current_pot_bingo, current_pot_jackpot
            FROM game_sessions
-           WHERE room = ? AND status = 'pending'
+           WHERE room = ? AND status IN ('pending', 'closing', 'starting')
            ORDER BY start_time ASC
            LIMIT 1`,
           [dbRoom]
@@ -1663,6 +1871,7 @@ exports.getLiveDraw = async (req, res) => {
           isActive: false,
           room: dbRoom,
           message: 'No hay sorteo activo en esta sala',
+          salesClosed: pendingSession.length > 0 && pendingSession[0].status === 'closing',
           nextSession: pendingSession.length > 0 ? {
             sessionId: pendingSession[0].id,
             startTime: pendingSession[0].start_time,
@@ -1730,5 +1939,115 @@ exports.getLiveDraw = async (req, res) => {
   } catch (error) {
     console.error('[GameController] Error obteniendo sorteo en vivo:', error);
     res.status(500).json({ success: false, error: 'Error obteniendo estado del sorteo' });
+  }
+};
+
+/**
+ * GET /api/game/history/:room
+ * Obtiene el historial de sesiones completadas de una sala
+ * PÚBLICO - para transparencia y verificación de resultados
+ */
+exports.getSessionHistoryByRoom = async (req, res) => {
+  try {
+    const { room } = req.params;
+    const { limit = 20, page = 1 } = req.query;
+    
+    // Validar sala
+    const validRooms = ['starter', 'bronce', 'plata', 'oro'];
+    const normalizedRoom = room === 'free_starter' ? 'starter' : room;
+    
+    if (!validRooms.includes(normalizedRoom)) {
+      return res.status(400).json({
+        success: false,
+        message: `Sala inválida. Salas válidas: ${validRooms.join(', ')}`
+      });
+    }
+    
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    
+    // Obtener historial de sesiones completadas
+    const [sessions] = await pool.query(`
+      SELECT 
+        gs.id as game_session_id,
+        gs.room,
+        gs.start_time,
+        gs.status,
+        gs.current_pot_linea as prize_linea,
+        gs.current_pot_bingo as prize_bingo,
+        gs.current_pot_jackpot as prize_jackpot,
+        gs.linea_ball_number,
+        gs.linea_ball_index,
+        gs.bingo_ball_number,
+        gs.bingo_ball_index,
+        gs.total_cards_validated as total_cards,
+        (SELECT COUNT(DISTINCT gsb.id) FROM game_session_balls gsb WHERE gsb.game_session_id = gs.id) as total_balls
+      FROM game_sessions gs
+      WHERE gs.room = ? 
+        AND gs.status IN ('completed', 'finished')
+      ORDER BY gs.start_time DESC
+      LIMIT ? OFFSET ?
+    `, [normalizedRoom, parseInt(limit), offset]);
+    
+    // Para cada sesión, obtener ganadores
+    const sessionsWithDetails = await Promise.all(sessions.map(async (session) => {
+      // Obtener ganadores
+      const [winners] = await pool.query(`
+        SELECT 
+          gw.prize_type,
+          gw.prize_amount,
+          u.username as winner_username,
+          gw.line_type,
+          gw.winning_numbers
+        FROM game_winners gw
+        LEFT JOIN users u ON gw.user_id = u.id
+        WHERE gw.game_session_id = ?
+        ORDER BY gw.prize_type DESC
+      `, [session.game_session_id]);
+      
+      // Contar cartones participantes
+      const [cardCount] = await pool.query(`
+        SELECT COUNT(*) as count FROM bingo_cards WHERE game_session_id = ?
+      `, [session.game_session_id]);
+      
+      return {
+        ...session,
+        total_cards: cardCount[0]?.count || session.total_cards || 0,
+        winners: winners.map(w => ({
+          type: w.prize_type,
+          username: w.winner_username || 'Anónimo',
+          amount: parseFloat(w.prize_amount) || 0,
+          lineType: w.line_type,
+          winningNumbers: w.winning_numbers ? JSON.parse(w.winning_numbers) : []
+        })),
+        lineWinner: winners.find(w => w.prize_type === 'linea')?.winner_username || null,
+        bingoWinner: winners.find(w => w.prize_type === 'bingo')?.winner_username || null
+      };
+    }));
+    
+    // Contar total para paginación
+    const [totalCount] = await pool.query(`
+      SELECT COUNT(*) as total 
+      FROM game_sessions 
+      WHERE room = ? AND status IN ('completed', 'finished')
+    `, [normalizedRoom]);
+    
+    res.json({
+      success: true,
+      room: normalizedRoom,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: totalCount[0]?.total || 0,
+        totalPages: Math.ceil((totalCount[0]?.total || 0) / parseInt(limit))
+      },
+      sessions: sessionsWithDetails
+    });
+    
+  } catch (error) {
+    console.error('[GameController] Error obteniendo historial:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error obteniendo historial de sesiones' 
+    });
   }
 };

@@ -12,6 +12,7 @@ import BingoCardPreview from './BingoCardPreview';
 import Countdown from './Countdown';
 import useLiveDraw from '../hooks/useLiveDraw';
 import SessionHistory from './SessionHistory';
+import ConnectionIndicator from './ConnectionIndicator';
 
 export default function StarterRoom({ onLogout }) {
   const { sessionId } = useParams();
@@ -26,11 +27,13 @@ export default function StarterRoom({ onLogout }) {
     prizes: livePrizes,
     lineWinnersPaid,
     bingoWinnersPaid,
+    iAmTheLineWinner,  // NUEVO: ¡YO soy el ganador de línea!
+    iAmTheBingoWinner, // NUEVO: ¡YO soy el ganador de bingo!
     isLoading: liveDrawLoading,
     setBallsDrawn,
     setCurrentBall,
     setGameStatus
-  } = useLiveDraw('free_starter');
+  } = useLiveDraw('starter');
   
   const [lastBall, setLastBall] = useState(null);
   const [previousGameStatus, setPreviousGameStatus] = useState('waiting'); // Para detectar cambios
@@ -62,6 +65,10 @@ const [cardWinningLines, setCardWinningLines] = useState({}); // {cardId: [0,1,2
   const [showReadyModal, setShowReadyModal] = useState(false); // Modal "¡¡Todo Listo!!"
   const [showHistoryModal, setShowHistoryModal] = useState(false); // Modal de historial de sorteos
   const [isModalClosing, setIsModalClosing] = useState(false); // Estado de animación fade-out
+  const [showLateEntryModal, setShowLateEntryModal] = useState(false); // Modal info para entrada tardía
+  const [lateEntryChecked, setLateEntryChecked] = useState(false); // Evitar mostrar múltiples veces
+  const [showLateBingoModal, setShowLateBingoModal] = useState(false); // Modal info BINGO tardío
+  const [lateBingoChecked, setLateBingoChecked] = useState(false); // Evitar mostrar múltiples veces
 
   // Auto-cerrar modal "¡¡Todo Listo!!" después de 5 segundos con fade-out
   useEffect(() => {
@@ -92,6 +99,47 @@ const [cardWinningLines, setCardWinningLines] = useState({}); // {cardId: [0,1,2
       setShowReadyModal(true);
     }
   }, [selectedPlayerCards.length]);
+
+  // Detectar entrada tardía: Si el jugador entra cuando ya se pagó línea Y NO fue el ganador
+  // IMPORTANTE: Solo mostrar si el usuario NO es el ganador (verificar via Socket.IO)
+  useEffect(() => {
+    // Solo mostrar modal de "otro jugador ganó" si:
+    // 1. lineWinnersPaid es true (el servidor ya pagó línea)
+    // 2. YO NO SOY el ganador (iAmTheLineWinner es false)
+    // 3. El usuario NO celebró su propia línea localmente
+    // 4. No hay cartones ganadores detectados localmente
+    // 5. El juego está activo
+    const userDidNotWin = !iAmTheLineWinner && celebratedCardIds.length === 0 && winnerCards.length === 0;
+    
+    if (lineWinnersPaid && !lateEntryChecked && gameStatus === 'active' && userDidNotWin) {
+      setLateEntryChecked(true);
+      setShowLateEntryModal(true);
+      setLineCelebrated(true); // Marcar línea como ya celebrada para no detectar más
+      
+      // Auto-cerrar modal después de 5 segundos
+      const timer = setTimeout(() => {
+        setShowLateEntryModal(false);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [lineWinnersPaid, lateEntryChecked, gameStatus, celebratedCardIds.length, winnerCards.length, iAmTheLineWinner]);
+
+  // Detectar entrada tardía BINGO: Si el jugador entra cuando ya se pagó BINGO y NO fue el ganador
+  useEffect(() => {
+    // Solo mostrar modal de "otro ganó BINGO" si YO NO soy el ganador
+    if (bingoWinnersPaid && !lateBingoChecked && !iAmTheBingoWinner) {
+      setLateBingoChecked(true);
+      setShowLateBingoModal(true);
+      setBingoCelebrated(true);
+      
+      // Auto-cerrar modal después de 5 segundos y redirigir al lobby
+      const timer = setTimeout(() => {
+        setShowLateBingoModal(false);
+        window.location.href = '/';
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [bingoWinnersPaid, lateBingoChecked, iAmTheBingoWinner]);
   
   // Estados para mejoras visuales
   const [toasts, setToasts] = useState([]); // Notificaciones toast
@@ -118,7 +166,7 @@ celebrationAudio.volume = 0.7;
     const checkSalesStatus = async () => {
       try {
         const response = await fetch('/api/game/sales-status/starter', {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('playerToken') || localStorage.getItem('token')}` }
         });
         
         if (response.ok) {
@@ -165,7 +213,9 @@ celebrationAudio.volume = 0.7;
           if (cachedCards && cachedCards.length > 0) {
             console.log('📦 Cartones recuperados de localStorage:', cachedCards.length);
             setSelectedPlayerCards(cachedCards);
-            setCardsRemaining(20 - cachedCards.length);
+            // Para Starter, todos los cartones son gratis, pero igual aplicamos consistencia
+            const paidCards = cachedCards.filter(c => !c.isGift).length;
+            setCardsRemaining(20 - paidCards);
           }
         } catch (e) {
           console.log('Error parseando cache, ignorando');
@@ -175,7 +225,7 @@ celebrationAudio.volume = 0.7;
       // 2. Luego verificar con el servidor (fuente de verdad)
       try {
         const response = await fetch(`/api/game/starter/my-cards/${activeSessionId}`, {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('playerToken') || localStorage.getItem('token')}` }
         });
         
         if (response.ok) {
@@ -186,11 +236,16 @@ celebrationAudio.volume = 0.7;
             id: c.id,
             serial: c.serial,
             hasSerial: !!c.serial,
-            hasNumbers: !!c.numbers
+            hasNumbers: !!c.numbers,
+            isGift: c.isGift
           })));
           
           setSelectedPlayerCards(currentCards);
-          const remaining = 20 - currentCards.length;
+          // IMPORTANTE: Solo contar cartones PAGOS para el límite de 20
+          // Los cartones de yapa/regalo NO cuentan para el límite
+          // Nota: En Starter, la sala es gratis pero igual aplica el límite
+          const paidCards = data.paidCards !== undefined ? data.paidCards : currentCards.filter(c => !c.isGift).length;
+          const remaining = 20 - paidCards;
           setCardsRemaining(remaining);
           
           // Guardar en localStorage para persistencia
@@ -199,7 +254,7 @@ celebrationAudio.volume = 0.7;
             console.log('💾 Cartones guardados en localStorage');
           }
           
-          console.log(`✅ Sala Starter: ${currentCards.length} cartones cargados, ${remaining} restantes (máx 20)`);
+          console.log(`✅ Sala Starter: ${paidCards} cartones PAGOS (${currentCards.length} total), ${remaining} restantes (máx 20)`);
         }
       } catch (error) {
         console.error('❌ Error cargando cartones:', error);
@@ -955,6 +1010,68 @@ useEffect(() => {
   </div>
 )}
 
+          {/* MODAL INFORMATIVO: Entrada tardía - Línea ya fue ganada */}
+          {showLateEntryModal && (
+            <div className="winner-celebration-overlay" style={{ backgroundColor: 'rgba(0,0,0,0.85)' }}>
+              <div className="celebration-content" style={{ maxWidth: '400px' }}>
+                <div style={{ fontSize: '48px', marginBottom: '16px' }}>ℹ️</div>
+                <h2 style={{ color: '#4ade80', marginBottom: '12px' }}>Premio de Línea Ya Otorgado</h2>
+                <p style={{ color: '#fff', fontSize: '16px', lineHeight: '1.5' }}>
+                  El premio de LÍNEA ya fue ganado por otro jugador. 
+                  <br /><br />
+                  ¡Pero aún puedes ganar el <strong style={{ color: '#4ade80' }}>BINGO</strong>!
+                </p>
+                <button 
+                  onClick={() => setShowLateEntryModal(false)}
+                  style={{
+                    marginTop: '20px',
+                    padding: '12px 32px',
+                    backgroundColor: '#4ade80',
+                    color: '#000',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '16px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Entendido
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* MODAL INFORMATIVO: Entrada tardía - BINGO ya fue ganado */}
+          {showLateBingoModal && (
+            <div className="winner-celebration-overlay" style={{ backgroundColor: 'rgba(0,0,0,0.95)' }}>
+              <div className="celebration-content" style={{ maxWidth: '400px' }}>
+                <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎰</div>
+                <h2 style={{ color: '#4ade80', marginBottom: '12px' }}>Sorteo Finalizado</h2>
+                <p style={{ color: '#fff', fontSize: '16px', lineHeight: '1.5' }}>
+                  El <strong style={{ color: '#4ade80' }}>BINGO</strong> ya fue ganado por otro jugador.
+                  <br /><br />
+                  Serás redirigido al lobby en unos segundos...
+                </p>
+                <button 
+                  onClick={() => { setShowLateBingoModal(false); window.location.href = '/'; }}
+                  style={{
+                    marginTop: '20px',
+                    padding: '12px 32px',
+                    backgroundColor: '#4ade80',
+                    color: '#000',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '16px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Ir al Lobby
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* CELEBRACIÓN DE LÍNEA GANADORA - Usa el cartón de la grilla con números marcados */}
           {winnerCards.length > 0 && !bingoWinnerCard && (
   <div className="winner-celebration-overlay">
@@ -1189,6 +1306,7 @@ useEffect(() => {
                 {gameStatus === 'active' && '🔴 EN VIVO'}
                 {gameStatus === 'ended' && '✅ FINALIZADO'}
               </div>
+              <ConnectionIndicator showLabel={false} />
             </div>
           </div>
 
@@ -1263,8 +1381,18 @@ useEffect(() => {
             {/* Mensaje de espera cuando no hay cartones disponibles */}
             {gameStatus === 'waiting' && cardsRemaining === 0 && !salesClosed && (
               <div className="waiting-message">
-                <div className="waiting-icon">⏳</div>
-                <div className="waiting-text">Esperando inicio...</div>
+                {selectedPlayerCards.length > 0 ? (
+                  <>
+                    <div className="waiting-icon">✅</div>
+                    <div className="waiting-text">¡{selectedPlayerCards.length}/20 Cartones!</div>
+                    <div className="waiting-subtext">Esperando inicio del sorteo...</div>
+                  </>
+                ) : (
+                  <>
+                    <div className="waiting-icon">⏳</div>
+                    <div className="waiting-text">Esperando inicio...</div>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -1519,7 +1647,7 @@ useEffect(() => {
             <p className="ready-modal-subtitle">Tienes {selectedPlayerCards.length} cartones listos para jugar</p>
             <div className="ready-modal-countdown">
               <p className="ready-modal-countdown-label">Próximo Sorteo en:</p>
-              <Countdown targetDate={nextDrawTime} />
+              <Countdown targetDate={nextSessionTime} />
             </div>
           </div>
         </div>

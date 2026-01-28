@@ -52,7 +52,7 @@ export default function StackedBingoCards({ gameSessionId, socket, onCardSelect 
     }
 
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
       const response = await fetch(
         `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/game/my-cards-analysis/${gameSessionId}`,
         {

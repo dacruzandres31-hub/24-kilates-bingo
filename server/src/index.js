@@ -102,6 +102,14 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Heartbeat para detectar conexiones zombie
+  socket.on('ping_heartbeat', (data) => {
+    socket.emit('pong_heartbeat', { 
+      timestamp: Date.now(),
+      clientTimestamp: data?.timestamp 
+    });
+  });
+
   // Eventos del juego
   socket.on('join_game', (data) => {
     const roomName = `game_${data.room}`;

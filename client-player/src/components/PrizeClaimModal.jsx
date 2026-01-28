@@ -71,7 +71,7 @@ export default function PrizeClaimModal({
       setLoading(true);
       setError(null);
 
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
 
       const { data } = await axios.post(
         `${API_URL}/api/withdrawals/request`,

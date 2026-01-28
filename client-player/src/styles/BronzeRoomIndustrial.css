@@ -1,6 +1,6 @@
-﻿/* ============================================
-   SALA STARTER - NEÃ“N, ENERGÃA, ARCADE MODERNO
-   Paleta: Cian ElÃ©ctrico, Violeta NeÃ³n, Negro Profundo
+/* ============================================
+   SALA STARTER - NEÓN, ENERGÍA, ARCADE MODERNO
+   Paleta: Cian Eléctrico, Violeta Neón, Negro Profundo
    ============================================ */
 
 .bronze-room {
@@ -74,7 +74,7 @@
   }
 }
 
-/* Cortinilla de transiciÃ³n waiting â†’ active */
+/* Cortinilla de transición waiting → active */
 .transition-curtain {
   position: fixed;
   inset: 0;
@@ -144,7 +144,7 @@
 }
 
 /* ============================================
-   CELEBRACIÃ“N DE LÃNEA GANADORA
+   CELEBRACIÓN DE LÍNEA GANADORA
    ============================================ */
 
 .winner-celebration-overlay {
@@ -318,7 +318,7 @@
   }
 }
 
-/* Estilos para el cartÃ³n en el modal de celebraciÃ³n */
+/* Estilos para el cartón en el modal de celebración */
 .celebration-card-expanded {
   margin: 30px auto;
   max-width: 700px;
@@ -377,7 +377,7 @@
   text-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
 }
 
-/* LÃ­nea resaltada en dorado */
+/* Línea resaltada en dorado */
 .celebration-card-expanded .card-cell.highlighted-line {
   background: linear-gradient(135deg, #ff6600 0%, #ff6600 100%);
   border: 3px solid #ff6600;
@@ -406,11 +406,11 @@
 }
 
 /* ============================================
-   ALERTA DE CASI LÃNEA
+   ALERTA DE CASI LÍNEA
    ============================================ */
 
 /* ============================================
-   ALERTA DE CASI LÃNEA - COMPACTA
+   ALERTA DE CASI LÍNEA - COMPACTA
    ============================================ */
 
 .compact-line-alert {
@@ -754,7 +754,7 @@
   }
 }
 
-/* Tag de precio del cartÃ³n */
+/* Tag de precio del cartón */
 .card-price-tag {
   display: flex;
   flex-direction: column;
@@ -998,7 +998,7 @@
 }
 
 /* ============================================
-   CUADRÃCULA DIGITAL (IZQUIERDA) - 3x3 LAYOUT
+   CUADRÍCULA DIGITAL (IZQUIERDA) - 3x3 LAYOUT
    ============================================ */
 
 .digital-grid-full {
@@ -1145,7 +1145,7 @@
   }
 }
 
-/* Barra de Ãºltimas bolas */
+/* Barra de últimas bolas */
 .recent-balls-bar {
   margin-top: 12px;
   padding: 10px;
@@ -1171,16 +1171,7 @@
 }
 
 .recent-ball-chip {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 0.8rem;
-  color: #000;
-  border: 2px solid rgba(255, 102, 0, 0.9);
+  /* Base - los estilos espec�ficos vienen de .bingo-ball-mini */
   animation: recentBallPop 0.4s ease-out;
 }
 
@@ -1211,8 +1202,64 @@
 }
 
 /* ============================================
-   CUADRÃCULA DIGITAL ANTIGUA (BACKUP)
+   CUADRÍCULA DIGITAL ANTIGUA (BACKUP)
    ============================================ */
+
+/* Estilos para mini bolillas de últimas bolas */
+.bingo-ball-mini {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+/* Centro blanco para bola grande del bolillero */
+.ball-white-center {
+  width: 70%;
+  height: 70%;
+  background: radial-gradient(circle at 40% 40%, #ffffff, #f0f0f0);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.ball-white-center .ball-number-large {
+  font-size: 3.5rem;
+  font-weight: 900;
+  color: #000000;
+  text-shadow: none;
+  line-height: 1;
+}
+
+.ball-white-center-mini {
+  width: 65%;
+  height: 65%;
+  background: radial-gradient(circle at 40% 40%, #ffffff, #f0f0f0);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 1px 5px rgba(0,0,0,0.1);
+}
+
+.ball-white-center-mini .ball-number {
+  font-size: 1rem !important;
+  font-weight: 900 !important;
+  color: #000000 !important;
+  text-shadow: none !important;
+  line-height: 1 !important;
+  width: auto !important;
+  height: auto !important;
+  background: none !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+}
 
 .digital-grid {
   background: rgba(0, 0, 0, 0.6);
@@ -1380,69 +1427,6 @@
   }
 }
 
-/* Barra de Ãºltimas bolas */
-.recent-balls-bar {
-  margin-top: 4px;
-  padding: 6px 10px;
-  background: rgba(0, 0, 0, 0.8);
-  border: 2px solid rgba(255, 102, 0, 0.3);
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.recent-label {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: #ff6600;
-  letter-spacing: 2px;
-  text-shadow: 0 0 10px rgba(255, 102, 0, 0.6);
-}
-
-.recent-balls-list {
-  display: flex;
-  gap: 8px;
-  flex: 1;
-}
-
-.recent-ball-chip {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 12px;
-  border-radius: 20px;
-  font-weight: 900;
-  color: #000;
-  font-size: 0.85rem;
-  animation: chip-slide-in 0.4s ease-out;
-}
-
-@keyframes chip-slide-in {
-  0% {
-    transform: translateX(-20px);
-    opacity: 0;
-  }
-
-  100% {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-.ball-letter {
-  font-size: 0.9rem;
-  font-weight: 700;
-}
-
-.ball-number {
-  font-size: 1rem;
-  font-weight: 900;
-}
-
-/* ============================================
-   SECCIÃ“N DERECHA - TÃTULO + INFO + BOLILLERO
-   ============================================ */
 
 .right-section {
   flex: 0 0 50%;
@@ -1605,26 +1589,37 @@
   }
 }
 
-/* Esfera de AcrÃ­lico Transparente */
+/* Esfera de Acrílico Transparente */
 .acrylic-sphere {
   width: 240px;
   height: 240px;
   border-radius: 50%;
-  background:
-    radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.3), transparent 50%),
-    radial-gradient(circle at 70% 70%, rgba(255, 102, 0, 0.15), transparent);
-  backdrop-filter: blur(15px) saturate(200%);
-  -webkit-backdrop-filter: blur(15px) saturate(200%);
+  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.1), transparent 50%);
   border: 4px solid rgba(255, 102, 0, 0.5);
   box-shadow:
     0 0 60px rgba(255, 102, 0, 0.6),
-    0 0 100px rgba(255, 102, 0, 0.3),
-    inset 0 0 80px rgba(255, 102, 0, 0.2);
+    0 0 100px rgba(255, 102, 0, 0.3);
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+}
+
+/* Video del Bolillero */
+.bolillero-video {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  z-index: 1;
+}
+
+/* Bola actual superpuesta sobre el video */
+.acrylic-sphere .current-ball-showcase {
+  z-index: 10;
+  position: relative;
 }
 
 /* Borde LED Azul */
@@ -1844,7 +1839,7 @@
   }
 }
 
-/* PartÃ­culas de explosiÃ³n al aparecer bola */
+/* Partículas de explosión al aparecer bola */
 @keyframes particle-burst {
   0% {
     transform: translate(0, 0) scale(1);
@@ -1947,7 +1942,7 @@
   letter-spacing: 2px;
 }
 
-/* BotÃ³n de SelecciÃ³n de Cartones en el Bolillero */
+/* Botón de Selección de Cartones en el Bolillero */
 .card-selection-sphere {
   width: 100%;
   height: 100%;
@@ -1984,6 +1979,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
 }
 
 .select-cards-sphere-btn:hover {
@@ -1993,6 +1989,37 @@
 
 .select-cards-sphere-btn:active {
   transform: scale(1.03);
+}
+
+/* Badge de Disponibles dentro del bot�n - Bronce */
+.available-badge {
+  position: absolute;
+  top: 75%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  background: linear-gradient(135deg, rgba(205, 127, 50, 0.95), rgba(184, 115, 51, 0.95));
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 6px 16px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  box-shadow: 0 0 20px rgba(205, 127, 50, 0.6);
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+  white-space: nowrap;
+}
+
+@keyframes badge-pulse {
+  0%, 100% { 
+    box-shadow: 0 0 20px rgba(205, 127, 50, 0.6);
+    transform: scale(1);
+  }
+  50% { 
+    box-shadow: 0 0 35px rgba(205, 127, 50, 0.9);
+    transform: scale(1.05);
+  }
 }
 
 .sphere-btn-image {
@@ -2038,7 +2065,7 @@
   }
 }
 
-/* Contador VIEJO dentro del cÃ­rculo - mantener por compatibilidad */
+/* Contador VIEJO dentro del círculo - mantener por compatibilidad */
 .sphere-btn-counter {
   display: flex;
   flex-direction: column;
@@ -2116,7 +2143,7 @@
   margin-top: 3px;
 }
 
-/* Base de la MÃ¡quina */
+/* Base de la Máquina */
 .machine-base {
   width: 80%;
   display: flex;
@@ -2159,7 +2186,7 @@
 }
 
 /* ============================================
-   SISTEMA DE TOASTS Y ALERTAS CINEMATOGRÃFICAS
+   SISTEMA DE TOASTS Y ALERTAS CINEMATOGRÁFICAS
    ============================================ */
 
 .toast-container {
@@ -2237,7 +2264,7 @@
   color: #4a2800;
 }
 
-/* Alerta de lÃ­nea tipo marquesina */
+/* Alerta de línea tipo marquesina */
 .marquee-alert {
   position: fixed;
   top: 50%;
@@ -2425,7 +2452,7 @@
 }
 
 /* ============================================
-   DIVIDER NEÃ“N
+   DIVIDER NEÓN
    ============================================ */
 
 .neon-divider {
@@ -2482,7 +2509,7 @@
    ============================================ */
 
 /* ============================================
-   ELEMENTOS DE GAMIFICACIÃ“N
+   ELEMENTOS DE GAMIFICACIÓN
    ============================================ */
 
 .gamification-panel {
@@ -2703,7 +2730,7 @@
   border: 1px solid rgba(255, 0, 0, 0.3);
 }
 
-/* Scroll Container - Con superposiciÃ³n vertical */
+/* Scroll Container - Con superposición vertical */
 .cards-scroll-container {
   flex: 1;
   position: relative;
@@ -2763,7 +2790,7 @@
   z-index: 10;
 }
 
-/* CartÃ³n a 1 de lÃ­nea - borde dorado pulsante intenso */
+/* Cartón a 1 de línea - borde dorado pulsante intenso */
 .compact-card.almost-line {
   border-color: #ff6600;
   animation: cyan-pulse-intense 0.8s ease-in-out infinite;
@@ -2792,7 +2819,7 @@
   }
 }
 
-/* Barra de progreso circular alrededor del cartÃ³n */
+/* Barra de progreso circular alrededor del cartón */
 .compact-card::before {
   content: '';
   position: absolute;
@@ -2903,7 +2930,7 @@
 }
 
 /* ============================================
-   CARTÃ“N EXPANDIDO - OVERLAY CENTRAL
+   CARTÓN EXPANDIDO - OVERLAY CENTRAL
    ============================================ */
 
 .expanded-card-overlay {
@@ -2993,7 +3020,7 @@
 }
 
 /* ============================================
-   CARTÃ“N DE BINGO - ESTILO CARTAS SUPERPUESTAS VERTICAL (BACKUP)
+   CARTÓN DE BINGO - ESTILO CARTAS SUPERPUESTAS VERTICAL (BACKUP)
    ============================================ */
 
 .bingo-card-starter {
@@ -3016,41 +3043,41 @@
   margin-bottom: -210px;
 }
 
-/* Primer cartÃ³n - totalmente visible con mayor z-index */
+/* Primer cartón - totalmente visible con mayor z-index */
 .bingo-card-starter:first-child {
   margin-top: 0;
   z-index: 10;
 }
 
-/* Segundo cartÃ³n - desplazado 50px hacia abajo */
+/* Segundo cartón - desplazado 50px hacia abajo */
 .bingo-card-starter:nth-child(2) {
   margin-top: 50px;
   z-index: 9;
 }
 
-/* Tercer cartÃ³n - desplazado 100px hacia abajo */
+/* Tercer cartón - desplazado 100px hacia abajo */
 .bingo-card-starter:nth-child(3) {
   margin-top: 100px;
   z-index: 8;
 }
 
-/* Cuarto cartÃ³n - desplazado 150px hacia abajo */
+/* Cuarto cartón - desplazado 150px hacia abajo */
 .bingo-card-starter:nth-child(4) {
   margin-top: 150px;
   z-index: 7;
 }
 
-/* Quinto cartÃ³n y siguientes */
+/* Quinto cartón y siguientes */
 .bingo-card-starter:nth-child(n+5) {
   z-index: 6;
 }
 
-/* Ãšltimo cartÃ³n - debe tener margen normal para no cortar */
+/* Último cartón - debe tener margen normal para no cortar */
 .bingo-card-starter:last-child {
   margin-bottom: 0;
 }
 
-/* Hover - expandir cartÃ³n */
+/* Hover - expandir cartón */
 .bingo-card-starter:hover {
   transform: scale(1.03);
   z-index: 20 !important;
@@ -3367,13 +3394,13 @@
     font-size: 1rem;
   }
 
-  /* Cartones en stack vertical en mÃ³vil */
+  /* Cartones en stack vertical en móvil */
   .cards-compact-grid {
     grid-template-columns: repeat(2, 1fr);
     grid-template-rows: repeat(15, 1fr);
   }
 
-  /* BotÃ³n de selecciÃ³n mÃ¡s grande en touch */
+  /* Botón de selección más grande en touch */
   .select-cards-sphere-btn {
     transform: scale(1.2);
   }
@@ -3382,7 +3409,7 @@
     width: 180px;
   }
 
-  /* Toasts mÃ¡s pequeÃ±os */
+  /* Toasts más pequeños */
   .toast-notification {
     padding: 15px 20px;
   }
@@ -3395,7 +3422,7 @@
     font-size: 0.9rem;
   }
 
-  /* Medidores de gamificaciÃ³n mÃ¡s compactos */
+  /* Medidores de gamificación más compactos */
   .gamification-panel {
     bottom: 10px;
     left: 10px;
@@ -3412,7 +3439,7 @@
 
 .bingo-card-starter-90 {
   max-width: 400px;
-  /* MÃ¡s ancho para acomodar 9 columnas */
+  /* Más ancho para acomodar 9 columnas */
 }
 
 .card-grid-90 {
@@ -3456,8 +3483,8 @@
 .ball-number-large {
   font-size: 3.5rem;
   font-weight: 900;
-  color: white;
-  text-shadow: 0 0 30px rgba(255, 255, 255, 0.8);
+  color: #000000;
+  text-shadow: none;
 }
 
 .announcement-number-large {
@@ -3756,7 +3783,7 @@
   }
 }
 
-/* Modo CelebraciÃ³n Full Screen */
+/* Modo Celebración Full Screen */
 .celebration-overlay {
   position: fixed;
   inset: 0;
@@ -3881,7 +3908,7 @@
   }
 }
 
-/* Confetti para CelebraciÃ³n */
+/* Confetti para Celebración */
 .celebration-confetti {
   position: absolute;
   inset: 0;
@@ -3909,7 +3936,7 @@
   }
 }
 
-/* NÃºmeros Marcados con Efecto */
+/* Números Marcados con Efecto */
 .marked-number-effect {
   position: fixed;
   top: 50%;
@@ -4062,7 +4089,7 @@
   --j: -1;
 }
 
-/* AnimaciÃ³n de Entrada de Cartones (Deal) */
+/* Animación de Entrada de Cartones (Deal) */
 .compact-card {
   animation: card-deal 0.5s ease-out backwards;
 }
@@ -4178,7 +4205,7 @@
   box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
 }
 
-/* Ripple Effect Suave - solo para nÃºmeros llamados que NO son recientes */
+/* Ripple Effect Suave - solo para números llamados que NO son recientes */
 .grid-number.called:not(.recent)::after {
   content: '';
   position: absolute;
@@ -4190,7 +4217,7 @@
   pointer-events: none;
 }
 
-/* Efecto especial para el nÃºmero mÃ¡s reciente - brillo dorado */
+/* Efecto especial para el número más reciente - brillo dorado */
 .grid-number.recent::after {
   content: '';
   position: absolute;
@@ -4244,7 +4271,7 @@
 
 
 /* ============================
-   Modal Ready - ¡¡Todo Listo!!
+   Modal Ready - ��Todo Listo!!
    ============================ */
 
 .ready-modal-overlay {
@@ -4451,7 +4478,7 @@
 }
 
 /* ============================================
-   FESTEJO DE LÃNEA - Usando cartÃ³n de grilla 6x5
+   FESTEJO DE LÍNEA - Usando cartón de grilla 6x5
    ============================================ */
 
 .winner-celebration-overlay {
@@ -4490,7 +4517,7 @@
   }
 }
 
-/* TÃ­tulo "Felicitaciones" con pulso */
+/* Título "Felicitaciones" con pulso */
 .felicitaciones-pulse {
   font-size: 4rem;
   font-weight: 900;
@@ -4533,7 +4560,7 @@
   font-weight: 600;
 }
 
-/* Contenedor del cartÃ³n en el festejo */
+/* Contenedor del cartón en el festejo */
 .celebration-card-display {
   display: flex;
   justify-content: center;
@@ -4541,7 +4568,7 @@
   filter: drop-shadow(0 0 30px rgba(255, 215, 0, 0.8));
 }
 
-/* Confetti (ya existe pero agregamos mÃ¡s partÃ­culas) */
+/* Confetti (ya existe pero agregamos más partículas) */
 .confetti-container {
   position: fixed;
   inset: 0;
@@ -4582,7 +4609,7 @@
 
 
 /* ============================================
-   FESTEJO DE LÍNEA - Usando cartón de grilla 6x5
+   FESTEJO DE L�NEA - Usando cart�n de grilla 6x5
    ============================================ */
 
 .winner-celebration-overlay {

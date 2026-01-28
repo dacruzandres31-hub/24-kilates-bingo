@@ -1,6 +1,6 @@
 ﻿/* ============================================
-   SALA STARTER - NEÃ“N, ENERGÃA, ARCADE MODERNO
-   Paleta: Cian ElÃ©ctrico, Violeta NeÃ³n, Negro Profundo
+   SALA STARTER - NEÓN, ENERGÍA, ARCADE MODERNO
+   Paleta: Cian Eléctrico, Violeta Neón, Negro Profundo
    ============================================ */
 
 .bronze-room {
@@ -33,7 +33,7 @@
   }
 }
 
-/* Cortinilla de transiciÃ³n waiting â†’ active */
+/* Cortinilla de transición waiting → active */
 .transition-curtain {
   position: fixed;
   inset: 0;
@@ -101,7 +101,7 @@
 }
 
 /* ============================================
-   CELEBRACIÃ“N DE LÃNEA GANADORA
+   CELEBRACIÓN DE LÍNEA GANADORA
    ============================================ */
 
 .winner-celebration-overlay {
@@ -265,7 +265,7 @@
   }
 }
 
-/* Estilos para el cartÃ³n en el modal de celebraciÃ³n */
+/* Estilos para el cartón en el modal de celebración */
 .celebration-card-expanded {
   margin: 30px auto;
   max-width: 700px;
@@ -324,7 +324,7 @@
   text-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
 }
 
-/* LÃ­nea resaltada en dorado */
+/* Línea resaltada en dorado */
 .celebration-card-expanded .card-cell.highlighted-line {
   background: linear-gradient(135deg, #ff6600 0%, #ff6600 100%);
   border: 3px solid #ff6600;
@@ -352,11 +352,11 @@
 }
 
 /* ============================================
-   ALERTA DE CASI LÃNEA
+   ALERTA DE CASI LÍNEA
    ============================================ */
 
 /* ============================================
-   ALERTA DE CASI LÃNEA - COMPACTA
+   ALERTA DE CASI LÍNEA - COMPACTA
    ============================================ */
 
 .compact-line-alert {
@@ -396,7 +396,7 @@
 }
 
 /* ============================================
-   MODAL DE CASI LÍNEA - AL LADO DEL TÍTULO
+   MODAL DE CASI L�NEA - AL LADO DEL T�TULO
    ============================================ */
 
 .almost-line-modal {
@@ -907,11 +907,11 @@
   margin-bottom: 2px;
   position: relative;
   z-index: 2;
-  overflow: hidden;
+  overflow: visible;
 }
 
 /* ============================================
-   CUADRÃCULA DIGITAL (IZQUIERDA) - 3x3 LAYOUT
+   CUADRÍCULA DIGITAL (IZQUIERDA) - 3x3 LAYOUT
    ============================================ */
 
 .digital-grid-full {
@@ -922,7 +922,7 @@
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5),
               inset 0 2px 10px rgba(255, 255, 255, 0.05);
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -1038,9 +1038,9 @@
   }
 }
 
-/* PartÃ­culas doradas flotantes */
+/* Partículas doradas flotantes */
 .grid-row .grid-number.recent::after {
-  content: 'âœ¨';
+  content: '✨';
   position: absolute;
   top: -20px;
   left: 50%;
@@ -1061,7 +1061,7 @@
   }
 }
 
-/* Barra de Ãºltimas bolas */
+/* Barra de últimas bolas */
 .recent-balls-bar {
   margin-top: 12px;
   padding: 10px;
@@ -1087,16 +1087,7 @@
 }
 
 .recent-ball-chip {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 0.8rem;
-  color: #000;
-  border: 2px solid rgba(255, 102, 0, 0.9);
+  /* Base - los estilos espec�ficos vienen de .bingo-ball-mini */
   animation: recentBallPop 0.4s ease-out;
 }
 
@@ -1112,7 +1103,7 @@
 }
 
 /* ============================================
-   CUADRÃCULA DIGITAL ANTIGUA (BACKUP)
+   CUADRÍCULA DIGITAL ANTIGUA (BACKUP)
    ============================================ */
 
 .digital-grid {
@@ -1259,238 +1250,6 @@
   }
 }
 
-/* Barra de Ãºltimas bolas */
-.recent-balls-bar {
-  margin-top: 4px;
-  padding: 6px 10px;
-  background: rgba(0, 0, 0, 0.8);
-  border: 2px solid rgba(255, 102, 0, 0.3);
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.recent-label {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: #ff6600;
-  letter-spacing: 2px;
-  text-shadow: 0 0 10px rgba(255, 102, 0, 0.6);
-}
-
-.recent-balls-list {
-  display: flex;
-  gap: 8px;
-  flex: 1;
-}
-
-.recent-ball-chip {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 12px;
-  border-radius: 20px;
-  font-weight: 900;
-  color: #000;
-  font-size: 0.85rem;
-  animation: chip-slide-in 0.4s ease-out;
-}
-
-@keyframes chip-slide-in {
-  0% {
-    transform: translateX(-20px);
-    opacity: 0;
-  }
-  100% {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-.ball-letter {
-  font-size: 0.9rem;
-  font-weight: 700;
-}
-
-.ball-number {
-  font-size: 1rem;
-  font-weight: 900;
-}
-
-/* ============================================
-   SECCIÃ“N DERECHA - TÃTULO + INFO + BOLILLERO
-   ============================================ */
-
-.right-section {
-  flex: 0 0 50%;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 2px;
-}
-
-.side-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex: 0 0 auto;
-}
-
-.room-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 1.2rem;
-  font-weight: 900;
-  letter-spacing: 1.5px;
-  padding: 6px 10px;
-  background: rgba(0, 0, 0, 0.6);
-  border: 2px solid rgba(255, 102, 0, 0.3);
-  border-radius: 12px;
-  flex-wrap: wrap;
-}
-
-.title-icon {
-  width: 24px;
-  height: 24px;
-  object-fit: contain;
-  animation: icon-float 2s ease-in-out infinite;
-}
-
-.title-text {
-  color: #ffa500 !important;
-  text-shadow: 0 0 20px rgba(255, 102, 0, 0.8), 0 0 40px rgba(255, 102, 0, 0.6);
-  font-weight: 900;
-}
-
-.title-tag {
-  background: linear-gradient(135deg, #00ff00, #00aa00);
-  color: #000;
-  font-size: 0.8rem;
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-weight: 900;
-  letter-spacing: 1px;
-  box-shadow: 0 0 15px rgba(0, 255, 0, 0.6);
-}
-
-.game-info {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.info-badge {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: rgba(0, 0, 0, 0.6);
-  padding: 8px 15px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 102, 0, 0.3);
-}
-
-.badge-label {
-  font-size: 0.9rem;
-  color: #888;
-  font-weight: 600;
-}
-
-.badge-value {
-  font-size: 1.1rem;
-  font-weight: 900;
-  color: #ff6600;
-  text-shadow: 0 0 10px rgba(255, 102, 0, 0.6);
-}
-
-.status-badge {
-  padding: 8px 15px;
-  border-radius: 10px;
-  font-weight: 900;
-  font-size: 0.95rem;
-  border: 2px solid;
-  letter-spacing: 1px;
-}
-
-.status-badge.waiting {
-  background: rgba(128, 128, 128, 0.2);
-  border-color: rgba(255, 102, 0, 0.5);
-  color: #888;
-}
-
-.status-badge.active {
-  background: rgba(255, 0, 0, 0.2);
-  border-color: rgba(255, 0, 0, 0.5);
-  color: #ff0000;
-  animation: status-pulse 1.5s ease-in-out infinite;
-}
-
-.status-badge.ended {
-  background: rgba(0, 255, 0, 0.2);
-  border-color: rgba(0, 255, 0, 0.5);
-  color: #00ff00;
-}
-
-@keyframes status-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
-}
-
-/* ============================================
-   BOLILLERO MODERNO (DERECHA)
-   ============================================ */
-
-.modern-bingo-machine {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  position: relative;
-  flex: 1;
-  min-height: 0;
-}
-
-.machine-top-led {
-  width: 80%;
-  height: 8px;
-  background: linear-gradient(to right, 
-    transparent, 
-    rgba(255, 102, 0, 0.8) 50%, 
-    transparent);
-  border-radius: 10px;
-  box-shadow: 0 0 20px rgba(255, 102, 0, 0.6);
-  animation: led-pulse 2s ease-in-out infinite;
-}
-
-@keyframes led-pulse {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 1; }
-}
-
-/* Esfera de AcrÃ­lico Transparente */
-.acrylic-sphere {
-  width: 240px;
-  height: 240px;
-  border-radius: 50%;
-  background: 
-    radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.3), transparent 50%),
-    radial-gradient(circle at 70% 70%, rgba(255, 102, 0, 0.15), transparent);
-  backdrop-filter: blur(15px) saturate(200%);
-  -webkit-backdrop-filter: blur(15px) saturate(200%);
-  border: 4px solid rgba(255, 102, 0, 0.5);
-  box-shadow: 
-    0 0 60px rgba(255, 102, 0, 0.6),
-    0 0 100px rgba(255, 102, 0, 0.3),
-    inset 0 0 80px rgba(255, 102, 0, 0.2);
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
-
 /* Borde LED Azul */
 .led-ring {
   position: absolute;
@@ -1597,40 +1356,91 @@
   width: 150px;
   height: 150px;
   border-radius: 50%;
-  border: 4px solid rgba(255, 0, 0, 0.4);
+  border: 3px solid rgba(255, 255, 255, 0.3);
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: ball-zoom-in 2s ease-out;
+  animation: ball-appear 0.5s ease-out;
 }
 
-@keyframes ball-zoom-in {
+/* Estilo de bolilla tipo bingo real */
+.bingo-ball-style {
+  background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4), transparent 50%);
+}
+
+.ball-white-center {
+  width: 70%;
+  height: 70%;
+  background: radial-gradient(circle at 40% 40%, #ffffff, #f0f0f0);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.ball-white-center .ball-number-large {
+  font-size: 3.5rem;
+  font-weight: 900;
+  color: #000000;
+  text-shadow: none;
+  line-height: 1;
+}
+
+/* Animaci�n suave de aparici�n */
+@keyframes ball-appear {
   0% {
-    transform: scale(0) rotate(0deg);
+    transform: scale(0.3);
     opacity: 0;
-    filter: brightness(3) blur(20px);
   }
-  30% {
-    transform: scale(1.5) rotate(180deg);
+  60% {
+    transform: scale(1.1);
     opacity: 1;
-    filter: brightness(2) blur(5px);
-  }
-  50% {
-    transform: scale(0.9) rotate(270deg);
-    filter: brightness(1.5) blur(0);
-  }
-  70% {
-    transform: scale(1.1) rotate(340deg);
   }
   100% {
-    transform: scale(1) rotate(360deg);
+    transform: scale(1);
     opacity: 1;
-    filter: brightness(1) blur(0);
   }
 }
 
-/* PartÃ­culas de explosiÃ³n al aparecer bola */
+/* Estilos para mini bolillas de �ltimas bolas */
+.bingo-ball-mini {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.ball-white-center-mini {
+  width: 65%;
+  height: 65%;
+  background: radial-gradient(circle at 40% 40%, #ffffff, #f0f0f0);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 1px 5px rgba(0,0,0,0.1);
+}
+
+.ball-white-center-mini .ball-number {
+  font-size: 1rem !important;
+  font-weight: 900 !important;
+  color: #000000 !important;
+  text-shadow: none !important;
+  line-height: 1 !important;
+  width: auto !important;
+  height: auto !important;
+  background: none !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+}
+
+/* Part�culas de explosi�n al aparecer bola */
 @keyframes particle-burst {
   0% {
     transform: translate(0, 0) scale(1);
@@ -1720,7 +1530,7 @@
   letter-spacing: 2px;
 }
 
-/* BotÃ³n de SelecciÃ³n de Cartones en el Bolillero */
+/* Botón de Selección de Cartones en el Bolillero */
 .card-selection-sphere {
   width: 100%;
   height: 100%;
@@ -1794,7 +1604,7 @@
   50% { transform: translateY(-5px); }
 }
 
-/* Contador VIEJO dentro del cÃ­rculo - mantener por compatibilidad */
+/* Contador VIEJO dentro del círculo - mantener por compatibilidad */
 .sphere-btn-counter {
   display: flex;
   flex-direction: column;
@@ -1867,7 +1677,7 @@
   margin-top: 3px;
 }
 
-/* Base de la MÃ¡quina */
+/* Base de la Máquina */
 .machine-base {
   width: 80%;
   display: flex;
@@ -1905,7 +1715,7 @@
 }
 
 /* ============================================
-   SISTEMA DE TOASTS Y ALERTAS CINEMATOGRÃFICAS
+   SISTEMA DE TOASTS Y ALERTAS CINEMATOGRÁFICAS
    ============================================ */
 
 .toast-container {
@@ -1975,7 +1785,7 @@
   color: #4a2800;
 }
 
-/* Alerta de lÃ­nea tipo marquesina */
+/* Alerta de línea tipo marquesina */
 .marquee-alert {
   position: fixed;
   top: 50%;
@@ -2067,7 +1877,7 @@
 }
 
 /* ============================================
-   DIVIDER NEÃ“N
+   DIVIDER NEÓN
    ============================================ */
 
 .neon-divider {
@@ -2121,7 +1931,7 @@
    ============================================ */
 
 /* ============================================
-   ELEMENTOS DE GAMIFICACIÃ“N
+   ELEMENTOS DE GAMIFICACIÓN
    ============================================ */
 
 .gamification-panel {
@@ -2318,7 +2128,7 @@
   border: 1px solid rgba(255, 0, 0, 0.3);
 }
 
-/* Scroll Container - Con superposiciÃ³n vertical */
+/* Scroll Container - Con superposición vertical */
 .cards-scroll-container {
   flex: 1;
   position: relative;
@@ -2378,7 +2188,7 @@
   z-index: 10;
 }
 
-/* CartÃ³n a 1 de lÃ­nea - borde dorado pulsante intenso */
+/* Cartón a 1 de línea - borde dorado pulsante intenso */
 .compact-card.almost-line {
   border-color: #ff6600;
   animation: cyan-pulse-intense 0.8s ease-in-out infinite;
@@ -2404,7 +2214,7 @@
   }
 }
 
-/* Barra de progreso circular alrededor del cartÃ³n */
+/* Barra de progreso circular alrededor del cartón */
 .compact-card::before {
   content: '';
   position: absolute;
@@ -2446,7 +2256,6 @@
   overflow: visible;
   max-width: 100%;
   display: block;
-}
 }
 
 .compact-card-progress {
@@ -2531,7 +2340,7 @@
 }
 
 /* ============================================
-   CARTÃ“N EXPANDIDO - OVERLAY CENTRAL
+   CARTÓN EXPANDIDO - OVERLAY CENTRAL
    ============================================ */
 
 .expanded-card-overlay {
@@ -2690,7 +2499,7 @@
 }
 
 /* ============================================
-   CARTÃ“N DE BINGO - ESTILO CARTAS SUPERPUESTAS VERTICAL (BACKUP)
+   CARTÓN DE BINGO - ESTILO CARTAS SUPERPUESTAS VERTICAL (BACKUP)
    ============================================ */
 
 .bingo-card-starter {
@@ -2713,41 +2522,41 @@
   margin-bottom: -210px;
 }
 
-/* Primer cartÃ³n - totalmente visible con mayor z-index */
+/* Primer cartón - totalmente visible con mayor z-index */
 .bingo-card-starter:first-child {
   margin-top: 0;
   z-index: 10;
 }
 
-/* Segundo cartÃ³n - desplazado 50px hacia abajo */
+/* Segundo cartón - desplazado 50px hacia abajo */
 .bingo-card-starter:nth-child(2) {
   margin-top: 50px;
   z-index: 9;
 }
 
-/* Tercer cartÃ³n - desplazado 100px hacia abajo */
+/* Tercer cartón - desplazado 100px hacia abajo */
 .bingo-card-starter:nth-child(3) {
   margin-top: 100px;
   z-index: 8;
 }
 
-/* Cuarto cartÃ³n - desplazado 150px hacia abajo */
+/* Cuarto cartón - desplazado 150px hacia abajo */
 .bingo-card-starter:nth-child(4) {
   margin-top: 150px;
   z-index: 7;
 }
 
-/* Quinto cartÃ³n y siguientes */
+/* Quinto cartón y siguientes */
 .bingo-card-starter:nth-child(n+5) {
   z-index: 6;
 }
 
-/* Ãšltimo cartÃ³n - debe tener margen normal para no cortar */
+/* Último cartón - debe tener margen normal para no cortar */
 .bingo-card-starter:last-child {
   margin-bottom: 0;
 }
 
-/* Hover - expandir cartÃ³n */
+/* Hover - expandir cartón */
 .bingo-card-starter:hover {
   transform: scale(1.03);
   z-index: 20 !important;
@@ -3039,13 +2848,13 @@
     font-size: 1rem;
   }
 
-  /* Cartones en stack vertical en mÃ³vil */
+  /* Cartones en stack vertical en móvil */
   .cards-compact-grid {
     grid-template-columns: repeat(2, 1fr);
     grid-template-rows: repeat(15, 1fr);
   }
 
-  /* BotÃ³n de selecciÃ³n mÃ¡s grande en touch */
+  /* Botón de selección más grande en touch */
   .select-cards-sphere-btn {
     transform: scale(1.2);
   }
@@ -3054,7 +2863,7 @@
     width: 180px;
   }
 
-  /* Toasts mÃ¡s pequeÃ±os */
+  /* Toasts más pequeños */
   .toast-notification {
     padding: 15px 20px;
   }
@@ -3067,7 +2876,7 @@
     font-size: 0.9rem;
   }
 
-  /* Medidores de gamificaciÃ³n mÃ¡s compactos */
+  /* Medidores de gamificación más compactos */
   .gamification-panel {
     bottom: 10px;
     left: 10px;
@@ -3083,7 +2892,7 @@
 /* ===== BINGO 90 STYLES (3x9 Grid) ===== */
 
 .bingo-card-starter-90 {
-  max-width: 400px; /* MÃ¡s ancho para acomodar 9 columnas */
+  max-width: 400px; /* Más ancho para acomodar 9 columnas */
 }
 
 .card-grid-90 {
@@ -3130,8 +2939,8 @@
 .ball-number-large {
   font-size: 3.5rem;
   font-weight: 900;
-  color: white;
-  text-shadow: 0 0 30px rgba(255, 255, 255, 0.8);
+  color: #000000;
+  text-shadow: none;
 }
 
 .announcement-number-large {
@@ -3427,7 +3236,7 @@
   }
 }
 
-/* Modo CelebraciÃ³n Full Screen */
+/* Modo Celebración Full Screen */
 .celebration-overlay {
   position: fixed;
   inset: 0;
@@ -3536,7 +3345,7 @@
   }
 }
 
-/* Confetti para CelebraciÃ³n */
+/* Confetti para Celebración */
 .celebration-confetti {
   position: absolute;
   inset: 0;
@@ -3563,7 +3372,7 @@
   }
 }
 
-/* NÃºmeros Marcados con Efecto */
+/* Números Marcados con Efecto */
 .marked-number-effect {
   position: fixed;
   top: 50%;
@@ -3658,7 +3467,7 @@
 .marked-particle:nth-child(7) { --i: 0; --j: -1; }
 .marked-particle:nth-child(8) { --i: 1; --j: -1; }
 
-/* AnimaciÃ³n de Entrada de Cartones (Deal) */
+/* Animación de Entrada de Cartones (Deal) */
 .compact-card {
   animation: card-deal 0.5s ease-out backwards;
 }
@@ -3689,7 +3498,7 @@
   }
 }
 
-/* Efecto 3D en nÃºmeros del grid cuando son cantados */
+/* Efecto 3D en números del grid cuando son cantados */
 .grid-number.called {
   animation: number-3d-pop 0.6s ease-out;
 }
@@ -3788,10 +3597,9 @@
    ESTILOS DE VENTAS CERRADAS (T-5 Closure)
    ============================================ */
 
-.sales-closed {
-  display: flex;
-  align-items: center;
+.card-selection-sphere.sales-closed {
   justify-content: center;
+  padding: 20px;
 }
 
 .sales-closed-message {
@@ -3800,13 +3608,14 @@
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 20px;
-  background: rgba(0, 0, 0, 0.85);
+  padding: 30px 40px;
+  background: rgba(0, 0, 0, 0.9);
   border-radius: 20px;
-  border: 3px solid #ff4444;
-  box-shadow: 0 0 30px rgba(255, 68, 68, 0.5),
-              inset 0 0 20px rgba(255, 68, 68, 0.1);
+  border: 3px solid #cd7f32;
+  box-shadow: 0 0 30px rgba(205, 127, 50, 0.5),
+              inset 0 0 20px rgba(205, 127, 50, 0.1);
   animation: pulse-warning 2s ease-in-out infinite;
+  min-width: 250px;
 }
 
 @keyframes pulse-warning {
@@ -3832,7 +3641,7 @@
 }
 
 .sales-closed-text {
-  font-size: 1.4rem;
+  font-size: 1.1rem;
   font-weight: bold;
   color: #ff4444;
   text-transform: uppercase;

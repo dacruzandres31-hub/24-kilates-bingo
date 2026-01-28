@@ -1,5 +1,4 @@
 const pool = require('../db');
-const referralService = require('../services/referralService');
 
 /**
  * USER CONTROLLER - Gestión de Usuarios
@@ -375,20 +374,13 @@ exports.getNetworkStats = async (req, res) => {
  */
 exports.getUserProfile = async (req, res) => {
   try {
-    const userId = req.user.id || req.user.userId;
-
+    const userId = req.user.id; // El token contiene 'id', no 'userId'
+    
     console.log('[getUserProfile] 🔍 Buscando usuario ID:', userId);
-
-    // Intentar entregar premios de referidos pendientes (1 por día)
-    try {
-      await referralService.deliverPendingReward(userId);
-    } catch (err) {
-      console.error('[getUserProfile] Error entregando premios referidos:', err.message);
-    }
 
     // Obtener datos del usuario
     const [users] = await pool.query(
-      'SELECT id, username, role, balance, referral_code FROM users WHERE id = ?',
+      'SELECT id, username, role, balance FROM users WHERE id = ?',
       [userId]
     );
 
@@ -400,62 +392,32 @@ exports.getUserProfile = async (req, res) => {
     const user = users[0];
     console.log('[getUserProfile] ✅ Usuario encontrado:', user.username);
 
-    // Obtener cartones disponibles separados por tipo (igual que adminController)
-    // Esto asegura que la suma sea consistente con lo que ve el admin
-    console.log('[getUserProfile] 🔍 Buscando inventario para usuario:', userId);
-
+    // Obtener cartones disponibles del inventario (suma normales + regalo)
+    // Los jugadores ven el total combinado sin discriminación
     const [inventory] = await pool.query(
       `SELECT 
-        COALESCE(SUM(CASE WHEN room = 'bronce' AND is_gift = 0 THEN quantity ELSE 0 END), 0) as cards_bronce,
-        COALESCE(SUM(CASE WHEN room = 'plata' AND is_gift = 0 THEN quantity ELSE 0 END), 0) as cards_plata,
-        COALESCE(SUM(CASE WHEN room = 'oro' AND is_gift = 0 THEN quantity ELSE 0 END), 0) as cards_oro,
-        COALESCE(SUM(CASE WHEN room = 'bronce' AND is_gift = 1 THEN quantity ELSE 0 END), 0) as gift_bronce,
-        COALESCE(SUM(CASE WHEN room = 'plata' AND is_gift = 1 THEN quantity ELSE 0 END), 0) as gift_plata,
-        COALESCE(SUM(CASE WHEN room = 'oro' AND is_gift = 1 THEN quantity ELSE 0 END), 0) as gift_oro
+        COALESCE(SUM(CASE WHEN room = 'bronce' THEN quantity ELSE 0 END), 0) as bronze,
+        COALESCE(SUM(CASE WHEN room = 'plata' THEN quantity ELSE 0 END), 0) as silver,
+        COALESCE(SUM(CASE WHEN room = 'oro' THEN quantity ELSE 0 END), 0) as gold
        FROM user_card_inventory
        WHERE user_id = ?`,
       [userId]
     );
 
-    console.log('[getUserProfile] 📦 Inventario RAW:', inventory);
-
-    const data = inventory[0] || {};
-
-    // Sumar normales + regalo para el jugador
-    const bronzeTotal = (parseInt(data.cards_bronce) || 0) + (parseInt(data.gift_bronce) || 0);
-    const silverTotal = (parseInt(data.cards_plata) || 0) + (parseInt(data.gift_plata) || 0);
-    const goldTotal = (parseInt(data.cards_oro) || 0) + (parseInt(data.gift_oro) || 0);
-
-    console.log('[getUserProfile] 🎴 Tickets (N+R):', {
-      bronze: `${data.cards_bronce}+${data.gift_bronce}=${bronzeTotal}`,
-      silver: `${data.cards_plata}+${data.gift_plata}=${silverTotal}`,
-      gold: `${data.cards_oro}+${data.gift_oro}=${goldTotal}`
-    });
-
-    // Obtener membresía activa
-    const [subs] = await pool.query(
-      `SELECT m.name, m.id 
-       FROM user_subscriptions us
-       JOIN memberships m ON us.membership_id = m.id
-       WHERE us.user_id = ? AND us.status = 'active'
-       ORDER BY us.created_at DESC LIMIT 1`,
-      [userId]
-    );
-    const activePlan = subs.length > 0 ? subs[0] : null;
+    const tickets = inventory[0] || { bronze: 0, silver: 0, gold: 0 };
+    console.log('[getUserProfile] 🎴 Tickets:', tickets);
 
     const response = {
       username: user.username,
       balance: user.balance || 0,
-      referral_code: user.referral_code,
-      plan: activePlan ? { name: activePlan.name, id: activePlan.id } : null,
       tickets: {
         starter: 0, // Starter se maneja aparte
-        bronze: bronzeTotal,
-        silver: silverTotal,
-        gold: goldTotal
+        bronze: parseInt(tickets.bronze) || 0,
+        silver: parseInt(tickets.silver) || 0,
+        gold: parseInt(tickets.gold) || 0
       }
     };
-
+    
     console.log('[getUserProfile] 📤 Enviando respuesta:', response);
     res.json(response);
 
@@ -587,7 +549,7 @@ exports.unblockUser = async (req, res) => {
     const { userId } = req.params;
     const performedBy = req.user.id;
     const performedByRole = req.user.role;
-
+    
     console.log('🔓 [UNBLOCK] Inicio - UserID:', userId, 'PerformedBy:', performedBy, 'Role:', performedByRole);
 
     // Verificar que el usuario existe y está bloqueado
@@ -609,7 +571,7 @@ exports.unblockUser = async (req, res) => {
       'SELECT username FROM users WHERE id = ?',
       [performedBy]
     );
-
+    
     console.log('🔓 [UNBLOCK] Performer:', performerInfo[0]);
 
     const isAndy = performerInfo[0].username === 'Andy';
@@ -619,7 +581,7 @@ exports.unblockUser = async (req, res) => {
     if (isAndy) {
       console.log('🔓 [UNBLOCK] REGLA 1: Andy puede desbloquear - PERMITIDO');
       // Andy tiene permiso total
-    }
+    } 
     // REGLA 2: Si Andy bloqueó al usuario, solo Andy puede desbloquearlo
     else if (user[0].blocked_by) {
       console.log('🔓 [UNBLOCK] Usuario fue bloqueado por ID:', user[0].blocked_by);
@@ -627,12 +589,12 @@ exports.unblockUser = async (req, res) => {
         'SELECT username FROM users WHERE id = ?',
         [user[0].blocked_by]
       );
-
+      
       console.log('🔓 [UNBLOCK] Bloqueador:', blockerInfo[0]);
 
       if (blockerInfo.length > 0 && blockerInfo[0].username === 'Andy') {
         console.log('🔓 [UNBLOCK] REGLA 2: Bloqueado por Andy - Solo Andy puede desbloquear - DENEGADO');
-        return res.status(403).json({
+        return res.status(403).json({ 
           error: 'Solo el SuperAdmin puede desbloquear a este usuario',
           reason: 'Este usuario fue bloqueado por el SuperAdmin. Comunícate con tu Agente Superior para más información.',
           blockedBy: 'SuperAdmin'
@@ -642,28 +604,28 @@ exports.unblockUser = async (req, res) => {
       // REGLA 3: Solo puede desbloquear quien bloqueó o un superior jerárquico
       if (user[0].blocked_by !== performedBy) {
         console.log('🔓 [UNBLOCK] No es el mismo bloqueador, verificando jerarquía...');
-
+        
         // Obtener información del bloqueador para mensaje personalizado
         const [blocker] = await pool.query(
           'SELECT username, role FROM users WHERE id = ?',
           [user[0].blocked_by]
         );
-
+        
         // Verificar si el que intenta desbloquear es superior en la jerarquía del bloqueado
         const canUnblock = await canUnblockUser(performedBy, performedByRole, userId, user[0].blocked_by);
         console.log('🔓 [UNBLOCK] ¿Puede desbloquear?:', canUnblock);
-
+        
         if (!canUnblock) {
           // Mensaje personalizado según quién bloqueó
           if (blocker.length > 0 && blocker[0].role === 'agente') {
             console.log('🔓 [UNBLOCK] DENEGADO - Bloqueado por agente superior');
-            return res.status(403).json({
+            return res.status(403).json({ 
               error: 'Este usuario fue bloqueado por un Agente Superior',
               reason: 'Comunícate con tu superior',
               blockedBy: blocker[0].username
             });
           } else {
-            return res.status(403).json({
+            return res.status(403).json({ 
               error: 'No tienes permiso para desbloquear a este usuario',
               reason: 'Solo puede desbloquear quien bloqueó el usuario o un superior en la jerarquía'
             });

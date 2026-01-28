@@ -11,9 +11,12 @@ async function syncStarterCards(userId, selectedCards) {
     try {
         console.log(`[Sync] 🔄 Sincronizando selección Starter para usuario ${userId}`);
 
-        // 1. Buscar sesión activa de starter
+        // 1. Buscar sesión activa de starter (playing, starting, pending)
         const [activeSession] = await pool.query(
-            "SELECT id FROM game_sessions WHERE room = 'starter' AND status IN ('pending', 'active') ORDER BY created_at DESC LIMIT 1"
+            `SELECT id FROM game_sessions 
+             WHERE room = 'starter' AND status IN ('playing', 'starting', 'pending', 'active') 
+             ORDER BY FIELD(status, 'playing', 'starting', 'pending', 'active'), created_at DESC 
+             LIMIT 1`
         );
 
         if (activeSession.length === 0) {
@@ -22,16 +25,18 @@ async function syncStarterCards(userId, selectedCards) {
         }
 
         const sessionId = activeSession[0].id;
-
-        // 2. Formatear cartones para cardPoolService
-        const cardsForPool = selectedCards.map(c => ({
-            id: c.id,
-            serial: c.card_serial,
-            numbers: typeof c.numbers === 'string' ? JSON.parse(c.numbers) : c.numbers
-        }));
-
-        // 3. Sincronizar con card_pool
-        await syncCardPool(sessionId, userId, cardsForPool);
+        
+        // 2. Actualizar game_session_id en bingo_cards_pool para estos cartones
+        const cardIds = selectedCards.map(c => c.id);
+        if (cardIds.length > 0) {
+            await pool.query(
+                `UPDATE bingo_cards_pool 
+                 SET game_session_id = ? 
+                 WHERE id IN (?) AND selected_by = ?`,
+                [sessionId, cardIds, userId]
+            );
+            console.log(`[Sync] ✅ ${cardIds.length} cartones asignados a sesión ${sessionId}`);
+        }
 
         console.log(`[Sync] ✅ Sincronización Starter exitosa para sesión ${sessionId}`);
     } catch (error) {

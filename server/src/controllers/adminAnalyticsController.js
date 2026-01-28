@@ -72,21 +72,27 @@ exports.getDailyNetwin = async (req, res) => {
     try {
         const query = `
       SELECT 
-        LPAD(HOUR(created_at), 2, '0') as hora,
-        COALESCE(SUM(CASE 
-          WHEN movement_type IN ('purchase', 'deposit') 
-          THEN ABS(amount) 
-          ELSE 0 
-        END), 0) as ganancia,
-        COALESCE(SUM(CASE 
-          WHEN movement_type IN ('prize', 'withdrawal', 'bonus', 'refund') 
-          THEN ABS(amount) 
-          ELSE 0 
-        END), 0) as gasto
-      FROM chips_movements
-      WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
-      GROUP BY HOUR(created_at)
-      ORDER BY HOUR(created_at) ASC
+        LPAD(hora, 2, '0') as hora,
+        COALESCE(SUM(ganancia), 0) as ganancia,
+        COALESCE(SUM(gasto), 0) as gasto
+      FROM (
+        SELECT 
+          HOUR(created_at) as hora,
+          CASE 
+            WHEN movement_type IN ('purchase', 'deposit') 
+            THEN ABS(amount) 
+            ELSE 0 
+          END as ganancia,
+          CASE 
+            WHEN movement_type IN ('prize', 'withdrawal', 'bonus', 'refund') 
+            THEN ABS(amount) 
+            ELSE 0 
+          END as gasto
+        FROM chips_movements
+        WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+      ) subq
+      GROUP BY hora
+      ORDER BY hora ASC
     `;
 
         const [rows] = await pool.query(query);

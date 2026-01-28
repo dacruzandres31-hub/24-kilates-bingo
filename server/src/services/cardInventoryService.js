@@ -481,27 +481,44 @@ class CardInventoryService {
 
   /**
    * Obtiene cartones validados de un jugador para una sesión
+   * Busca en bingo_cards_pool (status='selected') que es donde se guardan los cartones seleccionados
    */
   async getValidatedCards(playerId, gameSessionId) {
+    // Buscar en bingo_cards_pool que es la tabla principal
     const [cards] = await pool.query(
       `SELECT 
-         id,
-         serial_number,
-         grid_numbers,
-         is_gift,
-         contributed_amount,
-         validated_at
-       FROM validated_cards
-       WHERE player_id = ? AND game_session_id = ?
-       ORDER BY validated_at ASC`,
+         bcp.id,
+         bcp.card_serial as serial_number,
+         bcp.numbers as grid_numbers,
+         bcp.is_gift,
+         0 as contributed_amount,
+         bcp.selected_at as validated_at
+       FROM bingo_cards_pool bcp
+       WHERE bcp.selected_by = ? 
+         AND bcp.game_session_id = ?
+         AND bcp.status = 'selected'
+       ORDER BY bcp.selected_at ASC`,
       [playerId, gameSessionId]
     );
 
-    return cards.map(card => ({
-      ...card,
-      grid_numbers: JSON.parse(card.grid_numbers),
-      is_gift: card.is_gift === 1
-    }));
+    return cards.map(card => {
+      // Parsear grid_numbers - puede venir como JSON string u objeto
+      let gridNumbers = card.grid_numbers;
+      if (typeof gridNumbers === 'string') {
+        try {
+          gridNumbers = JSON.parse(gridNumbers);
+        } catch (e) {
+          console.error(`[CardInventory] Error parseando números del cartón ${card.id}:`, e.message);
+          gridNumbers = [];
+        }
+      }
+      
+      return {
+        ...card,
+        grid_numbers: gridNumbers,
+        is_gift: card.is_gift === 1
+      };
+    });
   }
 }
 

@@ -4,8 +4,9 @@
   border-radius: 12px;
   overflow: hidden;
   transition: all 0.3s ease;
-  width: 280px;
-  margin: 10px;
+  width: 100%;
+  max-width: 280px;
+  margin: 0 auto;
   user-select: none;
 }
 
@@ -63,16 +64,15 @@
   border: 1px solid;
   border-radius: 4px;
   font-weight: bold;
-  font-size: 1.1rem;
+  font-size: clamp(0.9rem, 2vw, 1.3rem);
   transition: all 0.2s;
-  min-width: 26px;
-  min-height: 26px;
-  height: 32px;
-  max-height: 40px;
+  min-width: 0;
+  min-height: 0;
+  overflow: visible;
 }
 
 .card-cell.filled {
-  font-size: 1.2rem;
+  font-size: clamp(1rem, 2.2vw, 1.4rem);
 }
 
 .card-cell.empty {

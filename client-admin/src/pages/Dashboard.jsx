@@ -20,6 +20,7 @@ import SessionControlPanel from '../components/SessionControlPanel';
 import LiveMonitoringPanel from '../components/LiveMonitoringPanel';
 import RoomConfigPanel from '../components/RoomConfigPanel';
 import ScheduleGridPanel from '../components/ScheduleGridPanel';
+import SessionHistoryPanel from '../components/SessionHistoryPanel';
 
 // Paneles adicionales
 import MembershipAccounting from '../components/MembershipAccounting';
@@ -31,6 +32,7 @@ import WhatsAppConfigPanel from '../components/WhatsAppConfigPanel';
 import MovimientosChips from '../components/MovimientosChips';
 import SystemHealthPanel from '../components/SystemHealthPanel';
 import AdminAuditLog from '../components/AdminAuditLog';
+import GlobalNotificationsPanel from '../components/GlobalNotificationsPanel';
 
 import { ChevronDown, ChevronRight } from 'lucide-react';
 
@@ -72,6 +74,7 @@ export default function Dashboard() {
     'movimientos-recientes': false,
     'pozos': false,
     'sesiones-stats': false,
+    'session-history': false,
     'sesiones-control': false,
     'sesiones-live': false,
     'room-config': false,
@@ -85,7 +88,8 @@ export default function Dashboard() {
     'whatsapp-config': false,
     'system-health': false,
     'audit-logs': false,
-    'support': false
+    'support': false,
+    'global-notifications': false
   });
 
   useEffect(() => {
@@ -495,6 +499,13 @@ export default function Dashboard() {
             </section>
           )}
 
+          {/* Historial de Sorteos */}
+          {activeSections['session-history'] && (
+            <section className="mb-8">
+              <SessionHistoryPanel />
+            </section>
+          )}
+
           {/* Control de Sesiones (SuperAdmin only) */}
           {activeSections['sesiones-control'] && (
             <section className="mb-8">
@@ -617,6 +628,13 @@ export default function Dashboard() {
           {activeSections['whatsapp-config'] && (
             <section className="mb-8">
               <WhatsAppConfigPanel />
+            </section>
+          )}
+
+          {/* Notificaciones Globales (Andy only) */}
+          {activeSections['global-notifications'] && (
+            <section className="mb-8">
+              <GlobalNotificationsPanel />
             </section>
           )}
 

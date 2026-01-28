@@ -12,12 +12,13 @@ import BingoCardPreview from './BingoCardPreview';
 import Countdown from './Countdown';
 import useLiveDraw from '../hooks/useLiveDraw';
 import SessionHistory from './SessionHistory';
+import ConnectionIndicator from './ConnectionIndicator';
 
 export default function GoldRoom({ onLogout }) {
   const { sessionId } = useParams();
   const navigate = useNavigate();
   
-  // Hook para sorteo en vivo - reemplaza la simulación local
+  // Hook para sorteo en vivo - reemplaza la simulaci�n local
   const {
     ballsDrawn,
     currentBall,
@@ -26,6 +27,8 @@ export default function GoldRoom({ onLogout }) {
     prizes: livePrizes,
     lineWinnersPaid,
     bingoWinnersPaid,
+    iAmTheLineWinner,  // NUEVO: ¡YO soy el ganador de línea!
+    iAmTheBingoWinner, // NUEVO: ¡YO soy el ganador de bingo!
     isLoading: liveDrawLoading,
     setBallsDrawn,
     setCurrentBall,
@@ -35,14 +38,14 @@ export default function GoldRoom({ onLogout }) {
   const [lastBall, setLastBall] = useState(null);
   const [previousGameStatus, setPreviousGameStatus] = useState('waiting'); // Para detectar cambios
   const [floatingBalls, setFloatingBalls] = useState([]);
-  const [almostLineCards, setAlmostLineCards] = useState([]); // Cartones a 2 bolillas de línea
-  const [expandedCard, setExpandedCard] = useState(null); // Cartón expandido actualmente
-  const [canCloseExpandedCard, setCanCloseExpandedCard] = useState(true); // Controla si se puede cerrar el cartón expandido
-  const [lastHitCard, setLastHitCard] = useState(null); // Último cartón con acierto
-  const [winnerCards, setWinnerCards] = useState([]); // Cartones ganadores con línea completa
+  const [almostLineCards, setAlmostLineCards] = useState([]); // Cartones a 2 bolillas de l�nea
+  const [expandedCard, setExpandedCard] = useState(null); // Cart�n expandido actualmente
+  const [canCloseExpandedCard, setCanCloseExpandedCard] = useState(true); // Controla si se puede cerrar el cart�n expandido
+  const [lastHitCard, setLastHitCard] = useState(null); // �ltimo cart�n con acierto
+  const [winnerCards, setWinnerCards] = useState([]); // Cartones ganadores con l�nea completa
   const [celebratedCardIds, setCelebratedCardIds] = useState([]); // IDs de cartones ya festejados (previene loop)
   const [lineCelebrated, setLineCelebrated] = useState(false); // Flag de festejo activo
-  const [bingoWinnerCard, setBingoWinnerCard] = useState(null); // Cartón ganador de BINGO
+  const [bingoWinnerCard, setBingoWinnerCard] = useState(null); // Cart�n ganador de BINGO
   const [bingoCelebrated, setBingoCelebrated] = useState(false); // Flag de festejo BINGO activo
   const [showVoiceSelector, setShowVoiceSelector] = useState(false); // Selector de voz
   const [availableVoices, setAvailableVoices] = useState([]); // Voces disponibles
@@ -52,23 +55,27 @@ export default function GoldRoom({ onLogout }) {
   const [salesClosed, setSalesClosed] = useState(false);
   const [salesMessage, setSalesMessage] = useState('');
   const [nextSessionTime, setNextSessionTime] = useState(null);
-const [pauseTimeout, setPauseTimeout] = useState(null); // Controlar pausa automática
-const [highlightedLine, setHighlightedLine] = useState(null); // Línea a resaltar
-const [cardWinningLines, setCardWinningLines] = useState({}); // {cardId: [0,1,2]} líneas ganadoras por cartón
+const [pauseTimeout, setPauseTimeout] = useState(null); // Controlar pausa autom�tica
+const [highlightedLine, setHighlightedLine] = useState(null); // L�nea a resaltar
+const [cardWinningLines, setCardWinningLines] = useState({}); // {cardId: [0,1,2]} l�neas ganadoras por cart�n
   const [sidebarOpen, setSidebarOpen] = useState(false); // Estado del sidebar
-  const [showCardSelection, setShowCardSelection] = useState(false); // Mostrar lobby de selección de cartones
+  const [showCardSelection, setShowCardSelection] = useState(false); // Mostrar lobby de selecci�n de cartones
   const [selectedPlayerCards, setSelectedPlayerCards] = useState([]); // Cartones seleccionados por el jugador
   const [cardsRemaining, setCardsRemaining] = useState(20); // Cartones que faltan por seleccionar
-  const [showReadyModal, setShowReadyModal] = useState(false); // Modal "¡¡Todo Listo!!"
+  const [showReadyModal, setShowReadyModal] = useState(false); // Modal "��Todo Listo!!"
   const [showHistoryModal, setShowHistoryModal] = useState(false); // Modal de historial de sorteos
+  const [showLateEntryModal, setShowLateEntryModal] = useState(false); // Modal info para entrada tard�a
+  const [lateEntryChecked, setLateEntryChecked] = useState(false); // Evitar mostrar m�ltiples veces
+  const [showLateBingoModal, setShowLateBingoModal] = useState(false); // Modal info BINGO tard�o
+  const [lateBingoChecked, setLateBingoChecked] = useState(false); // Evitar mostrar m�ltiples veces
 
-  // Calcular targetDate una sola vez (optimización)
+  // Calcular targetDate una sola vez (optimizaci�n)
   const nextDrawTime = useMemo(() => {
     const today = new Date();
     const drawTime = new Date(today);
     drawTime.setHours(22, 0, 0, 0); // Oro a las 22:00
     
-    // Si ya pasó las 22:00 hoy, programar para mañana
+    // Si ya pas� las 22:00 hoy, programar para ma�ana
     if (today > drawTime) {
       drawTime.setDate(drawTime.getDate() + 1);
     }
@@ -76,7 +83,7 @@ const [cardWinningLines, setCardWinningLines] = useState({}); // {cardId: [0,1,2
     return drawTime;
   }, []);
 
-  // Auto-cerrar modal "¡¡Todo Listo!!" después de 5 segundos
+  // Auto-cerrar modal "��Todo Listo!!" despu�s de 5 segundos
   useEffect(() => {
     if (showReadyModal) {
       const timer = setTimeout(() => {
@@ -85,21 +92,62 @@ const [cardWinningLines, setCardWinningLines] = useState({}); // {cardId: [0,1,2
       return () => clearTimeout(timer);
     }
   }, [showReadyModal]);
+
+  // Detectar entrada tardía: Si el jugador entra cuando ya se pagó línea Y NO fue el ganador
+  // IMPORTANTE: Solo mostrar si el usuario NO es el ganador (verificar via Socket.IO)
+  useEffect(() => {
+    // Solo mostrar modal de "otro jugador ganó" si:
+    // 1. lineWinnersPaid es true (el servidor ya pagó línea)
+    // 2. YO NO SOY el ganador (iAmTheLineWinner es false)
+    // 3. El usuario NO celebró su propia línea localmente
+    // 4. No hay cartones ganadores detectados localmente
+    // 5. El juego está activo
+    const userDidNotWin = !iAmTheLineWinner && celebratedCardIds.length === 0 && winnerCards.length === 0;
+    
+    if (lineWinnersPaid && !lateEntryChecked && gameStatus === 'active' && userDidNotWin) {
+      setLateEntryChecked(true);
+      setShowLateEntryModal(true);
+      setLineCelebrated(true); // Marcar línea como ya celebrada para no detectar más
+      
+      // Auto-cerrar modal después de 5 segundos
+      const timer = setTimeout(() => {
+        setShowLateEntryModal(false);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [lineWinnersPaid, lateEntryChecked, gameStatus, celebratedCardIds.length, winnerCards.length, iAmTheLineWinner]);
+
+  // Detectar entrada tardía BINGO: Si el jugador entra cuando ya se pagó BINGO y NO fue el ganador
+  useEffect(() => {
+    // Solo mostrar modal de "otro ganó BINGO" si YO NO soy el ganador
+    if (bingoWinnersPaid && !lateBingoChecked && !iAmTheBingoWinner) {
+      setLateBingoChecked(true);
+      setShowLateBingoModal(true);
+      setBingoCelebrated(true);
+      
+      // Auto-cerrar modal después de 5 segundos y redirigir al lobby
+      const timer = setTimeout(() => {
+        setShowLateBingoModal(false);
+        window.location.href = '/';
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [bingoWinnersPaid, lateBingoChecked, iAmTheBingoWinner]);
   
   // Estados para mejoras visuales
   const [toasts, setToasts] = useState([]); // Notificaciones toast
   const [showConfetti, setShowConfetti] = useState(false); // Confeti digital
   const [luckMeter, setLuckMeter] = useState(0); // Medidor de suerte (0-100)
   const [comboCount, setComboCount] = useState(0); // Contador de combo
-  const [lastComboTime, setLastComboTime] = useState(Date.now()); // Último tiempo de combo
+  const [lastComboTime, setLastComboTime] = useState(Date.now()); // �ltimo tiempo de combo
   
   // Nuevos estados para mejoras visuales adicionales
-  const [cardsDealing, setCardsDealing] = useState(false); // Animación de entrada de cartones
-  const [markedNumbers, setMarkedNumbers] = useState([]); // Números marcados con efecto
+  const [cardsDealing, setCardsDealing] = useState(false); // Animaci�n de entrada de cartones
+  const [markedNumbers, setMarkedNumbers] = useState([]); // N�meros marcados con efecto
   const [floatingEmojis, setFloatingEmojis] = useState([]); // Emojis flotantes
-  const [celebrationMode, setCelebrationMode] = useState(false); // Modo celebración full
-  const [winAmount, setWinAmount] = useState(0); // Monto ganado para animación
-  const [stateTransition, setStateTransition] = useState(''); // Transición entre estados
+  const [celebrationMode, setCelebrationMode] = useState(false); // Modo celebraci�n full
+  const [winAmount, setWinAmount] = useState(0); // Monto ganado para animaci�n
+  const [stateTransition, setStateTransition] = useState(''); // Transici�n entre estados
   const [columnCounts, setColumnCounts] = useState([0,0,0,0,0,0,0,0,0]); // Contador por columna
   
 // Efectos de festejo (fuera del componente o arriba)
@@ -111,7 +159,7 @@ celebrationAudio.volume = 0.7;
     const checkSalesStatus = async () => {
       try {
         const response = await fetch('/api/game/sales-status/oro', {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('playerToken') || localStorage.getItem('token')}` }
         });
         
         if (response.ok) {
@@ -121,7 +169,7 @@ celebrationAudio.volume = 0.7;
           setNextSessionTime(data.nextSession);
           
           if (!data.salesOpen) {
-            console.log(`🔒 Ventas cerradas: ${data.reason} - ${data.message}`);
+            console.log(`?? Ventas cerradas: ${data.reason} - ${data.message}`);
           }
         }
       } catch (error) {
@@ -138,7 +186,7 @@ celebrationAudio.volume = 0.7;
   // Verificar cartones existentes del jugador al montar
   // PERSISTENCIA: Los cartones se guardan en localStorage para no perderlos al salir de la sala
   useEffect(() => {
-    // Usar liveSessionId (sesión real del servidor) si está disponible, sino sessionId de URL
+    // Usar liveSessionId (sesi�n real del servidor) si est� disponible, sino sessionId de URL
     const activeSessionId = liveSessionId || sessionId;
     const STORAGE_KEY = `bingo_cards_oro_${activeSessionId}`;
     
@@ -153,7 +201,9 @@ celebrationAudio.volume = 0.7;
           if (cachedCards && cachedCards.length > 0) {
             console.log('📦 Cartones recuperados de localStorage:', cachedCards.length);
             setSelectedPlayerCards(cachedCards);
-            setCardsRemaining(20 - cachedCards.length);
+            // IMPORTANTE: Solo contar cartones PAGOS para el límite (no yapa/regalo)
+            const paidCardsFromCache = cachedCards.filter(c => !c.isGift).length;
+            setCardsRemaining(20 - paidCardsFromCache);
           }
         } catch (e) {
           console.log('Error parseando cache, ignorando');
@@ -163,7 +213,7 @@ celebrationAudio.volume = 0.7;
       // 2. Luego verificar con el servidor (fuente de verdad)
       try {
         const response = await fetch(`/api/game/my-cards?roomType=oro`, {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('playerToken') || localStorage.getItem('token')}` }
         });
         
         if (response.ok) {
@@ -172,18 +222,23 @@ celebrationAudio.volume = 0.7;
             id: card.id,
             serial: card.serial_number,
             numbers: JSON.parse(card.grid_numbers || '[]'),
-            room: card.room
+            room: card.room,
+            isGift: card.is_gift
           }));
           
-          console.log('🔍 DEBUG - Cartones cargados desde /my-cards:', currentCards.map(c => ({
+          console.log('📋 DEBUG - Cartones cargados desde /my-cards:', currentCards.map(c => ({
             id: c.id,
             serial: c.serial,
             hasSerial: !!c.serial,
-            hasNumbers: !!c.numbers
+            hasNumbers: !!c.numbers,
+            isGift: c.isGift
           })));
           
           setSelectedPlayerCards(currentCards);
-          const remaining = 20 - currentCards.length;
+          // IMPORTANTE: Solo contar cartones PAGOS para el límite de 20
+          // Los cartones de yapa/regalo NO cuentan para el límite
+          const paidCards = data.paidCards || currentCards.filter(c => !c.isGift).length;
+          const remaining = 20 - paidCards;
           setCardsRemaining(remaining);
           
           // Guardar en localStorage para persistencia
@@ -193,9 +248,9 @@ celebrationAudio.volume = 0.7;
           }
           
           if (remaining > 0) {
-            console.log(`📋 Tiene ${currentCards.length} cartones, faltan ${remaining}`);
+            console.log(`📊 Tiene ${paidCards} cartones PAGOS (${currentCards.length} total), faltan ${remaining}`);
           } else {
-            console.log('✅ Ya tiene 20 cartones completos');
+            console.log('✅ Ya tiene 20 cartones PAGOS completos');
           }
         }
       } catch (error) {
@@ -208,7 +263,7 @@ celebrationAudio.volume = 0.7;
     checkExistingCards();
   }, [sessionId, liveSessionId]);
 
-  // Generar número de serie del cartón: DDMMYY-S0001
+  // Generar n�mero de serie del cart�n: DDMMYY-S0001
   const generateCardSerial = (cardIndex, roomLetter = 'S') => {
     const now = new Date();
     const day = String(now.getDate()).padStart(2, '0');
@@ -243,11 +298,11 @@ celebrationAudio.volume = 0.7;
     const now = Date.now();
     const timeSinceLastBall = now - lastComboTime;
     
-    // Si pasó menos de 5 segundos, incrementar combo
+    // Si pas� menos de 5 segundos, incrementar combo
     if (timeSinceLastBall < 5000) {
       setComboCount(prev => prev + 1);
       if (comboCount > 0 && comboCount % 5 === 0) {
-        addToast('🔥', 'COMBO!', `${comboCount} números consecutivos`);
+        addToast('🔥', 'COMBO!', `${comboCount} n�meros consecutivos`);
       }
     } else {
       setComboCount(1);
@@ -271,7 +326,7 @@ celebrationAudio.volume = 0.7;
     }, 3000);
   };
   
-  // Marcar número con efecto
+  // Marcar n�mero con efecto
   const markNumberWithEffect = (number) => {
     setMarkedNumbers(prev => [...prev, { number, timestamp: Date.now() }]);
     audioService.playBolaCayendo(); // Sonido de match
@@ -280,7 +335,7 @@ celebrationAudio.volume = 0.7;
     }, 1500);
   };
   
-  // Activar modo celebración al ganar
+  // Activar modo celebraci�n al ganar
   const activateCelebration = (amount) => {
     setCelebrationMode(true);
     setWinAmount(amount);
@@ -295,7 +350,7 @@ celebrationAudio.volume = 0.7;
     }, 8000);
   };
   
-  // Transición de estado con efecto
+  // Transici�n de estado con efecto
   const transitionToState = (newState) => {
     setStateTransition('fade-out');
     setTimeout(() => {
@@ -354,7 +409,7 @@ celebrationAudio.volume = 0.7;
   }, []);
 
   // NOTA: El sorteo ahora viene del hook useLiveDraw via Socket.IO
-  // La simulación local fue eliminada - las bolas llegan en tiempo real del backend
+  // La simulaci�n local fue eliminada - las bolas llegan en tiempo real del backend
   
   // Actualizar contadores de columna cuando cambian las bolas
   useEffect(() => {
@@ -364,12 +419,12 @@ celebrationAudio.volume = 0.7;
   // Reproducir sonido cuando la bola CAE (currentBall se establece)
   useEffect(() => {
     if (currentBall) {
-      console.log(`🎱 [SONIDO] Bola cayendo AHORA: ${currentBall.number}`);
+      console.log(`?? [SONIDO] Bola cayendo AHORA: ${currentBall.number}`);
       audioService.playBolaCayendoConPausa();
     }
   }, [currentBall]);
   
-  // Animación de entrada de cartones
+  // Animaci�n de entrada de cartones
   useEffect(() => {
     if (selectedPlayerCards.length > 0 && !cardsDealing) {
       setCardsDealing(true);
@@ -392,18 +447,18 @@ celebrationAudio.volume = 0.7;
     }
   }, [gameStatus, previousGameStatus]);
 
-  // Función para obtener color según el número - Paleta Dorada
+  // Funci�n para obtener color seg�n el n�mero - Paleta Dorada
   const getBallColor = (number) => {
     // Tonos dorados variados para sala Oro - paleta completa dorada
-    if (number >= 1 && number <= 10) return '#FFD700'; // Oro estándar
-    if (number >= 11 && number <= 20) return '#FFC107'; // Ámbar
+    if (number >= 1 && number <= 10) return '#FFD700'; // Oro est�ndar
+    if (number >= 11 && number <= 20) return '#FFC107'; // �mbar
     if (number >= 21 && number <= 30) return '#FFAB00'; // Naranja dorado
     if (number >= 31 && number <= 40) return '#FF8F00'; // Naranja oscuro
     if (number >= 41 && number <= 50) return '#F57F17'; // Lima oscuro
-    if (number >= 51 && number <= 60) return '#FDD835'; // Amarillo limón
+    if (number >= 51 && number <= 60) return '#FDD835'; // Amarillo lim�n
     if (number >= 61 && number <= 70) return '#FFEA00'; // Amarillo
     if (number >= 71 && number <= 80) return '#FFD600'; // Amarillo oro
-    return '#FFCC00'; // Ámbar dorado (81-90)
+    return '#FFCC00'; // �mbar dorado (81-90)
   };
 
   // Organizar bolillas por decenas para el grid
@@ -417,9 +472,9 @@ celebrationAudio.volume = 0.7;
   // Usar cartones seleccionados por el jugador (si hay)
   const playerCards = selectedPlayerCards.length > 0 ? selectedPlayerCards : [];
 
-  // Handlers para selección de cartones
+  // Handlers para selecci�n de cartones
   const handleCardsSelected = (reservedCards, remainingTicketsFromBackend) => {
-    console.log('🔍 DEBUG - Cartones recibidos del backend:', reservedCards.map(c => ({
+    console.log('?? DEBUG - Cartones recibidos del backend:', reservedCards.map(c => ({
       id: c.id,
       serial: c.serial,
       hasSerial: !!c.serial
@@ -429,25 +484,25 @@ celebrationAudio.volume = 0.7;
     const allCards = [...selectedPlayerCards, ...reservedCards];
     setSelectedPlayerCards(allCards);
     
-    console.log('🔍 DEBUG - Todos los cartones después de combinar:', allCards.map(c => ({
+    console.log('?? DEBUG - Todos los cartones despu�s de combinar:', allCards.map(c => ({
       id: c.id,
       serial: c.serial,
       hasSerial: !!c.serial
     })));
     
-    // Usar el valor que viene del backend (ya descontó solo los comprados, no PLUS)
+    // Usar el valor que viene del backend (ya descont� solo los comprados, no PLUS)
     const remaining = remainingTicketsFromBackend ?? (20 - allCards.length);
     setCardsRemaining(remaining);
     setShowCardSelection(false);
-    console.log(`✅ Total de cartones: ${allCards.length}, faltan: ${remaining}`);
+    console.log(`? Total de cartones: ${allCards.length}, faltan: ${remaining}`);
     
-    // 💾 PERSISTENCIA: Guardar cartones en localStorage
-    // Usar liveSessionId (sesión real del servidor) si está disponible, sino sessionId de URL
+    // ?? PERSISTENCIA: Guardar cartones en localStorage
+    // Usar liveSessionId (sesi�n real del servidor) si est� disponible, sino sessionId de URL
     const activeSessionId = liveSessionId || sessionId;
     const STORAGE_KEY = `bingo_cards_oro_${activeSessionId}`;
     if (allCards.length > 0 && activeSessionId) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(allCards));
-      console.log('💾 Cartones guardados en localStorage después de selección');
+      console.log('?? Cartones guardados en localStorage despu�s de selecci�n');
     }
     
     // Si se completaron los 20 cartones, mostrar modal
@@ -457,7 +512,7 @@ celebrationAudio.volume = 0.7;
   };
 
   const handleCancelSelection = () => {
-    // Simplemente cerrar el lobby de selección
+    // Simplemente cerrar el lobby de selecci�n
     setShowCardSelection(false);
   };
 
@@ -465,16 +520,16 @@ celebrationAudio.volume = 0.7;
     return ballsDrawn.some(ball => ball.number === number);
   };
 
-  // Calcular progreso del cartón (números marcados de 15 totales)
+  // Calcular progreso del cart�n (n�meros marcados de 15 totales)
   const getCardProgress = (card) => {
     const allNumbers = card.numbers.flat().filter(n => n !== null && n !== undefined);
     const markedNumbers = allNumbers.filter(num => isNumberCalled(num));
-    return markedNumbers.length; // Retorna cantidad de números marcados (de 15)
+    return markedNumbers.length; // Retorna cantidad de n�meros marcados (de 15)
   };
 
-  // Expandir cartón (por click o por acierto)
+  // Expandir cart�n (por click o por acierto)
   const expandCard = (cardId) => {
-    // NO expandir si hay celebración de línea activa
+    // NO expandir si hay celebraci�n de l�nea activa
     if (winnerCards.length > 0 || lineCelebrated) {
       return;
     }
@@ -482,16 +537,16 @@ celebrationAudio.volume = 0.7;
     setCanCloseExpandedCard(false); // Bloquear cierre manual durante tiempo programado
     setTimeout(() => {
       setExpandedCard(null);
-      setCanCloseExpandedCard(true); // Restablecer después de cerrar
+      setCanCloseExpandedCard(true); // Restablecer despu�s de cerrar
     }, 3500); // 3.5 segundos expandido
   };
 
-  // Detectar cuando un número coincide con un cartón
+  // Detectar cuando un n�mero coincide con un cart�n
   useEffect(() => {
-    if (ballsDrawn.length > 0 && !lineCelebrated && winnerCards.length === 0) { // No expandir si hay festejo de línea
+    if (ballsDrawn.length > 0 && !lineCelebrated && winnerCards.length === 0) { // No expandir si hay festejo de l�nea
       const latestBall = ballsDrawn[ballsDrawn.length - 1];
       
-      // Buscar cartones que tienen este número
+      // Buscar cartones que tienen este n�mero
       playerCards.forEach(card => {
         const hasNumber = card.numbers.flat().includes(latestBall.number);
         if (hasNumber && expandedCard !== card.id) {
@@ -502,7 +557,7 @@ celebrationAudio.volume = 0.7;
     }
   }, [ballsDrawn]);
 
-  // Detectar líneas en BINGO 90 (solo horizontales - 3 filas)
+  // Detectar l�neas en BINGO 90 (solo horizontales - 3 filas)
   const checkLineStatus = (card) => {
     const lines = [];
     
@@ -516,7 +571,7 @@ celebrationAudio.volume = 0.7;
       });
     }
 
-    // Verificar cuántas bolillas faltan en cada línea
+    // Verificar cu�ntas bolillas faltan en cada l�nea
     const linesStatus = lines.map(lineData => {
       const missing = lineData.line.filter(num => !isNumberCalled(num));
       const marked = lineData.line.filter(num => isNumberCalled(num));
@@ -531,7 +586,7 @@ celebrationAudio.volume = 0.7;
     return linesStatus;
   };
 
-  // Detectar cartones a 1-2 números de línea y líneas completas
+  // Detectar cartones a 1-2 n�meros de l�nea y l�neas completas
   useEffect(() => {
   if (ballsDrawn.length === 0) {
     setAlmostLineCards([]);
@@ -542,10 +597,10 @@ celebrationAudio.volume = 0.7;
     return;
   }
 
-  // PREMIO ÚNICO: Si ya se celebró línea O el servidor marcó lineWinnersPaid, NO detectar más
-  // Esto evita que se marquen múltiples líneas como ganadoras después de la primera
+  // PREMIO �NICO: Si ya se celebr� l�nea O el servidor marc� lineWinnersPaid, NO detectar m�s
+  // Esto evita que se marquen m�ltiples l�neas como ganadoras despu�s de la primera
   if (lineCelebrated || lineWinnersPaid || celebratedCardIds.length > 0) {
-    // Solo detectar cartones "casi línea" para alertas, pero NO nuevas líneas ganadoras
+    // Solo detectar cartones "casi l�nea" para alertas, pero NO nuevas l�neas ganadoras
     const cardsAlmostThere = [];
     playerCards.forEach(card => {
       const linesStatus = checkLineStatus(card);
@@ -561,7 +616,7 @@ celebrationAudio.volume = 0.7;
       }
     });
     setAlmostLineCards(cardsAlmostThere);
-    return; // Salir temprano - no detectar más líneas ganadoras
+    return; // Salir temprano - no detectar m�s l�neas ganadoras
   }
 
   const cardsAlmostThere = [];
@@ -571,7 +626,7 @@ celebrationAudio.volume = 0.7;
   playerCards.forEach(card => {
     const linesStatus = checkLineStatus(card);
     const almostLines = linesStatus.filter(line => line.missing === 1 || line.missing === 2);
-    // PREMIO ÚNICO: Detectar línea completa solo si aún no hay ganador
+    // PREMIO �NICO: Detectar l�nea completa solo si a�n no hay ganador
     const completedLines = linesStatus.filter(line => line.missing === 0 && line.markedCount >= 5);
 
     if (almostLines.length > 0) {
@@ -585,7 +640,7 @@ celebrationAudio.volume = 0.7;
     }
 
     if (completedLines.length > 0) {
-      // Guardar qué filas (índices 0, 1, 2) están completas
+      // Guardar qu� filas (�ndices 0, 1, 2) est�n completas
       const winningRowIndices = completedLines.map(line => line.row);
       newCardWinningLines[card.id] = winningRowIndices;
       
@@ -600,77 +655,77 @@ celebrationAudio.volume = 0.7;
   });
 
   setAlmostLineCards(cardsAlmostThere);
-  setCardWinningLines(newCardWinningLines); // Actualizar líneas ganadoras
+  setCardWinningLines(newCardWinningLines); // Actualizar l�neas ganadoras
 
-  // Mostrar celebración si hay NUEVOS ganadores que NO han sido festejados
-  // ANTI-LOOP: Verificar que el cartón NO esté en celebratedCardIds Y que no haya celebración activa
+  // Mostrar celebraci�n si hay NUEVOS ganadores que NO han sido festejados
+  // ANTI-LOOP: Verificar que el cart�n NO est� en celebratedCardIds Y que no haya celebraci�n activa
   const newWinners = cardsWithWinningLines.filter(card => 
     !celebratedCardIds.includes(card.cardId)
   );
   
-  // PREMIO ÚNICO: Solo celebrar si lineWinnersPaid === false (primer ganador solamente)
+  // PREMIO �NICO: Solo celebrar si lineWinnersPaid === false (primer ganador solamente)
   if (newWinners.length > 0 && !lineCelebrated && winnerCards.length === 0 && !lineWinnersPaid) {
-    // Tomar el primer cartón ganador nuevo
+    // Tomar el primer cart�n ganador nuevo
     const winnerCard = newWinners[0];
     
     setWinnerCards([winnerCard]); // Solo el nuevo ganador
     setLineCelebrated(true);
     setCelebratedCardIds([...celebratedCardIds, winnerCard.cardId]); // Marcar como festejado
     
-    // Limpiar alertas de "casi línea" porque ya se ganó
+    // Limpiar alertas de "casi l�nea" porque ya se gan�
     setAlmostLineCards([]);
     
-    // 1. PRIMERO: Anunciar línea ganadora INMEDIATAMENTE (100ms para dar tiempo a que se active el audio)
+    // 1. PRIMERO: Anunciar l�nea ganadora INMEDIATAMENTE (100ms para dar tiempo a que se active el audio)
     setTimeout(() => {
-      console.log('[GoldRoom] 🎶 Reproduciendo voz: Felicitaciones, Ganaste Línea');
-      voiceService.speak('Felicitaciones, Ganaste Línea', { volume: 1.0, rate: 0.9 });
+      console.log('[GoldRoom] ?? Reproduciendo voz: Felicitaciones, Ganaste L�nea');
+      voiceService.speak('Felicitaciones, Ganaste L�nea', { volume: 1.0, rate: 0.9 });
     }, 100);
     
-    // 2. Toast de celebración (sin sonido)
-    addToast('🎉', '¡LÍNEA!', 'Has completado una línea', 8000);
+    // 2. Toast de celebraci�n (sin sonido)
+    addToast('🎯', '�L�NEA!', 'Has completado una l�nea', 8000);
     
     // 3. Activar confeti
     triggerConfetti();
     
-    // 4. DESPUÉS DE LA VOZ: Reproducir aplausos (1.5 segundos después para no interferir)
+    // 4. DESPU�S DE LA VOZ: Reproducir aplausos (1.5 segundos despu�s para no interferir)
     setTimeout(() => {
       celebrationAudio.currentTime = 0;
       celebrationAudio.play();
     }, 1500);
     
-    // 5. Pausar sorteo (pero NO anunciar "Sorteo Pausado" - se anunciará al reanudar)
+    // 5. Pausar sorteo (pero NO anunciar "Sorteo Pausado" - se anunciar� al reanudar)
     if (gameStatus === 'active') {
       setGameStatus('waiting');
       const timeout = setTimeout(() => {
-        // Anunciar continuación a BINGO antes de reanudar
+        // Anunciar continuaci�n a BINGO antes de reanudar
         voiceService.speak('Continuamos hasta Bingo');
         setTimeout(() => {
           // ORDEN IMPORTANTE: Limpiar ganadores PRIMERO pero NO resetear lineCelebrated
-          // lineCelebrated debe mantenerse TRUE para que no detecte más líneas ganadoras
-          // El premio de línea ya se pagó, ahora solo se puede ganar BINGO
+          // lineCelebrated debe mantenerse TRUE para que no detecte m�s l�neas ganadoras
+          // El premio de l�nea ya se pag�, ahora solo se puede ganar BINGO
           setWinnerCards([]);
           setHighlightedLine(null);
-          // NO RESETEAR: setLineCelebrated(false); -- mantener TRUE para evitar detectar más líneas
+          // NO RESETEAR: setLineCelebrated(false); -- mantener TRUE para evitar detectar m�s l�neas
           setGameStatus('active');
         }, 2000); // Esperar 2 segundos para que termine el anuncio
       }, 18000); // 18 segundos + 2 del anuncio = 20 segundos total
       setPauseTimeout(timeout);
     }
     
-    // 6. Resaltar la línea ganadora (primera del primer cartón)
+    // 6. Resaltar la l�nea ganadora (primera del primer cart�n)
     if (cardsWithWinningLines[0]?.lines?.length > 0) {
       setHighlightedLine(cardsWithWinningLines[0].lines[0].numbers);
     }
   }
 
-  // DETECTAR BINGO (Cartón completo - 15 números marcados)
+  // DETECTAR BINGO (Cart�n completo - 15 n�meros marcados)
   if (!bingoCelebrated && !lineCelebrated && winnerCards.length === 0) {
     playerCards.forEach(card => {
       const allNumbers = card.numbers.flat().filter(n => n !== null && n !== undefined);
       const markedNumbers = allNumbers.filter(num => isNumberCalled(num));
       
       if (markedNumbers.length === 15) {
-        console.log('[GoldRoom] 🎊 BINGO DETECTADO');
+        console.log('[GoldRoom] ?? BINGO DETECTADO');
         setBingoWinnerCard({
           cardId: card.id,
           cardSerial: card.serial || generateCardSerial(playerCards.indexOf(card), 'O'),
@@ -681,7 +736,7 @@ celebrationAudio.volume = 0.7;
         
         setTimeout(() => voiceService.speak('BINGO', { volume: 1.0, rate: 0.9 }), 100);
         setTimeout(() => voiceService.speak('Felicitaciones, Ganaste Bingo', { volume: 1.0, rate: 0.9 }), 1500);
-        addToast('🎊', '¡BINGO!', 'Has completado el cartón', 8000);
+        addToast('🏆', '�BINGO!', 'Has completado el cart�n', 8000);
         triggerConfetti();
         setTimeout(() => { celebrationAudio.currentTime = 0; celebrationAudio.play(); }, 2000);
         
@@ -692,7 +747,7 @@ celebrationAudio.volume = 0.7;
             setBingoWinnerCard(null); setBingoCelebrated(false); setGameStatus('waiting');
             setShowCardSelection(false); setCardsRemaining(2); setCelebratedCardIds([]);
             setWinnerCards([]); setLineCelebrated(false); audioService.stopBolilleroGirando();
-            addToast('✅', 'Juego Finalizado', 'Puedes comprar nuevos cartones', 5000);
+            addToast('?', 'Juego Finalizado', 'Puedes comprar nuevos cartones', 5000);
           }, 2000);
         }, 18000);
         return;
@@ -710,20 +765,20 @@ useEffect(() => {
   // Detectar cambios en el estado del juego y anunciar
   useEffect(() => {
     if (gameStatus === 'active' && previousGameStatus !== 'active') {
-      console.log('🎬 INICIANDO SORTEO - Activando bolillero INMEDIATAMENTE');
+      console.log('?? INICIANDO SORTEO - Activando bolillero INMEDIATAMENTE');
       
       audioService.startBolilleroGirando();
       audioService.lowerMusicVolume();
       
       if (previousGameStatus === 'waiting') {
         voiceService.announceSorteoIniciado();
-        addToast('🎲', '¡Sorteo iniciado!', 'Buena suerte');
+        addToast('🎰', '�Sorteo iniciado!', 'Buena suerte');
       } else if (previousGameStatus === 'paused') {
         voiceService.announceSorteoReiniciado();
       }
       
     } else if (gameStatus === 'waiting' && previousGameStatus === 'active') {
-      // NO anunciar "Sorteo Pausado" si hay línea celebrada (ya se anunció "Felicitaciones")
+      // NO anunciar "Sorteo Pausado" si hay l�nea celebrada (ya se anunci� "Felicitaciones")
       if (!lineCelebrated) {
         voiceService.announceSorteoPausado();
       }
@@ -737,12 +792,12 @@ useEffect(() => {
     setPreviousGameStatus(gameStatus);
   }, [gameStatus]);
 
-  // Anunciar número cantado
+  // Anunciar n�mero cantado
   useEffect(() => {
-    if (ballsDrawn.length > 0 && !lineCelebrated) { // No anunciar si hay festejo de línea
+    if (ballsDrawn.length > 0 && !lineCelebrated) { // No anunciar si hay festejo de l�nea
       const lastDrawnBall = ballsDrawn[ballsDrawn.length - 1];
       
-      // Anunciar el número con voz
+      // Anunciar el n�mero con voz
       setTimeout(() => {
         voiceService.announceNumber(lastDrawnBall.number);
       }, 500);
@@ -752,13 +807,13 @@ useEffect(() => {
       const luck = calculateLuck();
       setLuckMeter(luck);
       
-      // Detectar si el jugador acertó un número
+      // Detectar si el jugador acert� un n�mero
       const hasMatch = playerCards.some(card => 
         card.numbers.flat().includes(lastDrawnBall.number)
       );
       
       if (hasMatch) {
-        addToast('✨', '¡Acierto!', `Número ${lastDrawnBall.number}`);
+        addToast('?', '�Acierto!', `N�mero ${lastDrawnBall.number}`);
       }
     }
   }, [ballsDrawn.length]);
@@ -778,7 +833,7 @@ useEffect(() => {
         ))}
       </div>
 
-      {/* Panel de gamificación */}
+      {/* Panel de gamificaci�n */}
       {playerCards.length > 0 && (
         <div className="gamification-panel">
           {/* Avatar del jugador */}
@@ -831,13 +886,13 @@ useEffect(() => {
       {/* Contador Pre-40 (Posibilidad de Pozo) */}
       {gameStatus === 'active' && ballsDrawn.length < 40 && (
         <div className={`pre40-counter ${ballsDrawn.length >= 39 ? 'spin-exit' : ''}`}>
-          <div className="pre40-title">🎰 Posibilidad de Pozo Pre-40</div>
+          <div className="pre40-title">💰 Posibilidad de Pozo Pre-40</div>
           <div className="pre40-value">{40 - ballsDrawn.length}</div>
           <div className="pre40-label">Bolas restantes</div>
         </div>
       )}
 
-      {/* Lobby de selección de cartones (overlay sobre la sala) */}
+      {/* Lobby de selecci�n de cartones (overlay sobre la sala) */}
       {showCardSelection && (
         <CardSelectionLobby
           sessionId={sessionId || 'starter_default'}
@@ -850,10 +905,10 @@ useEffect(() => {
         />
       )}
 
-      {/* Sala de juego (solo visible después de seleccionar cartones) */}
+      {/* Sala de juego (solo visible despu�s de seleccionar cartones) */}
       {!showCardSelection && (
         <>
-          {/* Sidebar con información del jugador */}
+          {/* Sidebar con informaci�n del jugador */}
           <PlayerSidebar 
             isOpen={sidebarOpen} 
             onToggle={() => setSidebarOpen(!sidebarOpen)} 
@@ -862,7 +917,7 @@ useEffect(() => {
             accentColor="#FFD700"
           />
 
-          {/* CELEBRACIÓN DE BINGO GANADOR */}
+          {/* CELEBRACI�N DE BINGO GANADOR */}
           {bingoWinnerCard && (
 <div className="winner-celebration-overlay">
   <div className="celebration-content">
@@ -887,7 +942,69 @@ useEffect(() => {
 </div>
 )}
 
-          {/* CELEBRACIÓN DE LÍNEA GANADORA - Usa el cartón de la grilla con números marcados */}
+          {/* MODAL INFORMATIVO: Entrada tard�a - L�nea ya fue ganada */}
+          {showLateEntryModal && (
+            <div className="winner-celebration-overlay" style={{ backgroundColor: 'rgba(0,0,0,0.85)' }}>
+              <div className="celebration-content" style={{ maxWidth: '400px' }}>
+                <div style={{ fontSize: '48px', marginBottom: '16px' }}>💰</div>
+                <h2 style={{ color: '#FFD700', marginBottom: '12px' }}>Premio de Línea Ya Otorgado</h2>
+                <p style={{ color: '#fff', fontSize: '16px', lineHeight: '1.5' }}>
+                  El premio de LÍNEA ya fue ganado por otro jugador. 
+                  <br /><br />
+                  �Pero aún puedes ganar el <strong style={{ color: '#FFD700' }}>BINGO</strong>!
+                </p>
+                <button 
+                  onClick={() => setShowLateEntryModal(false)}
+                  style={{
+                    marginTop: '20px',
+                    padding: '12px 32px',
+                    backgroundColor: '#FFD700',
+                    color: '#000',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '16px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Entendido
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* MODAL INFORMATIVO: Entrada tard�a - BINGO ya fue ganado */}
+          {showLateBingoModal && (
+            <div className="winner-celebration-overlay" style={{ backgroundColor: 'rgba(0,0,0,0.95)' }}>
+              <div className="celebration-content" style={{ maxWidth: '400px' }}>
+                <div style={{ fontSize: '48px', marginBottom: '16px' }}>💰</div>
+                <h2 style={{ color: '#FFD700', marginBottom: '12px' }}>Sorteo Finalizado</h2>
+                <p style={{ color: '#fff', fontSize: '16px', lineHeight: '1.5' }}>
+                  El <strong style={{ color: '#FFD700' }}>BINGO</strong> ya fue ganado por otro jugador.
+                  <br /><br />
+                  Serás redirigido al lobby en unos segundos...
+                </p>
+                <button 
+                  onClick={() => { setShowLateBingoModal(false); window.location.href = '/'; }}
+                  style={{
+                    marginTop: '20px',
+                    padding: '12px 32px',
+                    backgroundColor: '#FFD700',
+                    color: '#000',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '16px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Ir al Lobby
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* CELEBRACI�N DE L�NEA GANADORA - Usa el cart�n de la grilla con n�meros marcados */}
           {winnerCards.length > 0 && !bingoWinnerCard && (
   <div className="winner-celebration-overlay">
     <div className="celebration-content">
@@ -1178,7 +1295,7 @@ useEffect(() => {
           </div>
         </div>
 
-        {/* Sección derecha: Título/Info arriba, Bolillero abajo */}
+        {/* Secci�n derecha: T�tulo/Info arriba, Bolillero abajo */}
         <div className="right-section">
           {/* Info superior */}
           <div className="side-info">
@@ -1205,10 +1322,11 @@ useEffect(() => {
                 🎱 Bola {ballsDrawn.length} de 90
               </div>
               <div className={`status-badge ${gameStatus}`}>
-                {gameStatus === 'waiting' && '⏸️ ESPERA'}
+                {gameStatus === 'waiting' && '⏳ PRÓXIMO'}
                 {gameStatus === 'active' && '🔴 EN VIVO'}
                 {gameStatus === 'ended' && '✅ FINALIZADO'}
               </div>
+              <ConnectionIndicator showLabel={false} />
             </div>
           </div>
 
@@ -1246,7 +1364,7 @@ useEffect(() => {
               </div>
             )}
 
-            {/* Estado de espera - Botón de Selección de Cartones */}
+            {/* Estado de espera - Bot�n de Selecci�n de Cartones */}
             {gameStatus === 'waiting' && cardsRemaining > 0 && !salesClosed && (
               <div className="card-selection-sphere">
                 <button 
@@ -1283,13 +1401,23 @@ useEffect(() => {
             {/* Mensaje de espera cuando no hay cartones disponibles */}
             {gameStatus === 'waiting' && cardsRemaining === 0 && !salesClosed && (
               <div className="waiting-message">
-                <div className="waiting-icon">⏳</div>
-                <div className="waiting-text">Esperando inicio...</div>
+                {selectedPlayerCards.length > 0 ? (
+                  <>
+                    <div className="waiting-icon">✅</div>
+                    <div className="waiting-text">¡{selectedPlayerCards.length}/20 Cartones!</div>
+                    <div className="waiting-subtext">Esperando inicio del sorteo...</div>
+                  </>
+                ) : (
+                  <>
+                    <div className="waiting-icon">⏳</div>
+                    <div className="waiting-text">Esperando inicio...</div>
+                  </>
+                )}
               </div>
             )}
           </div>
 
-          {/* Contador de Cartones eliminado - ahora está dentro del botón */}
+          {/* Contador de Cartones eliminado - ahora est� dentro del bot�n */}
 
           <div className="machine-base">
             <div className="base-panel"></div>
@@ -1332,15 +1460,15 @@ useEffect(() => {
             <span>MIS CARTONES</span>
           </div>
           
-          {/* Modal de Alerta de Casi Línea - Al lado del título */}
+          {/* Modal de Alerta de Casi L�nea - Al lado del t�tulo */}
           {almostLineCards.length > 0 && ballsDrawn.length < 40 && (() => {
             const minMissing = Math.min(...almostLineCards.map(card => card.minMissing));
             return (
               <div className="almost-line-modal">
                 <div className="almost-line-content">
-                  <span className="alert-icon-modal">⚡</span>
+                  <span className="alert-icon-modal">?</span>
                   <span className="alert-text-modal">
-                    ¡A {minMissing} NÚMERO{minMissing > 1 ? 'S' : ''} DE LÍNEA!
+                    �A {minMissing} N�MERO{minMissing > 1 ? 'S' : ''} DE L�NEA!
                   </span>
                 </div>
               </div>
@@ -1358,7 +1486,7 @@ useEffect(() => {
               
               // DEBUG: Log solo la primera vez o cuando cambia
               if (index === 0 && card.serial) {
-                console.log(`🔍 RENDER - Cartón ${index}: serial=${card.serial}, usando=${cardSerial}`);
+                console.log(`?? RENDER - Cart�n ${index}: serial=${card.serial}, usando=${cardSerial}`);
               }
               
               const progress = getCardProgress(card);
@@ -1397,7 +1525,7 @@ useEffect(() => {
             })}
           </div>
 
-          {/* Cartón expandido en el centro */}
+          {/* Cart�n expandido en el centro */}
           {expandedCard && (
             <div className="expanded-card-overlay" onClick={() => canCloseExpandedCard && setExpandedCard(null)}>
               <div className="expanded-card-container" onClick={(e) => e.stopPropagation()}>
@@ -1423,7 +1551,7 @@ useEffect(() => {
                   onClick={() => canCloseExpandedCard && setExpandedCard(null)}
                   style={{ opacity: canCloseExpandedCard ? 1 : 0.3, cursor: canCloseExpandedCard ? 'pointer' : 'not-allowed' }}
                 >
-                  ✕
+                  ?
                 </button>
               </div>
             </div>
@@ -1502,7 +1630,7 @@ useEffect(() => {
         </div>
       ))}
       
-      {/* Modo Celebración Full Screen */}
+      {/* Modo Celebraci�n Full Screen */}
       {celebrationMode && (
         <div className="celebration-overlay">
           <div className="celebration-content">
@@ -1530,13 +1658,13 @@ useEffect(() => {
         </div>
       )}
       
-      {/* Números Marcados con Efecto */}
+      {/* N�meros Marcados con Efecto */}
       {markedNumbers.map(mark => (
         <div 
           key={`mark-${mark.number}-${mark.timestamp}`} 
           className="marked-number-effect"
         >
-          <div className="marked-stamp">✓</div>
+          <div className="marked-stamp">?</div>
           <div className="marked-number">{mark.number}</div>
           <div className="marked-particles">
             {Array.from({ length: 8 }).map((_, i) => (
@@ -1546,11 +1674,11 @@ useEffect(() => {
         </div>
       ))}
 
-      {/* Modal "¡¡Todo Listo!!" cuando se completan 20 cartones */}
+      {/* Modal "��Todo Listo!!" cuando se completan 20 cartones */}
       {showReadyModal && (
         <div className="ready-modal-overlay">
           <div className="ready-modal-content gold-modal">
-            <div className="ready-modal-icon">🎉</div>
+            <div className="ready-modal-icon">🎮</div>
             <h2 className="ready-modal-title">¡¡Todo Listo!!</h2>
             <p className="ready-modal-subtitle">Tienes {selectedPlayerCards.length} cartones listos para jugar</p>
             <div className="ready-modal-countdown">

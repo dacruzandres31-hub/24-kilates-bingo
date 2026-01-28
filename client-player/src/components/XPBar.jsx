@@ -19,7 +19,7 @@ export default function XPBar() {
   const fetchProgress = async () => {
     try {
       const response = await axios.get('/api/gamification/progress', {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('playerToken') || localStorage.getItem('token')}` }
       });
       setProgress(response.data.data);
     } catch (error) {

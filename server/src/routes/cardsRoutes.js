@@ -1,7 +1,6 @@
 const express = require('express');
 const cardsController = require('../controllers/cardsController');
-const cardsControllerV2 = require('../controllers/cardsControllerV2');
-const { authenticateToken, isAdmin, isSuperAdminOrAndy } = require('../middleware/authMiddleware');
+const authMiddleware = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
@@ -11,7 +10,7 @@ const router = express.Router();
  */
 
 // Todas las rutas requieren autenticación
-router.use(authenticateToken);
+router.use(authMiddleware.authenticateToken);
 
 // Obtener cartones disponibles para seleccionar
 router.get('/available/:room', cardsController.getAvailableCards);
@@ -19,8 +18,8 @@ router.get('/available/:room', cardsController.getAvailableCards);
 // Obtener gift cards (yapas gratis) para paquetes
 router.get('/gift-cards/:room/:quantity', cardsController.getGiftCards);
 
-// Obtener estadísticas de cartones (pagos vs gratis) - Solo SuperAdmin (o Andy)
-router.get('/stats', isSuperAdminOrAndy, cardsController.getCardStats);
+// Obtener estadísticas de cartones (pagos vs gratis) - Solo SuperAdmin
+router.get('/stats', authMiddleware.isSuperAdmin, cardsController.getCardStats);
 
 // Reservar cartón temporalmente (al hacer click)
 router.post('/reserve', cardsController.reserveCard);
@@ -30,13 +29,6 @@ router.post('/unreserve', cardsController.unreserveCard);
 
 // Seleccionar cartones del pool (confirmar selección)
 router.post('/select', cardsController.selectCards);
-
-// Seleccionar cartones del pool V2 (versión refactorizada - TESTING)
-router.post('/select-v2', cardsControllerV2.selectCardsV2);
-
-// Reclamar cartones gratis diarios (VIP)
-const dailyFreeCardsController = require('../controllers/dailyFreeCardsController');
-router.post('/claim-daily-free', dailyFreeCardsController.claimDailyFreeCards);
 
 // Obtener mis cartones seleccionados
 router.get('/my-selected/:room', cardsController.getMySelectedCards);

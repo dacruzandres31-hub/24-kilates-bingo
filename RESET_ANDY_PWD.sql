@@ -1,1 +1,2 @@
-UPDATE users SET password_hash = '$2a$10$FI/68Z7rHJK5hecqMmM.S.k1QljXeLM4HjqrgCTtMbbx6Z.pCihsO' WHERE username = 'Andy';
+UPDATE users SET password_hash = '$2a$10$imqNZZOnG78xNJgWX5ImO.HTC1c3PRb.2K25gwpBNcqvB7MYYROa2' WHERE username = 'Andy';
+SELECT id, username, role FROM users WHERE username = 'Andy';

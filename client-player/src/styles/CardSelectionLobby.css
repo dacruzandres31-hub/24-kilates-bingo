@@ -15,43 +15,6 @@
   overflow: hidden;
 }
 
-/* Ghost Logo Background */
-.card-selection-lobby::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 1200px;
-  height: 1200px;
-  background-image: url('../assets/logo.png');
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: contain;
-  opacity: 0.4;
-  filter: blur(0.5px);
-  z-index: 0;
-  pointer-events: none;
-  animation: bg-logo-pulse 4s ease-in-out infinite;
-}
-
-@keyframes bg-logo-pulse {
-  0% {
-    transform: translate(-50%, -50%) scale(1);
-    opacity: 0.4;
-  }
-
-  50% {
-    transform: translate(-50%, -50%) scale(1.05);
-    opacity: 0.45;
-  }
-
-  100% {
-    transform: translate(-50%, -50%) scale(1);
-    opacity: 0.4;
-  }
-}
-
 .card-selection-lobby.loading,
 .card-selection-lobby.closed {
   display: flex;
@@ -70,9 +33,7 @@
 }
 
 @keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+  to { transform: rotate(360deg); }
 }
 
 .card-selection-lobby.loading p {
@@ -101,17 +62,8 @@
 }
 
 @keyframes pulse {
-
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-
-  50% {
-    opacity: 0.6;
-    transform: scale(1.1);
-  }
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.1); }
 }
 
 .closed-message h2 {
@@ -138,8 +90,6 @@
   border-bottom: 2px solid rgba(0, 212, 255, 0.3);
   background: rgba(0, 212, 255, 0.05);
   backdrop-filter: blur(10px);
-  position: relative;
-  z-index: 1;
 }
 
 .header-content {
@@ -229,53 +179,8 @@
   letter-spacing: 1px;
 }
 
-/* Drawing Indicator */
-.drawing-status {
-  border-color: #ff4444;
-  background: rgba(255, 0, 0, 0.1);
-}
-
-.drawing-indicator {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.drawing-dot {
-  width: 12px;
-  height: 12px;
-  background: #ff4444;
-  border-radius: 50%;
-  box-shadow: 0 0 10px #ff4444;
-  animation: blink 1s infinite;
-}
-
-.drawing-text {
-  font-size: 1.2rem;
-  font-weight: 800;
-  color: #ff4444;
-  letter-spacing: 1px;
-  text-shadow: 0 0 10px rgba(255, 0, 0, 0.4);
-}
-
-@keyframes blink {
-
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-
-  50% {
-    opacity: 0.5;
-    transform: scale(0.9);
-  }
-}
-
 /* Selection Counter */
 .selection-counter {
-  position: relative;
-  z-index: 1;
   padding: 15px 20px;
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(0, 212, 255, 0.3);
@@ -311,13 +216,10 @@
 }
 
 @keyframes bonusPulse {
-
-  0%,
-  100% {
+  0%, 100% {
     opacity: 1;
     transform: scale(1);
   }
-
   50% {
     opacity: 0.8;
     transform: scale(1.05);
@@ -350,8 +252,6 @@
   padding: 15px 30px;
   background: rgba(0, 0, 0, 0.4);
   border-top: 1px solid rgba(0, 212, 255, 0.2);
-  position: relative;
-  z-index: 1;
 }
 
 .refresh-cards-btn {
@@ -431,15 +331,14 @@
 /* Cards Grid */
 .cards-grid {
   flex: 1;
-  padding: 30px;
+  padding: 20px 15px;
   overflow-y: auto;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 25px;
-  gap: 25px;
+  gap: 15px;
   align-content: start;
-  position: relative;
-  z-index: 1;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .cards-grid::-webkit-scrollbar {
@@ -459,11 +358,13 @@
 .card-preview {
   background: rgba(0, 0, 0, 0.6);
   border: 2px solid rgba(0, 212, 255, 0.3);
-  border-radius: 15px;
-  padding: 15px;
+  border-radius: 12px;
+  padding: 10px;
   cursor: pointer;
   transition: all 0.3s ease;
   backdrop-filter: blur(5px);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .card-preview:hover {
@@ -528,15 +429,8 @@
 }
 
 @keyframes check-pulse {
-
-  0%,
-  100% {
-    transform: scale(1);
-  }
-
-  50% {
-    transform: scale(1.1);
-  }
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
 }
 
 .card-lock {
@@ -615,10 +509,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  align-items: center;
   gap: 20px;
-  position: relative;
-  z-index: 1;
 }
 
 .selection-info {
@@ -693,7 +584,7 @@
     gap: 15px;
     padding: 20px;
   }
-
+  
   .header-content {
     flex-direction: column;
     gap: 20px;
@@ -706,24 +597,24 @@
     gap: 10px;
     padding: 15px;
   }
-
+  
   .selection-header {
     padding: 15px;
   }
-
+  
   .header-title {
     font-size: 1.5rem;
   }
-
+  
   .header-subtitle {
     font-size: 0.9rem;
   }
-
+  
   .selection-footer {
     flex-direction: column;
     gap: 15px;
   }
-
+  
   .btn-back,
   .btn-confirm {
     width: 100%;
@@ -751,17 +642,8 @@
 }
 
 @keyframes gentle-pulse {
-
-  0%,
-  100% {
-    transform: scale(1);
-    filter: drop-shadow(0 0 15px rgba(255, 215, 0, 0.8));
-  }
-
-  50% {
-    transform: scale(1.05);
-    filter: drop-shadow(0 0 25px rgba(255, 215, 0, 1));
-  }
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 15px rgba(255, 215, 0, 0.8)); }
+  50% { transform: scale(1.05); filter: drop-shadow(0 0 25px rgba(255, 215, 0, 1)); }
 }
 
 .card-selection-lobby.theme-starter .header-title {
@@ -775,15 +657,8 @@
 }
 
 @keyframes gradient-shift {
-
-  0%,
-  100% {
-    background-position: 0% center;
-  }
-
-  50% {
-    background-position: 100% center;
-  }
+  0%, 100% { background-position: 0% center; }
+  50% { background-position: 100% center; }
 }
 
 .card-selection-lobby.theme-starter .stat-item {
@@ -818,15 +693,8 @@
 }
 
 @keyframes shimmer {
-
-  0%,
-  100% {
-    background-position: 0% center;
-  }
-
-  50% {
-    background-position: 100% center;
-  }
+  0%, 100% { background-position: 0% center; }
+  50% { background-position: 100% center; }
 }
 
 .card-selection-lobby.theme-starter .info-text {
@@ -905,9 +773,7 @@
    ============================================ */
 
 .card-selection-lobby.theme-bronze {
-  /* Fondo semi-transparente para ver el logo de la sala */
-  background: rgba(26, 15, 10, 0.75);
-  backdrop-filter: blur(5px);
+  background: linear-gradient(135deg, #1a0f0a 0%, #2d1810 50%, #3d1f15 100%);
 }
 
 .card-selection-lobby.theme-bronze .selection-header {
@@ -922,17 +788,8 @@
 }
 
 @keyframes bronze-pulse {
-
-  0%,
-  100% {
-    transform: scale(1);
-    filter: drop-shadow(0 0 15px rgba(205, 133, 63, 0.8));
-  }
-
-  50% {
-    transform: scale(1.05);
-    filter: drop-shadow(0 0 25px rgba(205, 133, 63, 1));
-  }
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 15px rgba(205, 133, 63, 0.8)); }
+  50% { transform: scale(1.05); filter: drop-shadow(0 0 25px rgba(205, 133, 63, 1)); }
 }
 
 .card-selection-lobby.theme-bronze .header-title {
@@ -946,15 +803,8 @@
 }
 
 @keyframes bronze-gradient-shift {
-
-  0%,
-  100% {
-    background-position: 0% center;
-  }
-
-  50% {
-    background-position: 100% center;
-  }
+  0%, 100% { background-position: 0% center; }
+  50% { background-position: 100% center; }
 }
 
 .card-selection-lobby.theme-bronze .stat-item {
@@ -989,15 +839,8 @@
 }
 
 @keyframes bronze-shimmer {
-
-  0%,
-  100% {
-    background-position: 0% center;
-  }
-
-  50% {
-    background-position: 100% center;
-  }
+  0%, 100% { background-position: 0% center; }
+  50% { background-position: 100% center; }
 }
 
 .card-selection-lobby.theme-bronze .info-text {
@@ -1373,13 +1216,8 @@
 }
 
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @keyframes slideIn {
@@ -1387,7 +1225,6 @@
     transform: translateY(-50px);
     opacity: 0;
   }
-
   to {
     transform: translateY(0);
     opacity: 1;
@@ -1395,15 +1232,8 @@
 }
 
 @keyframes pulse {
-
-  0%,
-  100% {
-    transform: scale(1);
-  }
-
-  50% {
-    transform: scale(1.1);
-  }
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
 }
 
 /* ============================================
@@ -1430,7 +1260,7 @@
   border-radius: 24px;
   padding: 50px 60px;
   text-align: center;
-  box-shadow:
+  box-shadow: 
     0 25px 80px rgba(0, 0, 0, 0.95),
     0 0 40px rgba(0, 212, 255, 0.4);
   border: 3px solid #00d4ff;
@@ -1442,28 +1272,28 @@
 /* Colores por sala */
 .success-modal-bronze {
   border-color: #b87333;
-  box-shadow:
+  box-shadow: 
     0 25px 80px rgba(0, 0, 0, 0.95),
     0 0 40px rgba(184, 115, 51, 0.5);
 }
 
 .success-modal-silver {
   border-color: #c0c0c0;
-  box-shadow:
+  box-shadow: 
     0 25px 80px rgba(0, 0, 0, 0.95),
     0 0 40px rgba(192, 192, 192, 0.5);
 }
 
 .success-modal-gold {
   border-color: #ffd700;
-  box-shadow:
+  box-shadow: 
     0 25px 80px rgba(0, 0, 0, 0.95),
     0 0 40px rgba(255, 215, 0, 0.5);
 }
 
 .success-modal-starter {
   border-color: #00d4ff;
-  box-shadow:
+  box-shadow: 
     0 25px 80px rgba(0, 0, 0, 0.95),
     0 0 40px rgba(0, 212, 255, 0.5);
 }
@@ -1475,15 +1305,8 @@
 }
 
 @keyframes bounce {
-
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-
-  50% {
-    transform: translateY(-20px);
-  }
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-20px); }
 }
 
 .success-modal h2 {
@@ -1513,7 +1336,6 @@
     opacity: 0;
     transform: translateY(-10px);
   }
-
   to {
     opacity: 1;
     transform: translateY(0);
@@ -1583,13 +1405,8 @@
 }
 
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @keyframes scaleIn {
@@ -1597,13 +1414,11 @@
     transform: scale(0.7);
     opacity: 0;
   }
-
   to {
     transform: scale(1);
     opacity: 1;
   }
 }
-
 /* ============================================
    GIFT CARDS - YAPAS GRATIS
    ============================================ */
@@ -1618,11 +1433,9 @@
     transform: scale(0.5) rotate(-10deg);
     opacity: 0;
   }
-
   60% {
     transform: scale(1.1) rotate(5deg);
   }
-
   100% {
     transform: scale(1) rotate(0deg);
     opacity: 1;
@@ -1647,13 +1460,10 @@
 }
 
 @keyframes giftBadgePulse {
-
-  0%,
-  100% {
+  0%, 100% {
     transform: scale(1);
     box-shadow: 0 4px 12px rgba(16, 185, 129, 0.5);
   }
-
   50% {
     transform: scale(1.1);
     box-shadow: 0 6px 16px rgba(16, 185, 129, 0.8);
@@ -1662,23 +1472,20 @@
 
 .gift-card-container .bingo-card-preview {
   border: 3px solid #10b981;
-  box-shadow:
+  box-shadow: 
     0 0 20px rgba(16, 185, 129, 0.4),
     0 8px 20px rgba(0, 0, 0, 0.3);
   animation: giftGlow 2s ease-in-out infinite;
 }
 
 @keyframes giftGlow {
-
-  0%,
-  100% {
-    box-shadow:
+  0%, 100% {
+    box-shadow: 
       0 0 20px rgba(16, 185, 129, 0.4),
       0 8px 20px rgba(0, 0, 0, 0.3);
   }
-
   50% {
-    box-shadow:
+    box-shadow: 
       0 0 30px rgba(16, 185, 129, 0.7),
       0 8px 25px rgba(0, 0, 0, 0.4);
   }

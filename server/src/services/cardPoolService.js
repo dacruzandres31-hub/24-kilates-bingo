@@ -49,7 +49,7 @@ class CardPoolService {
    */
   async initializePool(sessionId, totalCards = 10000, roomType = 'starter') {
     // PRIMERO: Verificar si ya existen cartones en BD
-    const checkQuery = 'SELECT COUNT(*) as count FROM card_pool WHERE session_id = ?';
+    const checkQuery = 'SELECT COUNT(*) as count FROM bingo_cards_pool WHERE game_session_id = ?';
     const [checkRows] = await db.query(checkQuery, [sessionId]);
 
     if (checkRows[0].count > 0) {
@@ -111,7 +111,7 @@ class CardPoolService {
 
     // Usar INSERT IGNORE para no fallar si ya existen
     const query = `
-      INSERT IGNORE INTO card_pool (id, session_id, serial, numbers, status)
+      INSERT IGNORE INTO bingo_cards_pool (id, game_session_id, card_serial, numbers, status)
       VALUES ?
     `;
 
@@ -272,9 +272,9 @@ class CardPoolService {
     const cardIds = cards.map(c => c.id);
 
     const query = `
-      UPDATE card_pool 
+      UPDATE bingo_cards_pool 
       SET status = 'reserved', reserved_by = ?, reserved_at = NOW()
-      WHERE id IN (?) AND session_id = ? AND status = 'available'
+      WHERE id IN (?) AND game_session_id = ? AND status = 'available'
     `;
 
     try {
@@ -296,9 +296,9 @@ class CardPoolService {
    */
   async loadPoolFromDB(sessionId) {
     const query = `
-      SELECT id, session_id, serial, numbers, status, reserved_by, is_gift
-      FROM card_pool
-      WHERE session_id = ?
+      SELECT id, game_session_id AS session_id, card_serial AS serial, numbers, status, reserved_by, is_gift
+      FROM bingo_cards_pool
+      WHERE game_session_id = ?
     `;
 
     try {

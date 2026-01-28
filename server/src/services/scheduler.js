@@ -5,6 +5,7 @@ const dailyGenerator = require('./dailyGenerator');
 const questManager = require('./quest_manager');
 const rankingEngine = require('./ranking_engine');
 const membershipService = require('./membershipService');
+const sessionWatchdog = require('./sessionWatchdog');
 
 /**
  * SCHEDULER - Orquestación de Cron Jobs
@@ -45,27 +46,32 @@ class Scheduler {
     console.log('[Scheduler] Iniciando...');
     this.isRunning = true;
 
-    // JOB 0: Auto-Draw Starter - Cada minuto, arrancar sesiones cuyo start_time <= NOW()
-    const autoDrawJob = cron.schedule('* * * * *', async () => {
+    // =========================================================================
+    // MASTER SCHEDULE JOB - Cada 10 segundos verifica estados de sesiones
+    // - T-5 min: Cierra ventas (status = 'closing')
+    // - T-1 min: Iniciando (status = 'starting')
+    // - T-0: Inicia sorteo (status = 'playing')
+    // =========================================================================
+    const masterScheduleJob = cron.schedule('*/10 * * * * *', async () => {
       try {
-        await this.checkAndStartPendingSessions();
+        await this.masterScheduleCheck();
       } catch (error) {
-        console.error('[Scheduler] Auto-Draw Starter error:', error.message);
+        console.error('[Scheduler] Master Schedule error:', error.message);
       }
     });
-    this.jobs.push({ name: 'Auto-Draw Starter', job: autoDrawJob });
-    console.log('[Scheduler] Job registrado: 🎱 Auto-Draw Starter (cada minuto)');
+    this.jobs.push({ name: 'Master Schedule', job: masterScheduleJob });
+    console.log('[Scheduler] Job registrado: ⏰ Master Schedule (cada 10 segundos)');
 
-    // JOB 1: T-5 Closure - Bloquear ventas (cada minuto, verificar si corresponde)
-    const t5Job = cron.schedule('* * * * *', async () => {
+    // JOB: Session Creator - Cada minuto, crear sesiones según schedule_settings
+    const sessionCreatorJob = cron.schedule('* * * * *', async () => {
       try {
-        await this.checkAndExecuteT5Closure();
+        await this.createScheduledSessions();
       } catch (error) {
-        console.error('[Scheduler] T-5 Closure error:', error.message);
+        console.error('[Scheduler] Session Creator error:', error.message);
       }
     });
-    this.jobs.push({ name: 'T-5 Closure', job: t5Job });
-    console.log('[Scheduler] Job registrado: T-5 Closure Monitor');
+    this.jobs.push({ name: 'Session Creator', job: sessionCreatorJob });
+    console.log('[Scheduler] Job registrado: 📅 Session Creator (cada minuto)');
 
     // JOB 2: Weekly Ranking Reset (Lunes 00:00)
     const weeklyRankingJob = cron.schedule('0 0 * * 1', async () => {
@@ -126,6 +132,19 @@ class Scheduler {
     this.jobs.push({ name: 'Expired Stock Cleanup', job: cleanupJob });
     console.log('[Scheduler] Job registrado: Cleanup Cartones Expirados (00:05 hs)');
 
+    // JOB: Ghost Cards Cleanup (cada 6 horas - limpieza de cartones fantasma)
+    const ghostCleanupJob = cron.schedule('30 */6 * * *', async () => {
+      try {
+        console.log('[Scheduler] Ejecutando: Ghost Cards Cleanup');
+        const stats = await sessionWatchdog.cleanupGhostCards();
+        console.log(`[Scheduler] ✅ Ghost Cleanup: ${stats.ghostCardsFromBingoCards} cartones fantasma eliminados`);
+      } catch (error) {
+        console.error('[Scheduler] Ghost Cleanup error:', error.message);
+      }
+    });
+    this.jobs.push({ name: 'Ghost Cards Cleanup', job: ghostCleanupJob });
+    console.log('[Scheduler] Job registrado: Ghost Cards Cleanup (cada 6h, :30 min)');
+
     // JOB: Membership Daily Benefits (00:10 cada día - entregar cartones/spins a miembros VIP)
     const membershipBenefitsJob = cron.schedule('10 0 * * *', async () => {
       try {
@@ -151,6 +170,94 @@ class Scheduler {
     console.log('[Scheduler] Job registrado: Sala Starter (19:00 hs)');
 
     console.log('[Scheduler] ✅ Todos los jobs iniciados correctamente');
+
+    // RECUPERACIÓN: Al iniciar, verificar si hay sesiones 'playing' huérfanas
+    // Si el servidor se reinició durante un sorteo, retomarlo o cerrarlo
+    setTimeout(async () => {
+      await this.recoverOrphanedSessions();
+    }, 5000); // Esperar 5 segundos para que todo esté inicializado
+  }
+
+  /**
+   * RECUPERACIÓN DE SESIONES HUÉRFANAS
+   * Si el servidor se reinició durante un sorteo activo, las sesiones quedan
+   * en estado 'playing' pero sin intervalo. Esta función:
+   * 1. Detecta sesiones 'playing' sin sorteo activo
+   * 2. Si llevan más de 20 minutos → las marca como completadas (timeout)
+   * 3. Si llevan menos de 20 minutos → intenta retomar el sorteo
+   */
+  async recoverOrphanedSessions() {
+    try {
+      console.log('[Scheduler] 🔍 Verificando sesiones huérfanas...');
+
+      const [orphanedSessions] = await pool.query(`
+        SELECT id, room, status, bingo_ball_index, start_time,
+               TIMESTAMPDIFF(MINUTE, start_time, NOW()) as minutes_elapsed
+        FROM game_sessions 
+        WHERE status = 'playing'
+        ORDER BY start_time DESC
+      `);
+
+      if (orphanedSessions.length === 0) {
+        console.log('[Scheduler] ✅ No hay sesiones huérfanas');
+        return;
+      }
+
+      console.log(`[Scheduler] ⚠️ Encontradas ${orphanedSessions.length} sesiones 'playing'`);
+
+      for (const session of orphanedSessions) {
+        const ballsDrawn = session.bingo_ball_index || 0;
+        const minutesElapsed = session.minutes_elapsed || 0;
+
+        console.log(`[Scheduler] 📋 Sesión #${session.id} (${session.room}): ${ballsDrawn} bolas, ${minutesElapsed} min`);
+
+        // CASO 1: Sorteo terminado (90 bolas) pero quedó en 'playing'
+        if (ballsDrawn >= 90) {
+          console.log(`[Scheduler] 🏁 Sesión #${session.id} completada (${ballsDrawn}/90 bolas) - Cerrando`);
+          await pool.query(
+            `UPDATE game_sessions SET status = 'completed' WHERE id = ?`,
+            [session.id]
+          );
+          continue;
+        }
+
+        // CASO 2: Más de 20 minutos sin actividad = timeout
+        if (minutesElapsed > 20) {
+          console.log(`[Scheduler] ⏰ Sesión #${session.id} timeout (${minutesElapsed} min) - Marcando como completada`);
+          await pool.query(
+            `UPDATE game_sessions SET status = 'completed' WHERE id = ?`,
+            [session.id]
+          );
+          continue;
+        }
+
+        // CASO 3: Menos de 20 minutos y no terminó - Intentar retomar
+        if (this.gameEngine) {
+          console.log(`[Scheduler] 🔄 Retomando sorteo de sesión #${session.id} (${ballsDrawn} bolas ya sorteadas)`);
+          try {
+            await this.gameEngine.startGame(session.id, { autoStart: true });
+            console.log(`[Scheduler] ✅ Sorteo #${session.id} retomado exitosamente`);
+          } catch (err) {
+            console.error(`[Scheduler] ❌ Error retomando sorteo #${session.id}:`, err.message);
+            // Si no se puede retomar, marcar como completada
+            await pool.query(
+              `UPDATE game_sessions SET status = 'completed' WHERE id = ?`,
+              [session.id]
+            );
+          }
+        } else {
+          console.log(`[Scheduler] ⚠️ GameEngine no disponible - Cerrando sesión #${session.id}`);
+          await pool.query(
+            `UPDATE game_sessions SET status = 'completed' WHERE id = ?`,
+            [session.id]
+          );
+        }
+      }
+
+      console.log('[Scheduler] ✅ Recuperación de sesiones huérfanas completada');
+    } catch (error) {
+      console.error('[Scheduler] Error en recuperación de sesiones:', error.message);
+    }
   }
 
   /**
@@ -166,7 +273,7 @@ class Scheduler {
       // Verificar si ya existe sesión hoy
       const [checkResult] = await pool.query(
         `SELECT id FROM game_sessions 
-         WHERE room = 'free_starter' AND DATE(start_time) = ?`,
+         WHERE room = 'starter' AND DATE(start_time) = ?`,
         [today]
       );
 
@@ -182,7 +289,7 @@ class Scheduler {
         // 1. Crear sesión
         const [sessionResult] = await connection.query(
           `INSERT INTO game_sessions (room, start_time, status, current_pot_bingo, current_pot_linea, current_pot_jackpot, is_preventa)
-           VALUES ('free_starter', ?, 'pending', 0.00, 0.00, 0.00, false)`,
+           VALUES ('starter', ?, 'pending', 0.00, 0.00, 0.00, false)`,
           [startTime]
         );
 
@@ -194,13 +301,18 @@ class Scheduler {
           await connection.query(
             `INSERT INTO daily_stock_cards 
              (room, serial_number, grid_numbers, play_date, play_time, status, price)
-             VALUES ('free_starter', ?, ?, ?, '19:00:00', 'available', 0.00)`,
+             VALUES ('starter', ?, ?, ?, '19:00:00', 'available', 0.00)`,
             [i, JSON.stringify(gridNumbers), today]
           );
         }
 
         await connection.query('COMMIT');
         console.log(`✅ Sala Starter creada: Sesión #${sessionId} con 20 cartones gratuitos`);
+
+        // 3. IMPORTANTE: Asignar cartones de bingo_cards_pool a esta sesión
+        // Los cartones en bingo_cards_pool son los que valida gameEngineAuto
+        await this.assignCardsToSession('starter', sessionId);
+        console.log(`✅ Cartones de bingo_cards_pool asignados a sesión starter #${sessionId}`);
 
       } finally {
         connection.release();
@@ -211,108 +323,500 @@ class Scheduler {
   }
 
   /**
-   * Verifica y ejecuta closure T-5 si corresponde
-   * Bloquea ventas y limpia cartones viejos 5 minutos antes de que termine la partida
+   * MASTER SCHEDULE CHECK - Controla transiciones de estado según horarios
+   * Ejecuta cada 10 segundos para precisión
+   * 
+   * Estados:
+   * - pending: Sesión creada, ventas abiertas
+   * - closing: T-5 min, ventas cerradas
+   * - starting: T-1 min, cuenta regresiva visual
+   * - playing: T-0, sorteo en curso
    */
-  async checkAndExecuteT5Closure() {
+  async masterScheduleCheck() {
     try {
       const now = new Date();
 
-      // Obtener todas las sesiones próximas a cerrarse
-      const [sessionsResult] = await pool.query(
-        `SELECT id, room, start_time FROM game_sessions 
-         WHERE status IN ('pending', 'active')
-         AND start_time IS NOT NULL`
-      );
+      // Obtener sesiones pendientes/closing/starting que tienen start_time
+      const [sessions] = await pool.query(`
+        SELECT id, room, status, start_time 
+        FROM game_sessions 
+        WHERE status IN ('pending', 'closing', 'starting')
+          AND start_time IS NOT NULL
+        ORDER BY start_time ASC
+      `);
 
-      for (const session of sessionsResult) {
+      for (const session of sessions) {
         const startTime = new Date(session.start_time);
-        const minutesUntilStart = (startTime - now) / (1000 * 60);
+        const secondsUntilStart = (startTime - now) / 1000;
+        const minutesUntilStart = secondsUntilStart / 60;
 
-        // Si faltan exactamente 5 minutos (con margen de 1 minuto para cron)
-        if (minutesUntilStart > 4 && minutesUntilStart <= 5) {
-          console.log(`[Scheduler T-5] Cerrando ventas para ${session.room} (faltan ${minutesUntilStart.toFixed(1)} min)`);
+        // ====== T-0: HORA EXACTA - INICIAR SORTEO ======
+        if (secondsUntilStart <= 0 && session.status !== 'playing') {
+          // Verificar que no haya otro sorteo activo DE LA MISMA SALA
+          // (Cada sala puede tener su propio sorteo en paralelo)
+          const [sameRoomPlaying] = await pool.query(
+            `SELECT id FROM game_sessions WHERE room = ? AND status = 'playing' LIMIT 1`,
+            [session.room]
+          );
+          
+          if (sameRoomPlaying.length > 0) {
+            console.log(`[MasterSchedule] ⏳ Esperando: ${session.room} #${session.id} (ya hay sorteo activo en esta sala)`);
+            continue;
+          }
 
-          // 1. Bloquear ventas
-          await stockManager.blockSales(new Date(session.start_time), session.room);
+          console.log(`[MasterSchedule] 🎱 T-0 HORA EXACTA: Iniciando sorteo ${session.room} #${session.id}`);
+          
+          await pool.query(
+            `UPDATE game_sessions SET status = 'active' WHERE id = ?`,
+            [session.id]
+          );
 
-          // 2. Limpiar cartones viejos (más de 24h)
-          const yesterday = new Date(now);
-          yesterday.setDate(yesterday.getDate() - 1);
-          await stockManager.cleanUnsoldStock(yesterday, session.room);
+          // Notificar a clientes que el sorteo va a empezar
+          if (this.gameEngine && this.gameEngine.io) {
+            this.gameEngine.io.to(`game_${session.room}`).emit('game_starting', {
+              sessionId: session.id,
+              room: session.room,
+              message: '¡El sorteo está comenzando!'
+            });
+          }
 
-          console.log(`[Scheduler T-5] ✅ Closure completado para ${session.room}`);
+          // Arrancar el motor de juego
+          if (this.gameEngine) {
+            await this.gameEngine.startGame(session.id, { autoStart: true });
+            console.log(`[MasterSchedule] ✅ Sorteo iniciado: ${session.room} #${session.id}`);
+          }
+          continue;
+        }
+
+        // ====== T-1: UN MINUTO ANTES - ESTADO "INICIANDO" ======
+        if (minutesUntilStart <= 1 && minutesUntilStart > 0 && session.status !== 'starting') {
+          console.log(`[MasterSchedule] ⏱️ T-1: ${session.room} #${session.id} - Estado INICIANDO (${secondsUntilStart.toFixed(0)}s)`);
+          
+          await pool.query(
+            `UPDATE game_sessions SET status = 'starting' WHERE id = ?`,
+            [session.id]
+          );
+
+          // Notificar a clientes con cuenta regresiva
+          if (this.gameEngine && this.gameEngine.io) {
+            this.gameEngine.io.to(`game_${session.room}`).emit('countdown_start', {
+              sessionId: session.id,
+              room: session.room,
+              secondsRemaining: Math.ceil(secondsUntilStart),
+              message: '¡Prepárate! El sorteo comienza pronto'
+            });
+          }
+          continue;
+        }
+
+        // ====== T-5: CINCO MINUTOS ANTES - CERRAR VENTAS ======
+        if (minutesUntilStart <= 5 && minutesUntilStart > 1 && session.status === 'pending') {
+          console.log(`[MasterSchedule] 🔒 T-5: ${session.room} #${session.id} - Cerrando ventas (${minutesUntilStart.toFixed(1)} min)`);
+          
+          await pool.query(
+            `UPDATE game_sessions SET status = 'closing' WHERE id = ?`,
+            [session.id]
+          );
+
+          // Liberar cartones no vendidos y asignarlos a la próxima sesión
+          await this.releaseUnsoldCardsToNextSession(session.id, session.room);
+
+          // Notificar a clientes que ventas están cerradas
+          if (this.gameEngine && this.gameEngine.io) {
+            this.gameEngine.io.to(`game_${session.room}`).emit('sales_closed', {
+              sessionId: session.id,
+              room: session.room,
+              minutesRemaining: Math.ceil(minutesUntilStart),
+              message: 'Las ventas están cerradas. El sorteo comenzará pronto.'
+            });
+          }
+          continue;
         }
       }
+
+      // Emitir actualizaciones de cuenta regresiva cada 10 segundos para sesiones 'starting'
+      const [startingSessions] = await pool.query(
+        `SELECT id, room, start_time FROM game_sessions WHERE status = 'starting'`
+      );
+
+      for (const session of startingSessions) {
+        const startTime = new Date(session.start_time);
+        const secondsRemaining = Math.max(0, Math.ceil((startTime - now) / 1000));
+
+        if (this.gameEngine && this.gameEngine.io) {
+          this.gameEngine.io.to(`game_${session.room}`).emit('countdown_update', {
+            sessionId: session.id,
+            room: session.room,
+            secondsRemaining,
+            message: secondsRemaining > 0 ? `Comienza en ${secondsRemaining}s` : '¡Comenzando!'
+          });
+        }
+      }
+
     } catch (error) {
-      console.error('[Scheduler T-5] Error en closure:', error);
+      console.error('[MasterSchedule] Error:', error.message);
     }
   }
 
   /**
-   * AUTO-DRAW STARTER
-   * Cada minuto busca sesiones pendientes cuyo start_time <= NOW()
-   * y las arranca automáticamente usando el gameEngine
+   * Verifica y ejecuta closure T-5 si corresponde
+   * NOTA: Esta función ahora es legacy, la lógica está en masterScheduleCheck
+   * Se mantiene por compatibilidad
+   */
+  async checkAndExecuteT5Closure() {
+    // La lógica ahora está en masterScheduleCheck()
+    // Esta función se mantiene vacía por compatibilidad
+  }
+
+  /**
+   * SESSION CREATOR - Nueva lógica de preparación anticipada
+   * 
+   * Flujo:
+   * 1. Cuando sala está en 'playing' → Crear próxima sesión + asignar cartones disponibles
+   * 2. Cuando sorteo termina → Cartones usados se archivan, próxima sesión queda lista
+   * 3. En T-5 (closing) → Cartones no vendidos se liberan para próxima sesión
+   * 
+   * Esto garantiza que siempre hay una sesión preparada mientras otra está sorteando.
+   */
+  async createScheduledSessions() {
+    try {
+      const rooms = ['starter', 'bronce', 'plata', 'oro'];
+      const now = new Date();
+      const currentDay = now.getDay();
+      const currentTime = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+
+      for (const room of rooms) {
+        try {
+          // Mapear room a formato de BD (ahora unificado)
+          const roomMap = {
+            'starter': 'starter',
+            'free_starter': 'starter',
+            'bronce': 'bronce',
+            'plata': 'plata',
+            'oro': 'oro'
+          };
+          const dbRoom = roomMap[room] || room;
+
+          // Verificar estado actual de la sala
+          const [currentSession] = await pool.query(`
+            SELECT id, status, start_time FROM game_sessions 
+            WHERE room = ? 
+              AND status IN ('pending', 'closing', 'starting', 'active', 'playing', 'waiting')
+            ORDER BY start_time DESC
+            LIMIT 1
+          `, [dbRoom]);
+
+          // ====== CASO 1: Sala está SORTEANDO - Crear próxima sesión ======
+          if (currentSession.length > 0 && currentSession[0].status === 'playing') {
+            // Verificar si ya existe la próxima sesión preparada
+            const [nextSession] = await pool.query(`
+              SELECT id, status FROM game_sessions 
+              WHERE room = ? 
+                AND status = 'pending'
+                AND start_time > NOW()
+              ORDER BY start_time ASC
+              LIMIT 1
+            `, [dbRoom]);
+
+            if (nextSession.length === 0) {
+              // No hay próxima sesión, crearla
+              const nextTime = await this.calculateNextScheduledTime(room, now);
+              
+              if (nextTime) {
+                // Verificar que no exista duplicado para ese horario
+                const [duplicateCheck] = await pool.query(`
+                  SELECT id FROM game_sessions 
+                  WHERE room = ? AND start_time = ? 
+                    AND status NOT IN ('completed', 'finished', 'cancelled')
+                  LIMIT 1
+                `, [dbRoom, nextTime]);
+
+                if (duplicateCheck.length === 0) {
+                  // Obtener Pre-40 acumulado para esta sala
+                  const accumulatedPre40 = await this.getAccumulatedPre40(dbRoom);
+                  
+                  const [sessionResult] = await pool.query(`
+                    INSERT INTO game_sessions 
+                    (room, start_time, status, current_pot_bingo, current_pot_linea, current_pot_jackpot, jackpot_pre40, is_preventa)
+                    VALUES (?, ?, 'pending', 0, 0, ?, ?, false)
+                  `, [dbRoom, nextTime, accumulatedPre40, accumulatedPre40]);
+
+                  const newSessionId = sessionResult.insertId;
+                  console.log(`[SessionCreator] ✅ Próxima sesión creada: #${newSessionId} para ${dbRoom} (mientras sortea) - Pre-40: $${accumulatedPre40.toFixed(2)}`);
+
+                  // Asignar cartones disponibles a la próxima sesión
+                  await this.assignCardsToSession(dbRoom, newSessionId);
+                }
+              }
+            }
+            continue; // Sala está sorteando, no hacer más
+          }
+
+          // ====== CASO 2: No hay sesión activa - Crear una ======
+          if (currentSession.length === 0) {
+            const nextTime = await this.calculateNextScheduledTime(room, now);
+            
+            if (nextTime) {
+              // Verificar duplicados
+              const [duplicateCheck] = await pool.query(`
+                SELECT id FROM game_sessions 
+                WHERE room = ? AND start_time = ? 
+                  AND status NOT IN ('completed', 'finished', 'cancelled')
+                LIMIT 1
+              `, [dbRoom, nextTime]);
+
+              if (duplicateCheck.length === 0) {
+                // Obtener Pre-40 acumulado para esta sala
+                const accumulatedPre40 = await this.getAccumulatedPre40(dbRoom);
+                
+                const [sessionResult] = await pool.query(`
+                  INSERT INTO game_sessions 
+                  (room, start_time, status, current_pot_bingo, current_pot_linea, current_pot_jackpot, jackpot_pre40, is_preventa)
+                  VALUES (?, ?, 'pending', 0, 0, ?, ?, false)
+                `, [dbRoom, nextTime, accumulatedPre40, accumulatedPre40]);
+
+                const newSessionId = sessionResult.insertId;
+                console.log(`[SessionCreator] ✅ Sesión creada: #${newSessionId} para ${dbRoom} - Próximo sorteo: ${nextTime.toLocaleString()} - Pre-40: $${accumulatedPre40.toFixed(2)}`);
+
+                // Asignar cartones disponibles a esta sesión
+                await this.assignCardsToSession(dbRoom, newSessionId);
+              }
+            }
+          }
+
+        } catch (sessionError) {
+          console.error(`[SessionCreator] Error creando sesión para ${room}:`, sessionError.message);
+        }
+      }
+    } catch (error) {
+      console.error('[SessionCreator] Error general:', error.message);
+    }
+  }
+
+  /**
+   * Calcula el próximo horario programado para una sala
+   */
+  async calculateNextScheduledTime(room, now) {
+    const currentDay = now.getDay();
+    const currentTime = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+
+    const [schedules] = await pool.query(`
+      SELECT day_of_week, hour
+      FROM schedule_settings
+      WHERE room = ? AND is_active = 1
+      ORDER BY day_of_week, hour
+    `, [room]);
+
+    if (schedules.length === 0) {
+      return null;
+    }
+
+    let nextTime = null;
+    let minDiff = Infinity;
+
+    for (const schedule of schedules) {
+      const [hour, minute, second] = schedule.hour.split(':').map(Number);
+      const scheduleTime = hour * 3600 + minute * 60 + (second || 0);
+      
+      let dayDiff = schedule.day_of_week - currentDay;
+      let timeDiff = scheduleTime - currentTime;
+
+      if (dayDiff === 0 && timeDiff <= 0) {
+        dayDiff = 7;
+      }
+      
+      if (dayDiff < 0) {
+        dayDiff += 7;
+      }
+
+      const totalDiff = dayDiff * 86400 + timeDiff;
+
+      if (totalDiff > 0 && totalDiff < minDiff) {
+        minDiff = totalDiff;
+        const nextDate = new Date(now);
+        nextDate.setDate(nextDate.getDate() + dayDiff);
+        nextDate.setHours(hour, minute, second || 0, 0);
+        nextTime = nextDate;
+      }
+    }
+
+    return nextTime;
+  }
+
+  /**
+   * Obtiene el pozo Pre-40 acumulado desde room_settings
+   * Este valor se acumula hasta que alguien gane BINGO antes de la bolilla 40
+   */
+  async getAccumulatedPre40(room) {
+    try {
+      const [settings] = await pool.query(`
+        SELECT accumulated_pot_pre40 FROM room_settings WHERE room = ?
+      `, [room]);
+      
+      if (settings.length > 0 && settings[0].accumulated_pot_pre40 > 0) {
+        console.log(`[SessionCreator] 💰 Pre-40 acumulado para ${room}: $${parseFloat(settings[0].accumulated_pot_pre40).toFixed(2)}`);
+        return parseFloat(settings[0].accumulated_pot_pre40) || 0;
+      }
+      return 0;
+    } catch (error) {
+      console.error(`[SessionCreator] Error obteniendo Pre-40 acumulado:`, error.message);
+      return 0;
+    }
+  }
+
+  /**
+   * Asigna cartones disponibles a una sesión específica
+   * Solo asigna cartones que NO están siendo usados en sorteo actual
+   */
+  async assignCardsToSession(dbRoom, sessionId) {
+    try {
+      // 1. Asignar cartones 'available' sin sesión asignada
+      const [result] = await pool.query(`
+        UPDATE bingo_cards_pool 
+        SET game_session_id = ?
+        WHERE room = ? 
+          AND status = 'available'
+          AND (game_session_id IS NULL OR game_session_id = 0)
+      `, [sessionId, dbRoom]);
+
+      if (result.affectedRows > 0) {
+        console.log(`[SessionCreator] 🎫 ${result.affectedRows} cartones 'available' asignados a sesión #${sessionId} (${dbRoom})`);
+      }
+
+      // 2. NUEVO: Migrar cartones 'selected' de sesiones terminadas a esta sesión
+      // Esto permite que los usuarios mantengan sus cartones entre sesiones
+      const [migratedResult] = await pool.query(`
+        UPDATE bingo_cards_pool bp
+        INNER JOIN game_sessions gs ON bp.game_session_id = gs.id
+        SET bp.game_session_id = ?
+        WHERE bp.room = ? 
+          AND bp.status = 'selected'
+          AND gs.status IN ('finished', 'completed', 'cancelled')
+      `, [sessionId, dbRoom]);
+
+      if (migratedResult.affectedRows > 0) {
+        console.log(`[SessionCreator] 🔄 ${migratedResult.affectedRows} cartones 'selected' migrados de sesiones anteriores a sesión #${sessionId} (${dbRoom})`);
+      }
+
+      return result.affectedRows + migratedResult.affectedRows;
+    } catch (error) {
+      console.error(`[SessionCreator] Error asignando cartones:`, error.message);
+      return 0;
+    }
+  }
+
+  /**
+   * Libera cartones no vendidos de una sesión y los asigna a la siguiente
+   * Se llama cuando una sesión cambia a 'closing' (T-5)
+   */
+  async releaseUnsoldCardsToNextSession(closingSessionId, room) {
+    try {
+      // Buscar la próxima sesión pendiente para esta sala
+      const [nextSession] = await pool.query(`
+        SELECT id FROM game_sessions 
+        WHERE room = ? 
+          AND status = 'pending'
+          AND id != ?
+        ORDER BY start_time ASC
+        LIMIT 1
+      `, [room, closingSessionId]);
+
+      if (nextSession.length === 0) {
+        console.log(`[SessionCreator] ⚠️ No hay próxima sesión para reasignar cartones de ${room}`);
+        return 0;
+      }
+
+      const nextSessionId = nextSession[0].id;
+
+      // Reasignar cartones 'available' (no vendidos) a la próxima sesión
+      const [result] = await pool.query(`
+        UPDATE bingo_cards_pool 
+        SET game_session_id = ?
+        WHERE room = ? 
+          AND game_session_id = ?
+          AND status = 'available'
+      `, [nextSessionId, room, closingSessionId]);
+
+      if (result.affectedRows > 0) {
+        console.log(`[SessionCreator] 🔄 ${result.affectedRows} cartones no vendidos reasignados de sesión #${closingSessionId} a #${nextSessionId}`);
+      }
+
+      return result.affectedRows;
+    } catch (error) {
+      console.error(`[SessionCreator] Error liberando cartones:`, error.message);
+      return 0;
+    }
+  }
+
+  /**
+   * Detecta y maneja sesiones huérfanas en estado 'playing' que no están en memoria
+   * Esto ocurre después de un reinicio de PM2 cuando hay sorteos en curso
+   */
+  async handleOrphanedPlayingSessions() {
+    try {
+      // Buscar sesiones en 'playing' que no están en memoria del gameEngine
+      const [playingSessions] = await pool.query(
+        `SELECT id, room, start_time FROM game_sessions WHERE status = 'playing'`
+      );
+
+      for (const session of playingSessions) {
+        const isInMemory = this.gameEngine.activeGames && this.gameEngine.activeGames.has(session.id);
+        
+        if (!isInMemory) {
+          console.log(`[Scheduler] ⚠️ Sesión huérfana detectada: #${session.id} (${session.room}) - en 'playing' pero no en memoria`);
+          
+          // Cambiar status a 'active' para que el scheduler la retome
+          await pool.query(
+            `UPDATE game_sessions SET status = 'active' WHERE id = ? AND status = 'playing'`,
+            [session.id]
+          );
+          console.log(`[Scheduler] 🔄 Sesión ${session.id} cambiada de 'playing' a 'active' para reanudar`);
+        }
+      }
+    } catch (error) {
+      console.error('[Scheduler] Error manejando sesiones huérfanas:', error.message);
+    }
+  }
+
+  /**
+   * AUTO-DRAW STARTER (Legacy/Recovery)
+   * Solo maneja sesiones huérfanas después de un reinicio de PM2.
+   * El inicio normal de sorteos lo maneja masterScheduleCheck.
    */
   async checkAndStartPendingSessions() {
     try {
       if (!this.gameEngine) {
-        // GameEngine no inyectado todavía - silently skip
         return;
       }
 
-      // Buscar sesiones pendientes que ya deberían haber empezado
-      const [pendingSessions] = await pool.query(
-        `SELECT id, room, start_time 
-         FROM game_sessions 
-         WHERE status = 'pending' 
-         AND start_time <= NOW()
-         ORDER BY start_time ASC`
+      // Solo manejar sesiones huérfanas (en 'playing' pero no en memoria)
+      await this.handleOrphanedPlayingSessions();
+
+      // Manejar sesiones en 'active' que no están corriendo (recovery después de reinicio)
+      const [activeSessions] = await pool.query(
+        `SELECT id, room FROM game_sessions WHERE status = 'active'`
       );
 
-      if (pendingSessions.length === 0) {
-        return; // No hay sesiones para iniciar
-      }
-
-      for (const session of pendingSessions) {
-        try {
-          // Verificar si ya está en memoria (evitar duplicados)
-          if (this.gameEngine.activeGames && this.gameEngine.activeGames.has(session.id)) {
-            console.log(`[AutoDraw] 🎮 Sesión ${session.id} (${session.room}) ya está activa en memoria`);
-            continue;
-          }
-
-          console.log(`[AutoDraw] 🎱 Iniciando sorteo automático: Sesión #${session.id} (${session.room})`);
-          
-          // Cambiar status de 'pending' a 'active' ANTES de llamar startGame
-          await pool.query(
-            `UPDATE game_sessions SET status = 'active' WHERE id = ? AND status = 'pending'`,
-            [session.id]
-          );
-          console.log(`[AutoDraw] 📍 Sesión ${session.id} marcada como active`);
-          
-          // Arrancar el sorteo
-          await this.gameEngine.startGame(session.id, { autoStart: true });
-          
-          console.log(`[AutoDraw] ✅ Sorteo arrancado: ${session.room} - Sesión #${session.id}`);
-          
-        } catch (gameError) {
-          console.error(`[AutoDraw] ❌ Error iniciando sesión ${session.id}:`, gameError.message);
-          
-          // Si hay error, marcar sesión como cancelada para no reintentar infinitamente
-          try {
-            await pool.query(
-              `UPDATE game_sessions SET status = 'cancelled' WHERE id = ?`,
-              [session.id]
-            );
-            console.log(`[AutoDraw] 🚫 Sesión ${session.id} marcada como cancelled`);
-          } catch (updateError) {
-            console.error(`[AutoDraw] Error marcando sesión como cancelled:`, updateError.message);
-          }
+      for (const session of activeSessions) {
+        if (this.gameEngine.activeGames && this.gameEngine.activeGames.has(session.id)) {
+          continue; // Ya está corriendo
         }
+
+        // Verificar que no haya otro sorteo activo
+        const [anyPlaying] = await pool.query(
+          `SELECT id FROM game_sessions WHERE status = 'playing' LIMIT 1`
+        );
+        
+        if (anyPlaying.length > 0) {
+          continue; // Hay otro sorteo activo
+        }
+
+        console.log(`[AutoDraw Recovery] 🔄 Reanudando sesión huérfana: ${session.room} #${session.id}`);
+        await this.gameEngine.startGame(session.id, { autoStart: true });
       }
+
     } catch (error) {
-      console.error('[AutoDraw] Error general:', error.message);
+      console.error('[AutoDraw] Error:', error.message);
     }
   }
 

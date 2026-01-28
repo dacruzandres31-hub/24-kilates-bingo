@@ -13,13 +13,53 @@
 }
 
 .wheel-modal {
-    /* Minimal container, mostly for controls below */
+    /* Container centrado vertical y horizontalmente */
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     width: 100%;
     height: 100%;
-    padding-top: 20px;
+    padding: 60px 20px 80px;
+    box-sizing: border-box;
+}
+
+/* Layout horizontal: Título + Rueda */
+.wheel-layout {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    width: 100%;
+    flex: 1;
+    position: relative;
+}
+
+/* Título lateral en 3 líneas - ocupa espacio izquierdo */
+.wheel-title-side {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: calc(50% - min(40vw, 40vh));
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #ffcc00;
+    font-family: 'Cinzel', serif;
+    font-size: 3.5rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    text-shadow: 0 0 30px rgba(255, 204, 0, 0.8), 0 0 60px rgba(255, 204, 0, 0.4);
+    letter-spacing: 6px;
+    line-height: 1.4;
+    z-index: 50;
+    text-align: center;
+}
+
+.wheel-title-side span {
+    display: block;
 }
 
 .wheel-title {
@@ -63,14 +103,14 @@
 /* ================= WHEEL CONTAINER (HUGE) ================= */
 .wheel-container {
     position: relative;
-    /* Make it fill most of the screen */
-    width: min(85vw, 85vh);
-    height: min(85vw, 85vh);
-    margin-top: 60px;
-    /* Space for title */
+    /* Rueda grande */
+    width: min(80vw, 80vh);
+    height: min(80vw, 80vh);
+    margin: 0;
     display: flex;
     justify-content: center;
     align-items: center;
+    flex-shrink: 0;
 }
 
 /* Outer Lights Ring */
@@ -433,7 +473,7 @@
     }
 }
 
-/* Cooldown Modal Styling */
+/* Cooldown Modal Styling - Centrado con la rueda */
 .cooldown-overlay {
     position: absolute;
     top: 50%;
@@ -451,9 +491,9 @@
     align-items: center;
     gap: 20px;
     backdrop-filter: blur(10px);
-    z-index: 1000;
+    z-index: 100;
     width: 90%;
-    max-width: 500px;
+    max-width: 450px;
 }
 
 .cooldown-overlay h3 {

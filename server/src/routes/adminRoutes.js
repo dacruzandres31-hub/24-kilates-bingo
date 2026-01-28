@@ -46,6 +46,7 @@ const scheduleController = require('../controllers/scheduleController');
 const paymentAccountsController = require('../controllers/paymentAccountsController');
 const diagnosticsController = require('../controllers/diagnosticsController');
 const adminAnalyticsController = require('../controllers/adminAnalyticsController');
+const giftCardsController = require('../controllers/giftCardsController');
 
 
 
@@ -414,6 +415,16 @@ router.delete('/memberships/subscriptions/:subscriptionId', authenticateToken, i
     connection.release();
   }
 });
+
+
+// ========================================
+// 🎁 CARTONES DE REGALO (Gift Cards)
+// Solo SuperAdmins pueden gestionar cartones de regalo
+// ========================================
+router.get('/gift-cards/stock/:userId', authenticateToken, isAdmin, giftCardsController.getGiftCardsStock);
+router.post('/gift-cards/add', authenticateToken, isAdmin, giftCardsController.addGiftCards);
+router.post('/gift-cards/remove', authenticateToken, isAdmin, giftCardsController.removeGiftCards);
+router.get('/gift-cards/history/:userId', authenticateToken, isAdmin, giftCardsController.getGiftCardsHistory);
 
 
 // CATCH-ALL 404 FOR ADMIN ROUTES

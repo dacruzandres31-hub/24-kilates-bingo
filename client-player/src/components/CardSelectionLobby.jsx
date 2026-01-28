@@ -6,19 +6,13 @@ import uiSoundService from '../services/uiSoundService';
 import axios from 'axios';
 import '../styles/CardSelectionLobby.css';
 
-const CardSelectionLobby = ({
-  sessionId,
-  onCardsSelected,
+const CardSelectionLobby = ({ 
+  sessionId, 
+  onCardsSelected, 
   onCancel,
   currentCards = 0, // Cartones ya seleccionados
   timeWindow = 'open', // 'open', 'closed', 'drawing'
-  roomTheme = 'starter', // 'starter', 'bronze', 'silver', 'gold'
-  isTourMode = false, // Modo tour interactivo
-  onTourFinish = null, // Callback al finalizar tour
-  onPackageSelected = null, // Callback al seleccionar paquete
-  onFirstCardSelected = null, // Callback al seleccionar primer cartón
-  freeCardsMode = false, // Modo cartones gratis VIP
-  freeCardsCount = 0 // Cantidad de cartones gratis disponibles
+  roomTheme = 'starter' // 'starter', 'bronze', 'silver', 'gold'
 }) => {
   const [availableCards, setAvailableCards] = useState([]);
   const [selectedCards, setSelectedCards] = useState([]);
@@ -26,8 +20,6 @@ const CardSelectionLobby = ({
   const [loading, setLoading] = useState(false); // Cambiado a false - solo cargar DESPUÉS de seleccionar paquete
   const [playersOnline, setPlayersOnline] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(null);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [nextDrawTime, setNextDrawTime] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [totalAvailable, setTotalAvailable] = useState(0);
   const [showExitWarning, setShowExitWarning] = useState(false);
@@ -35,10 +27,10 @@ const CardSelectionLobby = ({
   const [purchasedCount, setPurchasedCount] = useState(0);
   const [showInsufficientFundsModal, setShowInsufficientFundsModal] = useState(false);
   const [fundsError, setFundsError] = useState(null);
-
+  
   // Estados para el sistema de paquetes PLUS
-  const [showPackageModal, setShowPackageModal] = useState(!freeCardsMode); // No mostrar en modo free
-  const [selectedPackage, setSelectedPackage] = useState(freeCardsMode ? { id: 'free-vip', total: freeCardsCount, buy: 0, bonus: freeCardsCount } : null);
+  const [showPackageModal, setShowPackageModal] = useState(true); // Mostrar en todas las salas
+  const [selectedPackage, setSelectedPackage] = useState(null);
   const [giftCards, setGiftCards] = useState([]); // Gift cards PLUS
 
   // Manejar selección de paquete
@@ -46,15 +38,10 @@ const CardSelectionLobby = ({
     console.log('[CardSelection] Paquete seleccionado:', pkg);
     setSelectedPackage(pkg);
     setShowPackageModal(false);
-
-    // Notificar al tour si es necesario (FIX: Agregado para que avance el tour)
-    if (onPackageSelected) {
-      onPackageSelected(pkg);
-    }
-
+    
     // Limpiar gift cards (ya no se cargan automáticamente)
     setGiftCards([]);
-
+    
     // El jugador debe seleccionar TODOS los cartones manualmente
     if (pkg.total > 0) {
       // Paquete con cantidad específica (ej: 10+4 = 14 total)
@@ -75,22 +62,22 @@ const CardSelectionLobby = ({
       const response = await axios.get(`/api/cards/available/${roomTheme}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-
+      
       console.log('[CardSelection] Cartones recibidos:', response.data.cards);
       console.log('[CardSelection] Primer cartón:', response.data.cards[0]);
       console.log('[CardSelection] Length:', response.data.cards?.length);
-
+      
       setAvailableCards(response.data.cards || []);
-
+      
       // Solo ajustar maxCards si NO hay paquete seleccionado
       // Si hay paquete, mantener el total del paquete
       if (!selectedPackage || selectedPackage.total === 0) {
         const maxAllowed = Math.min(response.data.maxSelection || 20, 20 - currentCards);
         setMaxCards(maxAllowed);
       }
-
+      
       setTotalAvailable(response.data.totalAvailable || 0);
-
+      
       console.log('[CardSelection] Estado actualizado - availableCards length:', response.data.cards?.length);
       console.log('[CardSelection] Total disponibles en pool:', response.data.totalAvailable);
     } catch (error) {
@@ -103,62 +90,10 @@ const CardSelectionLobby = ({
     }
   }, [roomTheme, currentCards, selectedPackage]);
 
-  // Cargar estado de la sala (siguiente sorteo y si está sorteando)
-  const loadRoomStatus = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
-      const response = await axios.get(`/api/game/room-status/${roomTheme}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (response.data.success) {
-        setIsDrawing(response.data.isDrawing);
-        if (response.data.nextDraw) {
-          const drawDate = new Date(response.data.nextDraw);
-          setNextDrawTime(drawDate);
-
-          // Calcular segundos iniciales
-          const seconds = Math.max(0, Math.floor((drawDate - new Date()) / 1000));
-          setTimeRemaining(seconds);
-        }
-      }
-    } catch (error) {
-      console.error('[CardSelection] Error loading room status:', error);
-    }
-  }, [roomTheme]);
-
-  // Efecto para actualizar el contador cada segundo
-  useEffect(() => {
-    let interval = null;
-
-    if (nextDrawTime) {
-      interval = setInterval(() => {
-        const seconds = Math.max(0, Math.floor((nextDrawTime - new Date()) / 1000));
-        setTimeRemaining(seconds);
-
-        // Si llega a cero, refrescar estado de la sala por si cambió a sorteando
-        if (seconds === 0 && !isDrawing) {
-          loadRoomStatus();
-        }
-      }, 1000);
-    }
-
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [nextDrawTime, isDrawing, loadRoomStatus]);
-
-  // Cargar estado inicial y refrescar cada 30 segundos
-  useEffect(() => {
-    loadRoomStatus();
-    const statusInterval = setInterval(loadRoomStatus, 30000);
-    return () => clearInterval(statusInterval);
-  }, [loadRoomStatus]);
-
   // Ejecutar carga de cartones después de selección de paquete
   useEffect(() => {
     console.log('[CardSelection] useEffect ejecutado - roomTheme:', roomTheme, 'showPackageModal:', showPackageModal, 'selectedPackage:', selectedPackage);
-
+    
     // SOLO cargar cartones después de seleccionar paquete (modal cerrado)
     if (!showPackageModal && selectedPackage) {
       console.log('[CardSelection] Paquete PLUS seleccionado - cargando cartones disponibles');
@@ -181,24 +116,24 @@ const CardSelectionLobby = ({
     } else {
       // Si hay cartones seleccionados, mostrar nuevos cartones SIN perder selección
       setRefreshing(true);
-
+      
       try {
         const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
         const response = await axios.get(`/api/cards/available/${roomTheme}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-
+        
         // Actualizar cartones disponibles
         setAvailableCards(response.data.cards || []);
-
+        
         // Solo ajustar maxCards si NO hay paquete seleccionado
         if (!selectedPackage || selectedPackage.total === 0) {
           const maxAllowed = Math.min(response.data.maxSelection || 20, 20 - currentCards);
           setMaxCards(maxAllowed);
         }
-
+        
         setTotalAvailable(response.data.totalAvailable || 0);
-
+        
         console.log('[CardSelection] Cartones actualizados. Seleccionados mantenidos:', selectedCards.length);
         console.log('[CardSelection] Máximo de cartones permitido:', response.data.maxSelection);
       } catch (error) {
@@ -216,7 +151,7 @@ const CardSelectionLobby = ({
     uiSoundService.playClick();
 
     const isSelected = selectedCards.find(c => c.id === card.id);
-
+    
     // Mapear nombre de sala a español para backend
     const roomMap = {
       'bronze': 'bronce',
@@ -230,11 +165,11 @@ const CardSelectionLobby = ({
       // Deseleccionar - liberar reserva en backend
       try {
         const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
-        await axios.post('/api/cards/unreserve',
+        await axios.post('/api/cards/unreserve', 
           { cardId: card.id, room: roomDB },
           { headers: { 'Authorization': `Bearer ${token}` } }
         );
-
+        
         setSelectedCards(selectedCards.filter(c => c.id !== card.id));
         console.log('[CardSelection] Cartón liberado:', card.id);
       } catch (error) {
@@ -249,30 +184,15 @@ const CardSelectionLobby = ({
         return;
       }
 
-      // TOUR MODE BYPASS: Simular reserva exitosa sin backend
-      if (isTourMode) {
-        if (selectedCards.length === 0 && onFirstCardSelected) {
-          onFirstCardSelected();
-        }
-        setSelectedCards([...selectedCards, card]);
-        console.log('[CardSelection] Cartón reservado (Tour Mock):', card.id);
-        return;
-      }
-
       // Reservar en backend ANTES de agregar a la lista
       try {
         const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
-        const response = await axios.post('/api/cards/reserve',
+        const response = await axios.post('/api/cards/reserve', 
           { cardId: card.id, room: roomDB },
           { headers: { 'Authorization': `Bearer ${token}` } }
         );
 
         if (response.data.success) {
-          // En modo tour, si es el primer cartón, notificar
-          if (isTourMode && selectedCards.length === 0 && onFirstCardSelected) {
-            onFirstCardSelected();
-          }
-
           setSelectedCards([...selectedCards, card]);
           console.log('[CardSelection] Cartón reservado:', card.id);
         }
@@ -302,40 +222,13 @@ const CardSelectionLobby = ({
         return;
       }
     }
-
+    
+    // Si es paquete sin yapa (total=0), permitir cualquier cantidad de 1 a maxCards
     if (selectedPackage && selectedPackage.total === 0) {
       if (selectedCards.length > maxCards) {
         alert(`⚠️ Puedes seleccionar hasta ${maxCards} cartones\n\nActualmente tienes: ${selectedCards.length}`);
         return;
       }
-    }
-
-    // --- MODO TOUR: Simular éxito sin llamar al backend ---
-    if (isTourMode) {
-      console.log('[CardSelection] TOUR MODE - Simulando compra exitosa');
-      setPurchasedCount(selectedCards.length);
-      setShowSuccessModal(true);
-
-      // Simular delay y finalizar
-      setTimeout(() => {
-        setShowSuccessModal(false);
-        // Liberar selección localmente
-        setSelectedCards([]);
-
-        // Mock de cartones para visualizar en sala
-        const mockCards = selectedCards.map((c, i) => ({
-          ...c,
-          id: `tour-card-${i}`,
-          serial: c.card_serial || c.serial || `TOUR-00${i + 1}`
-        }));
-
-        if (onTourFinish) {
-          onTourFinish(mockCards); // Pasar cartones mock
-        } else {
-          onCancel();
-        }
-      }, 3000);
-      return;
     }
 
     try {
@@ -351,7 +244,7 @@ const CardSelectionLobby = ({
       // Enviar TODOS los IDs de cartones juntos
       // El backend usará packageInfo para determinar cuáles son gift
       const allCardIds = selectedCards.map(c => c.id);
-
+      
       console.log('[CardSelection] Confirmando selección:', {
         total: allCardIds.length,
         roomTheme,
@@ -361,7 +254,7 @@ const CardSelectionLobby = ({
       });
 
       const token = localStorage.getItem('playerToken') || localStorage.getItem('token');
-      const response = await axios.post('/api/cards/select',
+      const response = await axios.post('/api/cards/select', 
         {
           cardIds: allCardIds,         // TODOS los cartones
           room: roomDB,
@@ -392,7 +285,7 @@ const CardSelectionLobby = ({
     } catch (error) {
       console.error('Error reserving cards:', error);
       console.error('Error details:', error.response?.data);
-
+      
       // Error 402: Fondos insuficientes - mostrar modal especial
       if (error.response?.status === 402) {
         setFundsError(error.response.data);
@@ -401,7 +294,7 @@ const CardSelectionLobby = ({
         const errorMsg = error.response?.data?.error || error.response?.data?.message || 'Error seleccionando cartones';
         alert(`❌ ${errorMsg}`);
       }
-
+      
       // Recargar lista por si algunos cartones ya fueron tomados
       loadAvailableCards();
     }
@@ -411,7 +304,7 @@ const CardSelectionLobby = ({
   const handleExit = () => {
     // Reproducir sonido de clic
     uiSoundService.playClick();
-
+    
     // Siempre mostrar advertencia si hay cartones seleccionados
     if (selectedCards.length > 0) {
       setShowExitWarning(true);
@@ -437,7 +330,7 @@ const CardSelectionLobby = ({
     // Liberar cada cartón reservado
     for (const card of selectedCards) {
       try {
-        await axios.post('/api/cards/unreserve',
+        await axios.post('/api/cards/unreserve', 
           { cardId: card.id, room: roomDB },
           { headers: { 'Authorization': `Bearer ${token}` } }
         );
@@ -461,7 +354,7 @@ const CardSelectionLobby = ({
   };
 
   const getCardStatusColor = (status) => {
-    switch (status) {
+    switch(status) {
       case 'available': return 'available';
       case 'reserved': return 'reserved';
       case 'selected': return 'selected';
@@ -506,7 +399,7 @@ const CardSelectionLobby = ({
   console.log('[CardSelection] RENDER - availableCards:', availableCards);
   console.log('[CardSelection] RENDER - availableCards.length:', availableCards.length);
   console.log('[CardSelection] RENDER - loading:', loading);
-
+  
   // Mostrar modal de paquetes al inicio (sin early return)
   if (showPackageModal) {
     return (
@@ -532,7 +425,7 @@ const CardSelectionLobby = ({
       </div>
     );
   }
-
+  
   return (
     <div className={`card-selection-lobby theme-${roomTheme}`}>
       {/* Header */}
@@ -545,48 +438,43 @@ const CardSelectionLobby = ({
               <p className="header-subtitle">
                 {selectedPackage && selectedPackage.bonus > 0 ? (
                   <>
-                    Paquete: <strong>{selectedPackage.buy} para comprar + {selectedPackage.bonus} PLUS gratis</strong>
+                    Paquete: <strong>{selectedPackage.buy} para comprar + {selectedPackage.bonus} PLUS gratis</strong> 
                     {currentCards > 0 && ` (Ya tienes ${currentCards} en sala)`}
                   </>
                 ) : currentCards > 0 ? (
                   `Tienes ${currentCards} cartones. Selecciona hasta ${maxCards} más (Total: ${currentCards + maxCards} / 20)`
-                ) : (
+                ) : roomTheme === 'starter' ? (
                   `Elige hasta ${maxCards} cartones para jugar gratis`
+                ) : (
+                  `Elige hasta ${maxCards} cartones`
                 )}
               </p>
             </div>
           </div>
-
+          
           <div className="header-stats">
             <div className="stat-item">
               <FaUsers className="stat-icon" />
               <span className="stat-value">{playersOnline}</span>
               <span className="stat-label">Jugadores</span>
             </div>
-
-            {isDrawing ? (
-              <div className="stat-item drawing-status">
-                <div className="drawing-indicator">
-                  <span className="drawing-dot"></span>
-                  <span className="drawing-text">SORTEANDO EN VIVO</span>
-                </div>
-              </div>
-            ) : timeRemaining > 0 ? (
+            
+            {timeRemaining && (
               <div className="stat-item time">
                 <FaClock className="stat-icon" />
                 <span className="stat-value">{formatTimeRemaining(timeRemaining)}</span>
                 <span className="stat-label">Para iniciar</span>
               </div>
-            ) : null}
+            )}
           </div>
         </div>
-
+        
         {/* Contador de selección */}
         <div className="selection-counter">
           <div className="counter-content">
             <span className="counter-label">
-              {selectedPackage && selectedPackage.bonus > 0
-                ? `Selecciona ${selectedPackage.total} cartones (${selectedPackage.buy} para comprar + ${selectedPackage.bonus} yapas):`
+              {selectedPackage && selectedPackage.bonus > 0 
+                ? `Selecciona ${selectedPackage.total} cartones (${selectedPackage.buy} para comprar + ${selectedPackage.bonus} yapas):` 
                 : 'Cartones seleccionados:'}
             </span>
             <span className="counter-value">
@@ -597,8 +485,8 @@ const CardSelectionLobby = ({
             )}
           </div>
           <div className="counter-bar">
-            <div
-              className="counter-fill"
+            <div 
+              className="counter-fill" 
               style={{ width: `${(selectedCards.length / maxCards) * 100}%` }}
             ></div>
           </div>
@@ -607,11 +495,10 @@ const CardSelectionLobby = ({
 
       {/* Botón para actualizar cartones */}
       <div className="refresh-cards-container">
-        <button
+        <button 
           className={`refresh-cards-btn refresh-cards-btn-${roomTheme}`}
           onClick={handleRefreshCards}
           disabled={refreshing || loading}
-          id="btn-refresh-cards"
         >
           {refreshing ? '🔄 Actualizando...' : '💾 Reservar cartones seleccionados y Mostrar nuevos'}
         </button>
@@ -623,10 +510,10 @@ const CardSelectionLobby = ({
       {/* Grid de Cartones */}
       <div className="cards-grid">
         {/* Cartones normales disponibles para seleccionar */}
-        {availableCards.map((card, index) => {
-          console.log('[CardSelection] Rendering card:', card.id, 'serial:', card.card_serial || card.serial, 'numbers:', card.numbers);
+        {availableCards.map((card) => {
+          console.log('[CardSelection] Rendering card:', card.id, 'serial:', card.serial, 'numbers:', card.numbers);
           const selected = isCardSelected(card);
-
+          
           // Parsear números si vienen como string JSON
           let parsedNumbers = card.numbers;
           if (typeof card.numbers === 'string') {
@@ -638,19 +525,18 @@ const CardSelectionLobby = ({
               parsedNumbers = []; // Fallback a array vacío
             }
           }
-
+          
           return (
             <BingoCardPreview
               key={card.id}
               card={{
-                card_serial: card.card_serial || card.serial,
+                card_serial: card.serial,
                 numbers: parsedNumbers
               }}
               room={roomTheme}
               selected={selected}
               onClick={() => handleCardToggle(card)}
               showSerial={true}
-              id={index === 0 ? 'card-grid-item-0' : undefined}
             />
           );
         })}
@@ -659,25 +545,24 @@ const CardSelectionLobby = ({
 
       {/* Footer con acciones */}
       <div className="selection-footer">
-        <button
-          className="btn-back"
+        <button 
+          className="btn-back" 
           onClick={handleExit}
           title="Regresar a la sala"
         >
           <FaArrowLeft /> Regresar a la Sala
         </button>
-
+        
         <div className="selection-info">
           <span className="info-text">
-            {selectedCards.length > 0
+            {selectedCards.length > 0 
               ? `${selectedCards.length} cartón${selectedCards.length > 1 ? 'es' : ''} seleccionado${selectedCards.length > 1 ? 's' : ''}`
               : 'Selecciona cartones o regresa a la sala'}
           </span>
         </div>
-
-        <button
-          className="btn-confirm"
-          id="btn-confirm-selection"
+        
+        <button 
+          className="btn-confirm" 
           onClick={handleConfirmSelection}
           disabled={selectedCards.length === 0}
         >
@@ -692,7 +577,7 @@ const CardSelectionLobby = ({
             <div className="warning-icon">⚠️</div>
             <h2>¿Salir sin confirmar?</h2>
             <p>
-              Tienes <strong>{selectedCards.length} {selectedCards.length > 1 ? 'cartones' : 'cartón'} reservado{selectedCards.length > 1 ? 's' : ''}</strong>.
+              Tienes <strong>{selectedCards.length} cartón{selectedCards.length > 1 ? 'es' : ''} reservado{selectedCards.length > 1 ? 's' : ''}</strong>.
             </p>
             <p>
               Si sales sin confirmar, perderás la reserva de estos cartones y otros jugadores podrán tomarlos.
@@ -718,7 +603,7 @@ const CardSelectionLobby = ({
             {selectedPackage && selectedPackage.bonus > 0 ? (
               <>
                 <p className="success-count">
-                  {selectedPackage.buy} {selectedPackage.buy > 1 ? 'cartones' : 'cartón'} comprado{selectedPackage.buy > 1 ? 's' : ''}
+                  {selectedPackage.buy} cartón{selectedPackage.buy > 1 ? 'es' : ''} comprado{selectedPackage.buy > 1 ? 's' : ''}
                 </p>
                 <p className="success-bonus">
                   🎁 + {selectedPackage.bonus} PLUS{selectedPackage.bonus > 1 ? '' : ''} gratis
@@ -729,7 +614,7 @@ const CardSelectionLobby = ({
               </>
             ) : (
               <p className="success-count">
-                {purchasedCount} {purchasedCount > 1 ? 'cartones' : 'cartón'} confirmado{purchasedCount > 1 ? 's' : ''}
+                {purchasedCount} cartón{purchasedCount > 1 ? 'es' : ''} confirmado{purchasedCount > 1 ? 's' : ''}
               </p>
             )}
             <p className="success-message">Redirigiendo a la sala...</p>
@@ -747,9 +632,9 @@ const CardSelectionLobby = ({
             <p style={{ marginBottom: '15px' }}>
               No tienes suficientes tickets ni balance para seleccionar <strong>{fundsError?.cardsRequested || 0} cartones</strong>.
             </p>
-            <div style={{
-              backgroundColor: 'rgba(255, 255, 255, 0.1)',
-              padding: '15px',
+            <div style={{ 
+              backgroundColor: 'rgba(255, 255, 255, 0.1)', 
+              padding: '15px', 
               borderRadius: '10px',
               marginBottom: '15px',
               textAlign: 'left'
@@ -768,8 +653,8 @@ const CardSelectionLobby = ({
               📞 Por favor contacta a tu agente para recargar tu balance
             </p>
             <div className="warning-actions">
-              <button
-                className="btn-confirm-exit"
+              <button 
+                className="btn-confirm-exit" 
                 onClick={() => setShowInsufficientFundsModal(false)}
                 style={{ width: '100%' }}
               >

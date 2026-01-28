@@ -478,7 +478,7 @@ exports.selectCards = async (req, res) => {
     // giftCount ya está definido al inicio de la función
     
     // ========================================
-    // BUSCAR SESIÓN PENDIENTE PARA LA SALA
+    // BUSCAR SESIÓN PARA LA SALA
     // Los cartones se asignan a la sesión cuando se seleccionan
     // ========================================
     let pendingSessionId = null;
@@ -486,18 +486,25 @@ exports.selectCards = async (req, res) => {
     // Para sala starter, el room en la BD es 'starter'
     const dbRoom = room === 'starter' ? 'starter' : room;
     
-    const [pendingSession] = await connection.query(
-      `SELECT id FROM game_sessions 
-       WHERE room = ? AND status IN ('pending', 'preventa') 
-       ORDER BY start_time ASC LIMIT 1`,
-      [dbRoom]
+    // Para starter: buscar sesión activa (playing/starting) o pendiente
+    // Para otras salas: solo pendiente/preventa
+    const statusList = dbRoom === 'starter' 
+      ? ['playing', 'starting', 'pending', 'preventa']
+      : ['pending', 'preventa'];
+    
+    const [sessionResult] = await connection.query(
+      `SELECT id, status FROM game_sessions 
+       WHERE room = ? AND status IN (?) 
+       ORDER BY FIELD(status, 'playing', 'starting', 'pending', 'preventa'), start_time ASC 
+       LIMIT 1`,
+      [dbRoom, statusList]
     );
     
-    if (pendingSession.length > 0) {
-      pendingSessionId = pendingSession[0].id;
-      console.log(`[Cards] 🎯 Sesión pendiente encontrada: ${pendingSessionId} para sala ${dbRoom}`);
+    if (sessionResult.length > 0) {
+      pendingSessionId = sessionResult[0].id;
+      console.log(`[Cards] 🎯 Sesión encontrada: ${pendingSessionId} (${sessionResult[0].status}) para sala ${dbRoom}`);
     } else {
-      console.log(`[Cards] ⚠️ No hay sesión pendiente para sala ${dbRoom} - cartones quedarán sin asignar`);
+      console.log(`[Cards] ⚠️ No hay sesión para sala ${dbRoom} - cartones quedarán sin asignar`);
     }
     
     // Marcar todos los cartones como seleccionados con el game_session_id
@@ -604,42 +611,28 @@ exports.selectCards = async (req, res) => {
       // ========================================
       // ACTUALIZAR POZOS DE LA SESIÓN
       // Solo cartones COMPRADOS contribuyen (gift cards NO)
+      // USAR pendingSessionId que ya se calculó arriba
       // ========================================
       
-      // Obtener precio del cartón según la sala
-      const [roomSettings] = await connection.query(
-        `SELECT card_price FROM room_settings WHERE room = ? LIMIT 1`,
-        [room]
-      );
-
-      if (roomSettings && roomSettings.length > 0) {
-        const cardCost = parseFloat(roomSettings[0].card_price);
-        const totalRevenue = cardCost * purchasedCount; // Solo cartones comprados
-
-        // Distribuir según porcentajes: 50% Bingo, 15% Línea, 5% Jackpot
-        const bigoAmount = totalRevenue * 0.50;
-        const lineaAmount = totalRevenue * 0.15;
-        const jackpotAmount = totalRevenue * 0.05;
-        // 30% se queda en house (no entra aquí)
-
-        console.log(`[Cards] 💰 Contribución a pozos: ${purchasedCount} cartones × $${cardCost} = $${totalRevenue} → Bingo: $${bigoAmount}, Línea: $${lineaAmount}, Jackpot: $${jackpotAmount}`);
-
-        // Encontrar sesión pendiente de hoy
-        const todayStart = new Date();
-        todayStart.setHours(0, 0, 0, 0);
-        const todayEnd = new Date();
-        todayEnd.setHours(23, 59, 59, 999);
-        
-        const [sessionResult] = await connection.query(
-          `SELECT id FROM game_sessions 
-           WHERE room = ? AND status = 'pending' 
-           AND start_time >= ? AND start_time <= ?
-           ORDER BY created_at DESC LIMIT 1`,
-          [room, todayStart, todayEnd]
+      if (pendingSessionId) {
+        // Obtener precio del cartón según la sala
+        const [roomSettings] = await connection.query(
+          `SELECT card_price FROM room_settings WHERE room = ? LIMIT 1`,
+          [room]
         );
 
-        if (sessionResult.length > 0) {
-          const sessionId = sessionResult[0].id;
+        if (roomSettings && roomSettings.length > 0) {
+          const cardCost = parseFloat(roomSettings[0].card_price);
+          const totalRevenue = cardCost * purchasedCount; // Solo cartones comprados
+
+          // Distribuir según porcentajes: 50% Bingo, 15% Línea, 5% Jackpot
+          const bigoAmount = totalRevenue * 0.50;
+          const lineaAmount = totalRevenue * 0.15;
+          const jackpotAmount = totalRevenue * 0.05;
+          // 30% se queda en house (no entra aquí)
+
+          console.log(`[Cards] 💰 Contribución a pozos: ${purchasedCount} cartones × $${cardCost} = $${totalRevenue} → Bingo: $${bigoAmount}, Línea: $${lineaAmount}, Jackpot: $${jackpotAmount}`);
+
           await connection.query(
             `UPDATE game_sessions 
              SET current_pot_bingo = current_pot_bingo + ?,
@@ -650,15 +643,17 @@ exports.selectCards = async (req, res) => {
                  jackpot_pre40 = jackpot_pre40 + ?,
                  updated_at = NOW()
              WHERE id = ?`,
-            [bigoAmount, lineaAmount, jackpotAmount, bigoAmount, lineaAmount, jackpotAmount, sessionId]
+            [bigoAmount, lineaAmount, jackpotAmount, bigoAmount, lineaAmount, jackpotAmount, pendingSessionId]
           );
-          console.log(`[Cards] ✅ Pozos actualizados en sesión ${sessionId} (current_pot + jackpot)`);
+          console.log(`[Cards] ✅ Pozos actualizados en sesión ${pendingSessionId} (current_pot + jackpot)`);
           
           // Emitir actualización de pozos en vivo
           websocketService.emitPotsUpdate();
         } else {
-          console.log(`[Cards] ⚠️ No se encontró sesión pendiente para hoy en sala ${room}`);
+          console.log(`[Cards] ⚠️ No se encontró configuración de precio para sala ${room}`);
         }
+      } else {
+        console.log(`[Cards] ⚠️ No hay sesión pendiente para sala ${room} - pozos no actualizados`);
       }
     } else {
       console.log('[Cards] 🎁 Sala Starter - No se descontarán tickets');

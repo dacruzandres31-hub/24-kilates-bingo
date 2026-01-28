@@ -15,12 +15,14 @@ class StarterRoomController {
    * Helper para resolver sessionId (especialmente 'starter_default')
    */
   async _resolveSessionId(sessionId) {
-    if (sessionId !== 'starter_default') return sessionId;
+    if (sessionId !== 'starter_default' && sessionId !== '0' && sessionId !== 0) return sessionId;
 
+    // Buscar sesión activa de starter (puede ser 'starter' o 'free_starter')
     const [sessions] = await require('../db').query(`
       SELECT id FROM game_sessions 
-      WHERE room = 'starter' 
-      ORDER BY created_at DESC 
+      WHERE room IN ('starter', 'free_starter') 
+        AND status IN ('pending', 'starting', 'playing', 'closing')
+      ORDER BY start_time ASC 
       LIMIT 1
     `);
 
@@ -175,7 +177,7 @@ class StarterRoomController {
   /**
    * GET /api/game/starter/my-cards/:sessionId
    * Obtiene cartones ya reservados por el jugador actual
-   * Busca primero en BD (fuente de verdad), luego complementa con memoria
+   * Busca en sesiones activas de starter (playing, starting, pending)
    */
   async getMyCards(req, res) {
     try {
@@ -185,18 +187,22 @@ class StarterRoomController {
       // Resolver sessionId si es necesario
       sessionId = await this._resolveSessionId(sessionId);
 
-      if (!sessionId) {
-        return res.json({ success: true, cards: [] });
-      }
-
-      // 1. FUENTE DE VERDAD: Buscar en base de datos
+      // 1. FUENTE DE VERDAD: Buscar en base de datos para cualquier sesión activa de starter
+      // Primero intenta con el sessionId dado, luego busca en CUALQUIER sesión activa
+      // Incluye is_gift para distinguir cartones pagos vs yapa/regalo
       const [dbCards] = await pool.query(
-        `SELECT id, card_serial as serial, numbers, selected_at
-         FROM bingo_cards_pool
-         WHERE selected_by = ? 
-         AND status = 'selected'
-         AND room = 'starter'
-         AND game_session_id = ?`,
+        `SELECT bcp.id, bcp.card_serial as serial, bcp.numbers, bcp.selected_at, bcp.game_session_id, bcp.is_gift
+         FROM bingo_cards_pool bcp
+         LEFT JOIN game_sessions gs ON bcp.game_session_id = gs.id
+         WHERE bcp.selected_by = ? 
+         AND bcp.status = 'selected'
+         AND bcp.room IN ('starter', 'free_starter')
+         AND (
+           bcp.game_session_id = ?
+           OR gs.status IN ('playing', 'starting', 'pending', 'closing')
+           OR bcp.game_session_id IS NULL
+         )
+         ORDER BY bcp.selected_at DESC`,
         [userId, sessionId]
       );
 
@@ -206,17 +212,29 @@ class StarterRoomController {
           id: card.id,
           serial: card.serial,
           numbers: typeof card.numbers === 'string' ? JSON.parse(card.numbers) : card.numbers,
-          selectedAt: card.selected_at
+          selectedAt: card.selected_at,
+          sessionId: card.game_session_id,
+          isGift: card.is_gift === 1
         }));
 
-        console.log(`📋 [Starter/MyCards] Retornando ${formattedCards.length} cartones desde BD para usuario ${userId} en sesión ${sessionId}`);
+        // Contar cartones pagos vs regalo
+        const paidCards = formattedCards.filter(c => !c.isGift).length;
+        const giftCards = formattedCards.filter(c => c.isGift).length;
+
+        console.log(`📋 [Starter/MyCards] Retornando ${formattedCards.length} cartones desde BD para usuario ${userId} (${paidCards} pagos, ${giftCards} regalo)`);
         return res.json({
           success: true,
-          cards: formattedCards
+          cards: formattedCards,
+          paidCards: paidCards,
+          giftCards: giftCards
         });
       }
 
       // 2. FALLBACK: Buscar en pool de memoria (para reservas temporales aún no confirmadas)
+      if (!sessionId) {
+        return res.json({ success: true, cards: [], paidCards: 0, giftCards: 0 });
+      }
+      
       let memPool = cardPoolService.pools.get(sessionId);
 
       // Si no está en memoria, intentar cargar desde BD
@@ -233,7 +251,9 @@ class StarterRoomController {
       if (!memPool) {
         return res.json({
           success: true,
-          cards: []
+          cards: [],
+          paidCards: 0,
+          giftCards: 0
         });
       }
 
@@ -242,11 +262,17 @@ class StarterRoomController {
         card.status === 'reserved' && card.reserved_by === userId
       );
 
+      // En memoria, asumir todos como pagos (el is_gift se aplica en compra)
+      const paidCardsCount = myCards.filter(c => !c.is_gift).length;
+      const giftCardsCount = myCards.filter(c => c.is_gift).length;
+
       console.log(`📋 [Starter/MyCards] Retornando ${myCards.length} cartones desde MEMORIA para usuario ${userId} en sesión ${sessionId}`);
 
       res.json({
         success: true,
-        cards: myCards
+        cards: myCards,
+        paidCards: paidCardsCount,
+        giftCards: giftCardsCount
       });
     } catch (error) {
       console.error('❌ Error obteniendo mis cartones:', error);

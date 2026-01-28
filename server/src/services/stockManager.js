@@ -112,28 +112,24 @@ class StockManager {
   /**
    * Obtiene estado actual del stock
    * @param {string} roomType - Sala a verificar
-   * @param {Date} playDate - Fecha a verificar
+   * @param {Date} playDate - Fecha a verificar (no usado, legacy)
    * @returns {object} Estado detallado
    */
   static async getStockStatus(roomType = null, playDate = null) {
     try {
+      // NOTA: El sistema actual usa bingo_cards_pool con columna 'room'
       let query = `SELECT room, 
                           SUM(CASE WHEN status = 'available' THEN 1 ELSE 0 END) as available,
                           SUM(CASE WHEN status = 'sold' THEN 1 ELSE 0 END) as sold,
                           SUM(CASE WHEN status = 'discarded' THEN 1 ELSE 0 END) as discarded,
                           COUNT(*) as total
-                   FROM daily_stock_cards
+                   FROM bingo_cards_pool
                    WHERE 1=1`;
       const params = [];
 
       if (roomType) {
         query += ` AND room = ?`;
         params.push(roomType);
-      }
-
-      if (playDate) {
-        query += ` AND play_date = ?`;
-        params.push(playDate);
       }
 
       query += ` GROUP BY room`;
@@ -154,15 +150,15 @@ class StockManager {
    */
   static async getSalesReport(fromDate, toDate) {
     try {
+      // NOTA: El sistema actual usa bingo_cards_pool con columna 'room'
       const [result] = await pool.query(
         `SELECT room,
                 COUNT(CASE WHEN status = 'sold' THEN 1 END) as sold_count,
-                SUM(CASE WHEN status = 'sold' THEN price ELSE 0 END) as total_revenue,
-                AVG(CASE WHEN status = 'sold' THEN price ELSE NULL END) as avg_price,
-                DATE(play_date) as play_date
-         FROM daily_stock_cards
-         WHERE play_date >= ? AND play_date <= ?
-         GROUP BY room, DATE(play_date)
+                COUNT(*) as total_count,
+                DATE(updated_at) as play_date
+         FROM bingo_cards_pool
+         WHERE updated_at >= ? AND updated_at <= ?
+         GROUP BY room, DATE(updated_at)
          ORDER BY play_date DESC, room`,
         [fromDate, toDate]
       );
@@ -170,7 +166,7 @@ class StockManager {
       return result;
     } catch (error) {
       console.error('Get sales report error:', error);
-      throw error;
+      return []; // Retornar vacío en lugar de fallar
     }
   }
 
@@ -182,22 +178,20 @@ class StockManager {
    */
   static async getTopBuyers(limit = 10, fromDate = null) {
     try {
-      let query = `SELECT buyer_id, 
+      let query = `SELECT user_id as buyer_id, 
                           COUNT(*) as cards_bought,
-                          SUM(price) as total_spent,
-                          AVG(price) as avg_price,
                           GROUP_CONCAT(DISTINCT room SEPARATOR ',') as rooms
-                   FROM daily_stock_cards
-                   WHERE status = 'sold' AND buyer_id IS NOT NULL`;
+                   FROM bingo_cards_pool
+                   WHERE status = 'sold' AND user_id IS NOT NULL`;
       const params = [];
 
       if (fromDate) {
-        query += ` AND play_date >= ?`;
+        query += ` AND updated_at >= ?`;
         params.push(fromDate);
       }
 
-      query += ` GROUP BY buyer_id
-                 ORDER BY total_spent DESC
+      query += ` GROUP BY user_id
+                 ORDER BY cards_bought DESC
                  LIMIT ?`;
       params.push(limit);
 

@@ -25,6 +25,17 @@ router.get('/lobby-data', roomSettingsController.getLobbyData);
 // PÚBLICO para que cualquiera pueda ver el sorteo en curso
 router.get('/live-draw/:room', gameController.getLiveDraw);
 
+// Historial de sesiones por sala - PÚBLICO para transparencia
+// Muestra últimas sesiones con ganadores, bolas y cartones participantes
+router.get('/history/:room', gameController.getSessionHistoryByRoom);
+
+// Estado de ventas de una sala - PÚBLICO para habilitar/deshabilitar botón de compra
+// Centralizado con schedule_settings
+router.get('/sales-status/:room', gameController.getSalesStatus);
+
+// Estado de sala - Devuelve ID de sesión activa para obtener cartones del usuario
+router.get('/room-status/:room', authMiddleware.authenticateToken, gameController.getRoomStatus);
+
 // Todos los siguientes requieren autenticación
 router.use(authMiddleware.authenticateToken);
 
@@ -40,8 +51,11 @@ router.post('/claim-free-prize', gameController.claimFreePrize);
 // NUEVO: Procesar premio al terminar partida Sala Starter (LÍNEA/BINGO)
 router.post('/end-free-game', gameController.end_free_game);
 
-// Obtener cartones del jugador
+// Obtener cartones del jugador (solo sesiones activas)
 router.get('/my-cards', gameController.getPlayerCards);
+
+// Historial de cartones del jugador (sesiones completadas/archivadas)
+router.get('/my-cards-history', gameController.getPlayerCardsHistory);
 
 // Terminar sesión (admin/SuperAdmin)
 router.post('/finish-session', gameController.finishSession);
@@ -55,9 +69,6 @@ router.get('/session-status/:sessionId', diagnosticsController.getSessionStatus)
 
 // Sesiones activas
 router.get('/sessions', gameController.getActiveSessions);
-
-// Estado de ventas de una sala (para habilitar/deshabilitar botón de compra)
-router.get('/sales-status/:room', gameController.getSalesStatus);
 
 // NUEVO: Cantar línea en salas monetizadas
 router.post('/claim-line', gameController.claimLine);
