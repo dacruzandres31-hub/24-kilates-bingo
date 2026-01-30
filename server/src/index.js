@@ -104,9 +104,9 @@ io.on('connection', (socket) => {
 
   // Heartbeat para detectar conexiones zombie
   socket.on('ping_heartbeat', (data) => {
-    socket.emit('pong_heartbeat', { 
+    socket.emit('pong_heartbeat', {
       timestamp: Date.now(),
-      clientTimestamp: data?.timestamp 
+      clientTimestamp: data?.timestamp
     });
   });
 
@@ -182,7 +182,7 @@ app.get('/health', async (req, res) => {
   try {
     // Obtener reporte del watchdog
     const watchdogReport = await sessionWatchdog.getHealthReport();
-    
+
     res.json({
       status: 'ok',
       timestamp: new Date(),
@@ -227,7 +227,7 @@ app.use((req, res) => {
 async function loadExistingPools() {
   try {
     console.log('🎫 Verificando pools de cartones...');
-    
+
     // Verificar que hay cartones disponibles en el pool
     const [countResult] = await db.query(`
       SELECT room, COUNT(*) as card_count
@@ -279,7 +279,7 @@ const startServer = async () => {
     // Inyectar gameEngine al scheduler para auto-start de sorteos
     if (gameAdminController.gameEngine) {
       scheduler.setGameEngine(gameAdminController.gameEngine);
-      
+
       // 🛡️ INICIAR SESSION WATCHDOG - Sistema de vigilancia y auto-recuperación
       console.log('🛡️ Inicializando Session Watchdog...');
       sessionWatchdog.initialize(io, gameAdminController.gameEngine);
@@ -317,9 +317,9 @@ let isShuttingDown = false;
 process.on('SIGTERM', async () => {
   if (isShuttingDown) return;
   isShuttingDown = true;
-  
+
   console.log('\n📛 SIGTERM recibido, apagando servidor...');
-  
+
   try {
     sessionWatchdog.stop(); // 🛡️ Detener watchdog
     await scheduler.stop();
@@ -327,7 +327,7 @@ process.on('SIGTERM', async () => {
       console.log('✅ Servidor apagado correctamente');
       process.exit(0);
     });
-    
+
     // Forzar salida después de 10 segundos
     setTimeout(() => {
       console.log('⏱️ Tiempo agotado, forzando salida...');
@@ -342,9 +342,9 @@ process.on('SIGTERM', async () => {
 process.on('SIGINT', async () => {
   if (isShuttingDown) return;
   isShuttingDown = true;
-  
+
   console.log('\n📛 SIGINT recibido (Ctrl+C), apagando servidor...');
-  
+
   try {
     sessionWatchdog.stop(); // 🛡️ Detener watchdog
     await scheduler.stop();
@@ -352,7 +352,7 @@ process.on('SIGINT', async () => {
       console.log('✅ Servidor apagado correctamente');
       process.exit(0);
     });
-    
+
     // Forzar salida después de 10 segundos
     setTimeout(() => {
       console.log('⏱️ Tiempo agotado, forzando salida...');
@@ -377,7 +377,9 @@ process.on('unhandledRejection', (reason, promise) => {
   // NO llamar process.exit() - dejar que el servidor continúe
 });
 
-// Iniciar
-startServer();
+// Iniciar solo si se ejecuta directamente (no cuando se importa para tests)
+if (require.main === module) {
+  startServer();
+}
 
-module.exports = { app, server, io };
+module.exports = { app, server, io, startServer };

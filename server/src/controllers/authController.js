@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const pool = require('../db');
 const referralHelper = require('../helpers/referralHelper');
+const gamificationEngine = require('../services/gamification_engine');
 
 const SECRET = process.env.JWT_SECRET || 'tu_super_secret_key_24k';
 
@@ -35,7 +36,7 @@ exports.login = async (req, res) => {
 
     // Verificar si el usuario está bloqueado
     if (user.is_blocked) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         error: 'Usuario bloqueado',
         blocked: true,
         reason: user.block_reason,
@@ -52,24 +53,13 @@ exports.login = async (req, res) => {
     // Generar token
     const token = generateToken(user.id, user.role, user.username);
 
-    // Obtener datos de gamificación (streak, nivel, etc.) - datos en tabla user_streaks
+    // Obtener datos de gamificación (streak, nivel, etc.)
     let gamification = { streak: null };
     try {
-      const [streakResult] = await pool.query(
-        `SELECT us.current_streak, us.highest_streak as longest_streak, us.last_login_date, 
-                DATEDIFF(CURRENT_DATE, us.last_login_date) as days_since_login
-         FROM user_streaks us WHERE us.user_id = ?`,
-        [user.id]
-      );
-      if (streakResult.length > 0) {
-        gamification.streak = streakResult[0];
+      const streakData = await gamificationEngine.handleLoginStreak(user.id);
+      if (streakData) {
+        gamification.streak = streakData;
       }
-      // Actualizar o crear registro de streak
-      await pool.query(
-        `INSERT INTO user_streaks (user_id, last_login_date) VALUES (?, CURRENT_DATE)
-         ON DUPLICATE KEY UPDATE last_login_date = CURRENT_DATE`,
-        [user.id]
-      );
     } catch (gamErr) {
       console.error('Error obteniendo gamification:', gamErr);
     }
@@ -151,22 +141,7 @@ exports.register = async (req, res) => {
     // Auto-inicializar gamificación para jugadores
     if (role === 'jugador') {
       try {
-        // Crear progreso
-        await pool.query(`
-          INSERT INTO gamification_progress (user_id, current_level, xp_current, xp_lifetime)
-          VALUES (?, 1, 0, 0)
-        `, [newUser.id]);
-
-        // Crear quests iniciales
-        await pool.query(`
-          INSERT INTO daily_quests (user_id, quest_name, quest_type, target_value, xp_reward)
-          VALUES 
-            (?, 'Primera victoria', 'WIN', 1, 100),
-            (?, 'Jugar 3 partidas', 'PLAY', 3, 50),
-            (?, 'Completar un cartón', 'COMPLETE_CARD', 1, 75)
-        `, [newUser.id, newUser.id, newUser.id]);
-
-        console.log(`✓ Gamificación inicializada para ${newUser.username}`);
+        await gamificationEngine.initializePlayerProgress(newUser.id);
       } catch (gamErr) {
         console.error('⚠️ Error inicializando gamificación:', gamErr.message);
         // No bloquear el registro si falla gamificación
@@ -181,7 +156,7 @@ exports.register = async (req, res) => {
             'SELECT COUNT(*) as total FROM users WHERE parent_id = ?',
             [parent_id]
           );
-          
+
           whatsapp24KService.notifyNewPlayerRegistered(parent_id, {
             playerName: newUser.username,
             totalPlayers: countResult[0]?.total || 1
@@ -290,9 +265,9 @@ exports.changePassword = async (req, res) => {
       [newPasswordHash, userId]
     );
 
-    res.json({ 
-      success: true, 
-      message: 'Contraseña actualizada exitosamente' 
+    res.json({
+      success: true,
+      message: 'Contraseña actualizada exitosamente'
     });
   } catch (error) {
     console.error('Error cambiando contraseña:', error);

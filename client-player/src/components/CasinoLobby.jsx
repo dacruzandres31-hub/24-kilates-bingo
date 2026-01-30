@@ -33,6 +33,7 @@ import HotPotNotification from './Notifications/HotPotNotification';
 import CardPurchaseCalculator from './CardPurchaseCalculator';
 import ReferralDashboard from './Referral/ReferralDashboard';
 import { FaShareAlt, FaCheck } from 'react-icons/fa';
+import { useAuth } from '../context/AuthContext';
 
 const getTargetTime = (hour) => {
   const target = new Date();
@@ -82,8 +83,8 @@ const RoomCard = ({ room, style }) => {
         <div className="room-shine"></div>
 
         {/* Badge futurista de estado - usando datos centralizados del backend */}
-        <RoomStatusBadge 
-          status={room.status} 
+        <RoomStatusBadge
+          status={room.status}
           statusText={room.statusText}
           salesOpen={room.salesOpen}
         />
@@ -169,15 +170,16 @@ const RoomCard = ({ room, style }) => {
   );
 };
 
-const CasinoLobby = ({ user, onLogout }) => {
+const CasinoLobby = () => {
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [userData, setUserData] = useState(null);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  
+
   // Detección de móvil para forzar estilos
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
-  
+
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
     window.addEventListener('resize', handleResize);
@@ -644,7 +646,7 @@ const CasinoLobby = ({ user, onLogout }) => {
               cursor: 'not-allowed',
               opacity: 0.6
             }}
-            onClick={() => {}}
+            onClick={() => { }}
             disabled
             title="Próximamente"
           >
@@ -665,7 +667,7 @@ const CasinoLobby = ({ user, onLogout }) => {
               cursor: 'not-allowed',
               opacity: 0.6
             }}
-            onClick={() => {}}
+            onClick={() => { }}
             disabled
             title="Próximamente"
           >
@@ -729,7 +731,7 @@ const CasinoLobby = ({ user, onLogout }) => {
                   <span>Cambiar Contraseña</span>
                 </button>
                 <button className="dropdown-item logout" onClick={() => {
-                  onLogout();
+                  logout();
                 }}>
                   <FaSignOutAlt />
                   <span>Cerrar Sesión</span>
@@ -800,8 +802,8 @@ const CasinoLobby = ({ user, onLogout }) => {
       )}
 
       {/* Grid de Salas */}
-      <div 
-        className="rooms-grid" 
+      <div
+        className="rooms-grid"
         id="rooms-grid"
         style={isMobile ? {
           display: 'flex',
@@ -824,7 +826,7 @@ const CasinoLobby = ({ user, onLogout }) => {
               ...room,
               isLive: liveDraws[room.backendId] || false
             }}
-            style={{ 
+            style={{
               animationDelay: `${index * 100}ms`,
               ...(isMobile ? {
                 flex: '0 0 75vw',

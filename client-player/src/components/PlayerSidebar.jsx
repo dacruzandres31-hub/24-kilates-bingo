@@ -7,8 +7,10 @@ import audioService from '../services/audioService';
 import useSocket from '../hooks/useSocket';
 import axios from 'axios';
 import DepositModal from './DepositModal';
+import { useAuth } from '../context/AuthContext';
 
-const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor = '#ff00ff', onLogout }) => {
+const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor = '#ff00ff' }) => {
+  const { logout } = useAuth();
   const navigate = useNavigate();
   const socket = useSocket();
   const [audioStatus, setAudioStatus] = useState({ musicEnabled: true, efectosEnabled: true });
@@ -657,7 +659,7 @@ const PlayerSidebar = ({ isOpen, onToggle, themeColor = '#00ffff', accentColor =
               onClick={() => {
                 if (window.confirm('¿Estás seguro que deseas cerrar sesión?')) {
                   setShowChangePassword(false);
-                  onLogout();
+                  logout();
                 }
               }}
               style={{

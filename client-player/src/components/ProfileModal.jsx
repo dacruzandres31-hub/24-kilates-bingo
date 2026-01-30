@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { FaTimes, FaEye, FaEyeSlash, FaKey, FaSignOutAlt, FaUser, FaTrophy, FaLock, FaScroll } from 'react-icons/fa';
 import axios from 'axios';
 import MissionsPanel from './MissionsPanel';
+import { useAuth } from '../context/AuthContext';
 
-const ProfileModal = ({ isOpen, onClose, user, onLogout }) => {
+const ProfileModal = ({ isOpen, onClose }) => {
+  const { user, logout } = useAuth();
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
@@ -92,7 +94,7 @@ const ProfileModal = ({ isOpen, onClose, user, onLogout }) => {
 
   const handleLogout = () => {
     if (window.confirm('¿Estás seguro que deseas cerrar sesión?')) {
-      onLogout();
+      logout();
     }
   };
 

@@ -6,7 +6,10 @@ import '../styles/MembershipPage.css';
 import logoFull from '../assets/logo.png'; // Import Logo
 import MembershipPurchaseModal from '../components/MembershipPurchaseModal'; // Import Modal
 
-const MembershipPage = ({ user, onLogout }) => {
+import { useAuth } from '../context/AuthContext';
+
+const MembershipPage = () => {
+    const { user, logout } = useAuth();
     const [plans, setPlans] = useState([]);
     const [currentSub, setCurrentSub] = useState(null);
     const [pendingReq, setPendingReq] = useState(null); // New state for pending request

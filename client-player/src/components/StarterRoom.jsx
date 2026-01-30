@@ -13,10 +13,10 @@ import Countdown from './Countdown';
 import useLiveDraw from '../hooks/useLiveDraw';
 import SessionHistory from './SessionHistory';
 
-export default function StarterRoom({ onLogout }) {
+export default function StarterRoom() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
-  
+
   // Hook para sorteo en vivo - reemplaza la simulación local
   const {
     ballsDrawn,
@@ -29,7 +29,7 @@ export default function StarterRoom({ onLogout }) {
     setCurrentBall,
     setGameStatus
   } = useLiveDraw('free_starter');
-  
+
   const [lastBall, setLastBall] = useState(null);
   const [previousGameStatus, setPreviousGameStatus] = useState('waiting'); // Para detectar cambios
   const [floatingBalls, setFloatingBalls] = useState([]);
@@ -50,9 +50,9 @@ export default function StarterRoom({ onLogout }) {
   const [salesClosed, setSalesClosed] = useState(false);
   const [salesMessage, setSalesMessage] = useState('');
   const [nextSessionTime, setNextSessionTime] = useState(null);
-const [pauseTimeout, setPauseTimeout] = useState(null); // Controlar pausa automática
-const [highlightedLine, setHighlightedLine] = useState(null); // Línea a resaltar
-const [cardWinningLines, setCardWinningLines] = useState({}); // {cardId: [0,1,2]} líneas ganadoras por cartón
+  const [pauseTimeout, setPauseTimeout] = useState(null); // Controlar pausa automática
+  const [highlightedLine, setHighlightedLine] = useState(null); // Línea a resaltar
+  const [cardWinningLines, setCardWinningLines] = useState({}); // {cardId: [0,1,2]} líneas ganadoras por cartón
   const [sidebarOpen, setSidebarOpen] = useState(false); // Estado del sidebar
   const [showCardSelection, setShowCardSelection] = useState(false); // Mostrar lobby de selección de cartones
   const [selectedPlayerCards, setSelectedPlayerCards] = useState([]); // Cartones seleccionados por el jugador
@@ -68,20 +68,20 @@ const [cardWinningLines, setCardWinningLines] = useState({}); // {cardId: [0,1,2
       const fadeTimer = setTimeout(() => {
         setIsModalClosing(true);
       }, 4500);
-      
+
       // Después de 5 segundos, cerrar completamente
       const closeTimer = setTimeout(() => {
         setShowReadyModal(false);
         setIsModalClosing(false);
       }, 5000);
-      
+
       return () => {
         clearTimeout(fadeTimer);
         clearTimeout(closeTimer);
       };
     }
   }, [showReadyModal]);
-  
+
   // Mostrar modal "¡¡Todo Listo!!" solo cuando tenga 20 cartones (máximo permitido)
   useEffect(() => {
     console.log('🔍 DEBUG - cardsRemaining:', cardsRemaining, 'selectedPlayerCards:', selectedPlayerCards.length);
@@ -90,14 +90,14 @@ const [cardWinningLines, setCardWinningLines] = useState({}); // {cardId: [0,1,2
       setShowReadyModal(true);
     }
   }, [selectedPlayerCards.length]);
-  
+
   // Estados para mejoras visuales
   const [toasts, setToasts] = useState([]); // Notificaciones toast
   const [showConfetti, setShowConfetti] = useState(false); // Confeti digital
   const [luckMeter, setLuckMeter] = useState(0); // Medidor de suerte (0-100)
   const [comboCount, setComboCount] = useState(0); // Contador de combo
   const [lastComboTime, setLastComboTime] = useState(Date.now()); // Último tiempo de combo
-  
+
   // Nuevos estados para mejoras visuales adicionales
   const [cardsDealing, setCardsDealing] = useState(false); // Animación de entrada de cartones
   const [markedNumbers, setMarkedNumbers] = useState([]); // Números marcados con efecto
@@ -105,11 +105,11 @@ const [cardWinningLines, setCardWinningLines] = useState({}); // {cardId: [0,1,2
   const [celebrationMode, setCelebrationMode] = useState(false); // Modo celebración full
   const [winAmount, setWinAmount] = useState(0); // Monto ganado para animación
   const [stateTransition, setStateTransition] = useState(''); // Transición entre estados
-  const [columnCounts, setColumnCounts] = useState([0,0,0,0,0,0,0,0,0]); // Contador por columna
-  
-// Efectos de festejo (fuera del componente o arriba)
-const celebrationAudio = new Audio('/audio/celebration.mp3');
-celebrationAudio.volume = 0.7;
+  const [columnCounts, setColumnCounts] = useState([0, 0, 0, 0, 0, 0, 0, 0, 0]); // Contador por columna
+
+  // Efectos de festejo (fuera del componente o arriba)
+  const celebrationAudio = new Audio('/audio/celebration.mp3');
+  celebrationAudio.volume = 0.7;
 
   // Verificar estado de ventas (T-5 closure) cada 5 segundos - Centralizado con schedule_settings
   useEffect(() => {
@@ -118,13 +118,13 @@ celebrationAudio.volume = 0.7;
         const response = await fetch('/api/game/sales-status/starter', {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         });
-        
+
         if (response.ok) {
           const data = await response.json();
           setSalesClosed(!data.salesOpen);
           setSalesMessage(data.message || '');
           setNextSessionTime(data.nextSession);
-          
+
           if (!data.salesOpen) {
             console.log(`🔒 Ventas cerradas: ${data.reason} - ${data.message}`);
           }
@@ -133,10 +133,10 @@ celebrationAudio.volume = 0.7;
         console.log('Error verificando estado de ventas:', error);
       }
     };
-    
+
     checkSalesStatus();
     const interval = setInterval(checkSalesStatus, 5000);
-    
+
     return () => clearInterval(interval);
   }, []);
 
@@ -146,10 +146,10 @@ celebrationAudio.volume = 0.7;
     // Usar liveSessionId (sesión real del servidor) si está disponible, sino sessionId de URL
     const activeSessionId = liveSessionId || sessionId;
     const STORAGE_KEY = `bingo_cards_starter_${activeSessionId}`;
-    
+
     const checkExistingCards = async () => {
       if (!activeSessionId) return;
-      
+
       // 1. Primero intentar cargar desde localStorage (para cuando vuelve a la sala)
       const cached = localStorage.getItem(STORAGE_KEY);
       if (cached) {
@@ -164,34 +164,34 @@ celebrationAudio.volume = 0.7;
           console.log('Error parseando cache, ignorando');
         }
       }
-      
+
       // 2. Luego verificar con el servidor (fuente de verdad)
       try {
         const response = await fetch(`/api/game/starter/my-cards/${activeSessionId}`, {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
         });
-        
+
         if (response.ok) {
           const data = await response.json();
           const currentCards = data.cards || [];
-          
+
           console.log('🔍 DEBUG - Cartones cargados desde /my-cards:', currentCards.map(c => ({
             id: c.id,
             serial: c.serial,
             hasSerial: !!c.serial,
             hasNumbers: !!c.numbers
           })));
-          
+
           setSelectedPlayerCards(currentCards);
           const remaining = 20 - currentCards.length;
           setCardsRemaining(remaining);
-          
+
           // Guardar en localStorage para persistencia
           if (currentCards.length > 0) {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(currentCards));
             console.log('💾 Cartones guardados en localStorage');
           }
-          
+
           console.log(`✅ Sala Starter: ${currentCards.length} cartones cargados, ${remaining} restantes (máx 20)`);
         }
       } catch (error) {
@@ -237,7 +237,7 @@ celebrationAudio.volume = 0.7;
   const updateCombo = () => {
     const now = Date.now();
     const timeSinceLastBall = now - lastComboTime;
-    
+
     // Si pasó menos de 5 segundos, incrementar combo
     if (timeSinceLastBall < 5000) {
       setComboCount(prev => prev + 1);
@@ -255,7 +255,7 @@ celebrationAudio.volume = 0.7;
     setShowConfetti(true);
     setTimeout(() => setShowConfetti(false), 5000);
   };
-  
+
   // Agregar emoji flotante
   const addFloatingEmoji = (emoji) => {
     const id = Date.now() + Math.random();
@@ -265,7 +265,7 @@ celebrationAudio.volume = 0.7;
       setFloatingEmojis(prev => prev.filter(e => e.id !== id));
     }, 3000);
   };
-  
+
   // Marcar número con efecto
   const markNumberWithEffect = (number) => {
     setMarkedNumbers(prev => [...prev, { number, timestamp: Date.now() }]);
@@ -274,7 +274,7 @@ celebrationAudio.volume = 0.7;
       setMarkedNumbers(prev => prev.filter(n => n.number !== number));
     }, 1500);
   };
-  
+
   // Activar modo celebración al ganar
   const activateCelebration = (amount) => {
     setCelebrationMode(true);
@@ -284,12 +284,12 @@ celebrationAudio.volume = 0.7;
     addFloatingEmoji('🎉');
     addFloatingEmoji('🏆');
     addFloatingEmoji('💰');
-    
+
     setTimeout(() => {
       setCelebrationMode(false);
     }, 8000);
   };
-  
+
   // Transición de estado con efecto
   const transitionToState = (newState) => {
     setStateTransition('fade-out');
@@ -299,10 +299,10 @@ celebrationAudio.volume = 0.7;
       setTimeout(() => setStateTransition(''), 500);
     }, 500);
   };
-  
+
   // Actualizar contadores por columna
   const updateColumnCounts = () => {
-    const counts = [0,0,0,0,0,0,0,0,0];
+    const counts = [0, 0, 0, 0, 0, 0, 0, 0, 0];
     ballsDrawn.forEach(ball => {
       const columnIndex = Math.floor((ball.number - 1) / 10);
       counts[columnIndex]++;
@@ -331,7 +331,7 @@ celebrationAudio.volume = 0.7;
         document.removeEventListener('click', handleClick);
       }
     };
-    
+
     document.addEventListener('click', handleClick);
 
     // Cargar voces disponibles
@@ -340,7 +340,7 @@ celebrationAudio.volume = 0.7;
       setAvailableVoices(voices);
       setCurrentVoice(voiceService.getCurrentVoice());
     }, 500);
-    
+
     return () => {
       document.removeEventListener('click', handleClick);
       // Detener efectos de sonido al desmontar
@@ -350,12 +350,12 @@ celebrationAudio.volume = 0.7;
 
   // NOTA: El sorteo ahora viene del hook useLiveDraw via Socket.IO
   // La simulación local fue eliminada - las bolas llegan en tiempo real del backend
-  
+
   // Actualizar contadores de columna cuando cambian las bolas
   useEffect(() => {
     updateColumnCounts();
   }, [ballsDrawn]);
-  
+
   // Reproducir sonido cuando la bola CAE (currentBall se establece)
   useEffect(() => {
     if (currentBall) {
@@ -363,7 +363,7 @@ celebrationAudio.volume = 0.7;
       audioService.playBolaCayendoConPausa();
     }
   }, [currentBall]);
-  
+
   // Animación de entrada de cartones
   useEffect(() => {
     if (selectedPlayerCards.length > 0 && !cardsDealing) {
@@ -371,12 +371,12 @@ celebrationAudio.volume = 0.7;
       setTimeout(() => setCardsDealing(false), selectedPlayerCards.length * 100 + 500);
     }
   }, [selectedPlayerCards.length]);
-  
+
   // Detectar transiciones de estado
   useEffect(() => {
     if (previousGameStatus !== gameStatus) {
       setPreviousGameStatus(gameStatus);
-      
+
       if (gameStatus === 'active') {
         addToast('🎮', 'JUEGO INICIADO', 'El sorteo ha comenzado');
         audioService.startBolilleroGirando();
@@ -430,23 +430,23 @@ celebrationAudio.volume = 0.7;
       serial: c.serial,
       hasSerial: !!c.serial
     })));
-    
+
     // Combinar cartones existentes con nuevos
     const allCards = [...selectedPlayerCards, ...reservedCards];
     setSelectedPlayerCards(allCards);
-    
+
     console.log('🔍 DEBUG - Todos los cartones después de combinar:', allCards.map(c => ({
       id: c.id,
       serial: c.serial,
       hasSerial: !!c.serial
     })));
-    
+
     // Calcular cuántos cartones faltan basado en el total que tiene (máx 20)
     const remaining = Math.max(0, 20 - allCards.length);
     setCardsRemaining(remaining);
     setShowCardSelection(false);
     console.log(`✅ Total de cartones: ${allCards.length}, faltan: ${remaining}, tickets backend: ${remainingTicketsFromBackend}`);
-    
+
     // Si se completaron los 20 cartones, mostrar modal "¡¡Todo Listo!!"
     if (allCards.length >= 20) {
       setShowReadyModal(true);
@@ -487,7 +487,7 @@ celebrationAudio.volume = 0.7;
   useEffect(() => {
     if (ballsDrawn.length > 0 && !lineCelebrated && winnerCards.length === 0) { // No expandir si hay festejo de línea
       const latestBall = ballsDrawn[ballsDrawn.length - 1];
-      
+
       // Buscar cartones que tienen este número
       playerCards.forEach(card => {
         const hasNumber = card.numbers.flat().includes(latestBall.number);
@@ -502,14 +502,14 @@ celebrationAudio.volume = 0.7;
   // Detectar líneas en BINGO 90 (solo horizontales - 3 filas)
   const checkLineStatus = (card) => {
     const lines = [];
-    
+
     // Revisar las 3 filas horizontales
     for (let row = 0; row < 3; row++) {
       const rowNumbers = card.numbers[row].filter(n => n !== null && n !== undefined);
-      lines.push({ 
-        type: 'horizontal', 
-        row, 
-        line: rowNumbers 
+      lines.push({
+        type: 'horizontal',
+        row,
+        line: rowNumbers
       });
     }
 
@@ -530,199 +530,199 @@ celebrationAudio.volume = 0.7;
 
   // Detectar cartones a 1-2 números de línea y líneas completas
   useEffect(() => {
-  if (ballsDrawn.length === 0) {
-    setAlmostLineCards([]);
-    setWinnerCards([]);
-    setLineCelebrated(false);
-    setHighlightedLine(null);
-    setCardWinningLines({});
-    return;
-  }
-
-  const cardsAlmostThere = [];
-  const cardsWithWinningLines = [];
-  const newCardWinningLines = {};
-
-  playerCards.forEach(card => {
-    const linesStatus = checkLineStatus(card);
-    const almostLines = linesStatus.filter(line => line.missing === 1 || line.missing === 2);
-    // Una línea está completa solo si missing === 0 Y tiene al menos 5 números marcados
-    const completedLines = linesStatus.filter(line => line.missing === 0 && line.markedCount >= 5);
-
-    if (almostLines.length > 0) {
-      const minMissing = Math.min(...almostLines.map(line => line.missing));
-      cardsAlmostThere.push({
-        cardId: card.id,
-        almostLineCount: almostLines.length,
-        lines: almostLines,
-        minMissing: minMissing
-      });
+    if (ballsDrawn.length === 0) {
+      setAlmostLineCards([]);
+      setWinnerCards([]);
+      setLineCelebrated(false);
+      setHighlightedLine(null);
+      setCardWinningLines({});
+      return;
     }
 
-    if (completedLines.length > 0) {
-      // Guardar qué filas (índices 0, 1, 2) están completas
-      const winningRowIndices = completedLines.map(line => line.row);
-      newCardWinningLines[card.id] = winningRowIndices;
-      
-      cardsWithWinningLines.push({
-        cardId: card.id,
-        cardSerial: card.serial || generateCardSerial(playerCards.indexOf(card)),
-        lineCount: completedLines.length,
-        lines: completedLines,
-        card // importante para renderizado
-      });
-    }
-  });
+    const cardsAlmostThere = [];
+    const cardsWithWinningLines = [];
+    const newCardWinningLines = {};
 
-  setAlmostLineCards(cardsAlmostThere);
-  setCardWinningLines(newCardWinningLines); // Actualizar líneas ganadoras
-
-  setAlmostLineCards(cardsAlmostThere);
-
-  // Mostrar celebración si hay NUEVOS ganadores que NO han sido festejados
-  // ANTI-LOOP: Verificar que el cartón NO esté en celebratedCardIds Y que no haya celebración activa
-  const newWinners = cardsWithWinningLines.filter(card => 
-    !celebratedCardIds.includes(card.cardId)
-  );
-  
-  if (newWinners.length > 0 && !lineCelebrated && winnerCards.length === 0) {
-    // Tomar el primer cartón ganador nuevo
-    const winnerCard = newWinners[0];
-    
-    setWinnerCards([winnerCard]); // Solo el nuevo ganador
-    setLineCelebrated(true);
-    setCelebratedCardIds([...celebratedCardIds, winnerCard.cardId]); // Marcar como festejado
-    
-    // Limpiar alertas de "casi línea" porque ya se ganó
-    setAlmostLineCards([]);
-    
-    // 1. PRIMERO: Anunciar línea ganadora INMEDIATAMENTE (100ms para dar tiempo a que se active el audio)
-    setTimeout(() => {
-      console.log('[StarterRoom] 🎶 Reproduciendo voz: Felicitaciones, Ganaste Línea');
-      voiceService.speak('Felicitaciones, Ganaste Línea', { volume: 1.0, rate: 0.9 });
-    }, 100);
-    
-    // 2. Toast de celebración (sin sonido)
-    addToast('🎉', '¡LÍNEA!', 'Has completado una línea', 8000);
-    
-    // 3. Activar confeti
-    triggerConfetti();
-    
-    // 4. DESPUÉS DE LA VOZ: Reproducir aplausos (1.5 segundos después para no interferir)
-    setTimeout(() => {
-      celebrationAudio.currentTime = 0;
-      celebrationAudio.play();
-    }, 1500);
-    
-    // 5. Pausar sorteo (pero NO anunciar "Sorteo Pausado" - se anunciará al reanudar)
-    if (gameStatus === 'active') {
-      setGameStatus('waiting');
-      const timeout = setTimeout(() => {
-        // Anunciar continuación a BINGO antes de reanudar
-        voiceService.speak('Continuamos hasta Bingo');
-        setTimeout(() => {
-          // Cerrar modal y resetear flags
-          setWinnerCards([]); // ← CERRAR MODAL
-          setHighlightedLine(null);
-          setLineCelebrated(false);
-          setGameStatus('active');
-        }, 2000); // Esperar 2 segundos para que termine el anuncio
-      }, 18000); // 18 segundos + 2 del anuncio = 20 segundos total
-      setPauseTimeout(timeout);
-    }
-    
-    // 6. Resaltar la línea ganadora (primera del primer cartón)
-    if (cardsWithWinningLines[0]?.lines?.length > 0) {
-      setHighlightedLine(cardsWithWinningLines[0].lines[0].numbers);
-    }
-  }
-
-  // DETECTAR BINGO (Cartón completo - 15 números marcados)
-  if (!bingoCelebrated && !lineCelebrated && winnerCards.length === 0) {
     playerCards.forEach(card => {
-      const allNumbers = card.numbers.flat().filter(n => n !== null && n !== undefined);
-      const markedNumbers = allNumbers.filter(num => isNumberCalled(num));
-      
-      // BINGO = 15 números marcados (cartón completo)
-      if (markedNumbers.length === 15) {
-        console.log('[StarterRoom] 🎊 BINGO DETECTADO en cartón:', card.serial || card.id);
-        setBingoWinnerCard({
+      const linesStatus = checkLineStatus(card);
+      const almostLines = linesStatus.filter(line => line.missing === 1 || line.missing === 2);
+      // Una línea está completa solo si missing === 0 Y tiene al menos 5 números marcados
+      const completedLines = linesStatus.filter(line => line.missing === 0 && line.markedCount >= 5);
+
+      if (almostLines.length > 0) {
+        const minMissing = Math.min(...almostLines.map(line => line.missing));
+        cardsAlmostThere.push({
+          cardId: card.id,
+          almostLineCount: almostLines.length,
+          lines: almostLines,
+          minMissing: minMissing
+        });
+      }
+
+      if (completedLines.length > 0) {
+        // Guardar qué filas (índices 0, 1, 2) están completas
+        const winningRowIndices = completedLines.map(line => line.row);
+        newCardWinningLines[card.id] = winningRowIndices;
+
+        cardsWithWinningLines.push({
           cardId: card.id,
           cardSerial: card.serial || generateCardSerial(playerCards.indexOf(card)),
-          card: card
+          lineCount: completedLines.length,
+          lines: completedLines,
+          card // importante para renderizado
         });
-        setBingoCelebrated(true);
-        setGameStatus('ended');
-        
-        // 1. Anunciar BINGO
-        setTimeout(() => {
-          voiceService.speak('BINGO', { volume: 1.0, rate: 0.9 });
-        }, 100);
-        
-        setTimeout(() => {
-          voiceService.speak('Felicitaciones, Ganaste Bingo', { volume: 1.0, rate: 0.9 });
-        }, 1500);
-        
-        // 2. Toast
-        addToast('🎊', '¡BINGO!', 'Has completado el cartón', 8000);
-        
-        // 3. Confeti
-        triggerConfetti();
-        
-        // 4. Aplausos
-        setTimeout(() => {
-          celebrationAudio.currentTime = 0;
-          celebrationAudio.play();
-        }, 2000);
-        
-        // 5. Después de 18 segundos: finalizar y resetear todo
-        setTimeout(() => {
-          voiceService.speak('El Bingo ha finalizado');
-          
-          setTimeout(() => {
-            // RESET COMPLETO
-            setBallsDrawn([]);
-            setSelectedPlayerCards([]);
-            setPlayerCards([]);
-            setBingoWinnerCard(null);
-            setBingoCelebrated(false);
-            setGameStatus('waiting');
-            setShowCardSelection(false);
-            setCardsRemaining(20);
-            setCelebratedCardIds([]);
-            setWinnerCards([]);
-            setLineCelebrated(false);
-            audioService.stopBolilleroGirando();
-            
-            addToast('✅', 'Juego Finalizado', 'Puedes seleccionar nuevos cartones', 5000);
-          }, 2000);
-        }, 18000);
-        
-        return; // Solo un BINGO por vez
       }
     });
-  }
-}, [ballsDrawn.length, playerCards.length, lineCelebrated, gameStatus, winnerCards.length, bingoCelebrated]);
 
-useEffect(() => {
-  return () => {
-    if (pauseTimeout) clearTimeout(pauseTimeout);
-  };
-}, [pauseTimeout]);
+    setAlmostLineCards(cardsAlmostThere);
+    setCardWinningLines(newCardWinningLines); // Actualizar líneas ganadoras
+
+    setAlmostLineCards(cardsAlmostThere);
+
+    // Mostrar celebración si hay NUEVOS ganadores que NO han sido festejados
+    // ANTI-LOOP: Verificar que el cartón NO esté en celebratedCardIds Y que no haya celebración activa
+    const newWinners = cardsWithWinningLines.filter(card =>
+      !celebratedCardIds.includes(card.cardId)
+    );
+
+    if (newWinners.length > 0 && !lineCelebrated && winnerCards.length === 0) {
+      // Tomar el primer cartón ganador nuevo
+      const winnerCard = newWinners[0];
+
+      setWinnerCards([winnerCard]); // Solo el nuevo ganador
+      setLineCelebrated(true);
+      setCelebratedCardIds([...celebratedCardIds, winnerCard.cardId]); // Marcar como festejado
+
+      // Limpiar alertas de "casi línea" porque ya se ganó
+      setAlmostLineCards([]);
+
+      // 1. PRIMERO: Anunciar línea ganadora INMEDIATAMENTE (100ms para dar tiempo a que se active el audio)
+      setTimeout(() => {
+        console.log('[StarterRoom] 🎶 Reproduciendo voz: Felicitaciones, Ganaste Línea');
+        voiceService.speak('Felicitaciones, Ganaste Línea', { volume: 1.0, rate: 0.9 });
+      }, 100);
+
+      // 2. Toast de celebración (sin sonido)
+      addToast('🎉', '¡LÍNEA!', 'Has completado una línea', 8000);
+
+      // 3. Activar confeti
+      triggerConfetti();
+
+      // 4. DESPUÉS DE LA VOZ: Reproducir aplausos (1.5 segundos después para no interferir)
+      setTimeout(() => {
+        celebrationAudio.currentTime = 0;
+        celebrationAudio.play();
+      }, 1500);
+
+      // 5. Pausar sorteo (pero NO anunciar "Sorteo Pausado" - se anunciará al reanudar)
+      if (gameStatus === 'active') {
+        setGameStatus('waiting');
+        const timeout = setTimeout(() => {
+          // Anunciar continuación a BINGO antes de reanudar
+          voiceService.speak('Continuamos hasta Bingo');
+          setTimeout(() => {
+            // Cerrar modal y resetear flags
+            setWinnerCards([]); // ← CERRAR MODAL
+            setHighlightedLine(null);
+            setLineCelebrated(false);
+            setGameStatus('active');
+          }, 2000); // Esperar 2 segundos para que termine el anuncio
+        }, 18000); // 18 segundos + 2 del anuncio = 20 segundos total
+        setPauseTimeout(timeout);
+      }
+
+      // 6. Resaltar la línea ganadora (primera del primer cartón)
+      if (cardsWithWinningLines[0]?.lines?.length > 0) {
+        setHighlightedLine(cardsWithWinningLines[0].lines[0].numbers);
+      }
+    }
+
+    // DETECTAR BINGO (Cartón completo - 15 números marcados)
+    if (!bingoCelebrated && !lineCelebrated && winnerCards.length === 0) {
+      playerCards.forEach(card => {
+        const allNumbers = card.numbers.flat().filter(n => n !== null && n !== undefined);
+        const markedNumbers = allNumbers.filter(num => isNumberCalled(num));
+
+        // BINGO = 15 números marcados (cartón completo)
+        if (markedNumbers.length === 15) {
+          console.log('[StarterRoom] 🎊 BINGO DETECTADO en cartón:', card.serial || card.id);
+          setBingoWinnerCard({
+            cardId: card.id,
+            cardSerial: card.serial || generateCardSerial(playerCards.indexOf(card)),
+            card: card
+          });
+          setBingoCelebrated(true);
+          setGameStatus('ended');
+
+          // 1. Anunciar BINGO
+          setTimeout(() => {
+            voiceService.speak('BINGO', { volume: 1.0, rate: 0.9 });
+          }, 100);
+
+          setTimeout(() => {
+            voiceService.speak('Felicitaciones, Ganaste Bingo', { volume: 1.0, rate: 0.9 });
+          }, 1500);
+
+          // 2. Toast
+          addToast('🎊', '¡BINGO!', 'Has completado el cartón', 8000);
+
+          // 3. Confeti
+          triggerConfetti();
+
+          // 4. Aplausos
+          setTimeout(() => {
+            celebrationAudio.currentTime = 0;
+            celebrationAudio.play();
+          }, 2000);
+
+          // 5. Después de 18 segundos: finalizar y resetear todo
+          setTimeout(() => {
+            voiceService.speak('El Bingo ha finalizado');
+
+            setTimeout(() => {
+              // RESET COMPLETO
+              setBallsDrawn([]);
+              setSelectedPlayerCards([]);
+              setPlayerCards([]);
+              setBingoWinnerCard(null);
+              setBingoCelebrated(false);
+              setGameStatus('waiting');
+              setShowCardSelection(false);
+              setCardsRemaining(20);
+              setCelebratedCardIds([]);
+              setWinnerCards([]);
+              setLineCelebrated(false);
+              audioService.stopBolilleroGirando();
+
+              addToast('✅', 'Juego Finalizado', 'Puedes seleccionar nuevos cartones', 5000);
+            }, 2000);
+          }, 18000);
+
+          return; // Solo un BINGO por vez
+        }
+      });
+    }
+  }, [ballsDrawn.length, playerCards.length, lineCelebrated, gameStatus, winnerCards.length, bingoCelebrated]);
+
+  useEffect(() => {
+    return () => {
+      if (pauseTimeout) clearTimeout(pauseTimeout);
+    };
+  }, [pauseTimeout]);
 
   // Detectar cambios en el estado del juego y anunciar
   useEffect(() => {
     console.log(`🎮 [StarterRoom] gameStatus cambió: ${previousGameStatus} → ${gameStatus}`);
-    
+
     if (gameStatus === 'active' && previousGameStatus !== 'active') {
       console.log('🎬 SORTEO ACTIVO - Iniciando bolillero');
-      
+
       // Iniciar bolillero cuando arranca el sorteo
       audioService.startBolilleroGirando();
-      
+
       // Bajar volumen de música de fondo al 70%
       audioService.lowerMusicVolume();
-      
+
       // Anuncios según el estado previo
       if (previousGameStatus === 'waiting') {
         voiceService.announceSorteoIniciado();
@@ -730,7 +730,7 @@ useEffect(() => {
       } else if (previousGameStatus === 'paused') {
         voiceService.announceSorteoReiniciado();
       }
-      
+
     } else if (gameStatus === 'waiting' && previousGameStatus === 'active') {
       console.log('⏸️ PAUSANDO SORTEO - Deteniendo bolillero');
       // NO anunciar "Sorteo Pausado" si hay línea celebrada (ya se anunció "Felicitaciones")
@@ -745,7 +745,7 @@ useEffect(() => {
         addToast('⏸️', 'Sorteo pausado', 'Esperando...');
       }
     }
-    
+
     setPreviousGameStatus(gameStatus);
   }, [gameStatus]);
 
@@ -754,23 +754,23 @@ useEffect(() => {
     if (ballsDrawn.length > 0 && !lineCelebrated) { // No anunciar si hay festejo de línea
       const lastDrawnBall = ballsDrawn[ballsDrawn.length - 1];
       console.log(`📢 [StarterRoom] Anunciando número: ${lastDrawnBall.number}`);
-      
+
       // NO reproducir sonido aquí - ya se reprodujo cuando cayó (currentBall)
       // Solo anunciar con voz
       setTimeout(() => {
         voiceService.announceNumber(lastDrawnBall.number);
       }, 500);
-      
+
       // Actualizar combo y suerte
       updateCombo();
       const luck = calculateLuck();
       setLuckMeter(luck);
-      
+
       // Detectar si el jugador acertó un número
-      const hasMatch = playerCards.some(card => 
+      const hasMatch = playerCards.some(card =>
         card.numbers.flat().includes(lastDrawnBall.number)
       );
-      
+
       if (hasMatch) {
         addToast('✨', '¡Acierto!', `Número ${lastDrawnBall.number}`);
       }
@@ -868,657 +868,656 @@ useEffect(() => {
       {!showCardSelection && (
         <>
           {/* Sidebar con información del jugador */}
-          <PlayerSidebar 
-            isOpen={sidebarOpen} 
-            onToggle={() => setSidebarOpen(!sidebarOpen)} 
-            onLogout={onLogout}
+          <PlayerSidebar
+            isOpen={sidebarOpen}
+            onToggle={() => setSidebarOpen(!sidebarOpen)}
           />
 
           {/* CELEBRACIÓN DE BINGO GANADOR */}
           {bingoWinnerCard && (
-  <div className="winner-celebration-overlay">
-    <div className="celebration-content">
-      {/* Título pulsante */}
-      <h1 className="felicitaciones-pulse">¡BINGO!</h1>
-      <div className="celebration-subtitle">Felicitaciones Ganaste Bingo con el cartón {bingoWinnerCard.cardSerial}</div>
-      
-      {/* Cartón usando BingoCardPreview */}
-      <div className="celebration-card-display">
-        <BingoCardPreview
-          card={{
-            card_serial: bingoWinnerCard.cardSerial,
-            numbers: bingoWinnerCard.card.numbers
-          }}
-          room="starter"
-          selected={false}
-          onClick={null}
-          showSerial={true}
-          drawnNumbers={ballsDrawn.map(b => b.number)}
-          winningLines={[0, 1, 2]}
-        />
-      </div>
-    </div>
-    
-    {/* Confetti animado */}
-    <div className="confetti-container">
-      {Array.from({ length: 50 }).map((_, i) => (
-        <div 
-          key={i} 
-          className="confetti"
-          style={{
-            left: `${Math.random() * 100}%`,
-            animationDelay: `${Math.random() * 3}s`,
-            backgroundColor: getBallColor(Math.floor(Math.random() * 90) + 1)
-          }}
-        />
-      ))}
-    </div>
-  </div>
-)}
+            <div className="winner-celebration-overlay">
+              <div className="celebration-content">
+                {/* Título pulsante */}
+                <h1 className="felicitaciones-pulse">¡BINGO!</h1>
+                <div className="celebration-subtitle">Felicitaciones Ganaste Bingo con el cartón {bingoWinnerCard.cardSerial}</div>
 
-          {/* CELEBRACIÓN DE LÍNEA GANADORA - Usa el cartón de la grilla con números marcados */}
-          {winnerCards.length > 0 && !bingoWinnerCard && (
-  <div className="winner-celebration-overlay">
-    <div className="celebration-content">
-      {/* Título pulsante */}
-      <h1 className="felicitaciones-pulse">¡Felicitaciones!</h1>
-      <div className="celebration-subtitle">Ganaste Línea con el cartón {winnerCards[0].cardSerial}</div>
-      
-      {/* Cartón usando BingoCardPreview IGUAL que el expandido */}
-      {winnerCards[0] && (
-        <div className="celebration-card-display">
-          <BingoCardPreview
-            card={{
-              card_serial: winnerCards[0].cardSerial,
-              numbers: winnerCards[0].card.numbers
-            }}
-            room="starter"
-            selected={false}
-            onClick={null}
-            showSerial={true}
-            drawnNumbers={ballsDrawn.map(b => b.number)}
-            winningLines={cardWinningLines[winnerCards[0].cardId] || []}
-          />
-        </div>
-      )}
-    </div>
-    
-    {/* Confetti animado */}
-    <div className="confetti-container">
-      {Array.from({ length: 50 }).map((_, i) => (
-        <div 
-          key={i} 
-          className="confetti"
-          style={{
-            left: `${Math.random() * 100}%`,
-            animationDelay: `${Math.random() * 3}s`,
-            backgroundColor: getBallColor(Math.floor(Math.random() * 90) + 1)
-          }}
-        />
-      ))}
-    </div>
-  </div>
-)}
-
-      {/* LAYOUT REORGANIZADO */}
-      <div className="game-table">
-        {/* Cuadrícula Digital - IZQUIERDA COMPLETA - 3 FILAS */}
-        <div className="digital-grid-full">
-          <div className="grid-header">
-            <div className="grid-title">NÚMEROS CANTADOS</div>
-            <div className="grid-glow"></div>
-          </div>
-          
-          {/* FILA 1: 1-10, 11-20, 21-30 */}
-          <div className="grid-row">
-            {[0, 1, 2].map(columnIndex => {
-              const start = columnIndex * 10 + 1;
-              const end = (columnIndex + 1) * 10;
-              const columnLabel = `${start}-${end}`;
-              const columnCount = columnCounts[columnIndex] || 0;
-              
-              return (
-                <div key={columnIndex} className="grid-column">
-                  <div 
-                    className="column-letter" 
-                    style={{ 
-                      color: getBallColor(start),
-                      textShadow: `0 0 20px ${getBallColor(start)}`
+                {/* Cartón usando BingoCardPreview */}
+                <div className="celebration-card-display">
+                  <BingoCardPreview
+                    card={{
+                      card_serial: bingoWinnerCard.cardSerial,
+                      numbers: bingoWinnerCard.card.numbers
                     }}
-                  >
-                    {columnLabel}
-                    {columnCount > 0 && (
-                      <div className="column-counter">{columnCount}</div>
-                    )}
-                  </div>
-                  <div className="column-numbers">
-                    {Array.from({ length: 10 }, (_, i) => {
-                      const number = start + i;
-                      const isCalled = ballsDrawn.some(b => b.number === number);
-                      const isRecent = ballsDrawn.length > 0 && 
-                                       ballsDrawn[ballsDrawn.length - 1]?.number === number;
-                      
-                      return (
-                        <div 
-                          key={number} 
-                          className={`grid-number ${isCalled ? 'called' : ''} ${isRecent ? 'recent' : ''}`}
-                          data-range={isCalled ? getNumberRange(number) : ''}
-                          style={isCalled ? {
-                            boxShadow: `0 0 20px ${getBallColor(number)}`
-                          } : {}}
-                        >
-                          {number}
-                          {isCalled && (
-                            <div className="number-glow-ring" style={{ borderColor: getBallColor(number) }}></div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* FILA 2: 31-40, 41-50, 51-60 */}
-          <div className="grid-row">
-            {[3, 4, 5].map(columnIndex => {
-              const start = columnIndex * 10 + 1;
-              const end = (columnIndex + 1) * 10;
-              const columnLabel = `${start}-${end}`;
-              const columnCount = columnCounts[columnIndex] || 0;
-              
-              return (
-                <div key={columnIndex} className="grid-column">
-                  <div 
-                    className="column-letter" 
-                    style={{ 
-                      color: getBallColor(start),
-                      textShadow: `0 0 20px ${getBallColor(start)}`
-                    }}
-                  >
-                    {columnLabel}
-                    {columnCount > 0 && (
-                      <div className="column-counter">{columnCount}</div>
-                    )}
-                  </div>
-                  <div className="column-numbers">
-                    {Array.from({ length: 10 }, (_, i) => {
-                      const number = start + i;
-                      const isCalled = ballsDrawn.some(b => b.number === number);
-                      const isRecent = ballsDrawn.length > 0 && 
-                                       ballsDrawn[ballsDrawn.length - 1]?.number === number;
-                      
-                      return (
-                        <div 
-                          key={number} 
-                          className={`grid-number ${isCalled ? 'called' : ''} ${isRecent ? 'recent' : ''}`}
-                          data-range={isCalled ? getNumberRange(number) : ''}
-                          style={isCalled ? {
-                            boxShadow: `0 0 20px ${getBallColor(number)}`
-                          } : {}}
-                        >
-                          {number}
-                          {isCalled && (
-                            <div className="number-glow-ring" style={{ borderColor: getBallColor(number) }}></div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* FILA 3: 61-70, 71-80, 81-90 */}
-          <div className="grid-row">
-            {[6, 7, 8].map(columnIndex => {
-              const start = columnIndex * 10 + 1;
-              const end = columnIndex === 8 ? 90 : (columnIndex + 1) * 10;
-              const columnLabel = `${start}-${end}`;
-              const columnCount = columnCounts[columnIndex] || 0;
-              
-              return (
-                <div key={columnIndex} className="grid-column">
-                  <div 
-                    className="column-letter" 
-                    style={{ 
-                      color: getBallColor(start),
-                      textShadow: `0 0 20px ${getBallColor(start)}`
-                    }}
-                  >
-                    {columnLabel}
-                    {columnCount > 0 && (
-                      <div className="column-counter">{columnCount}</div>
-                    )}
-                  </div>
-                  <div className="column-numbers">
-                    {Array.from({ length: end - start + 1 }, (_, i) => {
-                      const number = start + i;
-                      const isCalled = ballsDrawn.some(b => b.number === number);
-                      const isRecent = ballsDrawn.length > 0 && 
-                                       ballsDrawn[ballsDrawn.length - 1]?.number === number;
-                      
-                      return (
-                        <div 
-                          key={number} 
-                          className={`grid-number ${isCalled ? 'called' : ''} ${isRecent ? 'recent' : ''}`}
-                          data-range={isCalled ? getNumberRange(number) : ''}
-                          style={isCalled ? {
-                            boxShadow: `0 0 20px ${getBallColor(number)}`
-                          } : {}}
-                        >
-                          {number}
-                          {isCalled && (
-                            <div className="number-glow-ring" style={{ borderColor: getBallColor(number) }}></div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Sección derecha: Título/Info arriba, Bolillero abajo */}
-        <div className="right-section">
-          {/* Info superior */}
-          <div className="side-info">
-            <div className="room-title">
-              <img src={GiftIcon} alt="Gift" className="title-icon" />
-              <span className="title-text" style={{ 
-                color: '#00d4ff',
-                textShadow: '0 0 20px rgba(0, 212, 255, 1), 0 0 40px rgba(0, 212, 255, 0.8)',
-                WebkitTextFillColor: '#00d4ff'
-              }}>SALA STARTER</span>
-              <span className="title-tag">GRATIS</span>
-              <button 
-                className="lobby-btn"
-                onClick={() => navigate('/')}
-                title="Volver al lobby"
-              >
-                LOBBY
-              </button>
-              <div className="ball-counter-display">
-                🎱 Bola {ballsDrawn.length} de 90
-              </div>
-              <div className={`status-badge ${gameStatus}`}>
-                {gameStatus === 'waiting' && '⏸️ ESPERA'}
-                {gameStatus === 'active' && '🔴 EN VIVO'}
-                {gameStatus === 'ended' && '✅ FINALIZADO'}
-              </div>
-            </div>
-          </div>
-
-          {/* Bolillero Moderno con Video */}
-          <div className="modern-bingo-machine">
-          <div className="machine-top-led"></div>
-          
-          <div className="acrylic-sphere">
-            {/* Video del bolillero girando - SOLO cuando hay sorteo activo */}
-            {gameStatus === 'active' && (
-              <video 
-                className="bolillero-video"
-                src={bolilleroVideo}
-                autoPlay
-                loop
-                muted
-                playsInline
-              />
-            )}
-
-            {/* Bola actual en sorteo - superpuesta sobre el video */}
-            {currentBall && (
-              <div className="current-ball-showcase">
-                <div 
-                  className="showcase-ball bingo-ball-style"
-                  style={{
-                    backgroundColor: getBallColor(currentBall.number),
-                    boxShadow: `0 4px 15px rgba(0,0,0,0.4)`
-                  }}
-                >
-                  <div className="ball-white-center">
-                    <span className="ball-number-large">{currentBall.number}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Estado de espera - Botón de Selección de Cartones */}
-            {gameStatus === 'waiting' && cardsRemaining > 0 && !salesClosed && (
-              <div className="card-selection-sphere">
-                <button 
-                  className="select-cards-sphere-btn"
-                  onClick={() => setShowCardSelection(true)}
-                  title={`Seleccionar cartones (${cardsRemaining} restantes)`}
-                >
-                  <img 
-                    src={selectCardsButton} 
-                    alt="Seleccionar Cartones" 
-                    className="sphere-btn-image"
+                    room="starter"
+                    selected={false}
+                    onClick={null}
+                    showSerial={true}
+                    drawnNumbers={ballsDrawn.map(b => b.number)}
+                    winningLines={[0, 1, 2]}
                   />
-                  <span className="available-badge">{cardsRemaining} Disponibles</span>
-                </button>
-              </div>
-            )}
-
-            {/* VENTAS CERRADAS - Mostrar mensaje T-5 */}
-            {gameStatus === 'waiting' && salesClosed && (
-              <div className="card-selection-sphere sales-closed">
-                <div className="sales-closed-message">
-                  <div className="sales-closed-icon">🔒</div>
-                  <div className="sales-closed-text">VENTAS CERRADAS</div>
-                  <div className="sales-closed-subtext">{salesMessage}</div>
-                  {nextSessionTime && (
-                    <div className="sales-closed-countdown">
-                      Sorteo: {new Date(nextSessionTime).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
-                    </div>
-                  )}
                 </div>
               </div>
-            )}
 
-            {/* Mensaje de espera cuando no hay cartones disponibles */}
-            {gameStatus === 'waiting' && cardsRemaining === 0 && !salesClosed && (
-              <div className="waiting-message">
-                <div className="waiting-icon">⏳</div>
-                <div className="waiting-text">Esperando inicio...</div>
-              </div>
-            )}
-          </div>
-
-          {/* Contador de Cartones eliminado - ahora está dentro del botón */}
-
-          <div className="machine-base">
-            <div className="base-panel"></div>
-            <div className="base-lights">
-              <div className="light-strip"></div>
-            </div>
-          </div>
-
-          {/* Últimas 5 bolas */}
-          {ballsDrawn.length > 0 && (
-            <div className="recent-balls-bar">
-              <span className="recent-label">ÚLTIMAS:</span>
-              <div className="recent-balls-list">
-                {ballsDrawn.slice(-5).reverse().map((ball, index) => (
-                  <div 
-                    key={`${ball.number}-${index}`}
-                    className="recent-ball-chip bingo-ball-mini"
+              {/* Confetti animado */}
+              <div className="confetti-container">
+                {Array.from({ length: 50 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="confetti"
                     style={{
-                      backgroundColor: getBallColor(ball.number),
-                      boxShadow: `0 2px 8px rgba(0,0,0,0.3)`
+                      left: `${Math.random() * 100}%`,
+                      animationDelay: `${Math.random() * 3}s`,
+                      backgroundColor: getBallColor(Math.floor(Math.random() * 90) + 1)
                     }}
-                  >
-                    <div className="ball-white-center-mini">
-                      <span className="ball-number">{ball.number}</span>
-                    </div>
-                  </div>
+                  />
                 ))}
               </div>
             </div>
           )}
-        </div>
-        </div>
-      </div>
 
-      {/* MITAD INFERIOR - LOS CARTONES */}
-      <div className="player-cards-section">
-        <div className="cards-header">
-          <div className="cards-title">
-            <span className="cards-icon">🎴</span>
-            <span>MIS CARTONES</span>
-          </div>
-          
-          {/* Modal de Alerta de Casi Línea - Al lado del título */}
-          {almostLineCards.length > 0 && ballsDrawn.length < 40 && (() => {
-            const minMissing = Math.min(...almostLineCards.map(card => card.minMissing));
-            return (
-              <div className="almost-line-modal">
-                <div className="almost-line-content">
-                  <span className="alert-icon-modal">⚡</span>
-                  <span className="alert-text-modal">
-                    ¡A {minMissing} NÚMERO{minMissing > 1 ? 'S' : ''} DE LÍNEA!
-                  </span>
-                </div>
-              </div>
-            );
-          })()}
-          
-          <div className="cards-count">{playerCards.length} cartones</div>
-        </div>
+          {/* CELEBRACIÓN DE LÍNEA GANADORA - Usa el cartón de la grilla con números marcados */}
+          {winnerCards.length > 0 && !bingoWinnerCard && (
+            <div className="winner-celebration-overlay">
+              <div className="celebration-content">
+                {/* Título pulsante */}
+                <h1 className="felicitaciones-pulse">¡Felicitaciones!</h1>
+                <div className="celebration-subtitle">Ganaste Línea con el cartón {winnerCards[0].cardSerial}</div>
 
-        <div className="cards-grid-container">
-          {/* Grid compacto 6x5 = 30 cartones */}
-          <div className="cards-compact-grid">
-            {playerCards.map((card, index) => {
-              const cardSerial = card.serial || generateCardSerial(index);
-              
-              // DEBUG: Log solo la primera vez o cuando cambia
-              if (index === 0 && card.serial) {
-                console.log(`🔍 RENDER - Cartón ${index}: serial=${card.serial}, usando=${cardSerial}`);
-              }
-              
-              const progress = getCardProgress(card);
-              const isExpanded = expandedCard === card.id;
-              const isAlmostLine = almostLineCards.some(c => c.cardId === card.id);
-              
-              return (
-                <div 
-                  key={card.id} 
-                  className={`compact-card ${isExpanded ? 'expanded' : ''} ${isAlmostLine ? 'almost-line' : ''}`}
-                  onClick={() => !isExpanded && expandCard(card.id)}
-                  style={{
-                    cursor: 'pointer',
-                    '--progress': Math.round((progress / 15) * 100)
-                  }}
-                >
-                  {!isExpanded && (
-                    <>
-                      <div className="compact-card-serial" style={{ fontSize: '1.5rem', letterSpacing: '-0.1px', fontWeight: 700 }}>{cardSerial}</div>
-                      <div className="compact-card-progress">
-                        {Array.from({ length: 15 }).map((_, i) => (
-                          <div 
-                            key={i} 
-                            className={`progress-segment ${i < progress ? 'filled' : ''}`}
-                            style={{
-                              color: i < progress ? getBallColor((i + 1) * 6) : 'rgba(255,0,255,0.3)'
-                            }}
-                          />
-                        ))}
-                      </div>
-                      <div className="compact-card-count">{progress}/15</div>
-                    </>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Cartón expandido en el centro */}
-          {expandedCard && (
-            <div className="expanded-card-overlay" onClick={() => canCloseExpandedCard && setExpandedCard(null)}>
-              <div className="expanded-card-container" onClick={(e) => e.stopPropagation()}>
-                {playerCards
-                  .filter(card => card.id === expandedCard)
-                  .map(card => (
+                {/* Cartón usando BingoCardPreview IGUAL que el expandido */}
+                {winnerCards[0] && (
+                  <div className="celebration-card-display">
                     <BingoCardPreview
-                      key={card.id}
                       card={{
-                        card_serial: card.serial || generateCardSerial(playerCards.indexOf(card)),
-                        numbers: card.numbers
+                        card_serial: winnerCards[0].cardSerial,
+                        numbers: winnerCards[0].card.numbers
                       }}
                       room="starter"
                       selected={false}
                       onClick={null}
                       showSerial={true}
                       drawnNumbers={ballsDrawn.map(b => b.number)}
-                      winningLines={cardWinningLines[card.id] || []}
+                      winningLines={cardWinningLines[winnerCards[0].cardId] || []}
                     />
+                  </div>
+                )}
+              </div>
+
+              {/* Confetti animado */}
+              <div className="confetti-container">
+                {Array.from({ length: 50 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="confetti"
+                    style={{
+                      left: `${Math.random() * 100}%`,
+                      animationDelay: `${Math.random() * 3}s`,
+                      backgroundColor: getBallColor(Math.floor(Math.random() * 90) + 1)
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* LAYOUT REORGANIZADO */}
+          <div className="game-table">
+            {/* Cuadrícula Digital - IZQUIERDA COMPLETA - 3 FILAS */}
+            <div className="digital-grid-full">
+              <div className="grid-header">
+                <div className="grid-title">NÚMEROS CANTADOS</div>
+                <div className="grid-glow"></div>
+              </div>
+
+              {/* FILA 1: 1-10, 11-20, 21-30 */}
+              <div className="grid-row">
+                {[0, 1, 2].map(columnIndex => {
+                  const start = columnIndex * 10 + 1;
+                  const end = (columnIndex + 1) * 10;
+                  const columnLabel = `${start}-${end}`;
+                  const columnCount = columnCounts[columnIndex] || 0;
+
+                  return (
+                    <div key={columnIndex} className="grid-column">
+                      <div
+                        className="column-letter"
+                        style={{
+                          color: getBallColor(start),
+                          textShadow: `0 0 20px ${getBallColor(start)}`
+                        }}
+                      >
+                        {columnLabel}
+                        {columnCount > 0 && (
+                          <div className="column-counter">{columnCount}</div>
+                        )}
+                      </div>
+                      <div className="column-numbers">
+                        {Array.from({ length: 10 }, (_, i) => {
+                          const number = start + i;
+                          const isCalled = ballsDrawn.some(b => b.number === number);
+                          const isRecent = ballsDrawn.length > 0 &&
+                            ballsDrawn[ballsDrawn.length - 1]?.number === number;
+
+                          return (
+                            <div
+                              key={number}
+                              className={`grid-number ${isCalled ? 'called' : ''} ${isRecent ? 'recent' : ''}`}
+                              data-range={isCalled ? getNumberRange(number) : ''}
+                              style={isCalled ? {
+                                boxShadow: `0 0 20px ${getBallColor(number)}`
+                              } : {}}
+                            >
+                              {number}
+                              {isCalled && (
+                                <div className="number-glow-ring" style={{ borderColor: getBallColor(number) }}></div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* FILA 2: 31-40, 41-50, 51-60 */}
+              <div className="grid-row">
+                {[3, 4, 5].map(columnIndex => {
+                  const start = columnIndex * 10 + 1;
+                  const end = (columnIndex + 1) * 10;
+                  const columnLabel = `${start}-${end}`;
+                  const columnCount = columnCounts[columnIndex] || 0;
+
+                  return (
+                    <div key={columnIndex} className="grid-column">
+                      <div
+                        className="column-letter"
+                        style={{
+                          color: getBallColor(start),
+                          textShadow: `0 0 20px ${getBallColor(start)}`
+                        }}
+                      >
+                        {columnLabel}
+                        {columnCount > 0 && (
+                          <div className="column-counter">{columnCount}</div>
+                        )}
+                      </div>
+                      <div className="column-numbers">
+                        {Array.from({ length: 10 }, (_, i) => {
+                          const number = start + i;
+                          const isCalled = ballsDrawn.some(b => b.number === number);
+                          const isRecent = ballsDrawn.length > 0 &&
+                            ballsDrawn[ballsDrawn.length - 1]?.number === number;
+
+                          return (
+                            <div
+                              key={number}
+                              className={`grid-number ${isCalled ? 'called' : ''} ${isRecent ? 'recent' : ''}`}
+                              data-range={isCalled ? getNumberRange(number) : ''}
+                              style={isCalled ? {
+                                boxShadow: `0 0 20px ${getBallColor(number)}`
+                              } : {}}
+                            >
+                              {number}
+                              {isCalled && (
+                                <div className="number-glow-ring" style={{ borderColor: getBallColor(number) }}></div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* FILA 3: 61-70, 71-80, 81-90 */}
+              <div className="grid-row">
+                {[6, 7, 8].map(columnIndex => {
+                  const start = columnIndex * 10 + 1;
+                  const end = columnIndex === 8 ? 90 : (columnIndex + 1) * 10;
+                  const columnLabel = `${start}-${end}`;
+                  const columnCount = columnCounts[columnIndex] || 0;
+
+                  return (
+                    <div key={columnIndex} className="grid-column">
+                      <div
+                        className="column-letter"
+                        style={{
+                          color: getBallColor(start),
+                          textShadow: `0 0 20px ${getBallColor(start)}`
+                        }}
+                      >
+                        {columnLabel}
+                        {columnCount > 0 && (
+                          <div className="column-counter">{columnCount}</div>
+                        )}
+                      </div>
+                      <div className="column-numbers">
+                        {Array.from({ length: end - start + 1 }, (_, i) => {
+                          const number = start + i;
+                          const isCalled = ballsDrawn.some(b => b.number === number);
+                          const isRecent = ballsDrawn.length > 0 &&
+                            ballsDrawn[ballsDrawn.length - 1]?.number === number;
+
+                          return (
+                            <div
+                              key={number}
+                              className={`grid-number ${isCalled ? 'called' : ''} ${isRecent ? 'recent' : ''}`}
+                              data-range={isCalled ? getNumberRange(number) : ''}
+                              style={isCalled ? {
+                                boxShadow: `0 0 20px ${getBallColor(number)}`
+                              } : {}}
+                            >
+                              {number}
+                              {isCalled && (
+                                <div className="number-glow-ring" style={{ borderColor: getBallColor(number) }}></div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Sección derecha: Título/Info arriba, Bolillero abajo */}
+            <div className="right-section">
+              {/* Info superior */}
+              <div className="side-info">
+                <div className="room-title">
+                  <img src={GiftIcon} alt="Gift" className="title-icon" />
+                  <span className="title-text" style={{
+                    color: '#00d4ff',
+                    textShadow: '0 0 20px rgba(0, 212, 255, 1), 0 0 40px rgba(0, 212, 255, 0.8)',
+                    WebkitTextFillColor: '#00d4ff'
+                  }}>SALA STARTER</span>
+                  <span className="title-tag">GRATIS</span>
+                  <button
+                    className="lobby-btn"
+                    onClick={() => navigate('/')}
+                    title="Volver al lobby"
+                  >
+                    LOBBY
+                  </button>
+                  <div className="ball-counter-display">
+                    🎱 Bola {ballsDrawn.length} de 90
+                  </div>
+                  <div className={`status-badge ${gameStatus}`}>
+                    {gameStatus === 'waiting' && '⏸️ ESPERA'}
+                    {gameStatus === 'active' && '🔴 EN VIVO'}
+                    {gameStatus === 'ended' && '✅ FINALIZADO'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Bolillero Moderno con Video */}
+              <div className="modern-bingo-machine">
+                <div className="machine-top-led"></div>
+
+                <div className="acrylic-sphere">
+                  {/* Video del bolillero girando - SOLO cuando hay sorteo activo */}
+                  {gameStatus === 'active' && (
+                    <video
+                      className="bolillero-video"
+                      src={bolilleroVideo}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                    />
+                  )}
+
+                  {/* Bola actual en sorteo - superpuesta sobre el video */}
+                  {currentBall && (
+                    <div className="current-ball-showcase">
+                      <div
+                        className="showcase-ball bingo-ball-style"
+                        style={{
+                          backgroundColor: getBallColor(currentBall.number),
+                          boxShadow: `0 4px 15px rgba(0,0,0,0.4)`
+                        }}
+                      >
+                        <div className="ball-white-center">
+                          <span className="ball-number-large">{currentBall.number}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Estado de espera - Botón de Selección de Cartones */}
+                  {gameStatus === 'waiting' && cardsRemaining > 0 && !salesClosed && (
+                    <div className="card-selection-sphere">
+                      <button
+                        className="select-cards-sphere-btn"
+                        onClick={() => setShowCardSelection(true)}
+                        title={`Seleccionar cartones (${cardsRemaining} restantes)`}
+                      >
+                        <img
+                          src={selectCardsButton}
+                          alt="Seleccionar Cartones"
+                          className="sphere-btn-image"
+                        />
+                        <span className="available-badge">{cardsRemaining} Disponibles</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* VENTAS CERRADAS - Mostrar mensaje T-5 */}
+                  {gameStatus === 'waiting' && salesClosed && (
+                    <div className="card-selection-sphere sales-closed">
+                      <div className="sales-closed-message">
+                        <div className="sales-closed-icon">🔒</div>
+                        <div className="sales-closed-text">VENTAS CERRADAS</div>
+                        <div className="sales-closed-subtext">{salesMessage}</div>
+                        {nextSessionTime && (
+                          <div className="sales-closed-countdown">
+                            Sorteo: {new Date(nextSessionTime).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Mensaje de espera cuando no hay cartones disponibles */}
+                  {gameStatus === 'waiting' && cardsRemaining === 0 && !salesClosed && (
+                    <div className="waiting-message">
+                      <div className="waiting-icon">⏳</div>
+                      <div className="waiting-text">Esperando inicio...</div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Contador de Cartones eliminado - ahora está dentro del botón */}
+
+                <div className="machine-base">
+                  <div className="base-panel"></div>
+                  <div className="base-lights">
+                    <div className="light-strip"></div>
+                  </div>
+                </div>
+
+                {/* Últimas 5 bolas */}
+                {ballsDrawn.length > 0 && (
+                  <div className="recent-balls-bar">
+                    <span className="recent-label">ÚLTIMAS:</span>
+                    <div className="recent-balls-list">
+                      {ballsDrawn.slice(-5).reverse().map((ball, index) => (
+                        <div
+                          key={`${ball.number}-${index}`}
+                          className="recent-ball-chip bingo-ball-mini"
+                          style={{
+                            backgroundColor: getBallColor(ball.number),
+                            boxShadow: `0 2px 8px rgba(0,0,0,0.3)`
+                          }}
+                        >
+                          <div className="ball-white-center-mini">
+                            <span className="ball-number">{ball.number}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* MITAD INFERIOR - LOS CARTONES */}
+          <div className="player-cards-section">
+            <div className="cards-header">
+              <div className="cards-title">
+                <span className="cards-icon">🎴</span>
+                <span>MIS CARTONES</span>
+              </div>
+
+              {/* Modal de Alerta de Casi Línea - Al lado del título */}
+              {almostLineCards.length > 0 && ballsDrawn.length < 40 && (() => {
+                const minMissing = Math.min(...almostLineCards.map(card => card.minMissing));
+                return (
+                  <div className="almost-line-modal">
+                    <div className="almost-line-content">
+                      <span className="alert-icon-modal">⚡</span>
+                      <span className="alert-text-modal">
+                        ¡A {minMissing} NÚMERO{minMissing > 1 ? 'S' : ''} DE LÍNEA!
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div className="cards-count">{playerCards.length} cartones</div>
+            </div>
+
+            <div className="cards-grid-container">
+              {/* Grid compacto 6x5 = 30 cartones */}
+              <div className="cards-compact-grid">
+                {playerCards.map((card, index) => {
+                  const cardSerial = card.serial || generateCardSerial(index);
+
+                  // DEBUG: Log solo la primera vez o cuando cambia
+                  if (index === 0 && card.serial) {
+                    console.log(`🔍 RENDER - Cartón ${index}: serial=${card.serial}, usando=${cardSerial}`);
+                  }
+
+                  const progress = getCardProgress(card);
+                  const isExpanded = expandedCard === card.id;
+                  const isAlmostLine = almostLineCards.some(c => c.cardId === card.id);
+
+                  return (
+                    <div
+                      key={card.id}
+                      className={`compact-card ${isExpanded ? 'expanded' : ''} ${isAlmostLine ? 'almost-line' : ''}`}
+                      onClick={() => !isExpanded && expandCard(card.id)}
+                      style={{
+                        cursor: 'pointer',
+                        '--progress': Math.round((progress / 15) * 100)
+                      }}
+                    >
+                      {!isExpanded && (
+                        <>
+                          <div className="compact-card-serial" style={{ fontSize: '1.5rem', letterSpacing: '-0.1px', fontWeight: 700 }}>{cardSerial}</div>
+                          <div className="compact-card-progress">
+                            {Array.from({ length: 15 }).map((_, i) => (
+                              <div
+                                key={i}
+                                className={`progress-segment ${i < progress ? 'filled' : ''}`}
+                                style={{
+                                  color: i < progress ? getBallColor((i + 1) * 6) : 'rgba(255,0,255,0.3)'
+                                }}
+                              />
+                            ))}
+                          </div>
+                          <div className="compact-card-count">{progress}/15</div>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Cartón expandido en el centro */}
+              {expandedCard && (
+                <div className="expanded-card-overlay" onClick={() => canCloseExpandedCard && setExpandedCard(null)}>
+                  <div className="expanded-card-container" onClick={(e) => e.stopPropagation()}>
+                    {playerCards
+                      .filter(card => card.id === expandedCard)
+                      .map(card => (
+                        <BingoCardPreview
+                          key={card.id}
+                          card={{
+                            card_serial: card.serial || generateCardSerial(playerCards.indexOf(card)),
+                            numbers: card.numbers
+                          }}
+                          room="starter"
+                          selected={false}
+                          onClick={null}
+                          showSerial={true}
+                          drawnNumbers={ballsDrawn.map(b => b.number)}
+                          winningLines={cardWinningLines[card.id] || []}
+                        />
+                      ))}
+                    <button
+                      className="close-expanded-btn"
+                      onClick={() => canCloseExpandedCard && setExpandedCard(null)}
+                      style={{ opacity: canCloseExpandedCard ? 1 : 0.3, cursor: canCloseExpandedCard ? 'pointer' : 'not-allowed' }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Selector de Voz */}
+          {showVoiceSelector && (
+            <div className="voice-selector-overlay" onClick={() => setShowVoiceSelector(false)}>
+              <div className="voice-selector-modal" onClick={(e) => e.stopPropagation()}>
+                <h3>🎤 Seleccionar Voz</h3>
+                <div className="voice-list">
+                  {availableVoices.map((voice, index) => (
+                    <button
+                      key={index}
+                      className={`voice-option ${currentVoice?.name === voice.name ? 'active' : ''}`}
+                      onClick={() => {
+                        voiceService.setVoice(voice);
+                        setCurrentVoice(voice);
+                        voiceService.speak('Hola, esta es mi voz');
+                      }}
+                    >
+                      <span className="voice-name">{voice.name}</span>
+                      <span className="voice-lang">{voice.lang}</span>
+                    </button>
                   ))}
-                <button 
-                  className="close-expanded-btn"
-                  onClick={() => canCloseExpandedCard && setExpandedCard(null)}
-                  style={{ opacity: canCloseExpandedCard ? 1 : 0.3, cursor: canCloseExpandedCard ? 'pointer' : 'not-allowed' }}
-                >
-                  ✕
+                </div>
+                <button className="close-voice-selector" onClick={() => setShowVoiceSelector(false)}>
+                  Cerrar
                 </button>
               </div>
             </div>
           )}
-        </div>
-      </div>
 
-      {/* Selector de Voz */}
-      {showVoiceSelector && (
-        <div className="voice-selector-overlay" onClick={() => setShowVoiceSelector(false)}>
-          <div className="voice-selector-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>🎤 Seleccionar Voz</h3>
-            <div className="voice-list">
-              {availableVoices.map((voice, index) => (
-                <button
-                  key={index}
-                  className={`voice-option ${currentVoice?.name === voice.name ? 'active' : ''}`}
-                  onClick={() => {
-                    voiceService.setVoice(voice);
-                    setCurrentVoice(voice);
-                    voiceService.speak('Hola, esta es mi voz');
-                  }}
-                >
-                  <span className="voice-name">{voice.name}</span>
-                  <span className="voice-lang">{voice.lang}</span>
-                </button>
-              ))}
-            </div>
-            <button className="close-voice-selector" onClick={() => setShowVoiceSelector(false)}>
-              Cerrar
+          {/* Controles de audio e historial */}
+          <div className="test-controls">
+            <button
+              className="control-btn voice-btn"
+              onClick={() => setShowVoiceSelector(true)}
+              title="Cambiar voz del anunciador"
+            >
+              🎤 Voz
+            </button>
+            <button
+              className="control-btn"
+              onClick={() => setShowHistoryModal(true)}
+              title="Ver historial de sorteos"
+              style={{ background: 'linear-gradient(135deg, #22c55e, #16a34a)' }}
+            >
+              📜 Historial
             </button>
           </div>
-        </div>
-      )}
 
-      {/* Controles de audio e historial */}
-      <div className="test-controls">
-        <button 
-          className="control-btn voice-btn"
-          onClick={() => setShowVoiceSelector(true)}
-          title="Cambiar voz del anunciador"
-        >
-          🎤 Voz
-        </button>
-        <button 
-          className="control-btn"
-          onClick={() => setShowHistoryModal(true)}
-          title="Ver historial de sorteos"
-          style={{ background: 'linear-gradient(135deg, #22c55e, #16a34a)' }}
-        >
-          📜 Historial
-        </button>
-      </div>
-      
-      {/* Sistema de Reacciones */}
-      <div className="reactions-panel">
-        <div className="reactions-title">Reacciones</div>
-        <div className="reactions-buttons">
-          <button className="reaction-btn" onClick={() => addFloatingEmoji('👍')} title="Me gusta">👍</button>
-          <button className="reaction-btn" onClick={() => addFloatingEmoji('😮')} title="Sorprendido">😮</button>
-          <button className="reaction-btn" onClick={() => addFloatingEmoji('🎉')} title="Celebrar">🎉</button>
-          <button className="reaction-btn" onClick={() => addFloatingEmoji('😢')} title="Triste">😢</button>
-          <button className="reaction-btn" onClick={() => addFloatingEmoji('🔥')} title="Fuego">🔥</button>
-          <button className="reaction-btn" onClick={() => addFloatingEmoji('💎')} title="Diamante">💎</button>
-        </div>
-      </div>
-      
-      {/* Emojis Flotantes */}
-      {floatingEmojis.map(emoji => (
-        <div 
-          key={emoji.id} 
-          className="floating-emoji"
-          style={{ left: `${emoji.x}px` }}
-        >
-          {emoji.emoji}
-        </div>
-      ))}
-      
-      {/* Modo Celebración Full Screen */}
-      {celebrationMode && (
-        <div className="celebration-overlay">
-          <div className="celebration-content">
-            <div className="celebration-trophy">🏆</div>
-            <div className="celebration-text">¡FELICITACIONES!</div>
-            <div className="celebration-subtitle">Has ganado</div>
-            <div className="celebration-amount">${winAmount.toLocaleString()}</div>
-            <div className="celebration-stars">
-              {'⭐'.repeat(5)}
+          {/* Sistema de Reacciones */}
+          <div className="reactions-panel">
+            <div className="reactions-title">Reacciones</div>
+            <div className="reactions-buttons">
+              <button className="reaction-btn" onClick={() => addFloatingEmoji('👍')} title="Me gusta">👍</button>
+              <button className="reaction-btn" onClick={() => addFloatingEmoji('😮')} title="Sorprendido">😮</button>
+              <button className="reaction-btn" onClick={() => addFloatingEmoji('🎉')} title="Celebrar">🎉</button>
+              <button className="reaction-btn" onClick={() => addFloatingEmoji('😢')} title="Triste">😢</button>
+              <button className="reaction-btn" onClick={() => addFloatingEmoji('🔥')} title="Fuego">🔥</button>
+              <button className="reaction-btn" onClick={() => addFloatingEmoji('💎')} title="Diamante">💎</button>
             </div>
           </div>
-          <div className="celebration-confetti">
-            {Array.from({ length: 100 }).map((_, i) => (
-              <div 
-                key={i} 
-                className="celebration-confetti-piece"
-                style={{
-                  left: `${Math.random() * 100}%`,
-                  animationDelay: `${Math.random() * 3}s`,
-                  backgroundColor: getBallColor(Math.floor(Math.random() * 90) + 1)
-                }}
-              />
-            ))}
-          </div>
-        </div>
-      )}
 
-      {/* Modal "¡¡Todo Listo!!" cuando se completan 20 cartones */}
-      {showReadyModal && (
-        <div className={`ready-modal-overlay ${isModalClosing ? 'fade-out' : ''}`}>
-          <div className={`ready-modal-content starter-modal ${isModalClosing ? 'fade-out' : ''}`}>
-            <div className="ready-modal-icon">🎉</div>
-            <h2 className="ready-modal-title">¡¡Todo Listo!!</h2>
-            <p className="ready-modal-subtitle">Tienes {selectedPlayerCards.length} cartones listos para jugar</p>
-            <div className="ready-modal-countdown">
-              <p className="ready-modal-countdown-label">Próximo Sorteo en:</p>
-              <Countdown targetDate={(() => {
-                const today = new Date();
-                const drawTime = new Date(today);
-                drawTime.setHours(19, 0, 0, 0);
-                
-                // Si ya pasó las 19:00 hoy, programar para mañana
-                if (today > drawTime) {
-                  drawTime.setDate(drawTime.getDate() + 1);
-                }
-                
-                return drawTime;
-              })()} />
+          {/* Emojis Flotantes */}
+          {floatingEmojis.map(emoji => (
+            <div
+              key={emoji.id}
+              className="floating-emoji"
+              style={{ left: `${emoji.x}px` }}
+            >
+              {emoji.emoji}
             </div>
-          </div>
-        </div>
-      )}
-      
-      {/* Números Marcados con Efecto */}
-      {markedNumbers.map(mark => (
-        <div 
-          key={`mark-${mark.number}-${mark.timestamp}`} 
-          className="marked-number-effect"
-        >
-          <div className="marked-stamp">✓</div>
-          <div className="marked-number">{mark.number}</div>
-          <div className="marked-particles">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="marked-particle" />
-            ))}
-          </div>
-        </div>
-      ))}
+          ))}
 
-      {/* Modal de Historial de Sesiones */}
-      <SessionHistory
-        room="starter"
-        isOpen={showHistoryModal}
-        onClose={() => setShowHistoryModal(false)}
-      />
+          {/* Modo Celebración Full Screen */}
+          {celebrationMode && (
+            <div className="celebration-overlay">
+              <div className="celebration-content">
+                <div className="celebration-trophy">🏆</div>
+                <div className="celebration-text">¡FELICITACIONES!</div>
+                <div className="celebration-subtitle">Has ganado</div>
+                <div className="celebration-amount">${winAmount.toLocaleString()}</div>
+                <div className="celebration-stars">
+                  {'⭐'.repeat(5)}
+                </div>
+              </div>
+              <div className="celebration-confetti">
+                {Array.from({ length: 100 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="celebration-confetti-piece"
+                    style={{
+                      left: `${Math.random() * 100}%`,
+                      animationDelay: `${Math.random() * 3}s`,
+                      backgroundColor: getBallColor(Math.floor(Math.random() * 90) + 1)
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Modal "¡¡Todo Listo!!" cuando se completan 20 cartones */}
+          {showReadyModal && (
+            <div className={`ready-modal-overlay ${isModalClosing ? 'fade-out' : ''}`}>
+              <div className={`ready-modal-content starter-modal ${isModalClosing ? 'fade-out' : ''}`}>
+                <div className="ready-modal-icon">🎉</div>
+                <h2 className="ready-modal-title">¡¡Todo Listo!!</h2>
+                <p className="ready-modal-subtitle">Tienes {selectedPlayerCards.length} cartones listos para jugar</p>
+                <div className="ready-modal-countdown">
+                  <p className="ready-modal-countdown-label">Próximo Sorteo en:</p>
+                  <Countdown targetDate={(() => {
+                    const today = new Date();
+                    const drawTime = new Date(today);
+                    drawTime.setHours(19, 0, 0, 0);
+
+                    // Si ya pasó las 19:00 hoy, programar para mañana
+                    if (today > drawTime) {
+                      drawTime.setDate(drawTime.getDate() + 1);
+                    }
+
+                    return drawTime;
+                  })()} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Números Marcados con Efecto */}
+          {markedNumbers.map(mark => (
+            <div
+              key={`mark-${mark.number}-${mark.timestamp}`}
+              className="marked-number-effect"
+            >
+              <div className="marked-stamp">✓</div>
+              <div className="marked-number">{mark.number}</div>
+              <div className="marked-particles">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="marked-particle" />
+                ))}
+              </div>
+            </div>
+          ))}
+
+          {/* Modal de Historial de Sesiones */}
+          <SessionHistory
+            room="starter"
+            isOpen={showHistoryModal}
+            onClose={() => setShowHistoryModal(false)}
+          />
         </>
       )}
     </div>

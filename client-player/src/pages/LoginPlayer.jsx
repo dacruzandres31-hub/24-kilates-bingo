@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import '../styles/LoginPlayer.css';
 import BlockedUserModal from '../components/BlockedUserModal';
+import { useAuth } from '../context/AuthContext';
 
-export default function LoginPlayer({ onLogin }) {
+export default function LoginPlayer() {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -40,11 +42,9 @@ export default function LoginPlayer({ onLogin }) {
         return;
       }
 
-      // Guardar información del usuario
-      localStorage.setItem('playerToken', token);
-      localStorage.setItem('playerUser', JSON.stringify(user));
+      // Login using context
+      login(token, user, gamification);
 
-      onLogin(token, user, gamification);
     } catch (err) {
       console.log('🚫 Error en login:', err.response?.status, err.response?.data);
       // Verificar si el usuario está bloqueado

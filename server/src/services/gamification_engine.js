@@ -458,6 +458,82 @@ async function checkDailyStreak(userId) {
   }
 }
 
+// Manejar Racha de Login
+async function handleLoginStreak(userId) {
+  try {
+    const connection = await pool.getConnection();
+    try {
+      let streakData = null;
+
+      const [streakResult] = await connection.query(
+        `SELECT us.current_streak, us.highest_streak as longest_streak, us.last_login_date, 
+                DATEDIFF(CURRENT_DATE, us.last_login_date) as days_since_login
+         FROM user_streaks us WHERE us.user_id = ?`,
+        [userId]
+      );
+
+      if (streakResult.length > 0) {
+        streakData = streakResult[0];
+      }
+
+      // Actualizar o crear registro de streak
+      // Nota: La lógica compleja de incrementar racha vs resetear debería estar aquí si quisiéramos ser estrictos,
+      // pero por ahora mantenemos el comportamiento simple de "tocar base" del authController
+      // que solo actualiza la fecha. La lógica de incremento real suele estar en un cron o al reclamar.
+      // Sin embargo, para consistencia con el authController original:
+      await connection.query(
+        `INSERT INTO user_streaks (user_id, last_login_date) VALUES (?, CURRENT_DATE)
+         ON DUPLICATE KEY UPDATE last_login_date = CURRENT_DATE`,
+        [userId]
+      );
+
+      return streakData;
+    } finally {
+      connection.release();
+    }
+  } catch (error) {
+    console.error('Handle Login Streak Error:', error);
+    return null;
+  }
+}
+
+// Inicializar progreso de nuevo jugador
+async function initializePlayerProgress(userId) {
+  try {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // Crear progreso
+      await connection.query(`
+        INSERT INTO gamification_progress (user_id, current_level, xp_current, xp_lifetime)
+        VALUES (?, 1, 0, 0)
+      `, [userId]);
+
+      // Crear quests iniciales
+      await connection.query(`
+        INSERT INTO daily_quests (user_id, quest_name, quest_type, target_value, xp_reward)
+        VALUES 
+          (?, 'Primera victoria', 'WIN', 1, 100),
+          (?, 'Jugar 3 partidas', 'PLAY', 3, 50),
+          (?, 'Completar un cartón', 'COMPLETE_CARD', 1, 75)
+      `, [userId, userId, userId]);
+
+      await connection.commit();
+      console.log(`✓ Gamificación inicializada para User ${userId}`);
+      return true;
+    } catch (err) {
+      await connection.rollback();
+      throw err;
+    } finally {
+      connection.release();
+    }
+  } catch (error) {
+    console.error('Initialize Player Progress Error:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   addXPToPlayer,
   checkDailyStreak,
@@ -466,5 +542,7 @@ module.exports = {
   getTopPlayers,
   getAllLevels: () => ACCOUNT_LEVEL_CONFIG,
   spinDailyWheel, // Racha 7 dias
-  spinFortuneWheel // Rueda cada 4 horas
+  spinFortuneWheel, // Rueda cada 4 horas
+  handleLoginStreak,
+  initializePlayerProgress
 };
