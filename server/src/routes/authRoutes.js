@@ -20,11 +20,7 @@ router.post('/register', authLimiter, validate(registerSchema), authController.r
  * GET    /auth/verify    - Verificar validez del token
  */
 
-// Registro (sin autenticación)
-router.post('/register', authController.register);
 
-// Login (sin autenticación)
-router.post('/login', authController.login);
 
 // Refresh token (con autenticación)
 router.post('/refresh', authMiddleware.authenticateToken, authController.refreshToken);

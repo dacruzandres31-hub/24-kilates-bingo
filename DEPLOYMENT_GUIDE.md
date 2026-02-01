@@ -8,13 +8,15 @@ Este documento describe cómo desplegar Bingo 24 Kilates en cualquier proveedor 
 
 ## 📋 Pre-requisitos
 
-### En tu máquina local:
+### En tu máquina local
+
 - Node.js 18+
 - npm o yarn
 - Git
 - Docker (opcional, para testing local)
 
-### En Digital Ocean:
+### En Digital Ocean
+
 - Droplet Ubuntu 22.04 LTS
 - Mínimo: 4 vCPUs, 8GB RAM, 160GB SSD
 - Dominio configurado apuntando al droplet
@@ -23,7 +25,7 @@ Este documento describe cómo desplegar Bingo 24 Kilates en cualquier proveedor 
 
 ## 🏗️ Arquitectura
 
-```
+```plaintext
 Internet
     ↓
 Nginx (Reverse Proxy + SSL)
@@ -42,12 +44,14 @@ Nginx (Reverse Proxy + SSL)
 ## 📦 Archivos de Configuración
 
 ### 1. PM2 Ecosystem (`server/ecosystem.config.js`)
+
 - Cluster mode (usa todos los CPUs)
 - Auto-restart en crash
 - Límite de memoria: 1GB
 - Logs en `server/logs/`
 
 ### 2. Nginx (`nginx.conf`)
+
 - SSL/TLS con Let's Encrypt
 - HTTP/2 enabled
 - Gzip compression
@@ -56,6 +60,7 @@ Nginx (Reverse Proxy + SSL)
 - Service Worker sin cache
 
 ### 3. Docker Compose (`docker-compose.prod.yml`)
+
 - Nginx
 - Backend (Node.js + PM2)
 - MySQL 8.0
@@ -63,6 +68,7 @@ Nginx (Reverse Proxy + SSL)
 - Certbot (SSL auto-renewal)
 
 ### 4. Dockerfile (`server/Dockerfile.prod`)
+
 - Node 18 Alpine (imagen ligera)
 - PM2 runtime
 - Health checks
@@ -131,6 +137,7 @@ sudo certbot renew --dry-run
 ## 📊 Monitoreo
 
 ### Ver logs en tiempo real
+
 ```bash
 # Todos los servicios
 docker-compose -f docker-compose.prod.yml logs -f
@@ -143,6 +150,7 @@ docker exec bingo24k-backend-prod pm2 logs
 ```
 
 ### Estado de servicios
+
 ```bash
 # Docker
 docker-compose -f docker-compose.prod.yml ps
@@ -155,6 +163,7 @@ sudo systemctl status nginx
 ```
 
 ### Métricas PM2 Plus (Opcional)
+
 ```bash
 # Conectar a PM2 Plus para monitoring avanzado
 docker exec bingo24k-backend-prod pm2 link <secret> <public>
@@ -165,12 +174,14 @@ docker exec bingo24k-backend-prod pm2 link <secret> <public>
 ## 🔧 Optimizaciones Aplicadas
 
 ### PWA
+
 - ✅ Service Worker con caching agresivo
 - ✅ Manifest configurado
 - ✅ Iconos 192x192 y 512x512
 - ✅ Offline-first para assets estáticos
 
 ### Build
+
 - ✅ Code splitting por vendor y componentes
 - ✅ Terser minification (drop console.log)
 - ✅ CSS code splitting
@@ -178,6 +189,7 @@ docker exec bingo24k-backend-prod pm2 link <secret> <public>
 - ✅ Chunk naming optimizado
 
 ### Backend
+
 - ✅ PM2 cluster mode (multi-core)
 - ✅ Redis adapter para Socket.IO
 - ✅ Connection pooling MySQL (20 conexiones)
@@ -185,6 +197,7 @@ docker exec bingo24k-backend-prod pm2 link <secret> <public>
 - ✅ Health checks
 
 ### Nginx
+
 - ✅ Gzip compression
 - ✅ HTTP/2
 - ✅ Static file caching (1 año)
@@ -195,7 +208,8 @@ docker exec bingo24k-backend-prod pm2 link <secret> <public>
 
 ## 📈 Escalabilidad
 
-### Para 500-5000 usuarios:
+### Para 500-5000 usuarios
+
 ```yaml
 # Configuración actual (docker-compose.prod.yml)
 - 1x Nginx
@@ -204,7 +218,8 @@ docker exec bingo24k-backend-prod pm2 link <secret> <public>
 - 1x Redis
 ```
 
-### Para 5000+ usuarios:
+### Para 5000+ usuarios
+
 1. **Load Balancer**: Digital Ocean Load Balancer
 2. **App Servers**: 2-4 droplets con backend
 3. **Database**: Managed MySQL (Digital Ocean)
@@ -216,6 +231,7 @@ docker exec bingo24k-backend-prod pm2 link <secret> <public>
 ## 🐛 Troubleshooting
 
 ### Backend no inicia
+
 ```bash
 # Ver logs
 docker logs bingo24k-backend-prod
@@ -228,6 +244,7 @@ docker-compose -f docker-compose.prod.yml restart backend
 ```
 
 ### MySQL connection error
+
 ```bash
 # Verificar que MySQL esté corriendo
 docker-compose -f docker-compose.prod.yml ps mysql
@@ -237,6 +254,7 @@ docker exec bingo24k-mysql-prod mysql -u root -p -e "SHOW DATABASES;"
 ```
 
 ### WebSocket no conecta
+
 ```bash
 # Verificar Nginx config
 sudo nginx -t
@@ -269,6 +287,7 @@ docker-compose -f docker-compose.prod.yml up -d --build
 ## 💰 Costos Estimados (Digital Ocean)
 
 ### Setup Recomendado (~$150/mes)
+
 - Load Balancer: $12/mes
 - 2x App Servers (4GB): $48/mes
 - Database (8GB): $48/mes
@@ -277,6 +296,7 @@ docker-compose -f docker-compose.prod.yml up -d --build
 - CDN: $10-20/mes
 
 ### Alta Escala (~$300-500/mes)
+
 - Load Balancer: $12/mes
 - 4x App Servers: $96/mes
 - Managed Database (16GB): $120/mes
@@ -289,6 +309,7 @@ docker-compose -f docker-compose.prod.yml up -d --build
 ## 📞 Soporte
 
 Para problemas de deployment:
+
 1. Revisar logs: `docker-compose logs -f`
 2. Verificar health checks
 3. Consultar documentación de Digital Ocean
